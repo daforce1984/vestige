@@ -1,5 +1,7 @@
 # VESTIGE
 
+▶ **바로 보기: https://daforce1984.github.io/vestige/** (Chrome 등 WebGPU 지원 브라우저, 소리 켜기)
+
 HTML5와 **raw WebGPU**로 만든 실시간 SF 단편 영화입니다(약 6분 32초, 24 fps). 게임 엔진이나 3D 프레임워크 없이
 WGSL 셰이더와 자바스크립트만으로 렌더러, 연출, 사운드 믹싱을 브라우저에서 실시간으로 돌립니다.
 

@@ -146,6 +146,9 @@ def main():
         s.call('Page.reload', ignoreCache=True)
         time.sleep(float(sys.argv[2]) if len(sys.argv) > 2 else 3)
         print('reloaded')
+    elif cmd == 'front':
+        s.call('Page.bringToFront')
+        print('front')
     elif cmd == 'eval':
         r = s.call('Runtime.evaluate', expression=sys.argv[2], awaitPromise=True, returnByValue=True)
         print(json.dumps(r.get('result', {}).get('value', r), ensure_ascii=False, indent=1))
