@@ -1,9 +1,10 @@
-"""Generate the film's music cues with the MiniMax Music 3 ComfyUI workflow (audio_minimax_music_3.json).
-usage: comfy_music.py [cue_id ...]   env COMFY=http://192.168.0.148:8188 SEED=..."""
+"""Generate the film's music cues with a MiniMax Music 3 ComfyUI workflow (API-format JSON exported from ComfyUI;
+not included in the repository).
+usage: comfy_music.py [cue_id ...]   env COMFY=http://192.168.0.148:8188 WORKFLOW=path/to/workflow.json SEED=..."""
 import json, os, sys, time, random, urllib.request, urllib.parse
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE = os.environ.get('COMFY', 'http://192.168.0.148:8188')
-WF = json.load(open(os.path.join(ROOT, 'audio_minimax_music_3.json')))
+WF = json.load(open(os.environ.get('WORKFLOW', os.path.join(ROOT, 'audio_minimax_music_3.json'))))
 CUES = json.load(open(os.path.join(ROOT, 'assets', 'music', 'cues.json')))
 want = set(sys.argv[1:])
 
