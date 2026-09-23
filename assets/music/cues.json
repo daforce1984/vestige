@@ -1,0 +1,55 @@
+[
+ {
+  "id": "A_promise",
+  "t": 0,
+  "end": 63.0,
+  "dur": 80,
+  "fadeIn": 0.5,
+  "caption": "Instrumental only, no vocals, no singing, no lyrics. Epic cinematic film score in the style of Hans Zimmer's Dune and Interstellar: huge orchestra, deep brass, low wordless choir textures, sub-bass, vast reverb. Opening of a science-fiction epic: a fleet arriving at its long-lost homeworld. 60 BPM, D minor to D major. Starts almost silent with a low drone and distant horn calls, then slow enormous brass swells like colossal ships appearing, a solemn noble theme on low strings and horns, rising to a majestic awe-struck climax, then settling into a warm hopeful hush. No drums or only distant timpani. A slow, continuous piece of at least 70 seconds.",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Build]\n[Instrumental]\n\n[Climax]\n[Instrumental]\n\n[Outro]\n[Instrumental]"
+ },
+ {
+  "id": "B_dread",
+  "t": 63.04,
+  "dur": 64,
+  "fadeOut": 1.5,
+  "caption": "Instrumental only, no vocals, no singing, no lyrics. Epic cinematic film score in the style of Hans Zimmer's Dune and Interstellar: huge orchestra, deep brass, low wordless choir textures, sub-bass, vast reverb. A trap is sprung in space. 90 BPM, C minor. Starts abruptly with a violent low brass stab and alarm-like strings, then ominous pulsing low strings, massive distant war drums, dissonant brass clusters and huge braams like a colossal warship emerging from darkness, relentless crescendo into a gigantic final hit.",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Build]\n[Instrumental]\n\n[Climax]\n[Instrumental]\n\n[Outro]\n[Instrumental]"
+ },
+ {
+  "id": "C_battle",
+  "t": 120.0,
+  "dur": 100,
+  "fadeIn": 0.05,
+  "fadeOut": 2.5,
+  "caption": "Instrumental only, no vocals, no singing, no lyrics. Epic cinematic film score in the style of Hans Zimmer's Dune and Interstellar: huge orchestra, deep brass, low wordless choir textures, sub-bass, vast reverb. A full-scale space fleet battle. 130 BPM, D minor. Starts instantly at full power: thunderous taiko and orchestral percussion ostinato, driving string ostinatos, heroic horn and trombone theme, choir-like pads, cinematic braams and impacts, relentless momentum; around the middle a heroic rising brass fanfare for a hero launching into battle, then even bigger.",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Build]\n[Instrumental]\n\n[Climax]\n[Instrumental]\n\n[Outro]\n[Instrumental]"
+ },
+ {
+  "id": "D_aftermath",
+  "t": 216.6,
+  "dur": 48,
+  "fadeIn": 2.5,
+  "fadeOut": 2,
+  "caption": "Instrumental only, no vocals, no singing, no lyrics. Epic cinematic film score in the style of Hans Zimmer's Dune and Interstellar: huge orchestra, deep brass, low wordless choir textures, sub-bass, vast reverb. Devastation and resolve. 60 BPM, D minor. Starts nearly silent with a high ringing tone and low drones, then a mournful solo cello and slow strings; in the second half a slow heartbeat pulse, ticking clock textures and a rising, determined low brass line as the hero decides to sacrifice himself.",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Build]\n[Instrumental]\n\n[Climax]\n[Instrumental]\n\n[Outro]\n[Instrumental]"
+ },
+ {
+  "id": "E_climax",
+  "t": 262.0,
+  "dur": 72,
+  "fadeIn": 0.3,
+  "fadeOut": 2,
+  "caption": "Instrumental only, no vocals, no singing, no lyrics. Epic cinematic film score in the style of Hans Zimmer's Dune and Interstellar: huge orchestra, deep brass, low wordless choir textures, sub-bass, vast reverb. The final climax. 120 BPM, D minor to D major. Massive war drums, soaring heroic brass theme, huge choir-like pads, driving strings; around the middle a sudden break to near silence then an enormous explosive hit, followed by a triumphant, victorious finale as a giant warship is destroyed. A full-length piece of at least 65 seconds that must not end early.",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Build]\n[Instrumental]\n\n[Climax]\n[Instrumental]\n\n[Outro]\n[Instrumental]"
+ },
+ {
+  "id": "F_homeward",
+  "t": 320.0,
+  "dur": 58,
+  "fadeIn": 3,
+  "end": 372,
+  "caption": "Instrumental only, no vocals, no singing, no lyrics. Epic cinematic film score in the style of Hans Zimmer's Dune and Interstellar: huge orchestra, deep brass, low wordless choir textures, sub-bass, vast reverb. Homecoming. 66 BPM, F major. Quiet solo piano and warm strings, then a slow, enormous emotional swell of full orchestra and horns as the fleet finally descends toward its home planet at sunrise, a grand uplifting final chord, fading to silence.",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Build]\n[Instrumental]\n\n[Climax]\n[Instrumental]\n\n[Outro]\n[Instrumental]"
+ }
+]

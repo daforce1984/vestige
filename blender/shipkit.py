@@ -1,0 +1,413 @@
+"""Advanced ship kit: surface-parametrized hulls, layered armor plates with panel breaks,
+surface-oriented greebles, deep engine bells, turrets, radiators, sensor spines, hull numbers, booleans.
+
+Conventions (Blender space): nose toward -Y, station s = -y (nose = +s), up +Z, x = starboard/port.
+Profile points are normalized (u, v) in [-1, 1], ordered counter-clockwise seen from the nose.
+Surface parameter p is in *vertex-index space*: p = i + t means t of the way along profile edge i.
+"""
+import math
+import bpy, bmesh
+from mathutils import Vector, Matrix
+from lib import MB, lerp, D2R, link, get_mat
+
+# ------------------------------------------------------------------ profiles
+KNIFE = [(1, 0.05), (0.72, 0.55), (0.3, 1), (-0.3, 1), (-0.72, 0.55), (-1, 0.05),
+         (-0.78, -0.55), (-0.3, -1), (0.3, -1), (0.78, -0.55)]
+HEX = [(1, 0), (0.55, 1), (-0.55, 1), (-1, 0), (-0.55, -1), (0.55, -1)]
+BOX8 = [(1, -0.72), (1, 0.72), (0.8, 1), (-0.8, 1), (-1, 0.72), (-1, -0.72), (-0.8, -1), (0.8, -1)]
+DIAMOND = [(1, 0), (0.4, 0.6), (0, 1), (-0.4, 0.6), (-1, 0), (-0.4, -0.6), (0, -1), (0.4, -0.6)]
+BLADE = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+
+
+def smoothstep(t):
+    return t * t * (3 - 2 * t)
+
+
+class Hull:
+    """Lofted hull defined by stations (s, w, h, cz[, cx]) and a profile."""
+
+    def __init__(self, stations, prof, cx=0.0, cz=0.0, smooth=False):
+        self.st = [tuple(x) + ((0.0,) if len(x) == 4 else ()) for x in stations]
+        self.prof = prof
+        self.cx0 = cx
+        self.cz0 = cz
+        self.smooth = smooth
+        self.n = len(prof)
+
+    def at(self, s):
+        st = self.st
+        if s <= st[0][0]:
+            a = st[0]
+            return a[1], a[2], a[3] + self.cz0, a[4] + self.cx0
+        for a, b in zip(st, st[1:]):
+            if a[0] <= s <= b[0]:
+                t = (s - a[0]) / (b[0] - a[0]) if b[0] != a[0] else 0
+                if self.smooth:
+                    t = smoothstep(t)
+                return (lerp(a[1], b[1], t), lerp(a[2], b[2], t), lerp(a[3], b[3], t) + self.cz0,
+                        lerp(a[4], b[4], t) + self.cx0)
+        a = st[-1]
+        return a[1], a[2], a[3] + self.cz0, a[4] + self.cx0
+
+    def poly(self, s, off=0.0):
+        w, h, cz, cx = self.at(s)
+        P = [Vector((u * w / 2, v * h / 2)) for u, v in self.prof]
+        if off == 0.0:
+            return P, (cx, cz)
+        n = len(P)
+        Q = []
+        for i in range(n):
+            e0 = P[i] - P[i - 1]
+            e1 = P[(i + 1) % n] - P[i]
+            n0 = Vector((e0.y, -e0.x))
+            n1 = Vector((e1.y, -e1.x))
+            if n0.length < 1e-9 or n1.length < 1e-9:
+                Q.append(P[i])
+                continue
+            n0.normalize()
+            n1.normalize()
+            m = n0 + n1
+            if m.length < 1e-6:
+                m = n1
+            m.normalize()
+            k = max(0.35, m.dot(n1))
+            Q.append(P[i] + m * (off / k))
+        return Q, (cx, cz)
+
+    def _w(self, s, q, c):
+        return Vector((c[0] + q.x, -s, c[1] + q.y))
+
+    def edge_len(self, s, i):
+        P, _ = self.poly(s)
+        i %= self.n
+        return (P[(i + 1) % self.n] - P[i]).length
+
+    def pt(self, s, p, off=0.0):
+        """World point + outward normal at station s, surface param p (index space)."""
+        Q, c = self.poly(s, off)
+        P, _ = self.poly(s)
+        i = int(math.floor(p)) % self.n
+        t = p - math.floor(p)
+        j = (i + 1) % self.n
+        q = Q[i].lerp(Q[j], t)
+        e = P[j] - P[i]
+        nrm = Vector((e.y, 0.0, -e.x))
+        nrm = Vector((nrm.x, 0, nrm.z)).normalized() if nrm.length > 1e-9 else Vector((0, 0, 1))
+        return self._w(s, q, c), nrm
+
+    def sample(self, s, p0, p1, off=0.0, trim0=0.0, trim1=0.0):
+        """Points from p0 to p1 (p1 > p0), integer vertices included; trims in world units."""
+        Q, c = self.poly(s, off)
+        n = self.n
+        pts = []
+        i0 = int(math.floor(p0))
+        l0 = max(1e-6, (Q[(i0 + 1) % n] - Q[i0 % n]).length)
+        a = p0 + trim0 / l0
+        i1 = int(math.floor(p1 - 1e-9))
+        l1 = max(1e-6, (Q[(i1 + 1) % n] - Q[i1 % n]).length)
+        b = p1 - trim1 / l1
+
+        def at(p):
+            i = int(math.floor(p))
+            t = p - i
+            return Q[i % n].lerp(Q[(i + 1) % n], t)
+        pts.append(at(a))
+        k = int(math.floor(p0)) + 1
+        while k < p1 - 1e-6:
+            pts.append(Q[k % n])
+            k += 1
+        pts.append(at(b))
+        return [self._w(s, q, c) for q in pts]
+
+    def build(self, mb, mat, s0=None, s1=None, step=None, cap0=True, cap1=True, off=0.0, tip0=False, tip1=False):
+        s0 = self.st[0][0] if s0 is None else s0
+        s1 = self.st[-1][0] if s1 is None else s1
+        ss = sorted(set([s0, s1] + [x[0] for x in self.st if s0 < x[0] < s1] +
+                        ([s0 + (s1 - s0) * k / 24 for k in range(1, 24)] if self.smooth else [])))
+        rings = []
+        for s in ss:
+            w, h, cz, cx = self.at(s)
+            if w < 1e-3 and h < 1e-3:
+                rings.append(Vector((cx, -s, cz)))
+            else:
+                Q, c = self.poly(s, off)
+                rings.append([self._w(s, q, c) for q in Q])
+        mb.loft(rings, mat, cap0=cap0, cap1=cap1)
+
+
+# ------------------------------------------------------------------ armor plates
+def plate(mb, hull, s0, s1, p0, p1, mat, off=0.0, thick=0.8, ch=None, step=None):
+    """One armor plate following the hull surface, chamfered on all four sides."""
+    if s1 - s0 < 1e-3 or p1 - p0 < 1e-3:
+        return
+    ch = ch if ch is not None else min(thick * 1.2, (s1 - s0) * 0.2)
+    step = step or max(4.0, (s1 - s0) / 3)
+    ss = [s0, s0 + ch]
+    nmid = max(0, int((s1 - s0 - 2 * ch) / step))
+    for k in range(1, nmid + 1):
+        ss.append(lerp(s0 + ch, s1 - ch, k / (nmid + 1)))
+    ss += [s1 - ch, s1]
+    rings = []
+    for k, s in enumerate(ss):
+        end = k in (0, len(ss) - 1)
+        t = thick * (0.35 if end else 1.0)
+        inner = hull.sample(s, p0, p1, off - 0.05)
+        outer = hull.sample(s, p0, p1, off + t, trim0=ch, trim1=ch)
+        rings.append(inner + outer[::-1])
+    mb.loft(rings, mat)
+
+
+def armor(mb, hull, s_cuts, p_cuts, mats, R, off=0.0, thick=0.8, gap_s=0.6, gap_p=0.04, skip_prob=0.0,
+          skip=None, sub_prob=0.0, sub_mat=None, ch=None):
+    """Grid of plates. mats: callable(i_s, i_p, R) -> material or list."""
+    for i, (sa, sb) in enumerate(zip(s_cuts, s_cuts[1:])):
+        for j, (pa, pb) in enumerate(zip(p_cuts, p_cuts[1:])):
+            sm = (sa + sb) / 2
+            if skip and any(a <= sm <= b and (pp0 <= (pa + pb) / 2 <= pp1) for a, b, pp0, pp1 in skip):
+                continue
+            if skip_prob and R.random() < skip_prob:
+                continue
+            m = mats(i, j, R) if callable(mats) else R.choice(mats)
+            plate(mb, hull, sa + gap_s / 2, sb - gap_s / 2, pa + gap_p, pb - gap_p, m, off=off, thick=thick, ch=ch)
+            if sub_prob and R.random() < sub_prob:
+                L = sb - sa
+                a = R.uniform(sa + L * 0.15, sa + L * 0.4)
+                b = R.uniform(sa + L * 0.6, sb - L * 0.15)
+                pw = pb - pa
+                plate(mb, hull, a, b, pa + pw * 0.2, pb - pw * 0.2, sub_mat or m, off=off + thick, thick=thick * 0.6)
+
+
+def cuts(a, b, R, lmin, lmax):
+    out = [a]
+    while out[-1] < b - lmin:
+        out.append(min(b, out[-1] + R.uniform(lmin, lmax)))
+    out[-1] = b
+    return out
+
+
+# ------------------------------------------------------------------ oriented placement
+def frame(n, fwd=Vector((0, -1, 0))):
+    n = Vector(n).normalized()
+    t = fwd - n * fwd.dot(n)
+    if t.length < 1e-6:
+        t = Vector((1, 0, 0)) - n * n.x
+    t.normalize()
+    b = t.cross(n)
+    return b, t, n
+
+
+def obox(mb, pos, n, size, mat, lift=None, bevel=0.0, fwd=Vector((0, -1, 0)), spin=0.0):
+    """Box sitting on a surface point (pos, normal). size = (across, along, height)."""
+    b, t, nn = frame(n, fwd)
+    if spin:
+        c, s_ = math.cos(spin), math.sin(spin)
+        b, t = b * c + t * s_, t * c - b * s_
+    h = size[2]
+    lift = h / 2 - 0.05 * h if lift is None else lift
+    c = Vector(pos) + nn * lift
+    M = Matrix((
+        (b.x * size[0], t.x * size[1], nn.x * h, c.x),
+        (b.y * size[0], t.y * size[1], nn.y * h, c.y),
+        (b.z * size[0], t.z * size[1], nn.z * h, c.z),
+        (0, 0, 0, 1)))
+    r = bmesh.ops.create_cube(mb.bm, size=1.0, matrix=M)
+    mb._fin(mb._faces_of(r['verts']), mat, bevel)
+
+
+def windows(mb, hull, s0, s1, p, mat='window', off=0.9, pitch=1.6, size=(0.3, 0.8, 0.2), R=None, dropout=0.15,
+            gaps=None):
+    """Row of tiny window boxes on the surface; size = (across, along, thickness)."""
+    s = s0
+    while s < s1:
+        if not (gaps and any(a <= s <= b for a, b in gaps)) and not (R and R.random() < dropout):
+            pos, n = hull.pt(s, p, off)
+            obox(mb, pos, n, size, mat, lift=0.0)
+        s += pitch
+
+
+def plate_hull(mb, hull, s0, s1, R, lmin, lmax, mats, per_edge=2, edges=None, off=0.0, thick=0.8, gap_s=0.8,
+               gap_p=0.03, skip=None, skip_prob=0.04, sub_prob=0.25, sub_mat=None, ch=None):
+    n = hull.n
+    edges = range(n) if edges is None else edges
+    sc = cuts(s0, s1, R, lmin, lmax)
+    for e in edges:
+        pc = [e + k / per_edge for k in range(per_edge + 1)]
+        armor(mb, hull, sc, pc, mats, R, off=off, thick=thick, gap_s=gap_s, gap_p=gap_p, skip=skip,
+              skip_prob=skip_prob, sub_prob=sub_prob, sub_mat=sub_mat, ch=ch)
+        if R.random() < 0.5:  # re-cut s for the next edge so seams stagger
+            sc = cuts(s0, s1, R, lmin, lmax)
+
+
+def cowl(mb, hull, s0, s1, t, mat):
+    """Hollow shroud following the hull profile between s0 and s1 (wall thickness t)."""
+    def ring(s, off):
+        Q, c = hull.poly(s, off)
+        return [hull._w(s, q, c) for q in Q]
+    mb.loft([ring(s0, 0), ring(s1, 0), ring(s1, -t), ring(s0, -t)], mat, wrap=True)
+
+
+# ------------------------------------------------------------------ mechanical details
+def deep_nozzle(mb, p, d, r, mat_body, mat_inner, mat_glow, depth=1.4, flare=1.12, seg=24, ribs=True):
+    """Deep engine bell: outer shell + long inner cone + glowing core disk at the bottom."""
+    p, d = Vector(p), Vector(d).normalized()
+    q = d.to_track_quat('Z', 'Y' if abs(d.y) < 0.99 else 'X').to_matrix()
+    L = r * depth
+
+    def ring(rr, z):
+        return [p + q @ Vector((math.cos(a) * rr, math.sin(a) * rr, z)) for a in
+                [i / seg * 2 * math.pi for i in range(seg)]]
+    rim = r * flare
+    mb.loft([ring(r * 1.02, -0.2 * r), ring(rim * 1.04, L), ring(rim * 0.9, L)], mat_body, cap0=True, cap1=False)
+    mb.loft([ring(rim * 0.9, L), ring(r * 0.8, L * 0.55), ring(r * 0.52, L * 0.08)], mat_inner, cap0=False,
+            cap1=False)
+    mb.cyl(p + d * (L * 0.04), p + d * (L * 0.1), r * 0.54, r * 0.54, mat_glow, seg=seg)
+    # central plug / spike (makes the bell read as deep)
+    mb.cyl(p + d * (L * 0.08), p + d * (L * 0.34), r * 0.2, r * 0.07, mat_inner, seg=12)
+    if ribs:
+        for k in range(3):
+            z = L * (0.25 + 0.25 * k)
+            mb.loft([ring(r * (1.05 + 0.05 * k), z), ring(r * (1.12 + 0.05 * k), z), ring(r * (1.12 + 0.05 * k),
+                     z + r * 0.12), ring(r * (1.05 + 0.05 * k), z + r * 0.12)], mat_body, wrap=True)
+
+
+def turret(mb, pos, n, size, m_base, m_house, m_barrel, barrels=2, fwd=Vector((0, -1, 0)), blen=2.2, yaw=0.0):
+    b, t, nn = frame(n, fwd)
+    if yaw:
+        c, s_ = math.cos(yaw), math.sin(yaw)
+        b, t = b * c + t * s_, t * c - b * s_
+    pos = Vector(pos)
+    mb.cyl(pos - nn * size * 0.2, pos + nn * size * 0.3, size * 0.75, size * 0.7, m_base, seg=16)
+    # wedge housing
+    hw, hl, hh = size * 0.6, size * 0.75, size * 0.45
+    c0 = pos + nn * size * 0.3
+    pts = [c0 - b * hw + t * hl * 0.7, c0 + b * hw + t * hl * 0.7, c0 + b * hw - t * hl, c0 - b * hw - t * hl]
+    top = [c0 + nn * hh - b * hw * 0.8 + t * hl * 0.35, c0 + nn * hh + b * hw * 0.8 + t * hl * 0.35,
+           c0 + nn * hh * 0.8 + b * hw * 0.75 - t * hl * 0.8, c0 + nn * hh * 0.8 - b * hw * 0.75 - t * hl * 0.8]
+    mb.hexa(pts + top, m_house, bevel=size * 0.04)
+    for k in range(barrels):
+        off = (k - (barrels - 1) / 2) * size * 0.32
+        a = c0 + nn * hh * 0.45 + b * off + t * hl * 0.6
+        mb.cyl(a, a + t * size * blen, size * 0.08, size * 0.065, m_barrel, seg=8)
+        mb.cyl(a + t * size * (blen - 0.25), a + t * size * blen, size * 0.1, size * 0.1, m_barrel, seg=8)
+
+
+def fins(mb, base, along, n, count, pitch, h, L, thick, mat, taper=0.6):
+    """Radiator fin bank standing on a surface: fins spaced along `along`, height h along n, length L."""
+    base, along, n = Vector(base), Vector(along).normalized(), Vector(n).normalized()
+    t = n.cross(along).normalized()
+    for k in range(count):
+        c = base + along * (k * pitch)
+        p = [c - along * thick / 2 - t * L / 2, c + along * thick / 2 - t * L / 2,
+             c + along * thick / 2 + t * L / 2, c - along * thick / 2 + t * L / 2]
+        q = [c + n * h - along * thick / 2 - t * L * taper / 2, c + n * h + along * thick / 2 - t * L * taper / 2,
+             c + n * h + along * thick / 2 + t * L * taper / 2, c + n * h - along * thick / 2 + t * L * taper / 2]
+        mb.hexa(p + q, mat)
+
+
+def spine(mb, p0, p1, r, mat, nodes=4, node_mat=None, dish=False):
+    p0, p1 = Vector(p0), Vector(p1)
+    mb.cyl(p0, p1, r, r * 0.6, mat, seg=8)
+    d = (p1 - p0)
+    for k in range(1, nodes + 1):
+        c = p0 + d * (k / (nodes + 1))
+        mb.cyl(c - d.normalized() * r * 2, c + d.normalized() * r * 2, r * 2.2, r * 2.2, node_mat or mat, seg=8)
+        side = d.normalized().cross(Vector((0, 0, 1)))
+        if side.length < 0.1:
+            side = Vector((1, 0, 0))
+        side.normalize()
+        mb.cyl(c, c + side * r * (10 - k * 1.5), r * 0.4, r * 0.3, mat, seg=5)
+    mb.sphere(p1, r * 1.6, node_mat or mat, seg=10, rings=5)
+    if dish:
+        mb.cyl(p1, p1 + Vector((0, 0, r * 1.5)), r * 5, r * 1.5, node_mat or mat, seg=16)
+
+
+# 7-segment digits: segments a b c d e f g
+SEG = {'0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc', '5': 'afgcd', '6': 'afgedc', '7': 'abc',
+       '8': 'abcdefg', '9': 'abcdfg'}
+
+
+def digits(mb, hull, text, s_start, p, height, mat, off=0.95, thick=0.25, spacing=None):
+    """7-segment hull numbers laid on the hull surface, reading along -s (nose direction)."""
+    w = height * 0.55
+    sw = height * 0.14
+    spacing = spacing or w * 1.5
+    n0 = hull.pt(s_start, p, off)[1]
+    dirn = -1 if n0.x > 0 else 1   # keep glyphs readable from outside on either flank
+    for k, ch in enumerate(text):
+        s0 = s_start + dirn * k * spacing
+        pc, n = hull.pt(s0, p, off)
+        up = Vector((0, 0, 1)) - n * n.z
+        up = up.normalized() if up.length > 0.1 else Vector((0, 1, 0))
+        rt = Vector((0, -dirn, 0))
+        segs = {'a': (0, 1, True), 'g': (0, 0, True), 'd': (0, -1, True),
+                'f': (-1, 0.5, False), 'b': (1, 0.5, False), 'e': (-1, -0.5, False), 'c': (1, -0.5, False)}
+        for sname in SEG.get(ch, ''):
+            x, y, horiz = segs[sname]
+            c = pc + rt * (x * w / 2) + up * (y * height / 2)
+            size = (w, sw, thick) if horiz else (sw, height / 2, thick)
+            b = rt
+            M = Matrix(((b.x * size[0], up.x * size[1], n.x * size[2], c.x),
+                        (b.y * size[0], up.y * size[1], n.y * size[2], c.y),
+                        (b.z * size[0], up.z * size[1], n.z * size[2], c.z), (0, 0, 0, 1)))
+            r = bmesh.ops.create_cube(mb.bm, size=1.0, matrix=M)
+            mb._fin(mb._faces_of(r['verts']), mat)
+
+
+# ------------------------------------------------------------------ booleans / joining
+def cutter_box(center, size, mat, rot=(0, 0, 0)):
+    mb = MB()
+    mb.box(center, size, mat, rot=rot)
+    o = mb.to_object('_cut', smooth_angle=10)
+    return o
+
+
+def boolean_diff(obj, cutters):
+    for c in cutters:
+        m = obj.modifiers.new('bool', 'BOOLEAN')
+        m.operation = 'DIFFERENCE'
+        m.object = c
+        m.solver = 'EXACT'
+        try:
+            m.material_mode = 'TRANSFER'
+        except Exception:
+            pass
+        c.hide_render = True
+        c.hide_set(True)
+    bpy.context.view_layer.objects.active = obj
+    for m in list(obj.modifiers):
+        bpy.ops.object.modifier_apply(modifier=m.name)
+    for c in cutters:
+        me = c.data
+        bpy.data.objects.remove(c, do_unlink=True)
+        bpy.data.meshes.remove(me)
+
+
+def join(objs, name):
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in objs:
+        o.hide_set(False)
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    if len(objs) > 1:
+        bpy.ops.object.join()
+    o = objs[0]
+    o.name = name
+    o.data.name = name
+    # merge duplicate material slots by name
+    me = o.data
+    names = [m.name.split('.')[0] if m else None for m in me.materials]
+    uniq = []
+    for nm in names:
+        if nm not in uniq:
+            uniq.append(nm)
+    if len(uniq) != len(names):
+        remap = [uniq.index(nm) for nm in names]
+        idx = [0] * len(me.polygons)
+        me.polygons.foreach_get('material_index', idx)
+        idx = [remap[i] for i in idx]
+        me.materials.clear()
+        for nm in uniq:
+            me.materials.append(bpy.data.materials[nm])
+        me.polygons.foreach_set('material_index', idx)
+    me.set_sharp_from_angle(angle=24 * D2R)
+    return o

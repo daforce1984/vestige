@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vestige</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;500;700&family=Noto+Serif+KR:wght@300;600&family=Share+Tech+Mono&family=Rajdhani:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --fg: #e8ecf4; --dim: #8a93a6; --accent: #7fb2ff; --bg: #000; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  #c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  #sub { position: fixed; left: 50%; bottom: 3.2vh; transform: translateX(-50%); max-width: 80vw; text-align: center;
+    font-size: clamp(14px, 2.1vh, 24px); font-weight: 500; letter-spacing: .02em; opacity: 0; transition: opacity .25s;
+    text-shadow: 0 0 6px #000, 0 0 2px #000; pointer-events: none; }
+  #sub.on { opacity: 1; }
+  #sub .en { display: block; }
+  #sub .ko { display: block; font-size: .72em; color: #aab4c8; margin-top: .25em; font-weight: 300; }
+  #sub.narr .en { font-family: 'Noto Serif KR', serif; font-weight: 300; letter-spacing: .06em; font-style: italic; }
+  #typer { position: fixed; left: 6vw; bottom: 18vh; z-index: 6; pointer-events: none; font-family: 'Share Tech Mono', 'Consolas', 'Menlo', monospace;
+    color: #cfe3f7; font-size: clamp(13px, 2.3vh, 26px); letter-spacing: .16em; line-height: 1.7; text-shadow: 0 0 10px rgba(120,180,255,.35); opacity: 0; white-space: pre; }
+  #typer .l0 { color: #fff; font-size: 1.25em; letter-spacing: .3em; margin-bottom: .4em; }
+  #typer .dim { color: #7f9ab5; }
+  #typer .caret { display: inline-block; width: .6em; height: 1em; background: #cfe3f7; vertical-align: -0.12em; margin-left: .1em; }
+  #title .corp { display: flex; flex-direction: column; align-items: center; gap: 1.2vh; }
+  #title .corp-logo { font-size: clamp(30px, 6vh, 70px); color: #dfe8f5; opacity: .85; }
+  #title .corp-name { font-family: 'Rajdhani', sans-serif; font-weight: 500; letter-spacing: .55em; font-size: clamp(14px, 2.2vh, 26px); margin-right: -.55em; }
+  #title .corp-tag { font-family: 'Rajdhani', sans-serif; letter-spacing: .6em; font-size: clamp(10px, 1.3vh, 14px); color: var(--dim); margin-right: -.6em; }
+  #title .slogan { font-family: 'Rajdhani', sans-serif; font-weight: 600; letter-spacing: .7em; font-size: clamp(22px, 4.4vh, 56px); margin-right: -.7em; }
+  #title .slogan.hard { color: #ffb070; text-shadow: 0 0 30px rgba(255,90,20,.6); }
+  #sub .who { display: inline-block; margin-right: .7em; font-family: 'Rajdhani', sans-serif; font-weight: 600; color: var(--accent);
+    font-size: .8em; letter-spacing: .12em; text-transform: uppercase; }
+  #title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;
+    opacity: 0; text-align: center; text-shadow: 0 0 20px rgba(0,0,0,.8); }
+  #title .kicker { font-family: 'Rajdhani', sans-serif; letter-spacing: .5em; font-size: clamp(12px, 1.6vh, 18px); color: var(--dim); margin-bottom: 1.2vh; }
+  #title .big { font-family: 'Noto Serif KR', serif; font-weight: 300; font-size: clamp(22px, 4.2vh, 52px); letter-spacing: .15em; }
+  #title .title { font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: clamp(60px, 13vh, 180px); letter-spacing: .35em; margin-right: -.35em; }
+  #title .small { font-family: 'Rajdhani', sans-serif; letter-spacing: .6em; font-size: clamp(11px, 1.5vh, 16px); color: var(--dim); margin-top: 1.6vh; }
+  #title .credits { font-family: 'Rajdhani', sans-serif; letter-spacing: .25em; font-size: clamp(12px, 1.7vh, 18px); line-height: 2.2; color: #c9d2e4; }
+  #title .credits span { color: var(--dim); font-size: .8em; letter-spacing: .1em; }
+  #title .tech { font-family: 'Rajdhani', sans-serif; max-width: 78vw; margin-top: 2.2vh; text-align: center; font-size: clamp(10px, 1.45vh, 15px); line-height: 1.75; letter-spacing: .08em; color: #aab4c8; }
+  #title .tech b { color: #dfe8f5; font-weight: 600; letter-spacing: .22em; margin-right: .5em; }
+  #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.4vh;
+    background: radial-gradient(ellipse at center, rgba(20,24,40,.6), rgba(0,0,0,.92)); transition: opacity .6s; }
+  #start.hidden { opacity: 0; pointer-events: none; }
+  #start h1 { margin: 0; font-family: 'Rajdhani', sans-serif; font-weight: 600; letter-spacing: .3em; font-size: clamp(26px, 5vh, 60px); margin-right: -.3em; text-align: center; }
+  #start .sub { font-family: 'Rajdhani', sans-serif; letter-spacing: .5em; color: var(--dim); font-size: clamp(11px, 1.6vh, 16px); }
+  #start .go { margin-top: 2vh; background: transparent; color: var(--fg); border: 1px solid rgba(127,178,255,.6); padding: 14px 42px;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 17px; letter-spacing: .2em; cursor: pointer; border-radius: 2px; }
+  #start .go:hover:not(:disabled) { background: rgba(127,178,255,.12); }
+  #start .go:disabled { opacity: .4; cursor: wait; }
+  #status { font-size: 13px; color: var(--dim); letter-spacing: .05em; min-height: 1.2em; }
+  #start .keys { font-size: 12px; color: #5d6577; letter-spacing: .05em; }
+  #progress { position: fixed; left: 0; right: 0; bottom: 0; height: 6px; cursor: pointer; opacity: 0; transition: opacity .3s; }
+  #progress:hover { opacity: 1; }
+  #bar { height: 3px; margin-top: 3px; background: var(--accent); width: 0; }
+  #hud { position: fixed; left: 8px; top: 6px; font: 12px ui-monospace, monospace; color: #9fb; text-shadow: 0 0 3px #000; pointer-events: none; }
+  body.nohud #hud, body.nohud #progress { display: none; }
+  body.idle, body.idle * { cursor: none !important; }
+  body.idle #progress { opacity: 0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="title"></div>
+<div id="typer"></div>
+<div id="sub"></div>
+<div id="progress"><div id="bar"></div></div>
+<div id="hud"></div>
+<div id="start">
+  <h1>VESTIGE</h1>
+  <div class="sub">6:22</div>
+  <button class="go" disabled>▶ 재생</button>
+  <div id="status">WebGPU 초기화…</div>
+  <div class="keys">24fps · Space 일시정지 · ←/→ 5초 이동 · F 전체화면 · H UI 숨김 · 사운드를 켜 주세요</div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

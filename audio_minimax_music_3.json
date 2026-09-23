@@ -1,0 +1,186 @@
+{
+  "35": {
+    "inputs": {
+      "filename_prefix": "audio/audio_minimax_music3",
+      "format": "mp3",
+      "format.quality": "V0",
+      "audio": [
+        "37:43",
+        0
+      ]
+    },
+    "class_type": "SaveAudioAdvanced",
+    "_meta": {
+      "title": "오디오 저장 (고급)"
+    }
+  },
+  "37:6": {
+    "inputs": {
+      "unet_name": "minimax_music3_dit_fp16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "확산 모델 로드"
+    }
+  },
+  "37:13": {
+    "inputs": {
+      "caption": "Global Metadata: Dreamy K-pop with lo-fi and chillhop influences. 78 BPM, D-flat major. Modern Korean pop songwriting and production at its core, softened by warm bedroom lo-fi textures. Youthful, dreamy, intimate, and slightly nostalgic, with a subtle late-night glow. Catchy but understated melodic writing, polished K-pop sensibility beneath a dusty analog surface. The song gradually becomes more emotionally luminous through the middle before gently dissolving at the end.\n\nVocal Details: Teenage female K-pop vocal with a youthful, clear, sweet tone. Light, airy, delicate, and distinctly feminine, with the fresh character of a young Korean pop singer. Intimate close-mic delivery with soft breathiness and natural emotional detail. Verses are restrained and conversational, almost half-whispered at moments, while the pre-chorus gently lifts into a more melodic delivery. Chorus remains soft but noticeably catchier and more emotionally open, using a memorable K-pop topline rather than powerful belting. Clean Korean pop phrasing, subtle vocal runs, delicate falsetto transitions, whispered doubles, and soft layered harmonies. Occasional \"mmm\", \"ooh\", and breathy ad-libs. Vocals remain relatively close and intimate rather than huge or theatrical.\n\nArrangement: Modern K-pop structure blended with dusty lo-fi production. Soft boom-bap-inspired drums with a rounded kick, muted snare, delicate swung hi-hats, and warm sub bass. Rhodes piano provides jazzy extended chords while clean electric guitar adds short melodic responses and sparkling accents. Subtle synth pads and tiny electronic details add a contemporary K-pop sheen without losing the bedroom atmosphere. Vinyl crackle, tape hiss, wow-and-flutter, gentle saturation, and slightly detuned textures remain throughout.\n\nIntro: Rain ambience, vinyl crackle, and filtered Rhodes. A tiny vocal hum or breath appears before the beat enters.\n\nVerse: Minimal and intimate — soft drums, bass, Rhodes, sparse guitar, close youthful vocal.\n\nPre-Chorus: Harmony opens slightly, subtle pads enter, vocal melody rises and becomes more emotionally anticipatory.\n\nChorus: Clearly recognizable K-pop hook. Catchy, youthful melodic topline with layered female harmonies, warmer bass, fuller drums, shimmering guitar accents, and subtle synth textures. Still dreamy and restrained rather than explosive.\n\nPost-Chorus / Instrumental: Short memorable melodic motif carried by guitar, Rhodes, or a soft vocal chop.\n\nVerse 2: Returns to intimacy with small rhythmic and melodic variations.\n\nBridge: Drums disappear. Rain, vinyl crackle, floating detuned Rhodes, distant guitar harmonics, and exposed breathy vocal create a fragile late-night moment.\n\nFinal Chorus: Slightly fuller vocal layering and harmonies, emotionally warmer than the first chorus without becoming loud or dramatic.\n\nOutro: Vocals disappear first, followed gradually by drums, bass, and guitar. Only vinyl crackle, rain, and one unresolved Rhodes chord remain.\n",
+      "lyrics": "[Intro]\nOoh, ah\n희미하게 번진 light\n너를 따라가는 night\n\n[Verse 1]\n창문 너머 blue\n조금 느린 오후\n괜히 네 생각이 나\n이유도 없이\n\n손끝에 닿을 듯\n가까워진 온도\n모르는 척 고갤 돌려\n또 웃어 난\n\n[Pre-Chorus]\nOne step, two step\n조금씩 네게\n맘이 기울어지는 걸\n\n숨겨봐도\n투명한 내 맘\n너에게 다 비칠 것 같아\n\n[Chorus]\nYou give me that blue signal\nBlue signal\n반짝이는 맘이 켜져\n\n조금 더 가까이\nCome a little closer\n너만 보면 달라져 난\n\nBlue signal\nBlue signal\n자꾸 너를 향해 번져\n\n말하지 않아도\nYou already know\n우리 둘만 아는\nBlue signal\n\n[Post-Chorus]\nOoh-ooh, blue\nOoh-ooh, blue\n너를 향해 blinking\n\nOoh-ooh, blue\nOoh-ooh, blue\nI think I'm falling into you\n\n[Verse 2]\n평범했던 street\n오늘따라 dreamy\n네가 걷는 그 순간\n색이 달라져\n\n스쳐 가는 향기\n살짝 느린 heartbeat\n우연인 척 맞춘 걸음\n너와 나란히\n\n[Pre-Chorus]\nOne step, two step\n가까운 사이\n시간이 잠깐 멈춘 듯\n\n눈을 맞추면\n번지는 느낌\n이번에는 피하지 않아\n\n[Chorus]\nYou give me that blue signal\nBlue signal\n반짝이는 맘이 켜져\n\n조금 더 가까이\nCome a little closer\n너만 보면 달라져 난\n\nBlue signal\nBlue signal\n자꾸 너를 향해 번져\n\n말하지 않아도\nYou already know\n우리 둘만 아는\nBlue signal\n\n[Bridge]\nMaybe it's you\nMaybe it's true\n새벽빛처럼 스며든 you\n\n조금 천천히\n다가와 줘\n깨지지 않게\n이 순간 그대로\n\n[Final Chorus]\nYou give me that blue signal\nBlue signal\n온 세상이 밝아져\n\n조금 더 가까이\nCome a little closer\n이젠 숨길 필요 없어\n\nBlue signal\nBlue signal\n너와 내가 같은 순간\n\n말하지 않아도\nWe already know\n우리 둘을 잇는\nBlue signal\n\n[Outro]\nOoh-ooh, blue\nOoh-ooh, blue\nStill blinking\n\nOoh-ooh, blue\nOoh-ooh, blue\nI'm falling into you\n",
+      "seed": [
+        "37:38",
+        0
+      ],
+      "max_duration": 60,
+      "cfg_scale": 1.7,
+      "top_k": 50,
+      "clip": [
+        "37:3",
+        0
+      ]
+    },
+    "class_type": "MiniMaxMusic3TextEncode",
+    "_meta": {
+      "title": "MiniMax Music3 Text Encode"
+    }
+  },
+  "37:3": {
+    "inputs": {
+      "clip_name": "minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "CLIP 로드"
+    }
+  },
+  "37:7": {
+    "inputs": {
+      "vae_name": "minimax_music3_dav.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE 로드"
+    }
+  },
+  "37:10": {
+    "inputs": {
+      "conditioning": [
+        "37:13",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "조건 (0으로 출력)"
+    }
+  },
+  "37:15": {
+    "inputs": {
+      "seconds": [
+        "37:13",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyMiniMaxMusic3LatentAudio",
+    "_meta": {
+      "title": "Empty MiniMax Music3 Latent Audio"
+    }
+  },
+  "37:9": {
+    "inputs": {
+      "seed": [
+        "37:38",
+        0
+      ],
+      "steps": 30,
+      "cfg": 1.7,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "37:6",
+        0
+      ],
+      "positive": [
+        "37:13",
+        0
+      ],
+      "negative": [
+        "37:10",
+        0
+      ],
+      "latent_image": [
+        "37:15",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "37:12": {
+    "inputs": {
+      "samples": [
+        "37:9",
+        0
+      ],
+      "vae": [
+        "37:7",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "오디오 VAE 디코드"
+    }
+  },
+  "37:38": {
+    "inputs": {
+      "seed": 431552629870487
+    },
+    "class_type": "SeedNode",
+    "_meta": {
+      "title": "시드"
+    }
+  },
+  "37:42": {
+    "inputs": {
+      "tile_size": 1536,
+      "overlap": 64,
+      "samples": [
+        "37:9",
+        0
+      ],
+      "vae": [
+        "37:7",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudioTiled",
+    "_meta": {
+      "title": "VAE 오디오 디코드 (타일)"
+    }
+  },
+  "37:43": {
+    "inputs": {
+      "switch": true,
+      "on_false": [
+        "37:12",
+        0
+      ],
+      "on_true": [
+        "37:42",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "스위치"
+    }
+  }
+}

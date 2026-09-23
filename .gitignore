@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+tools/.cdp_tab.json
+# local backups and raw third-party downloads (converted assets are committed instead)
+assets/v*_backup/
+assets/src/
+assets/sfx_src/
+blender/previews/
+*.blend1

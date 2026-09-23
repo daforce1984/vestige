@@ -1,0 +1,377 @@
+{
+ "voices": {
+  "NARRATOR": "calm, polished corporate-propaganda narrator, warm and reassuring (clean, not radio)",
+  "CMDR": "fleet commander, older, authoritative, gritty (radio)",
+  "SENSOR": "sensor officer / flight control, female, tense (radio)",
+  "PILOT": "RX-H1 Gundam pilot, young male, determined (radio)",
+  "WING": "frigate / interceptor squadron lead, male, fast and excited (radio)"
+ },
+ "lines": [
+  {
+   "id": "v6c01",
+   "t": 45.0,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[fast] Hyperspace exit complete! All ships accounted for!",
+   "ko": "하이퍼스페이스 이탈 완료! 전 함선 이상 없음!",
+   "stability": 0.0,
+   "dur": 3.4
+  },
+  {
+   "id": "v6p01",
+   "t": 51.0,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[low, calm] Sigma. Standing by.",
+   "ko": "시그마. 대기.",
+   "stability": 0.5,
+   "dur": 2.12
+  },
+  {
+   "id": "v6c00",
+   "t": 59.8,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[fast] All ships, spool your drives! One more jump and we're ho-",
+   "ko": "전 함, 드라이브 가동! 한 번만 더 도약하면 우린 집—",
+   "stability": 0.0,
+   "cut": 63.0,
+   "dur": 3.47
+  },
+  {
+   "id": "v7s01",
+   "t": 64.2,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[panicked, shouting] Gravity spike, dead ahead! Jump drive's— no, no, it's DEAD! We can't jump!",
+   "ko": "전방 중력 급상승! 도약 엔진이— 아냐, 죽었어요! 도약 불가!",
+   "stability": 0.0,
+   "dur": 6.11
+  },
+  {
+   "id": "v4c02",
+   "t": 73.0,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[breathing hard] That's not a star... [shouting] It's a trap! All hands, battle stations!",
+   "ko": "저건 별이 아니야… 함정이다! 전원 전투 배치!",
+   "stability": 0.0,
+   "dur": 4.68
+  },
+  {
+   "id": "v7s02",
+   "t": 92.0,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[terrified, breathless] Contact— big contact! Dreadnought class! Oh God, it's— it's enormous!",
+   "ko": "접촉— 거대 접촉— 드레드노트급! 맙소사, 저건— 엄청나요!",
+   "stability": 0.0,
+   "dur": 6.84
+  },
+  {
+   "id": "v4c03",
+   "t": 102.0,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[fast, urgent] Battle line, now! Ion frigates, charge— charge everything you've got!",
+   "ko": "전열 형성, 당장! 이온 프리깃, 충전— 전부 쏟아부어!",
+   "stability": 0.0,
+   "dur": 4.83
+  },
+  {
+   "id": "v4w01",
+   "t": 109.4,
+   "voice": "WING",
+   "radio": true,
+   "text": "[fast, tense] Charging... eighty... ninety... come on, come on... locked! Ready!",
+   "ko": "충전… 80… 90… 빨리, 빨리… 고정! 준비 완료!",
+   "stability": 0.0,
+   "dur": 8.99
+  },
+  {
+   "id": "v4c05",
+   "t": 118.6,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[screaming] FIRE! FIRE!",
+   "ko": "발사! 발사!",
+   "stability": 0.0,
+   "dur": 1.72
+  },
+  {
+   "id": "v4w02",
+   "t": 124.6,
+   "voice": "WING",
+   "radio": true,
+   "text": "[excited, fast] Splash one! Next target, frigate three— no, two! Frigate two!",
+   "ko": "하나 격침! 다음 목표 프리깃 3— 아니, 2번! 2번!",
+   "stability": 0.0,
+   "dur": 5.8
+  },
+  {
+   "id": "v4w03",
+   "t": 134.6,
+   "voice": "WING",
+   "radio": true,
+   "text": "[panicked, shouting] Bandits, bandits! Break left— your other left! Break!",
+   "ko": "적기, 적기! 좌측 회피— 반대쪽 왼쪽! 회피!",
+   "stability": 0.0,
+   "dur": 4.21
+  },
+  {
+   "id": "v7s04",
+   "t": 146.4,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[shouting, fast] Port shields forty— thirty-five percent! They're chewing through us!",
+   "ko": "좌현 실드 40— 35퍼센트! 뚫리고 있어요!",
+   "stability": 0.0,
+   "dur": 4.13
+  },
+  {
+   "id": "v6p02",
+   "t": 156.1,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[low, cold] Sigma. Launching.",
+   "ko": "시그마. 발진.",
+   "stability": 0.5,
+   "dur": 2.04
+  },
+  {
+   "id": "v6p03",
+   "t": 171.0,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[low, bored] Two hostiles.",
+   "ko": "적 둘.",
+   "stability": 0.5,
+   "dur": 1.72
+  },
+  {
+   "id": "v6p04",
+   "t": 181.0,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[low] Above.",
+   "ko": "위다.",
+   "stability": 0.5,
+   "dur": 1.96
+  },
+  {
+   "id": "v7s06",
+   "t": 202.2,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[panicked, shouting] Energy spike on the dreadnought! It's aiming at us— at the mothership! Brace!",
+   "ko": "드레드노트 에너지 급상승— 엄청나요— 우릴 노려요! 모선을!",
+   "stability": 0.0,
+   "dur": 5.56
+  },
+  {
+   "id": "v4c08",
+   "t": 207.95,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[shouting, desperate] Evasive— no, there's no time! Brace! Everybody brace!",
+   "ko": "회피— 아냐, 시간이 없어! 충격 대비! 전원 대비!",
+   "stability": 0.0,
+   "dur": 4.36
+  },
+  {
+   "id": "v4c09",
+   "t": 224.6,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[coughing, dazed] Damage report... [shouting] Somebody talk to me!",
+   "ko": "피해 보고… 누구든 대답해!",
+   "stability": 0.0,
+   "dur": 4.28
+  },
+  {
+   "id": "v7s07",
+   "t": 229.1,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[shaken, fast, voice breaking] Thirty-two percent of the hull— gone! Decks four through nine— gone! If that well holds, we're dead! We're all dead!",
+   "ko": "선체 32퍼센트 소실. 4번에서 9번 갑판 전멸. 저 우물이 버티면 우린 죽어요. 전부 다.",
+   "stability": 0.0,
+   "dur": 11.15
+  },
+  {
+   "id": "v6p06",
+   "t": 240.5,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[low, flat] I'm going in.",
+   "ko": "들어간다.",
+   "stability": 0.5,
+   "dur": 2.19
+  },
+  {
+   "id": "v7s08",
+   "t": 244.0,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[screaming] Sigma, pull back! PULL BACK! Past that line you won't come back!",
+   "ko": "시그마, 물러나! 물러나! 그 선을 넘으면 못 돌아와!",
+   "stability": 0.0,
+   "dur": 4.6,
+   "radioFx": "broken"
+  },
+  {
+   "id": "v9c_dive1",
+   "t": 255.85,
+   "voice": "CMDR",
+   "radio": true,
+   "radioFx": "broken",
+   "text": "[shouting over heavy interference, urgent, fast] Sigma, respond! Your signal's breaking up— Sigma, do you read? Do you—",
+   "ko": "시그마, 응답하라! 신호가 끊긴다— 시그마, 들리나? 들리—",
+   "stability": 0.0,
+   "dur": 2.93
+  },
+  {
+   "id": "v9s_dive2",
+   "t": 261.25,
+   "voice": "SENSOR",
+   "radio": true,
+   "radioFx": "broken",
+   "text": "[panicked, fast, voice cracking] Telemetry's gone— I've got nothing! He's— he's gone dark!",
+   "ko": "원격 신호 끊겼어요— 아무것도 안 잡혀요! 그가— 사라졌어요!",
+   "stability": 0.0,
+   "dur": 3.87
+  },
+  {
+   "id": "v8p_scream",
+   "t": 266.8,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[screaming with all his strength, straining, roaring] Kraaaaaaaaaaaagh!",
+   "ko": "크아아아아악!",
+   "stability": 0.0,
+   "dur": 2.43
+  },
+  {
+   "id": "v8p_strain1",
+   "t": 271.0,
+   "filmTime": true,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[straining through gritted teeth, low growling, heavy breathing] Nnnghhh... hhhrrraaah...",
+   "ko": "크으으윽…",
+   "stability": 0.0,
+   "dur": 5.56
+  },
+  {
+   "id": "v7s09",
+   "t": 287.4,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[stunned, then shouting] The well... it's— it's GONE! It's gone!",
+   "ko": "우물이… 사— 사라졌어요! 없어졌어요!",
+   "stability": 0.0,
+   "dur": 5.88
+  },
+  {
+   "id": "v4c10",
+   "t": 292.1,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[fierce, fast] Bring us about! All power to the main gun— everything, now!",
+   "ko": "함수를 돌려! 전 출력 주포로— 전부, 지금!",
+   "stability": 0.0,
+   "dur": 3.55
+  },
+  {
+   "id": "c11",
+   "t": 299.1,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[roaring] FIRE!",
+   "ko": "발사!",
+   "reuse": "c11",
+   "dur": 1.31
+  },
+  {
+   "id": "v4w07",
+   "t": 304.0,
+   "voice": "WING",
+   "radio": true,
+   "text": "[cheering, breathless] She's breaking up! Dreadnought's breaking up!",
+   "ko": "부서진다! 드레드노트가 부서진다!",
+   "stability": 0.0,
+   "dur": 3.16
+  },
+  {
+   "id": "v7s10",
+   "t": 311.0,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[shouting, fast] They're running! Enemy ships jumping out!",
+   "ko": "도망친다! 적 함선 이탈 중!",
+   "stability": 0.0,
+   "dur": 3.24
+  },
+  {
+   "id": "v7s11",
+   "t": 324.2,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[desperate, voice cracking] Sigma, respond! Sigma! ...Please... respond!",
+   "ko": "시그마, 응답하라. 시그마! …제발… 대답해.",
+   "stability": 0.0,
+   "dur": 6.92
+  },
+  {
+   "id": "v7p10",
+   "t": 332.2,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[very low, gravelly, exhausted, slow] Sigma... Still here.",
+   "ko": "시그마. 아직 살아있다.",
+   "stability": 0.5,
+   "radioFx": "broken",
+   "dur": 2.51
+  },
+  {
+   "id": "v6c12",
+   "t": 342.4,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[fast, emotional] All ships, jump! Take us home!",
+   "ko": "전 함, 도약! 집으로 가자!",
+   "stability": 0.0,
+   "dur": 2.93
+  },
+  {
+   "id": "v5n01",
+   "t": 348.5,
+   "voice": "NARRATOR",
+   "radio": false,
+   "text": "[softly, slowly, warm] We all dream... of a place to call home.",
+   "ko": "우리 모두는 집이라 부를 곳을 꿈꿉니다.",
+   "stability": 0.5,
+   "dur": 5.56
+  },
+  {
+   "id": "v5n02",
+   "t": 354.6,
+   "voice": "NARRATOR",
+   "radio": false,
+   "text": "[slowly, gently] For forty-one years, we crossed the dark... carrying the last of our people.",
+   "ko": "41년 동안, 우리는 어둠을 건넜습니다… 마지막 남은 우리 민족을 싣고.",
+   "stability": 0.5,
+   "dur": 8.05
+  },
+  {
+   "id": "v5n10",
+   "t": 363.6,
+   "voice": "NARRATOR",
+   "radio": false,
+   "text": "[gently, with a sad smile] Some of us... have to fight for it.",
+   "ko": "어떤 이들은… 그것을 위해 싸워야 하죠.",
+   "stability": 0.5,
+   "dur": 3.0
+  }
+ ]
+}

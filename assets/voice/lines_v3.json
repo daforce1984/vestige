@@ -1,0 +1,360 @@
+{
+ "voices": {
+  "NARRATOR": "calm, polished corporate-propaganda narrator, warm and reassuring (clean, not radio)",
+  "CMDR": "fleet commander, older, authoritative, gritty (radio)",
+  "SENSOR": "sensor officer / flight control, female, tense (radio)",
+  "PILOT": "RX-H1 Gundam pilot, young male, determined (radio)",
+  "WING": "frigate / interceptor squadron lead, male, fast and excited (radio)"
+ },
+ "lines": [
+  {
+   "id": "n01",
+   "t": 8.5,
+   "voice": "NARRATOR",
+   "radio": false,
+   "text": "[softly] We all dream of a place to call home.",
+   "ko": "우리 모두는 집이라 부를 곳을 꿈꿉니다.",
+   "reuse": "n01",
+   "dur": 3.24
+  },
+  {
+   "id": "v3n02",
+   "t": 21.0,
+   "voice": "NARRATOR",
+   "radio": false,
+   "text": "For forty-one years, we crossed the dark... carrying the last of our people.",
+   "ko": "41년 동안, 우리는 어둠을 건넜습니다… 마지막 남은 우리 민족을 싣고.",
+   "dur": 5.07
+  },
+  {
+   "id": "v3n03",
+   "t": 33.5,
+   "voice": "NARRATOR",
+   "radio": false,
+   "text": "[proudly] The Kharak-Sajuuk. Our city among the stars.",
+   "ko": "카라크-사주크. 별들 사이, 우리의 도시.",
+   "dur": 3.63
+  },
+  {
+   "id": "c01",
+   "t": 45.0,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "Hyperspace exit complete. All ships accounted for.",
+   "ko": "하이퍼스페이스 이탈 완료. 전 함선 이상 없음.",
+   "reuse": "c01",
+   "dur": 3.4
+  },
+  {
+   "id": "v3p01",
+   "t": 51.0,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[quietly, amazed] Home... It's really there.",
+   "ko": "집이다… 정말 저기 있어.",
+   "dur": 2.59
+  },
+  {
+   "id": "v3n04",
+   "t": 57.0,
+   "voice": "NARRATOR",
+   "radio": false,
+   "text": "[warmly] Rest easy. You are home. And together, we will finally-",
+   "ko": "편히 쉬십시오. 당신은 집에 왔습니다. 그리고 함께, 우리는 마침내—",
+   "cut": 63.0,
+   "dur": 5.72
+  },
+  {
+   "id": "v3s01",
+   "t": 64.2,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[panicked] Gravity spike, dead ahead! We can't jump!",
+   "ko": "전방 중력 급상승! 도약할 수 없습니다!",
+   "dur": 2.69
+  },
+  {
+   "id": "v3c02",
+   "t": 73.0,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[tense] That's no star... It's a trap.",
+   "ko": "저건 별이 아니야… 함정이다.",
+   "dur": 2.27
+  },
+  {
+   "id": "v3s02",
+   "t": 92.0,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[fearful] Dreadnought class... God, it's enormous.",
+   "ko": "드레드노트급… 맙소사, 엄청나게 큽니다.",
+   "dur": 3.71
+  },
+  {
+   "id": "v3c03",
+   "t": 102.0,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[commanding] All ships, battle line. Ion frigates, charge your cannons.",
+   "ko": "전 함, 전열 형성. 이온 프리깃, 캐논 충전.",
+   "dur": 4.21
+  },
+  {
+   "id": "v3w01",
+   "t": 113.0,
+   "voice": "WING",
+   "radio": true,
+   "text": "Charged and locked! Ready to fire!",
+   "ko": "충전 완료, 조준 고정! 사격 준비!",
+   "dur": 2.51
+  },
+  {
+   "id": "c05",
+   "t": 118.6,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[yelling] FIRE!",
+   "ko": "발사!",
+   "reuse": "c05",
+   "dur": 1.49
+  },
+  {
+   "id": "w02",
+   "t": 124.6,
+   "voice": "WING",
+   "radio": true,
+   "text": "[excited] Target destroyed! New primary, frigate two!",
+   "ko": "목표 격파! 다음 목표, 프리깃 2번!",
+   "reuse": "w02",
+   "dur": 3.32
+  },
+  {
+   "id": "w03",
+   "t": 134.6,
+   "voice": "WING",
+   "radio": true,
+   "text": "[shouting] Bandits everywhere! Break left, break left!",
+   "ko": "적기 사방에! 좌측 회피, 좌측 회피!",
+   "reuse": "w03",
+   "dur": 3.08
+  },
+  {
+   "id": "s04",
+   "t": 146.4,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[urgent] Port shields at forty percent!",
+   "ko": "좌현 실드 40퍼센트!",
+   "reuse": "s04",
+   "dur": 2.19
+  },
+  {
+   "id": "v3p02",
+   "t": 156.1,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[determined, shouting] RX-H1, launching!",
+   "ko": "RX-H1, 발진한다!",
+   "dur": 3.08
+  },
+  {
+   "id": "p04",
+   "t": 181.0,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[shouting] Above me-!",
+   "ko": "위다—!",
+   "reuse": "p04",
+   "dur": 1.8
+  },
+  {
+   "id": "s06",
+   "t": 202.2,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[panicked] Massive energy build-up on the dreadnought! It's targeting the mothership!",
+   "ko": "드레드노트에 초고에너지 반응! 모선을 노리고 있습니다!",
+   "reuse": "s06",
+   "dur": 3.71
+  },
+  {
+   "id": "c08",
+   "t": 207.6,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[grimly] We can't evade. All decks, brace for impact!",
+   "ko": "회피 불가. 전 구획, 충격에 대비하라!",
+   "reuse": "c08",
+   "dur": 3.32
+  },
+  {
+   "id": "c09",
+   "t": 226.4,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[coughing] Damage report... somebody talk to me.",
+   "ko": "피해 보고… 누구든 대답해.",
+   "reuse": "c09",
+   "dur": 2.59
+  },
+  {
+   "id": "s07",
+   "t": 229.4,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[shaken] Thirty-two percent of the hull is gone. If that well stays up... we all die here.",
+   "ko": "선체 32퍼센트 소실. 저 우물이 버티는 한… 우린 여기서 전멸합니다.",
+   "reuse": "s07",
+   "dur": 5.56
+  },
+  {
+   "id": "p06",
+   "t": 236.2,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[quietly] ...I'm going in.",
+   "ko": "…내가 간다.",
+   "reuse": "p06",
+   "dur": 1.15
+  },
+  {
+   "id": "s08",
+   "t": 244.0,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[desperate] RX-H1, pull back! Past that line, time itself bends!",
+   "ko": "RX-H1, 물러나! 그 선을 넘으면 시간 자체가 휘어진다!",
+   "reuse": "s08",
+   "dur": 5.72
+  },
+  {
+   "id": "p07",
+   "t": 252.0,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[breathing heavily] My clock's... slowing down. It's okay. I can still see it.",
+   "ko": "시계가… 느려지고 있어. 괜찮아. 아직 보여.",
+   "reuse": "p07",
+   "dur": 8.44
+  },
+  {
+   "id": "p08",
+   "t": 266.4,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "Output to maximum. Limiters... off.",
+   "ko": "출력 최대. 리미터… 해제.",
+   "reuse": "p08",
+   "dur": 3.63
+  },
+  {
+   "id": "p09",
+   "t": 271.9,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[screaming] THIS ENDS NOW!",
+   "ko": "이걸로 끝이다!",
+   "reuse": "p09",
+   "dur": 2.27
+  },
+  {
+   "id": "v3s09",
+   "t": 288.0,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[astonished] The well... it's gone!",
+   "ko": "우물이… 사라졌습니다!",
+   "dur": 2.27
+  },
+  {
+   "id": "c10",
+   "t": 293.0,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[fiercely] Bring us about. Every drop of power to the main gun.",
+   "ko": "함수를 돌려라. 모든 에너지를 주포로.",
+   "reuse": "c10",
+   "dur": 3.55
+  },
+  {
+   "id": "c11",
+   "t": 299.1,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[roaring] FIRE!",
+   "ko": "발사!",
+   "reuse": "c11",
+   "dur": 1.31
+  },
+  {
+   "id": "w07",
+   "t": 304.0,
+   "voice": "WING",
+   "radio": true,
+   "text": "[cheering] Dreadnought is breaking apart!",
+   "ko": "드레드노트가 부서진다!",
+   "reuse": "w07",
+   "dur": 1.8
+  },
+  {
+   "id": "s10",
+   "t": 311.0,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "Enemy survivors are jumping out. They're running.",
+   "ko": "적 잔존 함대, 이탈합니다. 도망칩니다.",
+   "reuse": "s10",
+   "dur": 2.93
+  },
+  {
+   "id": "s11",
+   "t": 324.2,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[worried, softly] RX-H1... respond. RX-H1, do you copy?",
+   "ko": "RX-H1… 응답하라. RX-H1, 들리나?",
+   "reuse": "s11",
+   "dur": 5.96
+  },
+  {
+   "id": "p10",
+   "t": 332.2,
+   "voice": "PILOT",
+   "radio": true,
+   "text": "[weak, exhausted] ...This is RX-H1. I'm... coming home.",
+   "ko": "…여기는 RX-H1. 이제… 집에 간다.",
+   "reuse": "p10",
+   "dur": 7.0
+  },
+  {
+   "id": "v3c12",
+   "t": 341.0,
+   "voice": "CMDR",
+   "radio": true,
+   "text": "[warmly, emotional] All ships... take us home.",
+   "ko": "전 함… 집으로 가자.",
+   "dur": 3.16
+  },
+  {
+   "id": "n09",
+   "t": 358.0,
+   "voice": "NARRATOR",
+   "radio": false,
+   "text": "[softly] We all dream of a home.",
+   "ko": "우리 모두는 집을 꿈꿉니다.",
+   "reuse": "n09",
+   "dur": 1.88
+  },
+  {
+   "id": "n10",
+   "t": 362.0,
+   "voice": "NARRATOR",
+   "radio": false,
+   "text": "Some of us... have to fight for it.",
+   "ko": "어떤 이들은… 그것을 위해 싸워야 하죠.",
+   "reuse": "n10",
+   "dur": 2.77
+  }
+ ]
+}

@@ -1,0 +1,45 @@
+[
+ {
+  "file": "A_promise.mp3",
+  "t": 16.0,
+  "gain": 0.733,
+  "fadeIn": 0.5,
+  "end": 63.0,
+  "offset": 0
+ },
+ {
+  "file": "B_dread.mp3",
+  "t": 63.04,
+  "gain": 1.288,
+  "fadeOut": 1.5
+ },
+ {
+  "file": "C_battle.mp3",
+  "t": 120.0,
+  "gain": 1.318,
+  "fadeIn": 0.05,
+  "fadeOut": 3.0
+ },
+ {
+  "file": "D_aftermath.mp3",
+  "t": 216.6,
+  "gain": 0.902,
+  "fadeIn": 2.5,
+  "fadeOut": 2
+ },
+ {
+  "file": "E_climax.mp3",
+  "t": 262.0,
+  "gain": 0.933,
+  "fadeIn": 0.3,
+  "fadeOut": 2
+ },
+ {
+  "file": "F_homeward.mp3",
+  "t": 324.0,
+  "gain": 1.274,
+  "fadeIn": 4,
+  "end": 372,
+  "offset": 12.0
+ }
+]

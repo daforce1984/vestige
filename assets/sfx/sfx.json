@@ -1,0 +1,509 @@
+{
+ "sampleRate": 44100,
+ "samples": {
+  "expl_epic": {
+   "file": "expl_epic.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 2.3631
+  },
+  "boom_cine": {
+   "file": "boom_cine.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 5.1146
+  },
+  "hit_heavy": {
+   "file": "hit_heavy.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 4.6213
+  },
+  "expl_metal": {
+   "file": "expl_metal.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 5.1151
+  },
+  "expl_distant_huge": {
+   "file": "expl_distant_huge.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 9.0
+  },
+  "expl_distant": {
+   "file": "expl_distant.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 5.2
+  },
+  "expl_nuke": {
+   "file": "expl_nuke.mp3",
+   "ch": 2,
+   "kind": "one",
+   "dur": 7.5
+  },
+  "shockwave": {
+   "file": "shockwave.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 1.5
+  },
+  "expl_debris": {
+   "file": "expl_debris.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 2.3922
+  },
+  "debris_impact": {
+   "file": "debris_impact.mp3",
+   "ch": 2,
+   "kind": "one",
+   "hit": 0.8,
+   "dur": 6.0031
+  },
+  "laser_shot": {
+   "file": "laser_shot.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 1.0
+  },
+  "laser_shot2": {
+   "file": "laser_shot2.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 4.5
+  },
+  "laser_cannon": {
+   "file": "laser_cannon.mp3",
+   "ch": 1,
+   "kind": "one",
+   "slices": {
+    "s0": [
+     0.0,
+     1.8
+    ],
+    "s1": [
+     2.05,
+     1.7
+    ],
+    "s2": [
+     4.0,
+     1.8
+    ],
+    "s3": [
+     6.05,
+     1.8
+    ],
+    "s4": [
+     8.1,
+     1.8
+    ],
+    "s5": [
+     10.15,
+     1.9
+    ]
+   },
+   "dur": 12.3
+  },
+  "big_beam": {
+   "file": "big_beam.mp3",
+   "ch": 1,
+   "kind": "one",
+   "slices": {
+    "fire": [
+     2.7,
+     3.55
+    ]
+   },
+   "hit": 2.85,
+   "dur": 6.25
+  },
+  "charge_up": {
+   "file": "charge_up.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 1.25
+  },
+  "charge_weapon": {
+   "file": "charge_weapon.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 8.3244
+  },
+  "alarm": {
+   "file": "alarm.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 11.1
+  },
+  "alarm_amb": {
+   "file": "alarm_amb.mp3",
+   "ch": 2,
+   "loop": [
+    0.25,
+    12.0
+   ],
+   "kind": "loop",
+   "dur": 12.5
+  },
+  "hyperspace": {
+   "file": "hyperspace.mp3",
+   "ch": 2,
+   "kind": "one",
+   "dur": 13.0
+  },
+  "hyperspace_boom": {
+   "file": "hyperspace_boom.mp3",
+   "ch": 2,
+   "kind": "one",
+   "slices": {
+    "boom": [
+     7.0,
+     10.0
+    ],
+    "roar": [
+     3.2,
+     13.8
+    ]
+   },
+   "hit": 7.2,
+   "dur": 16.9818
+  },
+  "flyby_large": {
+   "file": "flyby_large.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 1.8,
+   "dur": 7.2201
+  },
+  "flyby_fast": {
+   "file": "flyby_fast.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 2.8,
+   "dur": 5.4129
+  },
+  "flyby_short": {
+   "file": "flyby_short.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 2.8,
+   "dur": 6.5
+  },
+  "missile": {
+   "file": "missile.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 2.5
+  },
+  "minigun": {
+   "file": "minigun.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 8.0
+  },
+  "heavy_mg": {
+   "file": "heavy_mg.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 2.9
+  },
+  "metal_groan": {
+   "file": "metal_groan.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 6.0675
+  },
+  "power_down": {
+   "file": "power_down.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 1.8
+  },
+  "heartbeat": {
+   "file": "heartbeat.mp3",
+   "ch": 1,
+   "kind": "one",
+   "slices": {
+    "s0": [
+     0.0,
+     1.35
+    ],
+    "s1": [
+     1.6,
+     1.35
+    ],
+    "s2": [
+     3.2,
+     1.3
+    ]
+   },
+   "dur": 4.75
+  },
+  "tinnitus": {
+   "file": "tinnitus.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 10.0
+  },
+  "space_amb": {
+   "file": "space_amb.mp3",
+   "ch": 2,
+   "loop": [
+    0.25,
+    22.0
+   ],
+   "kind": "loop",
+   "dur": 22.5
+  },
+  "mech_powerup": {
+   "file": "mech_powerup.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 3.4
+  },
+  "servo": {
+   "file": "servo.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 1.5391
+  },
+  "mech_steps": {
+   "file": "mech_steps.mp3",
+   "ch": 1,
+   "kind": "one",
+   "slices": {
+    "four": [
+     0.95,
+     2.1
+    ]
+   },
+   "dur": 4.9
+  },
+  "saber_ignite": {
+   "file": "saber_ignite.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 1.4217
+  },
+  "saber_hum": {
+   "file": "saber_hum.mp3",
+   "ch": 1,
+   "loop": [
+    0.25,
+    12.0
+   ],
+   "kind": "loop",
+   "dur": 12.5
+  },
+  "black_hole": {
+   "file": "black_hole.mp3",
+   "ch": 1,
+   "loop": [
+    0.25,
+    24.0
+   ],
+   "kind": "loop",
+   "dur": 24.5
+  },
+  "rumble": {
+   "file": "rumble.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 5.0519
+  },
+  "rumble_dark": {
+   "file": "rumble_dark.mp3",
+   "ch": 1,
+   "loop": [
+    0.25,
+    20.0
+   ],
+   "kind": "loop",
+   "dur": 20.5
+  },
+  "whoosh": {
+   "file": "whoosh.mp3",
+   "ch": 1,
+   "kind": "one",
+   "slices": {
+    "a": [
+     0.0,
+     4.3
+    ],
+    "b": [
+     4.35,
+     3.55
+    ],
+    "c": [
+     7.9,
+     6.7
+    ]
+   },
+   "dur": 14.4177
+  },
+  "whoosh_rev": {
+   "file": "whoosh_rev.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 1.45,
+   "dur": 2.1
+  },
+  "braam": {
+   "file": "braam.mp3",
+   "ch": 2,
+   "kind": "one",
+   "dur": 3.2
+  },
+  "braam2": {
+   "file": "braam2.mp3",
+   "ch": 2,
+   "kind": "one",
+   "dur": 4.236
+  },
+  "atomic_impact": {
+   "file": "atomic_impact.mp3",
+   "ch": 2,
+   "kind": "one",
+   "dur": 3.4
+  },
+  "warp_out2": {
+   "file": "warp_out2.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.0,
+   "dur": 1.4
+  },
+  "beam": {
+   "file": "beam.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.8,
+   "dur": 6.3
+  },
+  "typing": {
+   "file": "typing.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 1.75
+  },
+  "axe_metal1": {
+   "file": "axe_metal1.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.07,
+   "dur": 1.47
+  },
+  "axe_metal3": {
+   "file": "axe_metal3.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.07,
+   "dur": 1.77
+  },
+  "metal_crush": {
+   "file": "metal_crush.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.2,
+   "dur": 1.7
+  },
+  "metal_knock": {
+   "file": "metal_knock.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.05,
+   "dur": 0.8
+  },
+  "metal_door": {
+   "file": "metal_door.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.07,
+   "dur": 4.32
+  },
+  "hl_warp_out": {
+   "file": "hl_warp_out.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 11.0
+  },
+  "hl_warp_out2": {
+   "file": "hl_warp_out2.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 1.5
+  },
+  "hl_warp_in": {
+   "alias": "hl_warp_out"
+  },
+  "hl_warp_in2": {
+   "alias": "hl_warp_out2"
+  },
+  "hl_big_explosion": {
+   "file": "hl_big_explosion.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 7.1859
+  },
+  "hl_explosion": {
+   "file": "hl_explosion.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 2.8473
+  },
+  "heavy_beam": {
+   "file": "heavy_beam.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 7.5008
+  },
+  "hl_beam": {
+   "file": "hl_beam.mp3",
+   "ch": 1,
+   "loop": [
+    0.25,
+    2.8
+   ],
+   "kind": "loop",
+   "dur": 3.3
+  },
+  "beam_blast1": {
+   "file": "beam_blast1.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 2.25,
+   "dur": 3.02
+  },
+  "beam_blast4": {
+   "file": "beam_blast4.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 1.8,
+   "dur": 3.02
+  },
+  "hl_charge": {
+   "alias": "charge_weapon"
+  },
+  "hl_charge2": {
+   "file": "hl_charge2.mp3",
+   "ch": 1,
+   "kind": "one",
+   "dur": 19.048
+  },
+  "hl_thruster": {
+   "file": "hl_thruster.mp3",
+   "ch": 2,
+   "loop": [
+    0.25,
+    6.5
+   ],
+   "kind": "loop",
+   "dur": 7.0
+  },
+  "hl_thruster2": {
+   "alias": "hl_thruster"
+  }
+ }
+}
