@@ -353,6 +353,12 @@ function drawDock(R, t, me) {
     rig.matOverride = { dock_light: { base: [0.3, 0.7, 1], metal: 0, rough: 0.3, emissive: t < 343.05 ? [0.35 * blink * 3, 0.85 * blink * 3, 1.4 * blink * 3] : [0.1, 0.9, 0.4] } };
   }
   // blue containment field across the bay mouth (fades on as Sigma approaches; ripples as he pushes through)
+  if (t > 150 && t < 162) {                                   // the same field across the port bay when Sigma LAUNCHES
+    const k = smooth(150, 151.5, t) * (1 - smooth(160.8, 161.8, t));
+    const cw = M.transformPoint([0, 0, 0], mm, [-74.2, 4.5, 57]);
+    const au = M.transformDir([0, 0, 0], mm, [0, 0, 35]), av = M.transformDir([0, 0, 0], mm, [0, 21.5, 0]);
+    R.bayField(cw, au, av, t > 159.55 ? t - 159.55 : -1, [0.35, 0.7, 1.6], 0.8 * k);
+  }
   if (t > 336 && t < 344) {
     const k = smooth(336, 337.5, t) * (1 - smooth(343.2, 343.8, t));
     const cw = M.transformPoint([0, 0, 0], mm, [-74.2, 4.5, 57]);
@@ -595,7 +601,7 @@ export function drawWorld(R, t, opts = {}) {
     }
     // the wound: the hangar bay behind the melted wall, molten drips, and the bay's contents sucked out into space
     if (t > LANCE_FIRE) drawWound(R, t, me);
-    if (t > 335) drawDock(R, t, me);
+    if (t > 335 || (t > 150 && t < 162)) drawDock(R, t, me);   // (also at the launch: the bay field)
     // hull fires after lance
     if (t > LANCE_FIRE + 1) {
       const n = 14;

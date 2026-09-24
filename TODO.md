@@ -214,3 +214,5 @@
 - [x] 152. Emissive fixtures on every ship/fighter/bay (blender/shipkit.py lamp_fixture, light_bar, lamp_row, chevron_light, window_bay, light_panel, louvre_glow, beacon) replace plain glowing boxes; tri budgets kept; wound rim regenerated.
 - [x] 153. Warp in/out sound is now the user's warp_out.mp3: first 3.8 s kept, faded out from 1.6 s (tools/build_sfx.py entry; original kept in assets/sfx_src).
 - [x] 154. From scene 5 (40 s) to the Earth arrival the same moon hangs in the background of every exterior shot (frame-anchored upper/lower corner per shot, chosen where it is most fully sunlit); no other planets (the brown planet and the per-shot moon placements removed; interiors excluded; Earth ending unchanged).
+- [x] 155. The background moon is enormous: angular radius ≈ 2.3× the half-FOV, centred off the frame corner so its limb sweeps across a third of the frame; albedo toned down.
+- [x] 156. Scene 29 (S11d fly-by): the blue containment field is across the flagship's port launch bay as Sigma launches (fades on 150–151.5, ripple as he punches through at 159.55, off by 161.8).

@@ -1974,8 +1974,8 @@ export function frame(R, film) {
     const cam = ctx.cam, f = V.norm([0, 0, 0], V.sub([0, 0, 0], cam.target, cam.pos));
     const r = V.norm([0, 0, 0], V.cross([0, 0, 0], f, [0, 1, 0])), u = V.cross([0, 0, 0], r, f);
     const side = moonDir.side, half = Math.tan(cam.fov * 0.5), asp = R.width / Math.max(1, R.height);
-    const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], f, V.scale([0, 0, 0], r, 0.55 * half * asp * side)), V.scale([0, 0, 0], u, 0.42 * half * moonDir.up)));
-    ctx.env.planet = { dir, radius: Math.min(PL_R * 0.45, 0.62 * half), col: [0.5, 0.5, 0.52], earth: false, kind: 'moon' };
+    const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], f, V.scale([0, 0, 0], r, 1.3 * half * asp * side)), V.scale([0, 0, 0], u, 1.15 * half * moonDir.up)));   // centre off the corner: a vast limb fills that side
+    ctx.env.planet = { dir, radius: Math.min(1.4, 2.3 * Math.atan(half))   /* enormous: the limb sweeps across a third of the frame */, col: [0.36, 0.36, 0.38], earth: false, kind: 'moon' };
   }
   else if (t >= 40 && ctx.env.planet && !ctx.env.planet.earth) ctx.env.planet = null;
   if (globalThis.__CAM) { const q = globalThis.__CAM(t); if (q) camLook(ctx, q.pos, q.target, q.fov || 30, 0); }   // debug inspection camera (dev only)
