@@ -776,7 +776,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   col += envC * reflK * ao * mix(0.35, 1.0, sh);
   // rim (nebula backlight) for silhouettes
   let rim = pow(1.0 - max(dot(n, V), 0.0), 2.5);
-  col += F.rimCol.rgb * rim * F.rimCol.w * ao * (0.5 + 0.5 * base) * mix(0.3, 1.0, rockK);
+  col += F.rimCol.rgb * rim * F.rimCol.w * ao * (0.5 + 0.5 * base) * mix(0.3, 1.0, rockK) * select(1.0, 0.3, texSet > 0);   // mechs: subtle rim
   // cinematic fill from slightly above the camera: keeps the dark side of hulls readable
   let fillDir = normalize(V + vec3f(0.0, 0.35, 0.0));
   let fl = clamp((dot(n, fillDir) + F.fill.w) / (1.0 + F.fill.w), 0.0, 1.0);

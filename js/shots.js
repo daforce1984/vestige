@@ -578,14 +578,16 @@ export function drawGundam(R, t, s, opts = {}) {
 }
 // the finisher: from the moment the mace connects (192.4) RONIN #2 comes apart — the mace punches through, the body
 // splits into armour chunks that drift outward in slow motion, then the reactor goes at 194 and everything is flung
-const E2_FIN = 192.4, E1_FIN = 180.2;
+const E2_FIN = 192.4, E1_FIN = 179.15;   // RONIN #1 blows apart right after the mace smash (no long crumple)
 const _fin = {};
 function drawBreakup(R, t, idx) {
   const t0 = idx === 2 ? E2_FIN : E1_FIN;
   if (!_fin[idx]) { const s0 = idx === 2 ? enemyMS2(t0) : enemyMS1(t0); _fin[idx] = { m: msMatrix(new Float32Array(16), s0), pose: JSON.parse(JSON.stringify(s0.pose)) }; }
   // RONIN #2 (the finisher) comes apart in slow motion until its reactor blows at 194; RONIN #1 in real time
   const tt = idx === 2 ? E2_FIN + Math.min(1.6, t - E2_FIN) * 0.28 + Math.max(0, t - 194) * 1.1 : t;
-  shatter(R, 'enemy_ms', _fin[idx].m, tt, t0, idx === 2 ? 88 : 77, [3, 4, 3], idx === 2 ? 2.6 : 3.2, { tint: [2, 0.4, 0.3], pose: _fin[idx].pose, texSet: R.texLoaded & 4 ? 2 : 0 });
+  // the pieces are thrown along the killing blow (the mace swing direction), in the dead machine's model space
+  if (!_fin[idx].imp && BLOWS[idx]) { const ev = BLOWS[idx].ev; const inv = M.invert(M.new(), _fin[idx].m); _fin[idx].imp = V.norm([0, 0, 0], M.transformDir([0, 0, 0], inv, V.sub([0, 0, 0], ev.cut[1], ev.cut[0]))); }
+  shatter(R, 'enemy_ms', _fin[idx].m, tt, t0, idx === 2 ? 88 : 77, [3, 4, 3], idx === 2 ? 2.6 : 3.2, { tint: [2, 0.4, 0.3], pose: _fin[idx].pose, texSet: R.texLoaded & 4 ? 2 : 0, impulse: _fin[idx].imp, impulseK: idx === 2 ? 1.6 : 2.6 });
 }
 function drawEnemyMS(R, t, s, idx) {
   if (idx === 2 && t > E2_FIN + 0.03 && t < 200) { drawBreakup(R, t, 2); return null; }
@@ -602,7 +604,7 @@ function drawEnemyMS(R, t, s, idx) {
     const d = V.norm([0, 0, 0], M.transformDir([0, 0, 0], tm, BL.d));
     const cc = madd(M.transformPoint([0, 0, 0], tm, BL.p), d, 1.5);   // just inside the struck surface
     const lt = t - BL.ev.t;
-    const k = 1.05 * easeOut(sat(lt / 0.12)) + 0.1 * Math.sin(Math.min(lt, 0.4) * 40) * Math.exp(-lt * 8) + 0.55 * smooth(BL.ev.t + 0.15, BL.ev.t + 1.2, t);
+    const k = Math.min(0.75, 0.7 * easeOut(sat(lt / 0.12)) + 0.08 * Math.sin(Math.min(lt, 0.4) * 40) * Math.exp(-lt * 8));   // a dent, not a smear
     e.crush = [cc[0], cc[1], cc[2], 10 * Math.sign(d[2] || 1e-6), k, d[0], d[1]];
     e.damage = Math.max(e.damage || 0, 0.35 * sat(lt / 0.3));
   }
@@ -613,6 +615,16 @@ function drawEnemyMS(R, t, s, idx) {
 }
 
 const _e1m = new Map();
+const _vamb = new Map();
+function vambrace(ti) {                    // Sigma's right vambrace (forearm armour) at time ti — where the bolts land
+  let p = _vamb.get(ti);
+  if (!p) {
+    const fk = duelFK({ ...gundamState(ti), saber: 1 }, 'gundam');
+    p = V.lerp([0, 0, 0], M.transformPoint([0, 0, 0], fk.arm_R_lower, [0, 0, 0]), M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]), 0.6);
+    _vamb.set(ti, p);
+  }
+  return p;
+}
 function e1Muzzle(tf) {                  // pure function of time (cached): the left hand of RONIN #1, a little ahead of the fist
   let p = _e1m.get(tf);
   if (!p) {
@@ -663,15 +675,30 @@ function drawMSBattle(R, t) {
       const tf = 172 + k * 0.26;
       if (t < tf || t > tf + 0.5) continue;
       const mz = e1Muzzle(tf), from = mz.pos;                     // wrist gun on RONIN's aiming (left) arm
-      const dist = V.dist(from, gundamState(tf + 0.35).pos);
-      const sd = randDir([0, 0, 0], k * 3.7 + 1);                     // a little spray around the barrel line
-      const to = madd(madd(from, mz.dir, dist), sd, dist * 0.03);
-      bolt(R, t, tf, tf + 0.35, from, to, 14, 0.35, [3, 1.4, 0.4], 1);
+      // every bolt is swatted aside by Sigma's right vambrace (duel.js volleyParry): it lands on the armour at ti and
+      // glances off, sparks spraying
+      const ti = tf + 0.35;
+      const to = vambrace(ti);
+      bolt(R, t, tf, ti, from, to, 14, 0.35, [3, 1.4, 0.4], 1);
+      if (t >= ti) {
+        const lt = t - ti, inc = V.norm([0, 0, 0], V.sub([0, 0, 0], to, from));
+        const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], inc, -0.3), randDir([0, 0, 0], k * 5.3 + 2)));
+        bolt(R, t, ti, ti + 0.3, to, madd(to, out, 380), 10, 0.25, [2.4, 1.0, 0.3], 0.8);
+        const kf = Math.exp(-lt * 14);
+        R.glow(to, 1.5 + 2.5 * easeOut(sat(lt / 0.05)), [3 * kf, 1.8 * kf, 0.8 * kf], 0.4);
+        for (let q = 0; q < 8; q++) {
+          const sd2 = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], k * 11 + q * 3.1), out, 1.0));
+          const life = 0.18 + hash(k + q) * 0.2; if (lt > life) continue;
+          const u2 = lt / life, p = madd(to, sd2, (2 + 9 * hash(q + k * 2)) * easeOut(u2)), q2 = madd(p, sd2, -1.2 * (1 - u2));
+          const b = 3.5 * (1 - u2) * (1 - u2);
+          R.beam(q2, p, 0.06, [b, b * 0.6, b * 0.3], 1, 10);
+        }
+      }
       const mf = Math.exp(-(t - tf) * 12); if (t - tf < 0.3) { R.glow(from, 2.2, [3 * mf, 1.6 * mf, 0.5 * mf], 0.6); R.light(from, 30, [1, 0.6, 0.3], 4 * mf); }
     }
   }
   if (t > 179.1 && t < 180.3) hitFlash(R, t, 179.1, addv(enemyMS1(179.1).pos, [0, 9, 0]), 8, [1, 0.5, 0.3]);
-  explosion(R, t, 180.2, addv(enemyMS1(180.2).pos, [0, 9, 0]), 16, 501, 'ship');
+  explosion(R, t, E1_FIN, addv(enemyMS1(E1_FIN).pos, [0, 9, 0]), 18, 501, 'ship');
   // contact effects from the choreography (exact world contact points)
   for (const ev of [...DUEL_EVENTS, ...AUTO_FX]) {                  // choreographed + hitbox-detected contacts
     const lt = t - ev.t;
@@ -1235,17 +1262,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
       R.glow(hd, 0.35 + 0.4 * pk, [3 * pk + 0.4, 0.25, 0.12], 0.5);
       c.post.streak = 0.6 + 0.6 * pk; c.post.ca = 0.004 + 0.006 * pk; c.post.exposure = 0.8;
     }
-    if (t > 181.6 && t < 182.9) {                              // backlight: RONIN crosses a blinding light, ignites red
-      const e = duelEnemy2(t).pos, hh = addv(duelHero(t).pos, [0, 8, 0]);
-      const away = V.norm([0, 0, 0], V.sub([0, 0, 0], e, hh));
-      const B = madd(e, away, 900);
-      const k = smooth(181.6, 181.9, t) * (1 - smooth(182.6, 182.9, t));
-      R.glow(B, 110, [2.2 * k, 2.0 * k, 1.8 * k], 0.35);
-      c.post.godray = { pos: B, intensity: 0.28 * k, decay: 0.96 };
-      c.post.streak = 0.8 * k + 0.5; c.post.exposure = 0.8;
-      const ig = smooth(182.05, 182.2, t);                         // thrusters ignite: a red star on the silhouette
-      if (ig > 0) { R.glow(madd(e, away, 3), 4 + 6 * ig, [5 * ig, 0.6 * ig, 0.3 * ig], 0.5); R.light(e, 60, [1, 0.3, 0.2], 10 * ig); }
-    }
+    // (the backlight glow disc + red thruster star behind RONIN #2's entrance were removed: they read as a glow bug)
     if (t > 182.6 && t < 184.4) {                              // the dive: speed streaks and shock rings around RONIN
       const e = duelEnemy2(t).pos, eN = duelEnemy2(t + 0.05).pos;
       const dv = V.norm([0, 0, 0], V.sub([0, 0, 0], eN, e));

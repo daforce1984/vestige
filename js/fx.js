@@ -201,7 +201,8 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
         R.beam(_prev, _pn, r * (0.2 + 1.45 * Math.pow(f, 1.3)), [c[0] * kb, c[1] * kb, c[2] * kb], 0.9, 6, 0.6, 0.5);
         V.copy(_prev, _pn);
       }
-      R.glow(tmp, r * 2.4, [c[0] * 1.1, c[1] * 1.1, c[2] * 1.1], 0.35);   // bright additive glow round the thick base
+      if (isShip) R.glow(tmp, r * 2.4, [c[0] * 1.1, c[1] * 1.1, c[2] * 1.1], 0.35);   // bright additive glow round the thick base
+      else R.glow(tmp, r * 1.2, [c[0] * 0.6, c[1] * 0.6, c[2] * 0.6], 0.15);
       if (isShip) crossPlume(R, tmp, tmp2, r, len * 0.6, c);
       else { R.flame(tmp, V.scale(tmp3, tmp2, len * 0.45), r * 1.7, c, 1.4, i * 3.1, 1); crossPlume(R, tmp, tmp2, r * 0.8, len * 0.8, c); }
       if (opts.particles) {
@@ -230,7 +231,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     V.scale(tmp3, tmp2, len);
     R.flame(tmp, tmp3, r * 1.7, c, 1.4, i * 3.1, 1);
     crossPlume(R, tmp, tmp2, r * 0.8, len * 1.1, c);                  // the same cone plume as the ships (hot, additive base)
-    R.glow(tmp, r * 2.2, [c[0] * 0.9, c[1] * 0.9, c[2] * 0.9], 0.3);
+    R.glow(tmp, r * 1.1, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5], 0.15);   // mechs: tight nozzle glow (a big halo read as a white blob head-on)
   }
 }
 // two plume planes crossed along the thrust axis (reads as a volume from any angle), sized from the nozzle radius
@@ -343,7 +344,8 @@ export function shatter(R, name, base, t, t0, seed, grid = [2, 2, 3], speed = 1,
     const hi = [cut(ix + 1, gx, mn[0], mx[0], 1), cut(iy + 1, gy, mn[1], mx[1], 2), cut(iz + 1, gz, mn[2], mx[2], 3)];
     const c = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
     // velocity: away from the break point + random tumble; bigger ships drift slower
-    const dir = V.norm([0, 0, 0], [c[0] + (hash(s) - 0.5) * size * 0.3, c[1] + (hash(s + 1) - 0.5) * size * 0.3, c[2] * 0.6]);
+    let dir = V.norm([0, 0, 0], [c[0] + (hash(s) - 0.5) * size * 0.3, c[1] + (hash(s + 1) - 0.5) * size * 0.3, c[2] * 0.6]);
+    if (opts.impulse) dir = V.norm([0, 0, 0], V.madd([0, 0, 0], dir, opts.impulse, opts.impulseK ?? 2.5));   // thrown along the blow
     const v = size * (0.06 + hash(s + 2) * 0.1) * speed;
     const d = v * lt * (1 - Math.min(0.5, lt * 0.02));
     Q.fromEuler(_sq, lt * (hash(s + 3) - 0.5) * 0.5 * speed, lt * (hash(s + 4) - 0.5) * 0.4 * speed, lt * (hash(s + 5) - 0.5) * 0.6 * speed);

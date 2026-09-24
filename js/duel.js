@@ -203,13 +203,13 @@ L.iaiMid = P({
   leg_R_upper: [45, 0, -10], leg_R_lower: [20, 0, 0], foot_R: [50, 0, 0], _body: [25, 0, 0],
 });
 L.iaiEnd = P({
-  pelvis: [0, 25, 0], torso: [15, 40, 0], head: [5, -10, 0],
-  arm_L_upper: [-75, 135, 10], arm_L_lower: [-5, 0, 0], hand_L: [80, 0, 0],
+  pelvis: [0, 25, 0], torso: [20, 48, 0], head: [5, -10, 0],
+  arm_L_upper: [-38, 72, 15], arm_L_lower: [-40, 0, 0], hand_L: [30, 0, 0],   // follow-through across the body, elbow soft (no wrap-back)
   arm_R_upper: [-20, 0, -40], arm_R_lower: [-60, 0, 0],
   leg_L_upper: [-20, 0, 10], leg_L_lower: [40, 0, 0], foot_L: [30, 0, 0],
   leg_R_upper: [30, 0, -10], leg_R_lower: [50, 0, 0], foot_R: [40, 0, 0], _body: [10, 0, 0],
 });
-L.finish = W(L.iaiEnd, { torso: [8, 30, 0], arm_L_upper: [-45, 120, 20], arm_L_lower: [-15, 0, 0], _body: [0, 0, 0] });
+L.finish = W(L.iaiEnd, { torso: [8, 30, 0], arm_L_upper: [-22, 45, 18], arm_L_lower: [-42, 0, 0], hand_L: [15, 0, 0], _body: [0, 0, 0] });   // mace lowered, arm relaxed
 // defender poses (hero-side authoring; RONIN uses mirror())
 L.sideBlock = P({   // blade vertical-ish on own weapon side, catching a cut from the upper weapon side
   pelvis: [0, -10, 0], torso: [10, -15, 0], head: [-5, 10, 0],
@@ -830,6 +830,27 @@ const _c_duelHero = new Map();
 // the launch run's evasive manoeuvre: an enemy ion bolt aimed at where Sigma WOULD be at DODGE.t; he rolls and jinks
 // sideways ~10 m (lead-in 0.5 s, back on the line by +1.1 s), the bolt tears through the empty space
 export const DODGE = { t: 166.65, side: 1 };
+// RONIN #1's wrist-gun bursts (shots.js: fired at 172 + k·0.26, 0.35 s flight): Sigma swats EVERY bolt aside with the
+// right vambrace — the forearm stays up in a guard and flicks out to meet each impact, alternating sides
+export const E1_BOLTS = Array.from({ length: 24 }, (_, k) => 172 + k * 0.26 + 0.35);
+function volleyParry(tw, out) {
+  if (tw < 171.7 || tw > 178.0) return;
+  const guard = smooth(171.7, 172.2, tw) * (1 - smooth(177.35, 177.8, tw));
+  if (guard <= 0) return;
+  let flick = 0, twist = 0;
+  E1_BOLTS.forEach((ti, k) => {
+    const x = (tw - ti) / 0.09;
+    const g = Math.exp(-x * x);                              // meets the bolt, then relaxes (0.09 s either side)
+    const sd = k % 2 ? 1 : -1;
+    flick += g * sd; twist += g * sd * 0.6;
+  });
+  out[PIDX.arm_R_upper] += (-1.2) * guard;
+  out[PIDX.arm_R_upper + 1] += (0.45 + 0.35 * flick) * guard;
+  out[PIDX.arm_R_upper + 2] += (0.1 - 0.2 * flick) * guard;
+  out[PIDX.arm_R_lower] += -1.3 * guard;
+  out[PIDX.hand_R] += -0.25 * guard;
+  out[PIDX.torso + 1] += (-0.12 + 0.12 * twist) * guard;
+}
 export function dodgeRight(tw) { const d = nrm(sub(gundamLaunchPath(tw + 0.05), gundamLaunchPath(tw))); return nrm([d[2], 0, -d[0]]); }
 // forearm comes up across the chest (0.3 s before), takes the bolt on the armour at DODGE.t and sweeps it outward;
 // the body gives a little to the hit and the arm settles back with weight
@@ -867,7 +888,7 @@ function duelHero_(t) {
   s.pos = heroRawPos(tw);
   const co = collisionOffset('hero', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => heroRawPos(warp(x)), t); s._pf = (x) => heroRawPos(warp(x)); s._t = t;
-  springPose(heroPose, tw, _pose); heroImp(tw, _pose); if (tw >= 170) { heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper'); } micro(t, _pose, 1.3);
+  springPose(heroPose, tw, _pose); heroImp(tw, _pose); volleyParry(tw, _pose); if (tw >= 170) { heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper'); } micro(t, _pose, 1.3);
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   _pose[PIDX.hand_L] = maceWrist(_pose[PIDX.hand_L]);
   // facing
@@ -1074,7 +1095,7 @@ const EV = [
   [178.2, 'hit', 0.8, { kind: 'part-part', a: ['hero', 'leg_L_lower', [0, 0, 1]], b: ['e1', 'torso', [0, 0, 2.4]], note: 'hero knee to E1 gut' }],
   [178.55, 'hit', 0.9, { kind: 'part-part', a: ['hero', 'foot_R', [0, -1, 0.5]], b: ['e1', 'torso', [0, 1, 2.4]], note: 'push kick' }],
   [179.0, 'hit', 1.0, { kind: 'blade-part', blade: 'hero', part: ['e1', 'torso', [0, 1, 0]], cut: true, note: 'MACE SMASH on RONIN #1' }],
-  [180.2, 'shake', 1.0, { on: 'e1', note: 'E1 explodes' }],
+  [179.15, 'shake', 1.0, { on: 'e1', note: 'E1 explodes (right after the smash)' }],
   [184.5, 'clash', 1.0, { kind: 'blade-blade', note: 'E2 dive plunge blocked overhead' }],
   [186.0, 'clash', 0.8, { kind: 'blade-blade', note: 'S1 diagonal blocked' }],
   [186.45, 'clash', 0.6, { kind: 'blade-blade', note: 'S2 backhand blocked' }],

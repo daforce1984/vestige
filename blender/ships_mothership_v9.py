@@ -29,8 +29,8 @@ import bpy
 from mathutils import Vector
 import lib
 from lib import MB, reg, empty, rng, lerp, annulus, D2R
-from shipkit import Hull, plate, cuts, obox, turret, fins
-from hullkit import antenna, dome
+from shipkit import Hull, plate, obox, turret
+from hullkit import dome
 
 ASSETS = os.path.join(os.path.dirname(HERE), 'assets')
 OUT = os.path.join(HERE, 'previews')
@@ -230,7 +230,7 @@ def deck(mb, H, R):
                 continue                            # under the spine / command block
             if 243 <= b and a <= 311 and x1 <= 15:
                 continue                            # under the cannon brow
-            if x0 >= 42 and -226 <= (a + b) / 2 <= 170:
+            if x0 >= 42 and -110 <= (a + b) / 2 <= 170:
                 continue                            # under the strake
             oa, ob = min(x1, xea), min(x1, xeb)
             if min(oa, ob) < x0 + 2.5:
@@ -613,12 +613,391 @@ def port_launch_bay(mb, R):
     empty('hangar_exit', (x - D - 4, Y((sa + sb) / 2), (za + zb) / 2 - 4), rot=(0, 0, -90), size=6)
 
 
+# ==========================================================================================================
+# SYSTEMS: purpose-built machinery placed by the zoning plan (see blender/MOTHERSHIP_SYSTEMS.md)
+# ==========================================================================================================
+class Surf:
+    """Ray caster over the finished structure + armour; places components on the plate they are bolted to."""
+
+    def __init__(self, mb, tol=0.7):
+        from mathutils.bvhtree import BVHTree
+        self.T = BVHTree.FromBMesh(mb.bm)
+        self.tol = tol
+        self.stats = {}
+
+    def cast(self, o, d, dist=900.0):
+        o, d = Vector(o), Vector(d).normalized()
+        loc, n, _, _ = self.T.ray_cast(o, d, dist)
+        if loc is None:
+            return None
+        n = n.normalized()
+        if n.dot(d) > 0:
+            n = -n
+        return loc, n
+
+    def top(self, x, s):
+        return self.cast((x, Y(s), 400.0), (0, 0, -1))
+
+    def under(self, x, s):
+        return self.cast((x, Y(s), -400.0), (0, 0, 1))
+
+    def flank(self, sg, s, z):
+        return self.cast((sg * 400.0, Y(s), z), (-sg, 0, 0))
+
+    def _fit(self, hits, t, up, tol, tag):
+        st = self.stats.setdefault(tag, [0, 0])
+        if any(h is None for h in hits):
+            st[1] += 1
+            return None
+        o, n = hits[0]
+        ds = [(h[0] - o).dot(n) for h in hits[1:]]
+        if max(abs(d) for d in ds) > tol or any(h[1].dot(n) < 0.7 for h in hits[1:]):
+            st[1] += 1
+            return None
+        st[0] += 1
+        hi, lo = max(0.0, max(ds)), min(0.0, min(ds))
+        F = LF(o + n * hi, n, t, up)
+        F.sink = hi - lo + 0.35
+        return F
+
+    def site_top(self, x, s, W, L, tag='top', tol=None):
+        """Flat site on a dorsal surface: W across (x), L along (s)."""
+        pts = [(0, 0)] + [(a * W / 2, b * L / 2) for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0)]
+        hits = [self.top(x + a, s + b) for a, b in pts]
+        return self._fit(hits, (0, -1, 0), (1, 0, 0), tol or self.tol, tag)
+
+    def site_under(self, x, s, W, L, tag='under', tol=None):
+        pts = [(0, 0)] + [(a * W / 2, b * L / 2) for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0)]
+        hits = [self.under(x + a, s + b) for a, b in pts]
+        return self._fit(hits, (0, -1, 0), (1, 0, 0), tol or self.tol, tag)
+
+    def site_flank(self, sg, s, z, L, Hh, tag='flank', tol=None):
+        """Site on a side surface: L along s, Hh along z."""
+        pts = [(0, 0)] + [(a * L / 2, b * Hh / 2) for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0)]
+        hits = [self.flank(sg, s + a, z + b) for a, b in pts]
+        return self._fit(hits, (0, -1, 0), (0, 0, 1), tol or self.tol, tag)
+
+    def site_hull(self, H, s, p, L, W, tag='hull', tol=None):
+        """Site on hull edge p (index space) at station s: L along s, W across (world metres)."""
+        e = int(math.floor(p))
+        dp = W / 2 / max(1.0, H.edge_len(s, e))
+        pts = [(0, 0)] + [(a * L / 2, b * dp) for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0)]
+        hits = []
+        for a, b in pts:
+            pos, n = H.pt(s + a, p + b, 0.0)
+            hits.append(self.cast(pos + n * 60.0, -n))
+        up = Vector((0, 0, 1)) if abs(H.pt(s, p)[1].z) < 0.7 else Vector((1, 0, 0))
+        return self._fit(hits, (0, -1, 0), up, tol or self.tol, tag)
+
+    def heightmap(self):
+        """Debug: ASCII map of the dorsal surface (one row per 8 m station, one column per 4 m of x)."""
+        print('HEIGHTMAP  s \\ x = 0..136 step 4  (char = (z-20)/4, "." = miss)')
+        for s in range(308, -296, -8):
+            row = ''
+            for x in range(0, 140, 4):
+                h = self.top(x + 0.1, s + 0.1)
+                if h is None:
+                    row += '.'
+                else:
+                    k = int((h[0].z - 20) / 4)
+                    row += '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[max(0, min(35, k))]
+            print('%5d %s' % (s, row))
+
+
+class LF:
+    """Local frame on a surface: b across, t along (toward the bow), n out of the hull."""
+
+    def __init__(self, o, n, t=(0, -1, 0), up=None):
+        n = Vector(n).normalized()
+        t = Vector(t)
+        t = t - n * t.dot(n)
+        if t.length < 1e-4:
+            t = Vector((0, 0, 1)) - n * n.z
+        t.normalize()
+        b = t.cross(n)
+        if up is not None and b.dot(Vector(up)) < 0:
+            b = -b
+        self.o, self.n, self.t, self.b = Vector(o), n, t, b
+        self.sink = 0.35
+
+    def p(self, u, v, w=0.0):
+        return self.o + self.b * u + self.t * v + self.n * w
+
+    def box(self, mb, u, v, w, su, sv, sw, mat):
+        """Box with its bottom at height w."""
+        obox(mb, self.p(u, v, w + sw / 2), self.n, (su, sv, sw), mat, lift=0.0, fwd=self.t)
+
+    def cyl(self, mb, a, b, r0, r1=None, mat='trim', seg=8, caps=True):
+        mb.cyl(self.p(*a), self.p(*b), r0, r0 if r1 is None else r1, mat, seg=seg, caps=caps)
+
+    def plinth(self, mb, W, L, h, mat='hull', u=0.0, v=0.0):
+        self.box(mb, u, v, -self.sink, W, L, h + self.sink, mat)
+
+
+# ---------------------------------------------------------------------------------------------- components
+def pd_turret(mb, F, u, v, w, sz=2.6, yaw=0.0):
+    """Point-defence mount: low drum, boxy twin-gun housing, two barrels (yaw 0 = toward the bow)."""
+    F.cyl(mb, (u, v, w), (u, v, w + 0.4 * sz), 0.62 * sz, 0.55 * sz, 'trim', seg=8)
+    d = F.t * math.cos(yaw) + F.b * math.sin(yaw)
+    sd = F.n.cross(d)
+    c = F.p(u, v, w + 0.4 * sz + 0.25 * sz)
+    obox(mb, c, F.n, (0.8 * sz, 0.95 * sz, 0.5 * sz), 'hull2', lift=0.0, fwd=d)
+    for k in (-1, 1):
+        a = c + sd * (k * 0.2 * sz) + d * (0.35 * sz)
+        mb.cyl(a, a + d * (1.2 * sz), 0.085 * sz, 0.07 * sz, 'greeble', seg=6)
+
+
+def pd_battery(mb, F, n=3, pitch=5.0, sz=2.4, yaw=0.0):
+    """Row of PD mounts on a common armoured plinth with magazine hatch and end marker lights."""
+    L = n * pitch
+    F.plinth(mb, 1.7 * sz, L, 0.5, 'hull')
+    for k in range(n):
+        pd_turret(mb, F, 0.0, (k - (n - 1) / 2) * pitch, 0.5, sz, yaw)
+    for e in (-1, 1):
+        F.box(mb, 0.0, e * (L / 2 - 0.4), 0.5, 1.0, 0.5, 0.25, 'amber')
+
+
+def sensor_array(mb, F, W, L, nu, nv, lit=True):
+    """Phased-array panel: raised trim frame carrying a regular grid of emitter tiles + status strip."""
+    F.plinth(mb, W, L, 0.45, 'trim')
+    cu, cv = W / nu, L / nv
+    for i in range(nu):
+        for j in range(nv):
+            F.box(mb, -W / 2 + cu * (i + 0.5), -L / 2 + cv * (j + 0.5), 0.45, cu - 0.35, cv - 0.35, 0.3, 'plate')
+    if lit:
+        F.box(mb, 0.0, L / 2 + 0.5, 0.0, W * 0.7, 0.5, 0.35, 'blue_light')
+
+
+def radiator_bank(mb, F, W, L, pitch=1.6, fh=2.2):
+    """Heat-rejection bank: fins across the hull between two header pipes, manifold boxes at both ends."""
+    F.plinth(mb, W, L, 0.35, 'greeble')
+    n = max(2, int((L - 2.6) / pitch))
+    for k in range(n + 1):
+        v = -(L - 2.6) / 2 + k * (L - 2.6) / n
+        F.box(mb, 0.0, v, 0.35, W - 2.2, 0.3, fh, 'trim' if k % 4 == 0 else 'greeble')
+    for e in (-1, 1):
+        F.cyl(mb, (e * (W / 2 - 0.6), -L / 2 + 1.3, 0.9), (e * (W / 2 - 0.6), L / 2 - 1.3, 0.9), 0.45, mat='trim',
+              seg=6, caps=False)
+        F.box(mb, 0.0, e * (L / 2 - 0.6), 0.35, W, 1.2, 1.5, 'hull2')
+
+
+def antenna_mast(mb, F, u, v, h, r=0.45, yards=3, beacon='blue_light'):
+    """Comms / sensor mast: footing, tapered mast, cross yards, beacon."""
+    F.box(mb, u, v, -F.sink, 2.4, 2.4, 1.2 + F.sink, 'hull2')
+    F.cyl(mb, (u, v, 1.0), (u, v, 1.0 + h), r, r * 0.45, 'trim', seg=6)
+    for i in range(yards):
+        w = 1.0 + h * (0.35 + 0.55 * i / max(1, yards))
+        L = h * 0.32 * (1 - 0.45 * i / max(1, yards))
+        F.box(mb, u, v, w, L, r * 0.9, r * 0.9, 'greeble')
+    mb.sphere(F.p(u, v, 1.0 + h), r * 1.3, beacon, seg=6, rings=3)
+
+
+def dish(mb, F, u, v, r, tilt=0.5, face=(0.0, 1.0)):
+    """Comms dish on a pedestal, tilted `tilt` rad toward local direction face=(du, dv)."""
+    F.cyl(mb, (u, v, -F.sink), (u, v, r * 0.9), r * 0.28, r * 0.22, 'trim', seg=8)
+    d = (F.b * face[0] + F.t * face[1]).normalized()
+    ax = (F.n * math.cos(tilt) + d * math.sin(tilt)).normalized()
+    c = F.p(u, v, r * 0.9)
+    mb.cyl(c, c + ax * (r * 0.4), r * 0.3, r, 'hull2', seg=12)
+    mb.cyl(c + ax * (r * 0.4), c + ax * (r * 1.3), r * 0.08, r * 0.05, 'greeble', seg=5)
+    mb.sphere(c + ax * (r * 1.3), r * 0.12, 'blue_light', seg=6, rings=3)
+
+
+def rcs_quad(mb, F, u, v, sz=3.2):
+    """Reaction-control quad: armoured block with four flared nozzles (fore, aft, both sides) + marker."""
+    F.box(mb, u, v, -F.sink, sz, sz, 0.8 * sz + F.sink, 'hull2')
+    w = 0.45 * sz
+    for du, dv in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        a = (u + du * sz / 2, v + dv * sz / 2, w)
+        b = (u + du * (sz / 2 + 0.55 * sz), v + dv * (sz / 2 + 0.55 * sz), w)
+        F.cyl(mb, a, b, 0.14 * sz, 0.3 * sz, 'greeble', seg=6)
+    F.box(mb, u, v, 0.8 * sz, 0.5, 0.5, 0.3, 'amber')
+
+
+def hatch(mb, F, W, L, u=0.0, v=0.0, light=True):
+    """Access hatch: trim frame, recessed-looking door panel, hinge bar, one marker light."""
+    F.box(mb, u, v, -F.sink, W, L, 0.2 + F.sink, 'hull2')
+    for e in (-1, 1):
+        F.box(mb, u + e * (W / 2 - 0.2), v, 0.2, 0.4, L, 0.3, 'trim')
+        F.box(mb, u, v + e * (L / 2 - 0.2), 0.2, W - 0.8, 0.4, 0.3, 'trim')
+    F.box(mb, u, v - L / 2 + 0.9, 0.2, W - 1.4, 0.5, 0.45, 'greeble')      # hinge bar
+    if light:
+        F.box(mb, u + W / 2 - 0.6, v + L / 2 - 0.6, 0.5, 0.4, 0.4, 0.25, 'amber')
+
+
+def cargo_hatch(mb, F, W, L):
+    """Hangar lift / cargo hatch: heavy frame, two door leaves with stiffener ribs, hinge blocks, corner lights."""
+    F.plinth(mb, W + 1.6, L + 1.6, 0.3, 'hull')
+    for e in (-1, 1):
+        F.box(mb, e * (W / 2 + 0.4), 0.0, 0.3, 0.8, L + 1.6, 0.7, 'trim')
+        F.box(mb, 0.0, e * (L / 2 + 0.4), 0.3, W, 0.8, 0.7, 'trim')
+    for e in (-1, 1):                                       # leaves split along the centreline
+        F.box(mb, e * W / 4, 0.0, 0.3, W / 2 - 0.3, L, 0.35, 'hull2')
+        for k in range(3):
+            F.box(mb, e * W / 4, (k - 1) * L / 3.2, 0.65, W / 2 - 1.4, 0.6, 0.25, 'plate')
+        for k in range(3):
+            F.box(mb, e * (W / 2 + 1.1), (k - 1) * L / 3, 0.0, 0.8, 1.6, 0.9, 'greeble')
+    for a in (-1, 1):
+        for b in (-1, 1):
+            F.box(mb, a * (W / 2 + 0.4), b * (L / 2 + 0.4), 1.0, 0.5, 0.5, 0.25, 'amber')
+
+
+def docking_port(mb, F, r=4.0):
+    """Docking collar: square armoured base, trim collar ring, closed iris door, clamp lugs, approach lights."""
+    F.plinth(mb, 2.4 * r, 2.4 * r, 0.6, 'hull2')
+    annulus(mb, F.p(0, 0, 1.3), F.n, r, r + 1.0, 1.4, 'trim', seg=16)
+    F.cyl(mb, (0, 0, 0.6), (0, 0, 1.2), r, r, 'plate', seg=16)
+    for k in range(4):
+        a = k * math.pi / 2 + math.pi / 4
+        F.box(mb, math.cos(a) * (r + 1.4), math.sin(a) * (r + 1.4), 0.6, 1.2, 1.2, 1.4, 'greeble')
+    for a in (-1, 1):
+        for b in (-1, 1):
+            F.box(mb, a * 1.1 * r, b * 1.1 * r, 0.6, 0.6, 0.6, 0.25, 'amber')
+
+
+def vls_block(mb, F, nu, nv, cell=2.2):
+    """Vertical-launch missile cells: armoured frame over the magazine, a regular grid of cell hatches."""
+    W, L = nu * cell + 1.0, nv * cell + 1.0
+    F.plinth(mb, W, L, 0.8, 'hull2')
+    for i in range(nu):
+        for j in range(nv):
+            F.box(mb, -W / 2 + 0.5 + cell * (i + 0.5), -L / 2 + 0.5 + cell * (j + 0.5), 0.8, cell - 0.45,
+                  cell - 0.45, 0.2, 'plate' if (i + j) % 2 else 'greeble')
+    F.box(mb, W / 2 - 0.5, L / 2 - 0.5, 0.8, 0.5, 0.5, 0.3, 'amber')
+    F.box(mb, -W / 2 + 0.5, -L / 2 + 0.5, 0.8, 0.5, 0.5, 0.3, 'amber')
+
+
+def capacitor_bank(mb, F, nu, nv, pitch=2.8, r=1.0, h=2.4, feed=0.0):
+    """Cannon capacitor rack: cans in a grid on a base, bus bars along each row, optional feed toward -u."""
+    W, L = nu * pitch + 0.8, nv * pitch + 0.8
+    F.plinth(mb, W, L, 0.4, 'hull')
+    for i in range(nu):
+        u = -W / 2 + 0.4 + pitch * (i + 0.5)
+        for j in range(nv):
+            v = -L / 2 + 0.4 + pitch * (j + 0.5)
+            F.cyl(mb, (u, v, 0.4), (u, v, 0.4 + h), r, r, 'trim', seg=8)
+            F.cyl(mb, (u, v, 0.4 + h), (u, v, 0.7 + h), r * 0.6, r * 0.6, 'greeble', seg=6)
+        F.box(mb, u, 0.0, 0.7 + h, 0.5, L - 1.0, 0.35, 'hull2')         # bus bar
+    if feed > 0:
+        F.box(mb, -W / 2 - feed / 2, 0.0, 0.4, feed, 1.6, 1.0, 'greeble')
+
+
+def shield_emitter(mb, F, r=2.0):
+    """Field-emitter node: pedestal, trim collar, low dome with a glowing emitter tip."""
+    F.cyl(mb, (0, 0, -F.sink), (0, 0, 0.9), r * 1.35, r * 1.15, 'hull2', seg=8)
+    F.cyl(mb, (0, 0, 0.9), (0, 0, 1.3), r * 1.15, r * 1.1, 'trim', seg=10)
+    F.cyl(mb, (0, 0, 1.3), (0, 0, 1.3 + r * 0.7), r, r * 0.45, 'plate', seg=10)
+    mb.sphere(F.p(0, 0, 1.3 + r * 0.75), r * 0.3, 'blue_light', seg=6, rings=3)
+
+
+def vent_louvre(mb, F, W, L, pitch=1.0):
+    """Exhaust / heat louvre grille: trim frame with slats across (u)."""
+    F.plinth(mb, W, L, 0.25, 'trim')
+    n = max(2, int((L - 1.0) / pitch))
+    for k in range(n + 1):
+        F.box(mb, 0.0, -(L - 1.0) / 2 + k * (L - 1.0) / n, 0.25, W - 0.8, 0.28, 0.55, 'greeble')
+
+
+def manifold(mb, F, W, L, h=2.4, nstub=3):
+    """Coolant manifold / pump block with a row of valve stubs on top."""
+    F.plinth(mb, W, L, h, 'hull2')
+    F.box(mb, 0.0, 0.0, h, W - 1.0, L - 1.0, 0.3, 'greeble')
+    for k in range(nstub):
+        u = (k - (nstub - 1) / 2) * (W - 1.6) / max(1, nstub - 1)
+        F.cyl(mb, (u, 0, h + 0.3), (u, 0, h + 1.3), 0.45, 0.45, 'trim', seg=6)
+        F.cyl(mb, (u, 0, h + 1.3), (u, 0, h + 1.6), 0.75, 0.75, 'greeble', seg=6)
+
+
+def sensor_dome(mb, F, r):
+    """Sensor blister: armoured ring base and a low dark dome."""
+    F.cyl(mb, (0, 0, -F.sink), (0, 0, 0.6), r * 1.2, r * 1.15, 'trim', seg=12)
+    F.cyl(mb, (0, 0, 0.6), (0, 0, 0.6 + r * 0.45), r, r * 0.55, 'glass', seg=12)
+    F.box(mb, r * 0.9, 0.0, 0.6, 0.5, 0.5, 0.3, 'amber')
+
+
+# ------------------------------------------------------------------------------------------ linear runs
+def run_pts(fn, s0, s1, step=FRAME):
+    """Samples (pos, n) of a path function fn(s) from s0 to s1 (both ends included)."""
+    k = max(1, int(round(abs(s1 - s0) / step)))
+    out = []
+    for i in range(k + 1):
+        r = fn(lerp(s0, s1, i / k))
+        if r is None:
+            return out
+        out.append((Vector(r[0]), Vector(r[1]).normalized()))
+    return out
+
+
+def conduit(mb, pts, npipes=3, r=0.5, gap=1.25, clamp=True, mat='trim'):
+    """Pipe bundle along sampled surface points; clamp strap at every sample (6 m frames)."""
+    if len(pts) < 2:
+        return
+    for (p0, n0), (p1, n1) in zip(pts, pts[1:]):
+        d = (p1 - p0)
+        if d.length < 1e-3:
+            continue
+        d.normalize()
+        for i in range(npipes):
+            o = (i - (npipes - 1) / 2) * gap
+            s0, s1 = n0.cross(d).normalized(), n1.cross(d).normalized()
+            mb.cyl(p0 + s0 * o + n0 * (r + 0.15), p1 + s1 * o + n1 * (r + 0.15), r, r, mat, seg=6, caps=False)
+    if clamp:
+        for k, (p, n) in enumerate(pts):
+            d = (pts[min(k + 1, len(pts) - 1)][0] - pts[max(k - 1, 0)][0]).normalized()
+            obox(mb, p + n * (r + 0.15) - n * 0.4, n, (npipes * gap + 0.5, 0.7, 2 * r + 0.9), 'greeble',
+                 lift=0.0, fwd=d)
+
+
+def walkway(mb, pts, out, width=1.8, rail=1.2):
+    """Maintenance catwalk: deck strip, posts every frame and a hand rail on the `out` side (+1/-1 across)."""
+    if len(pts) < 2:
+        return
+    for (p0, n0), (p1, n1) in zip(pts, pts[1:]):
+        d = p1 - p0
+        L = d.length
+        if L < 1e-3:
+            continue
+        d.normalize()
+        n = (n0 + n1).normalized()
+        c = (p0 + p1) / 2
+        side = n.cross(d).normalized() * out
+        obox(mb, c + n * 0.25, n, (width, L + 0.05, 0.3), 'trim', lift=0.0, fwd=d)
+        obox(mb, c + side * (width / 2 - 0.1) + n * (0.4 + rail), n, (0.15, L, 0.15), 'trim', lift=0.0, fwd=d)
+    for p, n in pts:
+        d = Vector((0, -1, 0))
+        side = n.cross(d).normalized() * out
+        obox(mb, p + side * (width / 2 - 0.1) + n * (0.4 + rail / 2), n, (0.15, 0.15, rail), 'trim', lift=0.0)
+
+
+def window_band(mb, H, side, s0, s1, p, R, off=WALL_T + 0.05, dropout=0.15):
+    """Crew-deck window band on a wall: dark recessed strip per bay, 3 windows per 24 m bay on a 6 m pitch."""
+    e = 0 if side == 1 else 4
+    pp = e + (p if side == 1 else 1 - p)
+    for a, b in zip(grid(s0, s1), grid(s0, s1)[1:]):
+        if b - a < 10:
+            continue
+        pos, n = H.pt((a + b) / 2, pp, off)
+        obox(mb, pos, n, (2.4, b - a - 2.0, 0.35), 'greeble', lift=0.0)
+        k = int((b - a) / FRAME)
+        for i in range(1, k):
+            if R.random() < dropout:
+                continue
+            s = a + i * (b - a) / k
+            pos, n = H.pt(s, pp, off + 0.2)
+            obox(mb, pos, n, (1.0, (b - a) / k - 1.6, 0.3), 'window', lift=0.0)
+
+
+def systems(mb, H, R, S):
+    pass
+
+
 # ------------------------------------------------------------------------------------------ build
-def mothership():
+def mothership(probe=False):
     palette()
     R = rng(909)
     H = Hull(STATIONS, PROF)
     mb = MB()
+    # structure + armour
     main_hull(mb, H, R)
     deck(mb, H, R)
     spine_and_bridge(mb, H, R)
@@ -630,6 +1009,12 @@ def mothership():
     starboard_bay_wall(mb, R)
     port_launch_bay(mb, R)
     empty('wound', (WALL_X, Y(40.0), 10.0), size=6)
+    # functional systems, placed on the finished armour by ray casting (zoning plan: MOTHERSHIP_SYSTEMS.md)
+    S = Surf(mb)
+    if probe:
+        S.heightmap()
+    systems(mb, H, R, S)
+    print('SITES placed/rejected:', S.stats, flush=True)
     obj = mb.to_object('mothership', smooth_angle=26)
     fix_engine_normals(obj)
     return [obj]
@@ -731,7 +1116,7 @@ def main():
         render_previews(path)
         return
     lib.reset_scene()
-    objs = mothership()
+    objs = mothership(probe='probe' in argv)
     tris = sum(lib.tri_count(o) for o in bpy.context.scene.objects if o.type == 'MESH')
     bad = check_bay(objs[0])
     if 'nosave' not in argv:

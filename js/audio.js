@@ -310,7 +310,7 @@ export const SAMPLE_CUES = [
   ...[136, 136.6, 137.3, 141.8, 142.4, 143].map((t, i) => [t, 'missile', { pan0: i % 2 ? 0.6 : -0.6, pan1: i % 2 ? -0.4 : 0.5, gain: 0.8, far: (i % 3) * 0.15, prio: 6 }]),
   // ---------------- ship kills (enemy losses only after the well collapses; the mech kills in the duel)
   ...CAPITAL_KILLS.map(([t, far], i) => [t + 0.03, ['expl_epic', 'expl_metal', 'expl_distant_huge', 'expl_distant'][i % 4], { far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], gain: 0.5, prio: 5 }]),
-  ...[[180.2, 'expl_metal'], [180.25, 'expl_debris'], [194, 'expl_epic'], [194.05, 'expl_debris']].map(([t, sp]) => [t + 0.03, sp, { far: 0, gain: 0.5, prio: 5 }]),
+  ...[[179.15, 'expl_metal'], [179.2, 'expl_debris'], [194, 'expl_epic'], [194.05, 'expl_debris']].map(([t, sp]) => [t + 0.03, sp, { far: 0, gain: 0.5, prio: 5 }]),
   // homeland explosions (its conventions: size → playbackRate; capital = big_explosion 0.98→0.74 + explosion 0.86→0.76)
   ...CAPITAL_KILLS.flatMap(([t, far], i) => {
     const pan = [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6];
@@ -322,7 +322,7 @@ export const SAMPLE_CUES = [
   ...CAPITAL_KILLS.map(([t, far], i) => [t + 0.3 + 0.1 * (i % 6), i % 2 ? 'debris_impact' : 'metal_groan',
     i % 2 ? { at: 1.0, dur: 3.5, fadeOut: 1, gain: 0.6, far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], prio: 5 }
           : { at: 2.8, dur: 2.6, fadeOut: 0.8, rate: 0.8, gain: 0.65, far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], prio: 5 }]),
-  ...[180.2, 194].flatMap((t) => [                                                                                   // enemy mechs explode
+  ...[179.15, 194].flatMap((t) => [                                                                                   // enemy mechs explode
     [t, 'hl_explosion', { rate: 1.0, gain: 1.3, prio: 9, duck: 2, norand: true }],
     [t, 'hl_big_explosion', { rate: 1.05, gain: 1.0, prio: 9, norand: true }],
     [t + 0.05, 'expl_debris', { gain: 0.9, prio: 8, norand: true }],
@@ -347,6 +347,9 @@ export const SAMPLE_CUES = [
   [157.9, 'hl_thruster', { loop: true, dur: 12.1, rate: 0.95, rateTo: 1.15, gain: 0.4, fadeIn: 0.4, fadeOut: 2, prio: 6, norand: true }],
   [161,   'flyby_fast', { at: 'hit', gain: 1, pan0: -0.9, pan1: 0.9, prio: 8, norand: true }],
   // ---------------- mech duel
+  // …and every one is swatted off Sigma's vambrace: a hard metallic ping + spark crackle at each impact
+  ...Array.from({ length: 24 }, (_, k) => [172 + k * 0.26 + 0.35, 'metal_knock', { at: 'hit', rate: 1.25 + 0.1 * Math.sin(k * 1.7), gain: 0.55, pan: -0.2, prio: 8, norand: true }]),
+  ...Array.from({ length: 24 }, (_, k) => [172 + k * 0.26 + 0.36, '@sparkBurst', { vel: 0.35, pan: -0.2 }]),
   ...Array.from({ length: 24 }, (_, k) => [172 + k * 0.26, k % 3 ? 'laser_shot' : 'laser_shot2', { dur: 0.6, fadeOut: 0.2, rate: 1.05 + 0.1 * Math.sin(k * 2.3), gain: 0.7, far: 0.15, pan: 0.45, prio: 7 }]),   // enemy mech wrist laser (one per bolt, shots.js)
   [190,   'whoosh_rev', { rate: 0.6, gain: 0.7, prio: 7, norand: true }],
   // ---------------- lance 200–216
