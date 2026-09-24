@@ -351,7 +351,10 @@ export const SAMPLE_CUES = [
   [190,   'whoosh_rev', { rate: 0.6, gain: 0.7, prio: 7, norand: true }],
   // ---------------- lance 200–216
   [200,   'rumble_dark', { loop: true, dur: 16, gain: 1.1, fadeIn: 3, rate: 0.9, prio: 9, norand: true }],
-  [201.5, 'charge_weapon', { rate: 0.6, gain: 1, prio: 9, norand: true, dur: 14.5, fadeOut: 0.05 }],
+  [201.5, 'charge_weapon', { bus: 'dry', rate: 0.6, gain: 1.3, prio: 10, norand: true, dur: 14.5, fadeOut: 0.05 }],
+  // the lance charge must be HEARD: a long rising power whine under it (dry bus, climbs in pitch to the shot), a final spike
+  [200.2, 'hl_charge2', { bus: 'dry', rate: 0.62, rateTo: 1.2, dur: 15.8, gain: 1.2, fadeIn: 2.0, fadeOut: 0.05, prio: 10, norand: true }],
+  [212.4, 'charge_up', { bus: 'dry', rate: 0.75, rateTo: 1.5, dur: 3.6, gain: 1.1, fadeIn: 0.3, fadeOut: 0.05, prio: 10, norand: true }],
   [216,   'big_beam:fire', { rate: 0.8, gain: 1.2, prio: 9, duck: 4, norand: true }],
   [216,   'expl_nuke', { gain: 1, prio: 9, norand: true }],
   [216.05,'shockwave', { gain: 0.9, prio: 9, norand: true }],
@@ -428,10 +431,12 @@ export const SAMPLE_CUES = [
   [305.9, 'metal_groan', { at: 2.8, dur: 3, rate: 0.7, gain: 0.8, pan: -0.3, prio: 7 }],
   [306.6, 'debris_impact', { at: 1.0, dur: 4.5, gain: 0.9, prio: 8, norand: true }],
   [306.9, 'metal_groan', { at: 2.8, dur: 3.2, rate: 0.62, gain: 0.85, pan: 0.2, prio: 7, norand: true }],
-  [306,   'hl_big_explosion', { rate: 0.74, gain: 1.5, prio: 9, duck: 3.5, norand: true }],   // DREADNOUGHT dies
+  [306,   'hl_big_explosion', { bus: 'dry', rate: 0.68, gain: 1.9, prio: 10, duck: 4.5, duckDb: -10, norand: true }],   // DREADNOUGHT dies
+  ...[0.3, 0.65, 1.0, 1.4].map((d, i) => [306 + d, 'hl_big_explosion', { rate: 0.8 + 0.05 * i, gain: 0.9, pan: [-0.4, 0.35, -0.2, 0.5][i], prio: 8, norand: true }]),   // chain
   [306,   'hl_explosion', { rate: 0.76, gain: 1.1, prio: 9, norand: true }],
   [306.08,'expl_epic', { gain: 0.6, prio: 7 }],
-  [306.05,'expl_nuke', { gain: 0.8, rate: 0.85, prio: 9, norand: true }],
+  [306.05,'expl_nuke', { bus: 'dry', gain: 1.3, rate: 0.8, prio: 10, norand: true }],
+  [306.1, 'shockwave', { gain: 1.1, rate: 0.85, prio: 9, norand: true }],
   [306.3, 'debris_impact', { gain: 0.7, far: 0.2, pan: 0.3, prio: 7 }],
   // ---------------- enemy flee windows 311.5–317
   // ---------------- NEW ENDING: 344 the fleet jumps out, 347.5 arrival at Earth, narration from ~348.5
@@ -636,20 +641,21 @@ function ionShotCues() {
 // hyperspace in/out: one 'Atomic Impact' per warp, landing on the visual snap (world.js warpSchedule). Events within 0.25 s are
 // merged; big ships are deep and loud, line ships lighter and farther.
 function warpCues() {
-  // EVERY warp gets its own warp_out2, landing on its visual snap; only ships snapping in the same instant (< 0.15 s)
-  // share one (weighted by the largest). Small line ships are lighter, farther and panned; capital ships deep and
-  // loud with ducking. The enemy's arrival wave (80–84) stays one single hit (no clatter).
+  // EVERY warp gets its own warp_out2 on its visual snap, and it is ALWAYS clearly heard: it plays on the dry bus
+  // (past the sfx ducking / filtering) with top priority, louder the bigger the ship (line ship < frigate < capital),
+  // and briefly pulls the rest of the mix down. Ships snapping in the same instant (< 0.15 s) share one cue.
+  // The enemy's arrival wave (80–84) stays one single hit (no clatter).
   const ev = warpSchedule().filter((e) => !(e.t > 80 && e.t < 84.8 && e.size < 3)), out = [];
-  out.push([81.6, 'warp_out2', { gain: 2.2, rate: 0.9, prio: 10, duck: 2, duckDb: -9, norand: true }]);   // the whole enemy line arrives
+  const LVL = { 1: 1.0, 2: 1.35, 3: 1.8 }, RATE = { 1: 1.06, 2: 0.98, 3: 0.9 }, DUCK = { 1: [0.8, -4], 2: [1.4, -7], 3: [2.5, -10] };
+  out.push([81.6, 'warp_out2', { bus: 'dry', gain: 1.9, rate: 0.88, prio: 10, duck: 2.2, duckDb: -10, norand: true }]);   // the whole enemy line arrives
   for (let i = 0; i < ev.length;) {
     let j = i, size = 0, n = 0;
     while (j < ev.length && ev[j].t - ev[i].t < 0.15) { size = Math.max(size, ev[j].size); n++; j++; }
     const t = ev[i].t;
     i = j;
-    const g = size === 3 ? 2.2 : size === 2 ? 1.6 : 1.05;
-    const pan = size === 3 ? 0 : Math.sin(t * 7.3) * (size === 2 ? 0.35 : 0.6);
-    out.push([t, 'warp_out2', { gain: Math.min(2.4, g + 0.1 * (n - 1)), rate: size === 3 ? 0.92 : size === 2 ? 1.0 : 1.08 + 0.06 * Math.sin(t * 3.1),
-      far: size === 1 ? 0.18 : 0, pan, prio: size === 1 ? 8 : 10, norand: true, duck: size === 3 ? 2.5 : size === 2 ? 1.4 : 0.6, duckDb: size === 3 ? -9 : size === 2 ? -6 : -3 }]);
+    const pan = size === 3 ? 0 : Math.sin(t * 7.3) * (size === 2 ? 0.3 : 0.45);
+    out.push([t, 'warp_out2', { bus: 'dry', gain: Math.min(2.1, LVL[size] + 0.08 * (n - 1)), rate: RATE[size], pan, prio: 10, norand: true,
+      duck: DUCK[size][0], duckDb: DUCK[size][1] }]);
   }
   return out;
 }

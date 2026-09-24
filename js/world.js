@@ -724,9 +724,31 @@ function drawDreadnought(R, t, tmpM) {
   const hin = hyperIn(t, DREAD_ARRIVE, pos, fwd, Ld, DREAD_EMERGE);
   if (t > 84 && t < DREAD_ARRIVE) { const W0 = V.madd([0, 0, 0], pos, fwd, -Ld * 0.5); const k = easeOut((t - 84) / 1); hyperWindow(R, W0, fwd, (sz[0] * 0.75 + 20) * k, (sz[1] * 0.85 + 20) * k, HYPER_RED, 0.9); }
   if (!hin) return;
+  if (t > DREAD_DIE) {
+    // a far bigger death: the core blast, a chain of secondary detonations down the hull, an additive white-hot
+    // flash sprite that swells and fades (no 1-frame pop), a hard light and an expanding shock ring
+    const D = dreadPos(DREAD_DIE), lt = t - DREAD_DIE;
+    explosion(R, t, DREAD_DIE, pos, 240, 77, 'huge');
+    for (let k = 0; k < 7; k++) {
+      const tk = DREAD_DIE + 0.12 + k * 0.17 + hash(k * 3.1) * 0.1;
+      const lp = [(hash(k * 2.3 + 1) - 0.5) * sz[0] * 0.8, (hash(k * 4.1 + 1) - 0.5) * sz[1] * 0.8, (k / 6 - 0.5) * Ld * 0.9];
+      explosion(R, t, tk, V.add([0, 0, 0], D, lp), 70 + 25 * hash(k), 90 + k, k % 2 ? 'ship' : 'huge');
+    }
+    if (lt < 3.5) {
+      const att = easeOut(sat(lt / 0.12)), dec = Math.exp(-lt * 1.6);
+      const k = att * dec;
+      R.glow(D, 260 + 520 * easeOut(sat(lt / 0.8)), [5.5 * k, 4.2 * k, 3.0 * k], 1.0);            // white-hot core flash (additive)
+      R.glow(D, 500 + 500 * easeOut(sat(lt / 1.6)), [1.4 * k, 0.6 * k, 0.2 * k], 0.7);          // orange bloom
+      R.light(D, 3000, [1, 0.75, 0.5], 60 * k);
+      if (lt < 2.5) {
+        const rr = 60 + 1400 * easeOut(lt / 2.5), a2 = (1 - lt / 2.5);
+        R.ring(D, [rr, 0, 0], [0, rr * 0.18, rr * 0.35], [2.2 * a2, 1.3 * a2, 0.7 * a2], lt);
+        R.ripple(D, rr * 0.9, [0.4, 0.4, 0.4], a2 * 1.4);
+      }
+    }
+  }
   if (t > DREAD_DIE + 0.4) {
     if (t < EARTH_T) shatter(R, 'enemy_dreadnought', mat(M.new(), dreadPos(DREAD_DIE), [0, 0, 1]), t, DREAD_DIE, 77, [3, 3, 4], 0.7, { tint: [3, 1, 0.3] });
-    explosion(R, t, DREAD_DIE, pos, 130, 77, 'huge');
     return;
   }
   const e = R.add('enemy_dreadnought', mat(tmpM, hin.u < 1 ? hin.pos : pos, fwd));
@@ -890,29 +912,37 @@ export function ionMuzzle(R, t, i) {
 }
 // the gravity well steals the charge: energy streams OUT of the muzzle and bends away toward the well
 export function drainOutflow(R, t, t0, from, k, seed) {
+  // the charge is SUCKED OUT toward the gravity well: filaments peel off the coils, swing out, then bend onto the well
+  // line and accelerate away down it, stretching as they go (quadratic Bézier: muzzle → swing-out → 1.1 km down the line)
   if (k <= 0.01) return;
   const toWell = V.norm([0, 0, 0], V.sub([0, 0, 0], WELL, from));
-  for (let s = 0; s < 16; s++) {
-    const hs = hash(s * 1.7 + seed);
-    const ph = ((t - t0) * (1.4 + hs * 0.8) + hs) % 1;
+  const P = (a, b, c, u) => { const w = 1 - u; return [w * w * a[0] + 2 * w * u * b[0] + u * u * c[0], w * w * a[1] + 2 * w * u * b[1] + u * u * c[1], w * w * a[2] + 2 * w * u * b[2] + u * u * c[2]]; };
+  const end = V.madd([0, 0, 0], from, toWell, 1100);
+  for (let s = 0; s < 30; s++) {
+    const hs = hash(s * 1.7 + seed), hs2 = hash(s * 3.1 + seed + 5);
+    const ph = ((t - t0) * (0.55 + hs * 0.5) + hs2) % 1;
     const d0 = randDir([0, 0, 0], s * 5.1 + seed * 3.3);
-    const bend = ph * ph;
-    const p0 = V.add([0, 0, 0], V.madd([0, 0, 0], from, d0, 6 + 14 * (1 - bend)), V.scale([0, 0, 0], toWell, 12 + bend * 170));
-    const p1 = V.add([0, 0, 0], V.madd([0, 0, 0], from, d0, 6 + 14 * (1 - Math.max(0, ph - 0.1) ** 2)), V.scale([0, 0, 0], toWell, 12 + Math.max(0, ph - 0.1) ** 2 * 170));
-    const a = (1 - ph) * Math.min(1, ph * 6) * 2.2 * k;
-    R.beam(p1, p0, 0.45, [0.5 * a, 0.9 * a, 2.0 * a], 1, 10);
+    const a = V.madd([0, 0, 0], from, d0, 4 + 5 * hs);
+    const b = V.madd([0, 0, 0], V.madd([0, 0, 0], from, d0, 30 + 40 * hs2), toWell, 90);
+    const u = Math.pow(ph, 1.8), du = 0.015 + 0.09 * u;                 // accelerating, stretching
+    const head = P(a, b, end, u), tail = P(a, b, end, Math.max(0, u - du)), mid = P(a, b, end, Math.max(0, u - du * 0.5));
+    const fade = Math.min(1, ph * 8) * (1 - Math.pow(ph, 3));
+    const br = 2.6 * k * fade;
+    R.beam(tail, mid, 0.6 + 1.2 * u, [0.4 * br, 0.8 * br, 2.0 * br], 1, 10);
+    R.beam(mid, head, 0.9 + 1.8 * u, [0.6 * br, 1.0 * br, 2.4 * br], 1, 10);
   }
+  R.glow(V.madd([0, 0, 0], from, toWell, 25), 14 * k, [0.3 * k, 0.6 * k, 1.4 * k], 0.6);   // the leak at the mouth
 }
 function drawIonVolleys(R, t) {
   for (const [t0, t1, fi, ti] of VOLLEYS) {
     if (t < t0 - 3 || t > t1 + 0.6) continue;
     const from = ionMuzzle(R, t < t0 ? t : t0, fi);
     if (VOLLEY_FAILS(t0)) {                                   // failed charge: builds, stalls and sputters, then bleeds away
-      const c = 0.7 * sat((t - (t0 - 3)) / 2) * (1 - smooth(t0 - 1.6, t0 + 0.1, t));
+      const c = 0.7 * sat((t - (t0 - 3)) / 1) * (1 - smooth(t0 - 2.0, t0 + 0.1, t));
       const flick = 0.7 + 0.3 * Math.sin(t * 23 + fi) * Math.sin(t * 7.3 + fi * 2);
       if (c > 0.01) R.glow(from, 4 + c * 10, [ION_COL[0] * c * 2.2 * flick, ION_COL[1] * c * 2.2 * flick, ION_COL[2] * c * 2.2 * flick], 0.8);
-      if (t < t0 - 0.8) chargeInflow(R, t, t0 - 3, 3, from, 60, 40, [0.5, 0.9, 2], 3, 14, 0.4, fi * 7);
-      drainOutflow(R, t, t0 - 1.2, from, smooth(t0 - 1.2, t0 - 0.6, t) * (1 - smooth(t0 + 1.2, t1, t)), fi * 5 + t0);
+      if (t < t0 - 1.9) chargeInflow(R, t, t0 - 3, 1.1, from, 60, 40, [0.5, 0.9, 2], 3, 14, 0.4, fi * 7);   // brief inflow…
+      drainOutflow(R, t, t0 - 2.1, from, smooth(t0 - 2.1, t0 - 1.5, t) * (1 - smooth(t0 + 1.2, t1, t)), fi * 5 + t0);   // …then sucked out toward the well
       if (t > t0 && t < t0 + 0.5) { const sp = Math.exp(-(t - t0) * 6); R.glow(from, 6 * sp, [0.6 * sp, 0.9 * sp, 1.8 * sp], 0.5); }   // a feeble spit, nothing leaves
       continue;
     }

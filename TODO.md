@@ -168,3 +168,12 @@
       136.1 / 137.9 / 139.7 (fireball + break-up), new line v10w03 "I'm the only one left!" (140.1).
 - [x] 111. Cold open: the calm view slowly tilts down and sinks a little (0.8–8.2 s) before the whip pan.
 - [x] 112. Final shot: the sun rests on Earth's upper limb at the horizontal centre of the frame, just touching it.
+- [x] 113. warp_out2 always clearly heard: dry bus (past sfx ducking/filters), top priority, level by size (1.0 / 1.35 / 1.8), ducks the mix.
+- [x] 114. Return after the blackout: he sets off the way he already faces (no turn), jerk-limited acceleration (0 → 16 m/s²
+      over 334.3–339), roll levels out gently, waking pose blend kept until landing; the cut at 340 picks him up gliding
+      into the bay (ease-out along the bay axis), slow 1.6 s turn to face out. Frame-to-frame check: no jumps 330–340.
+- [x] 115. Dreadnought lance charge audible: hl_charge2 rising whine (rate 0.62 → 1.2) + charge_weapon on the dry bus + final spike.
+- [x] 116. Dreadnought death: 240 m core blast + 7 chained detonations down the hull, additive white-hot flash sprite
+      (eased, no screen wash), 3 km light, expanding shock ring + ripple; the cut-in that hid it moved to 308.4; louder chain audio.
+- [x] 117. Failed ion charges: brief inflow, then filaments peel off and race 1.1 km down the line toward the gravity well
+      (Bézier streams, accelerating/stretching); B5 camera swings side-on to the drain line.

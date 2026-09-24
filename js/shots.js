@@ -224,29 +224,33 @@ function toMother(t, p) {                                  // world -> flagship-
   return [0, 1, 2].map((c) => d[0] * m[c * 4] + d[1] * m[c * 4 + 1] + d[2] * m[c * 4 + 2]);
 }
 function recoveryPos(t) {
-  // integrated in the FLAGSHIP's frame: a spring chasing a point on a moving ship lags behind it (it used to stop ~7 m
-  // short of the cradle); in the ship frame the rig is fixed, so Sigma settles exactly between the clamps
-  const key = Math.round(t * 240);
-  if (_rcache.has(key)) return motherPoint([0, 0, 0], t, _rcache.get(key));
-  const dt = 1 / 120, z = 0.95;
-  let x = toMother(336, gundamDrift(336)), v = V.sub([0, 0, 0], toMother(336.01, gundamDrift(336.01)), x).map((c) => c * 100);
-  for (let tt = 336; tt < t; tt += dt) {
-    const w = 3.0 * (0.25 + 0.75 * smooth(336, 338.3, tt));    // the pull builds: slow to get going, then a hard burn
-    const tg = toMother(tt, recoveryTarget(tt));
-    for (let k = 0; k < 3; k++) { v[k] += (w * w * (tg[k] - x[k]) - 2 * z * w * v[k]) * dt; x[k] += v[k] * dt; }
-  }
-  x = V.lerp([0, 0, 0], x, DOCK.pad, smooth(341.6, 342.6, t));   // final guided seat into the cradle centre
-  if (t > 342.5) x[1] -= 0.2 * Math.sin((t - 342.5) * 9) * Math.exp(-(t - 342.5) * 5);   // clunks down onto the pad
-  if (_rcache.size > 4000) _rcache.clear();
-  _rcache.set(key, x.slice());
+  // until the cut at 340 he simply accelerates straight ahead (S21b); F0 then picks him up gliding into the bay,
+  // decelerating along the bay axis onto the pad (no waypoints, no swerves)
+  if (t < 340) return gundamDrift(t);
+  const L0 = [-150, 4, 57], u = sat((t - 340) / 2.45);
+  const e = 1 - Math.pow(1 - u, 2.2);                                   // arrives with speed bleeding off smoothly
+  const x = V.lerp([0, 0, 0], L0, DOCK.pad, e);
+  if (t > 342.45) x[1] -= 0.2 * Math.sin((t - 342.45) * 9) * Math.exp(-(t - 342.45) * 5);   // clunks down onto the pad
   return motherPoint([0, 0, 0], t, x);
 }
 function gundamDrift0(t) { const base = addv(WELL, [40, 60, -1150]); return addv(base, [Math.sin(t * 0.1) * 4, Math.sin(t * 0.13) * 3, -(t - 320) * 0.5]); }
 // coming to: from 334.3 he starts to creep forward toward home, accelerating gently (a = 3 m/s²) before the burn
 const CREEP_T = 334.3, CREEP_A = 3;
 let _creepDir = null;
-function creepDir() { return _creepDir || (_creepDir = V.norm([0, 0, 0], V.sub([0, 0, 0], motherPoint([0, 0, 0], 336, DOCK.wide), gundamDrift0(336)))); }
-function gundamDrift(t) { const x = Math.max(0, t - CREEP_T); return madd(gundamDrift0(t), creepDir(), 0.5 * CREEP_A * x * x); }
+// he sets off the way he is already facing when he comes to (no turn): the drift heading at CREEP_T
+function creepDir() { const a = CREEP_T * 0.05 + 1; return _creepDir || (_creepDir = V.norm([0, 0, 0], [Math.sin(a), 0.1, -Math.cos(a)])); }
+// distance travelled along creepDir: acceleration ramps smoothly 0 → 16 m/s² over 334.3–339 (jerk-limited: the heavy
+// machine gathers speed, no sudden jump), integrated in closed form per segment
+const CREEP_T1 = 339, CREEP_AMAX = 16;
+function creepDist(t) {
+  const x = t - CREEP_T; if (x <= 0) return 0;
+  const T = CREEP_T1 - CREEP_T, A = CREEP_AMAX;
+  // a(τ) = A·(τ/T)² for τ < T (smooth start), then A
+  if (x < T) return A * x ** 4 / (12 * T * T);
+  const d0 = A * T * T / 12, v0 = A * T / 3, y = x - T;
+  return d0 + v0 * y + 0.5 * A * y * y;
+}
+function gundamDrift(t) { return madd(gundamDrift0(t), creepDir(), creepDist(t)); }
 function motherDir(t, local) { return M.transformDir([0, 0, 0], motherMatrix(M.new(), t), local); }
 function recoveryBay(t) {
   const ex = GUN.motherModel?.empties?.hangar_exit;
@@ -375,8 +379,8 @@ function gundamStateRaw(t, s) {
     s.eye = 0.6 + 0.4 * Math.sin(t * 30);
   } else if (t < 346) {
     s.pos = gundamDrift(t);
-    s.fwd = V.norm([0, 0, 0], V.lerp([0, 0, 0], [Math.sin(t * 0.05 + 1), 0.1, -Math.cos(t * 0.05 + 1)], creepDir(), easeInOut(sat((t - 333.8) / 2.6))));   // slowly turns toward home
-    s.roll = 0.3 + (t - 292) * 0.004;                         // a single, very slow roll — dead weight
+    s.fwd = V.norm([0, 0, 0], V.lerp([0, 0, 0], [Math.sin(t * 0.05 + 1), 0.1, -Math.cos(t * 0.05 + 1)], creepDir(), easeInOut(sat((t - 333.6) / 2.4))));   // slowly turns toward home
+    s.roll = (0.3 + (t - 292) * 0.004) * (1 - easeInOut(sat((t - 332.5) / 4.5)));   // dead-weight roll, levelled out gently as he comes to
     blendPose('limp', 'flight', easeInOut(sat((t - 333.2) / 5)), s.pose);            // limbs gather slowly as he comes to
     if (t > 331 && t < 336) {                                                          // the head lifts first, a hand flexes
       const hk = smooth(331, 333.5, t) * (1 - smooth(334.5, 336, t));
@@ -396,19 +400,20 @@ function gundamStateRaw(t, s) {
       s.pos = recoveryPos(t);
       const vel = V.sub([0, 0, 0], recoveryPos(t + 0.08), recoveryPos(t - 0.08));
       const velDir = V.len(vel) > 0.05 ? V.norm([0, 0, 0], vel) : driftFwd;
-      let f = V.norm([0, 0, 0], V.lerp([0, 0, 0], driftFwd, velDir, easeInOut(sat((t - 336) / 1.2))));
-      if (t > 341.3) {                                         // yaw from 'into the bay' (+X local) round to 'facing out' (-X)
-        const k = easeInOut(sat((t - 341.3) / 1.2));
+      // straight ahead until the cut; in the bay: into the bay, then a slow, heavy turn round to face out
+      let f = t < 340 ? creepDir().slice() : velDir;
+      if (t > 341.0) {                                         // yaw from 'into the bay' (+X local) round to 'facing out' (-X)
+        const k = easeInOut(sat((t - 341.0) / 1.6));
         const yaw = lerp(Math.PI / 2, Math.PI * 1.5, k);
         const loc = [Math.sin(yaw), 0, Math.cos(yaw)];
         const wd = V.norm([0, 0, 0], motherDir(t, loc));
-        f = V.norm([0, 0, 0], V.lerp([0, 0, 0], f, wd, smooth(341.3, 341.65, t)));
+        f = V.norm([0, 0, 0], V.lerp([0, 0, 0], f, wd, smooth(341.0, 341.5, t)));
       }
       s.fwd = f;
       const land = smooth(341.8, 342.5, t);
-      s.roll = 0.15 * Math.sin(t * 0.9) * (1 - smooth(339.5, 341, t));
-      blendPose('flight', 'stand', land, s.pose);
-      s.boostK = smooth(336.6, 338.2, t) * (1 - smooth(339.4, 340.3, t));   // the burn builds to full, then home
+      s.roll += 0.05 * Math.sin(t * 0.9) * smooth(336, 337.5, t) * (1 - smooth(339.5, 341, t));
+      if (land > 0) { const cur = s.pose, st = {}; blendPose('flight', 'stand', land, st); for (const k in st) cur[k] = st[k]; }   // keep the waking blend until landing
+      s.boostK = smooth(336.2, 339.2, t) * (1 - smooth(339.8, 340.2, t));   // the burn builds slowly with the speed
       s.thr = t < 340.2 ? 1 : t < 342.1 ? 0.6 + 0.4 * Math.sin(t * 20) * 0.2 : 0.6 * (1 - smooth(342.1, 342.5, t));   // braking flare, then cut
       if (t > 343.7) s.vis = false;                            // behind the closed doors
     }
@@ -1045,7 +1050,13 @@ shot(110, 120, 'B5 ion muzzle charge', (c) => {
   const L = modelLen(c.R, 'ion_frigate');
   const m = ionMuzzle(c.R, t, 0);
   const side = V.norm([0, 0, 0], V.cross([0, 0, 0], st.fwd, [0, 1, 0]));
-  camLook(c, madd(madd(m, st.fwd, -L * 0.45 + u * 10), side, 30 + u * 4).map((v, i) => v + (i === 1 ? 12 : 0)), madd(m, st.fwd, 12), 44, 0.06);
+  // when the charge starts bleeding away the camera swings round to follow it: past the muzzle, down the line into
+  // the distance where the gravity well waits
+  const wellDir = V.norm([0, 0, 0], V.sub([0, 0, 0], WELL, m)), kc = easeInOut(sat((t - 116.4) / 2.4));
+  const p0 = madd(madd(m, st.fwd, -L * 0.45 + u * 10), side, 30 + u * 4).map((v, i) => v + (i === 1 ? 12 : 0));
+  const perp = V.norm([0, 0, 0], V.cross([0, 0, 0], wellDir, [0, 1, 0]));
+  const p1 = addv(madd(madd(m, wellDir, 60), perp, 230), [0, 45, 0]);            // side-on to the drain line: the streams race across frame
+  camLook(c, V.lerp([0, 0, 0], p0, p1, kc), V.lerp([0, 0, 0], madd(m, st.fwd, 12), madd(m, wellDir, 330), kc), lerp(44, 58, kc), 0.06);
   handheld(c, 0.3);
   c.env.shadowCenter = st.pos; c.env.shadowRadius = 70;
   const R = c.R;
@@ -1657,8 +1668,8 @@ shot(303, 310, 'S19c dreadnought dies', (c) => {
   const { t, u } = c;
   const d = dreadPos(t);
   camLook(c, addv(d, [700 - u * 120, 200, 900 - u * 100]), addv(d, [0, 0, 0]), 42, 0.05);
-  shake(c, t > 306 ? 1.2 * Math.exp(-(t - 306) * 0.8) : 0.3, 9);
-  c.post.flash = t > 306 && t < 307 ? 0.9 * (1 - (t - 306)) : 0;
+  shake(c, t > 306 ? 1.8 * Math.exp(-(t - 306) * 0.7) : 0.3, 9);
+  c.post.flash = 0;                                         // no screen wash: the additive world-space glow carries the flash
   c.env.shadowCenter = d; c.env.shadowRadius = 400;
 });
 shot(310, 320, 'S20 enemy flees', (c) => {
@@ -2130,5 +2141,5 @@ cut(196.8, 200, 'X wide over the planet', (c) => {
   againstPlanet(c, [0, 0, -900], 1500, 80, -500 + u * 80, 38, -0.05, 0.05, true);
   handheld(c, 0.3); c.env.shadowRadius = 1000; c.env.shadowCenter = [0, 0, -800];
 });
-cut(305.6, 308, 'X tracers into the wreck', (c) => { lineRide(c, 10, 0.8, 26, 14, 52, -0.1); shake(c, 0.4, 8); });
+cut(308.4, 310, 'X tracers into the wreck', (c) => { lineRide(c, 10, 0.8, 26, 14, 52, -0.1); shake(c, 0.4, 8); });
 SHOTS.unshift(...CUTS);
