@@ -366,6 +366,7 @@ function drawDock(R, t, me) {
 }
 
 function motherAnchor(R, me) { const b = R.models.mothership.bounds; return me.stretchOut ? b.min[2] : b.max[2]; }
+const _rimT = M.new(), _rimM = M.new();
 function drawWound(R, t, me) {
   // the interior rides with the hull: same live matrix (incl. hyperspace moves), stretch, reveal and visibility
   const mm = _m2; mm.set(me.m);
@@ -385,8 +386,19 @@ function drawWound(R, t, me) {
       amber: { base: [0.6, 0.3, 0.05], metal: 0, rough: 0.5, emissive: [4 * red, 0.5 * red, 0.1 * red] } };
     for (let i = 0; i < 4; i++) R.light(M.transformPoint([0, 0, 0], mm, [30, 12, -10 + i * 30]), 45, [1, 0.35 + 0.4 * fl, 0.25], 3 * fl);
   }
-  // molten drips peeling off the lower rim (streaks that cool from white to red)
+  // the armour's THICKNESS around the melt hole: a molten cut face + rolled lip (tools/make_wound_rim.py), scaled with
+  // the growing hole, deformed with the hull (same crush), riding every hull transform (stretch, reveal)
   const r = woundR(t);
+  if (!gone && r > 0.5 && me.melt) {
+    M.fromTRS(_rimT, LANCE_HIT, [0, 0, 0, 1], 1); _rimT[5] = r; _rimT[10] = r;
+    const rim = R.add('wound_rim', M.mul(_rimM, mm, _rimT));
+    if (rim) {
+      rim.texSet = -2; rim.emissive = me.melt[5]; rim.crush = me.crush; rim.seed = 9.1;
+      rim.stretch = me.stretch || 0; rim.stretchAnchor = (motherAnchor(R, me) - LANCE_HIT[2]) / r;
+      rim.revealDir = me.revealDir; rim.revealZ = (me.revealZ - LANCE_HIT[2]) / r; rim.revealWidth = me.revealWidth; rim.tint = me.tint;
+    }
+  }
+  // molten drips peeling off the lower rim (streaks that cool from white to red)
   for (let i = 0; i < 26; i++) {
     const per = 1.4 + hash(i) * 1.6, ph = ((t - LANCE_FIRE) / per + hash(i + 3)) % 1;
     if (t - LANCE_FIRE < ph * per) continue;

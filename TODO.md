@@ -151,3 +151,12 @@
       potato shape, ridged fault relief, creases, terraces, power-law craters with rims/ejecta, soft fracture planes;
       shader mode texSet = -1: dark regolith albedo, iron stains, grains, finite-difference bump, pit AO, no sheen.
       Debris field: 34 rocks + 5 hero rocks placed in the drift/return camera views; old low-poly rocks retired.
+- [x] 105. Hitboxes: capsule per mech part (both models) + weapon capsules (mace shaft + head, katana); the duel is swept
+      at 96 Hz after solving (~0.4 s at load) → AUTO_CONTACTS (entry with closing speed > 4 m/s, merged per 0.2 s):
+      sparks/glow/shake (shots.js via AUTO_FX), impact sounds (audio.js duelCues), and a physical response for both
+      mechs — impulse along the contact normal (mass-weighted, Newton's third law) + twist from the lever arm about the
+      hip, damped-spring profile, zero at contact frames (solved contacts stay exact; residuals unchanged).
+- [x] 106. Flagship wound has thickness: `tools/make_wound_rim.py` → `assets/wound_rim.glb` (rolled molten lip, ~11 m
+      laminated cut face, ragged inner edge) sharing the exact hole boundary B(θ) with the melt shader; shader mode
+      texSet −2: glowing runs, slag crust plates with molten cracks, plate seams; scaled with the growing hole, crushed
+      and warped with the hull.

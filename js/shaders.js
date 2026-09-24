@@ -409,17 +409,20 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   if (inst.clipMin.w > 1.5 && length(vec2f(i.lp.y - inst.clipMin.y, (i.lp.z - inst.clipMin.z) * 0.62)) < inst.clipMax.x * 2.2) {   // near the hole only
     let r = inst.clipMax.x;
     let q = i.lp - inst.clipMin.xyz;
-    let fing = pow(vnoise(vec3f(i.lp.z * 0.11, 3.0, 7.0) + inst.p1.w), 2.0) * 2.2;
-    var qy = q.y; if (qy < 0.0) { qy = qy / (1.0 + fing * smoothstep(0.0, -r, qy) * 1.2 + 0.25); }
-    let wob = (vnoise(i.lp * 0.07 + inst.p1.w) - 0.5) * r * 0.4 + (vnoise(i.lp * 0.35) - 0.5) * r * 0.07;
-    let d2 = length(vec2f(qy, q.z * 0.62)) + wob;               // gouge: stretched along the ship (grazing hit)
+    // boundary shared EXACTLY with the thick molten rim mesh (tools/make_wound_rim.py): |v| < r·B(θ)
+    let v = vec2f(q.z * 0.62, q.y);
+    let th = atan2(v.y, v.x);
+    let drip = 0.28 * pow(max(0.0, sin(7.0 * th + 1.1)), 3.0) * max(0.0, -sin(th));
+    let hb = 1.0 + 0.10 * sin(3.0 * th + 1.0) + 0.06 * sin(5.0 * th + 2.3) + 0.035 * sin(9.0 * th + 0.7) + 0.02 * sin(14.0 * th + 4.1) + drip;
+    let fing = drip * 8.0;
+    let d2 = length(v) / hb + (vnoise(i.lp * 0.35) - 0.5) * r * 0.03;   // gouge: stretched along the ship (grazing hit)
     let inDepth = q.x > -inst.clipMax.y;
     if (d2 < r && inDepth) { discard; }
     if (inDepth) {
       let e = max(d2 - r, 0.0);
       tornEdge = inst.clipMax.w * (exp(-e / (r * 0.05)) * 1.4 + exp(-e / (r * 0.22)) * 0.35);
       // molten runs below the hole: bright streaks that follow the fingers
-      if (q.y < 0.0) { tornEdge += inst.clipMax.w * 0.5 * smoothstep(0.55, 0.9, fing / 2.2) * exp(-e / (r * 0.5)); }
+      if (q.y < 0.0) { tornEdge += inst.clipMax.w * 0.5 * smoothstep(0.1, 0.9, fing / 2.2) * exp(-e / (r * 0.5)); }
     }
   }
   if (abs(inst.clipMin.w) > 0.5 && inst.clipMin.w < 1.5) {
@@ -478,7 +481,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   }
   // procedural asteroid (texSet = -1, tools/make_asteroids.py geometry): triplanar-free 3D regolith colour + bump.
   // Model space is ~unit radius, so every frequency scales with the rock.
-  if (texSet < 0) {
+  if (texSet == -1) {
     let q = i.lp;
     let big = fbm(q * 2.2 + inst.p1.w, 4);
     let mid = fbm(q * 7.0 + 3.1 + inst.p1.w, 3);
@@ -523,6 +526,29 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     rough = mix(rough, 0.95, scorch);
   }
   var emis = inst.emis.rgb * inst.p1.z;
+  // molten armour cut face (texSet = -2, assets/wound_rim.glb; heat in p1.z): white-hot rolled lip, glowing runs and
+  // drips flowing down the ~9 m cut face, a dark cooling slag crust breaking up the glow deeper in
+  if (texSet == -2) {
+    let q = i.lp;
+    let heat = inst.p1.z;
+    let dk = clamp((3.9 - q.x) / 11.0, 0.0, 1.0);                       // 0 at the lip .. 1 at the inner edge
+    let flange = smoothstep(1.035, 1.09, length(vec2f(q.z * 0.62, q.y)) / max(0.6, 1.0)) * step(2.4, q.x);   // outer curl on the skin
+    let flow = vnoise(vec3f(q.z * 30.0, q.y * 5.0 + F.camPos.w * 0.35, q.x * 0.5)) * 0.6 + vnoise(vec3f(q.z * 70.0, q.y * 14.0 + F.camPos.w * 0.8, q.x)) * 0.4;
+    // cooled slag crust plates; glow survives in the cracks between them and in the running drips
+    let cr = fbm(vec3f(q.z * 22.0, q.y * 22.0, q.x * 1.1) + 5.0, 3);
+    let crust = smoothstep(0.38, 0.5, cr) * clamp(0.35 + dk * 0.9 + flange * 0.6 - heat * 0.2, 0.0, 1.0);
+    let crack = 1.0 - smoothstep(0.0, 0.05, abs(cr - 0.44));
+    // laminated armour: the cut face shows the stacked plates (dark seams every ~1.3 m of depth)
+    let lam = smoothstep(0.82, 0.95, fract((3.4 - q.x) / 1.3)) * step(q.x, 3.3) * (1.0 - flange);
+    var temp = heat * (0.9 * pow(1.0 - dk, 2.2) + 0.5 * flow * (1.0 - 0.7 * dk)) * (1.0 - 0.9 * crust) * (1.0 - 0.6 * flange);
+    temp += heat * 1.1 * pow(1.0 - clamp(abs(q.x - 3.8) / 0.45, 0.0, 1.0), 2.0) * (1.0 - 0.5 * crust);   // the rolled lip: hottest line
+    temp += heat * 0.8 * crack * (1.0 - dk * 0.5);
+    temp *= 1.0 - 0.7 * lam;
+    let glow = vec3f(1.0, 0.16, 0.03) * smoothstep(0.06, 0.45, temp) + vec3f(1.0, 0.45, 0.1) * smoothstep(0.4, 0.95, temp) + vec3f(0.9, 0.8, 0.6) * smoothstep(0.9, 1.6, temp);
+    emis = glow * temp * 1.5 * (0.92 + 0.08 * sin(F.camPos.w * 9.0 + q.z * 40.0));
+    base = mix(vec3f(0.06, 0.05, 0.045), vec3f(0.1, 0.085, 0.075), crust) * (1.0 - 0.5 * lam);
+    rough = mix(0.28, 0.85, crust); metal = mix(0.85, 0.3, crust);
+  }
   let isEmissive = dot(inst.emis.rgb, vec3f(1.0)) > 0.01;
   var ao = 1.0;
   if (det > 0.0 && !isEmissive) {
@@ -574,7 +600,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // environment reflection with a brushed-metal streak (anisotropic look along the hull's long axis)
   let Rv = reflect(-V, n);
   let brushed = 0.75 + 0.5 * vnoise(vec3f(i.lp.x * 0.6, i.lp.y * 0.6, i.lp.z * 0.02) + inst.p1.w);
-  let rockK = select(1.0, 0.12, texSet < 0);                        // dusty rock: almost no sheen
+  let rockK = select(1.0, 0.12, texSet == -1);                        // dusty rock: almost no sheen
   let reflK = fres * (1.0 - rough * 0.8) * brushed * mix(0.2, 0.85, metal) * rockK;
   var envC = envRefl(Rv, rough);
   if (F.interior.w > 0.5) { envC = envInterior(i.wp, Rv, rough); }

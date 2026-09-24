@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, duelHero, duelEnemy1, duelEnemy2 } from './duel.js';   // pure data/functions (no DOM/GPU)
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2 } from './duel.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, TEAR_S0, TEAR_S1, TEAR_F1, FILM_DURATION, STORY_DURATION } from './timemap.js';
 // The Score clock is FILM time. Every table below (CUES, SAMPLE_CUES, SECTIONS, AUTOMATION, ION_SHOTS, DUEL_EVENTS,
@@ -489,7 +489,8 @@ export const INSERT_CUES = insertCues();
 //   modulated by swing speed, thruster boosts (boost rising edges), servo/hydraulic moves (joint angular-speed peaks).
 function duelCues() {
   const out = [], r = rng(8080), R = (a, b) => a + r() * (b - a), G = DUEL_GAIN;
-  const EV = DUEL_EVENTS.filter((e) => e.t >= 150 && e.t <= 200);
+  // choreographed events + contacts found by the hitbox sweep (duel.js AUTO_FX): every real touch gets its sound
+  const EV = [...DUEL_EVENTS, ...AUTO_FX.map((e) => ({ ...e, strength: e.strength * 0.8 }))].filter((e) => e.t >= 150 && e.t <= 200).sort((a, b) => a.t - b.t);
   const strikes = EV.filter((e) => e.type === 'clash' || e.type === 'block' || e.type === 'hit');
   const swing = (e) => /whoosh|whiff|slash|cut|thrust/i.test(e.note || '');
   // ---- events

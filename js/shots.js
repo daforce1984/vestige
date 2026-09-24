@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -668,7 +668,7 @@ function drawMSBattle(R, t) {
   if (t > 179.1 && t < 180.3) hitFlash(R, t, 179.1, addv(enemyMS1(179.1).pos, [0, 9, 0]), 8, [1, 0.5, 0.3]);
   explosion(R, t, 180.2, addv(enemyMS1(180.2).pos, [0, 9, 0]), 16, 501, 'ship');
   // contact effects from the choreography (exact world contact points)
-  for (const ev of DUEL_EVENTS) {
+  for (const ev of [...DUEL_EVENTS, ...AUTO_FX]) {                  // choreographed + hitbox-detected contacts
     const lt = t - ev.t;
     if (lt < 0 || lt > 0.7 || !ev.pos) continue;
     const st = ev.strength ?? 1;

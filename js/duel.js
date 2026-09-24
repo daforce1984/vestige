@@ -841,7 +841,7 @@ function dodgeOffset(tw) {
 export function duelHero(t) {
   if (!STATE_CACHE) return duelHero_(t);
   let r = _c_duelHero.get(t);
-  if (r === undefined) { r = duelHero_(t); if (_c_duelHero.size > 64) _c_duelHero.clear(); _c_duelHero.set(t, r); }
+  if (r === undefined) { r = duelHero_(t); if (AUTO_READY && r) r = applyImpulses('hero', t, r); if (_c_duelHero.size > 64) _c_duelHero.clear(); _c_duelHero.set(t, r); }
   return r;
 }
 function duelHero_(t) {
@@ -896,7 +896,7 @@ const _c_duelEnemy1 = new Map();
 export function duelEnemy1(t) {
   if (!STATE_CACHE) return duelEnemy1_(t);
   let r = _c_duelEnemy1.get(t);
-  if (r === undefined) { r = duelEnemy1_(t); if (_c_duelEnemy1.size > 64) _c_duelEnemy1.clear(); _c_duelEnemy1.set(t, r); }
+  if (r === undefined) { r = duelEnemy1_(t); if (AUTO_READY && r) r = applyImpulses('e1', t, r); if (_c_duelEnemy1.size > 64) _c_duelEnemy1.clear(); _c_duelEnemy1.set(t, r); }
   return r;
 }
 function duelEnemy1_(t) {
@@ -942,7 +942,7 @@ const _c_duelEnemy2 = new Map();
 export function duelEnemy2(t) {
   if (!STATE_CACHE) return duelEnemy2_(t);
   let r = _c_duelEnemy2.get(t);
-  if (r === undefined) { r = duelEnemy2_(t); if (_c_duelEnemy2.size > 64) _c_duelEnemy2.clear(); _c_duelEnemy2.set(t, r); }
+  if (r === undefined) { r = duelEnemy2_(t); if (AUTO_READY && r) r = applyImpulses('e2', t, r); if (_c_duelEnemy2.size > 64) _c_duelEnemy2.clear(); _c_duelEnemy2.set(t, r); }
   return r;
 }
 function duelEnemy2_(t) {
@@ -1220,7 +1220,7 @@ export const DUEL_EVENTS = EV.map(solveEvent);
 // Fast cuts (0.6–2.5 s). fn(t, u) returns {pos, target, fov, roll, shake, ...}.
 const hp = (t) => duelHero(t).pos, e1p = (t) => duelEnemy1(Math.min(t, 180.19)).pos, e2p = (t) => duelEnemy2(t).pos;
 const up = (p, h) => [p[0], p[1] + h, p[2]];
-const evShake = (t, list, decay = 5) => { let s = 0; for (const e of DUEL_EVENTS) { if (list && !list.includes(e.type)) continue; if (t >= e.t && t < e.t + 1.2) s = Math.max(s, e.strength * Math.exp(-(t - e.t) * decay)); } return s; };
+const evShake = (t, list, decay = 5) => { let s = 0; for (const e of [...DUEL_EVENTS, ...(AUTO_READY ? AUTO_FX : [])]) { if (list && !list.includes(e.type)) continue; if (t >= e.t && t < e.t + 1.2) s = Math.max(s, e.strength * Math.exp(-(t - e.t) * decay)); } return s; };
 const evFlash = (t) => { let f = 0; for (const e of DUEL_EVENTS) { if (e.type === 'shake' || e.type === 'spark') continue; const d = t - e.t; if (d >= 0 && d < 0.09) f = Math.max(f, 0.35 * e.strength); } return f; };
 // side vector of a two-shot line (perpendicular, horizontal)
 const sideOf = (a, b) => { const d = nrm(sub(b, a)); return nrm([d[2], 0, -d[0]]); };
@@ -1283,3 +1283,127 @@ export function duelCamera(t) {
 }
 
 STATE_CACHE = true;   // all solving done: states are now fixed functions of t
+
+// ============================================================================ hitboxes + automatic contacts
+// Every mech part and weapon carries a capsule hitbox (part-local segment + radius, from the model pivots). The whole
+// fight is swept at 96 Hz after solving; wherever two capsules START to interpenetrate with a real closing speed —
+// scripted or not — a contact is recorded with its exact world point, normal and closing speed. The contacts drive
+// sparks / flashes (shots.js), impact sounds (audio.js) and a physical response: both bodies receive an impulse
+// (Newton's third law) that shoves them along the normal and twists them about their hips by the lever arm, through a
+// damped spring (zero at the contact frame, so solved contacts stay exact).
+const mx = (a) => [-a[0], a[1], a[2]];
+const capsL = (part, a, b, r) => [[part, a, b, r], [part.replace('_L', '_R'), mx(a), mx(b), r]];
+const HITBOX = {
+  gundam: [
+    ['pelvis', [0, -0.4, 0], [0, 0.9, 0], 2.4], ['torso', [0, 0.2, 0.2], [0, 4.2, 0.2], 3.3], ['head', [0, 0.5, 0.2], [0, 1.8, 0.3], 1.4],
+    ...capsL('arm_L_upper', [0, 0, 0], [0.75, -2.2, 0.05], 1.5), ...capsL('arm_L_lower', [0, 0, 0], [0.65, -3.75, 0.25], 1.35),
+    ...capsL('hand_L', [0, -0.4, 0.2], [0, -1.6, 0.4], 1.0), ...capsL('leg_L_upper', [0, 0, 0], [0.8, -2.7, 0.2], 1.6),
+    ...capsL('leg_L_lower', [0, 0, 0], [0.65, -4.95, -0.2], 1.4), ...capsL('foot_L', [0, -0.6, 0.2], [0, -1.3, 1.6], 1.0),
+  ],
+  enemy_ms: [
+    ['pelvis', [0, -0.4, 0], [0, 0.9, 0], 2.0], ['torso', [0, 0.2, 0.1], [0, 3.3, 0.1], 2.6], ['head', [0, 0.3, 0], [0, 1.4, 0], 1.1],
+    ...capsL('arm_L_upper', [0, 0, 0], [0.84, -2.25, 0.23], 1.1), ...capsL('arm_L_lower', [0, 0, 0], [0.56, -2.42, 0.22], 1.0),
+    ...capsL('hand_L', [0, -0.3, 0.1], [0, -1.2, 0.3], 0.8), ...capsL('leg_L_upper', [0, 0, 0], [0.79, -4.17, -0.06], 1.3),
+    ...capsL('leg_L_lower', [0, 0, 0], [0.79, -4.38, -0.11], 1.1), ...capsL('foot_L', [0, -0.5, 0.1], [0, -1.1, 1.3], 0.9),
+  ],
+};
+const WEAPON = { hero: { shaft: 0.45, head: 2.1, headFrom: 0.78 }, e1: { shaft: 0.3 }, e2: { shaft: 0.3 } };
+function capsules(who, s) {
+  const model = MODEL[who], fk = duelFK({ ...s, saber: Math.max(s.saber, 1e-3) }, model), out = [];
+  for (const [part, a, b, r] of HITBOX[model]) out.push({ who, part, kind: 'body', a: M.transformPoint([0, 0, 0], fk[part], a), b: M.transformPoint([0, 0, 0], fk[part], b), r });
+  if (s.saber > 0.5) {
+    const [a, b] = fk.saber, w = WEAPON[who];
+    out.push({ who, part: 'weapon', kind: 'weapon', a, b, r: w.shaft });
+    if (w.head) out.push({ who, part: 'weapon', kind: 'weapon', a: lrp(a, b, w.headFrom), b, r: w.head });
+  }
+  return out;
+}
+let AUTO_READY = false;
+export const AUTO_CONTACTS = (() => {
+  const list = [], dt = 1 / 96, last = new Map(), prevIn = new Map();
+  const scripted = DUEL_EVENTS.filter((e) => e.type !== 'shake').map((e) => e.t);
+  let prev = null;
+  for (let t = 170.3; t < 194.0; t += dt) {
+    const foe = t < 180.15 ? 'e1' : t > 181.0 && t < 192.35 ? 'e2' : null;
+    if (!foe) { prev = null; continue; }
+    const hs = duelHero(t), fs = stateOf(foe, t);
+    if (!hs || !fs || !fs.vis) { prev = null; continue; }
+    const A = capsules('hero', hs), B = capsules(foe, fs);
+    const cur = { A, B, foe };
+    if (prev && prev.foe === foe) {
+      for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++) {
+        const ca = A[i], cb = B[j];
+        if (ca.kind === 'body' && cb.kind === 'body' && (ca.part === 'pelvis' || cb.part === 'pelvis')) continue;
+        const q = segSeg(ca.a, ca.b, cb.a, cb.b), depth = ca.r + cb.r - q.d, key = i * 64 + j;
+        const was = prevIn.get(key) || false, now = depth > 0;
+        prevIn.set(key, now);
+        if (!now || was) continue;
+        // closing speed of the two touching points (same segment parameters one step earlier)
+        const pa = prev.A[i], pb = prev.B[j];
+        if (!pa || !pb) continue;
+        const va = scl(sub(q.c1, lrp(pa.a, pa.b, q.s)), 1 / dt), vb = scl(sub(q.c2, lrp(pb.a, pb.b, q.t)), 1 / dt);
+        const n = q.d > 1e-4 ? nrm(sub(q.c2, q.c1)) : nrm(sub(vb, va));
+        const vn = V.dot(sub(va, vb), n);
+        if (vn < 4) continue;
+        if (scripted.some((x) => Math.abs(x - t) < 0.12)) continue;          // the choreographed contact already covers it
+        const kind = ca.kind === 'weapon' && cb.kind === 'weapon' ? 'weapon-weapon' : ca.kind === 'weapon' || cb.kind === 'weapon' ? 'weapon-body' : 'body-body';
+        const pk = ca.part + '|' + cb.part;
+        if (t - (last.get(pk) ?? -9) < 0.25) continue;
+        last.set(pk, t);
+        const pos = lrp(add(q.c1, scl(n, ca.r)), sub(q.c2, scl(n, cb.r)), 0.5);
+        list.push({ t: +t.toFixed(4), pos, n, vn, kind, a: 'hero', b: foe, partA: ca.part, partB: cb.part, strength: clamp(vn / 60, 0.15, 1) });
+      }
+    }
+    prev = cur;
+  }
+  // one physical event per exchange: contacts closer than 0.2 s merge into the hardest one (weapons outrank bodies);
+  // body-on-body brushes right around a choreographed hit belong to that hit
+  const score = (c) => c.vn * (c.kind === 'body-body' ? 0.5 : 1);
+  const kept = [];
+  for (const c of list) {
+    if (c.kind === 'body-body' && scripted.some((x) => Math.abs(x - c.t) < 0.3)) continue;
+    const k = kept[kept.length - 1];
+    if (k && c.t - k.t < 0.2) { if (score(c) > score(k)) kept[kept.length - 1] = c; continue; }
+    kept.push(c);
+  }
+  return kept;
+})();
+AUTO_READY = true;
+// the same contacts in DUEL_EVENTS form, for the effect / shake code (sparks + flash-free glow, no cut)
+export const AUTO_FX = AUTO_CONTACTS.map((c) => ({ t: c.t, pos: c.pos, type: c.kind === 'weapon-weapon' ? 'clash' : c.kind === 'weapon-body' ? 'hit' : 'spark', strength: c.strength, auto: true }));
+// physical response of `who` to every contact (auto + scripted hits/clashes/blocks): shove along the normal and a twist
+// from the lever arm about the hip, through a damped spring (0 at contact, peak ~0.12 s, settled by ~0.9 s)
+const IMPULSES = [
+  ...AUTO_CONTACTS.map((c) => ({ t: c.t, pos: c.pos, n: c.n, vn: c.vn, a: c.a, b: c.b, kind: c.kind })),
+  ...DUEL_EVENTS.filter((e) => e.pos && ['clash', 'block'].includes(e.type))   /* hits: collisionOffset */.map((e) => ({ t: e.t, pos: e.pos, n: null, vn: 25 * (e.strength ?? 1), a: 'hero', b: e.t < 180.5 ? 'e1' : 'e2', kind: 'weapon-weapon' })),
+];
+const MASS = { hero: 1.25, e1: 1, e2: 1 };   // Sigma is the heavier machine
+function impulseResponse(who, tw, s) {
+  if (!AUTO_READY) return null;
+  const off = [0, 0, 0], ang = [0, 0, 0];
+  let near = 1; for (const ti of IMPACTS) near = Math.min(near, smooth(0.03, 0.2, Math.abs(tw - ti)));
+  if (near <= 0) return null;
+  const f = nrm([s.fwd[0], 0, s.fwd[2]]), r = [f[2], 0, -f[0]];
+  for (const c of IMPULSES) {
+    const lt = tw - c.t;
+    if (lt <= 0 || lt > 0.9 || (c.a !== who && c.b !== who)) continue;
+    const other = c.a === who ? c.b : c.a;
+    const raw = (w, x) => (w === 'hero' ? duelHero_(x) : w === 'e1' ? duelEnemy1_(x) : duelEnemy2_(x));
+    let n = c.n || nrm(sub(raw(other, c.t).pos, raw(who, c.t).pos));
+    const sign = c.a === who ? -1 : 1;                                    // impulse on `who` points away from the other
+    const J = clamp(c.vn, 0, 80) * (c.kind === 'weapon-weapon' ? 0.02 : c.kind === 'weapon-body' ? 0.05 : 0.035) * (MASS[other] / MASS[who]);
+    const env = pulse(lt, 8) * (1 - lt / 0.9) * near;
+    for (let k = 0; k < 3; k++) off[k] += n[k] * sign * J * env;
+    const lever = sub(c.pos, s.pos), tq = V.cross([0, 0, 0], lever, scl(n, sign * J));      // twist about the hip
+    ang[0] += clamp(V.dot(tq, r), -8, 8) * 0.012 * env; ang[1] += clamp(tq[1], -8, 8) * 0.01 * env; ang[2] += clamp(V.dot(tq, f), -8, 8) * 0.012 * env;
+  }
+  return { off, ang };
+}
+export function applyImpulses(who, t, s) {
+  if (!s) return s;
+  const res = impulseResponse(who, warp(t), s);
+  if (!res) return s;
+  const o = { ...s, pos: add(s.pos, res.off), pitch: (s.pitch || 0) + res.ang[0], roll: (s.roll || 0) + res.ang[2] };
+  o.fwd = yawRot(s.fwd, res.ang[1]);
+  return o;
+}
