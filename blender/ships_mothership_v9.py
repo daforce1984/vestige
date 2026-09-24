@@ -423,7 +423,7 @@ def sponson(mb, R, sg):
     for z in (zb + 10, (zb + zt) / 2, zt - 9):
         light_row(mb, (sg * 133.2, Y(s_le - 22), z), (sg * 133.2, Y(s_te + 10), z), (sg, 0, 0), 4.0,
                   (0.8, 2.4, 0.3), 'window', R=R, dropout=0.15)
-    beacon(mb, Vector((sg * 133.2, Y(s_le - 18), zt - 4)), Vector((sg, 0, 0)), 1.4, 'blue_light' if sg > 0 else 'amber',
+    beacon(mb, Vector((sg * 133.2, Y(s_le - 18), zt - 4)), Vector((sg, 0, 0)), 1.3, 'blue_light' if sg > 0 else 'amber',
            LAMP_BODY, 'trim')
     # trailing (aft) face lights + small engine
     s_le, s_te, zb, zt = sec(100)
