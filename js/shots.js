@@ -591,7 +591,8 @@ export function drawGundam(R, t, s, opts = {}) {
   const bz = s.berserk || 0;
   const ec = [lerp(0.5 * 2.5, 9, bz) * eyeK, lerp(2.2 * 2.5, 0.4, bz) * eyeK, lerp(1.2 * 2.5, 0.25, bz) * eyeK];
   e.matOverride = { eye: { base: [0.2, 0.9, 0.5], metal: 0, rough: 0.3, emissive: ec } };
-  const pastHero = opts.pastState || ((tau) => { const q = gundamState(t - tau); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
+  // exhaust history never reaches back across a scene cut where his path jumps (340: the drift → the bay approach)
+  const pastHero = opts.pastState || ((tau) => { const q = gundamState(t >= 340 && t - tau < 340 ? 340 : t - tau); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
   if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.7, 0.9, 2.0], 0.9 * (1 + 0.9 * (s.boostK || 0)), s.thr, 1.2 + 1.5 * (s.boostK || 0), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
   const eye = emitWorld(R, 'gundam', e, 'eye');
