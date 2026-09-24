@@ -2170,12 +2170,13 @@ function deathCam(c, i, dist, ang, fov) {
   c.env.shadowCenter = p; c.env.shadowRadius = 90;
 }
 cut(121.8, 123.6, 'X enemy fire over the line', (c) => { lineRide(c, 4, 0.2, 30, 18, 48, -0.1); shake(c, 0.5, 9); });
-cut(80.6, 86.6, 'X the enemy arrives (wide)', (c) => {
+cut(80.6, 88.5, 'X the enemy arrives (wide)', (c) => {
   // high over our fleet's shoulder, looking down the gap: the whole enemy force rips in — frigates, the line, the dreadnought
   const { t, u } = c;
-  const m = motherPoint([0, 0, 0], t, [0, 0, 0]);
-  const tgt = [60, 40, -1500];
-  camLook(c, [m[0] + 320 - u * 30, m[1] + 170 - u * 20, m[2] - 380 - u * 60], tgt, 34, 0.03);   // at our bow, looking across the gap
+  // high off the enemy's flank, looking down on the whole arrival zone: every frigate and line ship rips in, and the
+  // dreadnought's window opens beside them — seen side-on and from above, so its length reads against the others
+  const tgt = [120, 20, -1700];
+  camLook(c, [2050 - u * 120, 1150 - u * 60, -1150 - u * 80], tgt, 44, 0.04);
   handheld(c, 0.05);
   c.env.shadowCenter = [0, 0, -1200]; c.env.shadowRadius = 1600;
   c.env.fill = [0.45, 0.4, 0.45, 0.55]; c.env.rim = [0.9, 0.6, 0.55, 0.6];

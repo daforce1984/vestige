@@ -197,3 +197,4 @@
 - [x] 135. Dive: Sigma's charge is one straight line from beside the flagship's wound to the well (he moves there off screen 226–240); S16a looks down that line toward the well with the wound in the foreground — no swerve.
 - [x] 136. Return after the well: no ember sparks off the arm thrusters while he comes to / flies home; camera placed behind him on his heading and held still so he slowly draws away (no asteroid in front of the lens).
 - [x] 137. Ship/fighter trails: one smooth cone per nozzle (the segmented past-trail capsules read as beads), nozzle glow only at the nozzle.
+- [x] 138. Enemy arrival: warp sounds 80–100 s ×3; the wide cut (80.6–88.5) is now high off the enemy flank looking down — every frigate/line ship warp-in plus the dreadnought side-on beside them for scale.
