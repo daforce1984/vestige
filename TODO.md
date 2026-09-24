@@ -161,3 +161,4 @@
       texSet −2: glowing runs, slag crust plates with molten cracks, plate seams; scaled with the growing hole, crushed
       and warped with the hull.
 - [x] 107. Every warp gets its own warp_out2 on its visual snap (only simultaneous < 0.15 s share); small ships lighter/panned — the enemy's fleeing line ships at 313.0 / 315.2 were silent (1.2 s clustering).
+- [x] 108. Wound rim conforms to the real hull (ray-cast skin under every column; no wall where the hole runs off the hull or deeper than the melt); FLEET COMMAND + SENSORS voices at 80 % (VOICE_TRIM).

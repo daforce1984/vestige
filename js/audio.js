@@ -50,6 +50,7 @@ export const DUCK_ATTACK = 0.08, DUCK_RELEASE = 0.4, HIT_DUCK_RELEASE = 0.9;
 export const SAMPLE_GAIN = 0.85;                 // master trim for all Pixabay samples
 export const RATE_VAR = 0.08;                    // ± playbackRate variation per cue
 export const GAIN_VAR_DB = 2;                    // ± gain variation per cue
+export const VOICE_TRIM = { CMDR: 0.8, SENSOR: 0.8 };   // per-speaker level: fleet command + sensors sit back 20 %
 export const MAX_SAMPLES = 96;                   // simultaneous sample voices (lowest prio / oldest stolen)
 export const LAZY_BYTES = 1.5e6;                 // samples decoding larger than this (and all loops) are JIT
 // synth texture under the samples (EVE bed + railguns), density scaled down in v3
@@ -947,7 +948,7 @@ export default class Score {
       const speech = this._voiceEnd(l) - l.tf;
       if (!(speech > 0.05)) continue;
       ev.push({ film: true, t: l.tf - VOICE_PRE, type: 'voiceLine', p: { buf: l.buf, id: l.id, radio: !!l.radio, broken: l.radioFx === 'broken', cut: this._voiceEnd(l) < l.tf + l.buf.duration - 1e-3, resume: true,
-        dur: VOICE_PRE + speech, gain: l.radioFx === 'broken' ? VOICE_GAIN.broken : l.radio ? VOICE_GAIN.radio : VOICE_GAIN.narrator } });
+        dur: VOICE_PRE + speech, gain: (l.radioFx === 'broken' ? VOICE_GAIN.broken : l.radio ? VOICE_GAIN.radio : VOICE_GAIN.narrator) * (VOICE_TRIM[l.voice] ?? 1) } });
     }
     if (stems) {   // ending extension to 381.8: F's final Ab chord replayed an octave down + an Ab-major pad
       const st = this.stems.find((x) => x.file === STEM_TAIL.file) || this.stems[this.stems.length - 1];

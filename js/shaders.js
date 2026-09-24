@@ -531,17 +531,18 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   if (texSet == -2) {
     let q = i.lp;
     let heat = inst.p1.z;
-    let dk = clamp((3.9 - q.x) / 11.0, 0.0, 1.0);                       // 0 at the lip .. 1 at the inner edge
-    let flange = smoothstep(1.035, 1.09, length(vec2f(q.z * 0.62, q.y)) / max(0.6, 1.0)) * step(2.4, q.x);   // outer curl on the skin
+    let pu = i.uv.x;                                                    // profile: 0 flange edge, 0.27 lip crest, 1 inner edge
+    let dk = clamp((pu - 0.27) / 0.73, 0.0, 1.0);
+    let flange = 1.0 - smoothstep(0.12, 0.25, pu);                      // outer curl on the skin
     let flow = vnoise(vec3f(q.z * 30.0, q.y * 5.0 + F.camPos.w * 0.35, q.x * 0.5)) * 0.6 + vnoise(vec3f(q.z * 70.0, q.y * 14.0 + F.camPos.w * 0.8, q.x)) * 0.4;
     // cooled slag crust plates; glow survives in the cracks between them and in the running drips
     let cr = fbm(vec3f(q.z * 22.0, q.y * 22.0, q.x * 1.1) + 5.0, 3);
     let crust = smoothstep(0.38, 0.5, cr) * clamp(0.35 + dk * 0.9 + flange * 0.6 - heat * 0.2, 0.0, 1.0);
     let crack = 1.0 - smoothstep(0.0, 0.05, abs(cr - 0.44));
     // laminated armour: the cut face shows the stacked plates (dark seams every ~1.3 m of depth)
-    let lam = smoothstep(0.82, 0.95, fract((3.4 - q.x) / 1.3)) * step(q.x, 3.3) * (1.0 - flange);
+    let lam = smoothstep(0.82, 0.95, fract(dk * 8.0)) * step(0.36, pu);
     var temp = heat * (0.9 * pow(1.0 - dk, 2.2) + 0.5 * flow * (1.0 - 0.7 * dk)) * (1.0 - 0.9 * crust) * (1.0 - 0.6 * flange);
-    temp += heat * 1.1 * pow(1.0 - clamp(abs(q.x - 3.8) / 0.45, 0.0, 1.0), 2.0) * (1.0 - 0.5 * crust);   // the rolled lip: hottest line
+    temp += heat * 1.1 * pow(1.0 - clamp(abs(pu - 0.27) / 0.06, 0.0, 1.0), 2.0) * (1.0 - 0.5 * crust);   // the rolled lip: hottest line
     temp += heat * 0.8 * crack * (1.0 - dk * 0.5);
     temp *= 1.0 - 0.7 * lam;
     let glow = vec3f(1.0, 0.16, 0.03) * smoothstep(0.06, 0.45, temp) + vec3f(1.0, 0.45, 0.1) * smoothstep(0.4, 0.95, temp) + vec3f(0.9, 0.8, 0.6) * smoothstep(0.9, 1.6, temp);
