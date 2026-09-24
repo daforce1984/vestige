@@ -1881,6 +1881,20 @@ shot(347.3, 358, 'F2 HOME', (c) => {
   c.env.shadowCenter = mp; c.env.shadowRadius = 600;
   c.env.fill = [0.35, 0.37, 0.45, 0.5];
 });
+// speed profile of the final one-take (story s): accelerates off the fleet, keeps a slow rise through the narration,
+// surges up through the sun, settles on the title. Integrated once; s runs 0 → 3 (fleet, limb, sun, title).
+const END_V = [[358, 0], [359.5, 0.35], [366.6, 0.45], [368.4, 1.6], [370.8, 0]];   // angular speed (relative)
+let _endTab = null;
+function endS(t) {
+  if (!_endTab) {
+    const vAt = (x) => { for (let i = 0; i < END_V.length - 1; i++) { const [a, va] = END_V[i], [b, vb] = END_V[i + 1]; if (x <= b) return va + (vb - va) * sat((x - a) / (b - a)); } return 0; };
+    _endTab = []; let acc = 0;
+    for (let x = 358; x <= 370.8 + 1e-6; x += 0.01) { _endTab.push(acc); acc += vAt(x + 0.005) * 0.01; }
+    _endTab = _endTab.map((v) => (v / acc) * 3);
+  }
+  const i = Math.round((t - 358) / 0.01);
+  return i <= 0 ? 0 : i >= _endTab.length ? 3 : _endTab[i];
+}
 shot(358, 393.5, 'S23 title', (c) => {
   const { t } = c;
   // ONE TAKE from F2: the camera keeps its place by the fleet and eases from the flagship onto Earth's limb (358–361);
@@ -1890,20 +1904,25 @@ shot(358, 393.5, 'S23 title', (c) => {
   const q = homeCam(t), pos = q.pos;
   const f0 = V.norm([0, 0, 0], V.sub([0, 0, 0], q.target, pos));
   const dir0 = V.norm([0, 0, 0], V.lerp([0, 0, 0], PLANET, SUN, 0.5 + sat((t - 358) / 9) * 0.04));
-  const S = SUN_RISE(), sp = madd([0, 0, 0], S, 1000);
+  const S = SUN_RISE();
   const upDir = V.norm([0, 0, 0], V.add([0, 0, 0], dir0, [0, 1.1, 0]));
-  const k0 = easeInOut(sat((t - 358) / 3.2));                 // fleet → the limb
-  // ONE continuous move after the narration (366.8–370.8): up through the rising sun (it crosses the centre of frame
-  // mid-move) and on round to the title — a quadratic Bézier through the sun, no stop
-  const k2 = easeInOut(sat((t - 366.8) / 4.0));
-  let dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], f0, dir0, k0));
-  if (k2 > 0) {
-    const Cp = V.sub([0, 0, 0], V.scale([0, 0, 0], S, 2), V.scale([0, 0, 0], V.add([0, 0, 0], dir, upDir), 0.5));
-    const w = 1 - k2;
-    dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], dir, w * w), V.scale([0, 0, 0], Cp, 2 * w * k2)), V.scale([0, 0, 0], upDir, k2 * k2)));
-  }
+  // ONE continuous move 358 → 370.8 that never stops: fleet → Earth's limb → (keeps rising slowly under the narration)
+  // → speeds up through the rising sun (dead centre mid-move) → round to the title. Catmull-Rom through the four
+  // directions, driven by a speed profile that is > 0 everywhere between the ends.
+  const Pts = [f0, dir0, S, upDir];
+  const cr = (a, b, c2, d, u) => 0.5 * (2 * b + (-a + c2) * u + (2 * a - 5 * b + 4 * c2 - d) * u * u + (-a + 3 * b - 3 * c2 + d) * u * u * u);
+  const at = (sv) => { const seg = Math.min(2, Math.floor(sv)), lu = sv - seg; const P0 = Pts[Math.max(0, seg - 1)], P1 = Pts[seg], P2 = Pts[seg + 1], P3 = Pts[Math.min(3, seg + 2)];
+    return V.norm([0, 0, 0], [0, 1, 2].map((k) => cr(P0[k], P1[k], P2[k], P3[k], lu))); };
+  // arc-length (angle) reparametrisation: the SPEED profile is in angle, so it never looks stalled
+  const N = 300, A = [0]; let prevD = at(0);
+  for (let k = 1; k <= N; k++) { const d = at(3 * k / N); A.push(A[k - 1] + Math.acos(Math.min(1, V.dot(d, prevD)))); prevD = d; }
+  const want = endS(t) / 3 * A[N];
+  let kk = 1; while (kk < N && A[kk] < want) kk++;
+  const sp = 3 * ((kk - 1) + (want - A[kk - 1]) / Math.max(1e-9, A[kk] - A[kk - 1])) / N;
+  let dir = at(Math.min(3, sp));
+  const k0 = sat(sp), k2 = sat(sp - 2);
   camLook(c, pos, madd(pos, dir, 1000), lerp(q.fov, 34, k0), lerp(0.04, 0.12, k0) - k2 * 0.08);
-  c.world = t < 366;                                          // the fleet stays in shot until we leave it behind
+  c.world = t < 369;                                          // the fleet stays until the camera has risen well past it (no pop)
   c.env.planet = { dir: PLANET, radius: PL_R, col: [0.3, 0.5, 1.0], earth: true };
   c.env.stars = 0.6 + k2 * 0.3; c.env.sunDisc = 0;
   c.post.exposure = 0.75;
