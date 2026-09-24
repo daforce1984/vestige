@@ -1138,7 +1138,7 @@ for (let i = 0; i < 18; i++) {
   const row = i % 3, col = Math.floor(i / 3);
   EXTRA_H.push({
     p: [(col - 2.5) * 150 + (hash(i * 3.1) - 0.5) * 60, (row - 1) * 110 + (hash(i * 5.3) - 0.5) * 40, 60 + row * 120 + hash(i * 7.7) * 160],
-    type: i % 3 === 1 ? 'assault_frigate' : 'ion_frigate', arrive: 40.7 + i * 0.14, depart: null,   // the whole fleet is out of hyperspace by ~44.1 s (before "exit complete" at 45) seed: 30 + i,
+    type: i % 3 === 1 ? 'assault_frigate' : 'ion_frigate', arrive: 40.7 + i * 0.14, depart: null, seed: 30 + i,   // all out of hyperspace by ~44.1 s (before "exit complete" at 45)
   });
 }
 export const EXTRA_E = [];
