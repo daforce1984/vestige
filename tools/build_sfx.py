@@ -75,6 +75,7 @@ SPEC = {
     'braam2':         dict(seg=(0.6, 6.4),  st=True,  kind='one'),
     # ---- v4: the user's own ../homeland/static sounds + heavy beam layers
     'atomic_impact':  dict(seg=(0.0, 3.4), st=True, kind='one'),
+    'warp_out':       dict(seg=(0.0, 3.8), st=False, kind='one', hit=0.0),        # hyperspace in/out (user's file): attack kept, 1.6–3.8 s faded out
     'warp_out2':      dict(raw=True, kind='one', hit=0.0),                        # hyperspace in/out: the user's file, untouched (full length, full level)
     'beam':           dict(seg=(0.0, 6.3), st=False, kind='one', hit=0.8),        # main ion cannon firing (from ../homeland)
     'typing':         dict(seg=(0.55, 2.3), st=False, kind='one', target=-22),               # title-card typing (from ../homeland)

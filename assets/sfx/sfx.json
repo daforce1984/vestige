@@ -504,6 +504,13 @@
   },
   "hl_thruster2": {
    "alias": "hl_thruster"
+  },
+  "warp_out": {
+   "file": "warp_out.mp3",
+   "ch": 2,
+   "kind": "one",
+   "hit": 0.0,
+   "dur": 3.8
   }
  }
 }
