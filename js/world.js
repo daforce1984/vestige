@@ -558,6 +558,7 @@ export function drawWorld(R, t, opts = {}) {
       me.matOverride = { window: { base: [0.2, 0.05, 0.05], metal: 0, rough: 0.5, emissive: [3 * pulse + 0.3, 0.15, 0.1] } };
     }
     if (t > LANCE_FIRE + 1 && t < LANCE_FIRE + 3) me.flash = Math.exp(-(t - LANCE_FIRE - 1) * 3) * 2;
+    me.forceThrottle = t > 28 && t < 41;                        // under way during the belly pass (the camera rides along)
     engineGlows(R, 'mothership', me, [0.35, 0.55, 1.1], 0.6, t > 232 && t < 292 ? 1 : 0.7, 1.6);
     // ARRIVAL (Dune-style): the window unfolds at 17.5, the ship slides out slowly 19–29
     if (t < MOTHER_ARRIVE + MOTHER_EMERGE + 1.5) {

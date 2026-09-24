@@ -71,12 +71,13 @@ export const ION_COLD_OPEN = [139.4, 153.4, -139.4, 8.6];   // world range [a,b)
 // Ending (stems mode): F_homeward resolves Eb→Ab (measured). Its final chord region is replayed an octave
 // down (rate 0.5 keeps the key) and an Ab-major pad swells under the title (371.8), fading 379.5–381.8.
 export const STEM_TAIL = { file: 'F_homeward.mp3', t: 368.8, from: 55.0, len: 3.0, rate: 0.5, gain: 0.85, fadeIn: 1.8, fadeOut: 2.5 };
+const END_X = 5;   // the title card holds 5 s longer than before
 export const ENDING_PAD = [
-  [367.5, 'strings', { notes: [44, 51, 56, 60, 63], dur: 14.3, vel: 0.3, atk: 4, rel: 1.5 }],        // Ab major
-  [368.5, 'choir',   { notes: [56, 60, 63], dur: 13.3, vel: 0.32, atk: 3.5, rel: 1.5, vowel: 'oo', vowel2: 'ah' }],
-  [371.8, 'choir',   { notes: [68, 72, 75], dur: 10, vel: 0.36, atk: 1.2, rel: 1.5, vowel: 'ah' }],   // swell under the title
-  [371.8, 'glass',   { notes: [80, 84, 87], dur: 10, vel: 0.08, atk: 2, rel: 1.5 }],
-  [368,   'sub',     { note: 32, dur: 13.8, vel: 0.35, atk: 3, rel: 1.5 }],
+  [367.5, 'strings', { notes: [44, 51, 56, 60, 63], dur: 14.3 + END_X, vel: 0.3, atk: 4, rel: 1.5 }],        // Ab major
+  [368.5, 'choir',   { notes: [56, 60, 63], dur: 13.3 + END_X, vel: 0.32, atk: 3.5, rel: 1.5, vowel: 'oo', vowel2: 'ah' }],
+  [371.8, 'choir',   { notes: [68, 72, 75], dur: 10 + END_X, vel: 0.36, atk: 1.2, rel: 1.5, vowel: 'ah' }],   // swell under the title
+  [371.8, 'glass',   { notes: [80, 84, 87], dur: 10 + END_X, vel: 0.08, atk: 2, rel: 1.5 }],
+  [368,   'sub',     { note: 32, dur: 13.8 + END_X, vel: 0.35, atk: 3, rel: 1.5 }],
 ];
 
 // =====================================================================================
@@ -116,7 +117,7 @@ export const SECTIONS = [
   { id: 'S21',  t0: 320, t1: 340, gen: 'drift' },
   { id: 'S22',  t0: 340, t1: 356, gen: 'homeward' },                  // homecoming
   { id: 'S23',  t0: 356, t1: 372, gen: 'title' },
-  { id: 'S24',  t0: 369, t1: 382, gen: 'titleTail' },                 // synth mode: carries D major to 381.8                     // epilogue
+  { id: 'S24',  t0: 369, t1: 387, gen: 'titleTail' },                 // synth mode: carries D major to 381.8                     // epilogue
 ];
 
 // Deterministic PRNG (identical every run / seek)
@@ -687,7 +688,7 @@ export const AUTOMATION = {
             [278.3, 20000], [279.95, 520], [280.0, 20000],            // engulfed: everything but the swell closes down
             [280.02, 20000], [280.15, 2200], [284, 20000]],
   music:   [[0, 1], [69.3, 1], [69.6, 0.03], [70.02, 0.03], [70.4, 1], [217.2, 1], [218, 0.2], [223, 0.2], [226, 1], [277.9, 1], [279.95, 0.25], [280.02, 1]],
-  master:  [[0, 1], [379.5, 1], [381.8, 0.0003]],
+  master:  [[0, 1], [384.5, 1], [386.8, 0.0003]],
   warp:    [[0, 1], [190.05, 1], [190.5, 0.62], [193.6, 0.62], [194.05, 1]],
 };
 

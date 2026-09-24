@@ -5,7 +5,7 @@
 export const TEAR_S0 = 267.2, TEAR_S1 = 268.0;          // story window
 export const TEAR_F1 = 278.0;                           // film time when the tear window ends
 export const INSERT_EXTRA = (TEAR_F1 - TEAR_S0) - (TEAR_S1 - TEAR_S0);   // 10.0 s
-export const STORY_DURATION = 382;
+export const STORY_DURATION = 387;   // title card holds ~15 s
 export const FILM_DURATION = STORY_DURATION + INSERT_EXTRA;               // 392
 
 // progress shape inside the window: a long struggle, then the barrier gives way at the end

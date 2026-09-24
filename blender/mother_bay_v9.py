@@ -22,6 +22,7 @@ import bpy, bmesh
 from mathutils import Vector, Matrix, noise
 import lib
 from lib import MB, reg, rng, lerp, D2R
+from shipkit import lamp_fixture, light_bar, light_panel, window_bay, beacon as sk_beacon
 
 ASSETS = os.path.join(os.path.dirname(HERE), 'assets')
 OUT = os.path.join(HERE, 'previews')
@@ -163,9 +164,34 @@ def stairs(mb, x0, x1, z_bot, y_bot, z_top, y_top, rails=True):
 
 
 def beacon(mb, p, nrm=(0, 1, 0), mat='amber', r=0.22):
-    p, nrm = Vector(p), Vector(nrm).normalized()
-    mb.cyl(p, p + nrm * 0.12, r * 1.3, r * 1.3, 'deck_dark', seg=8)
-    mb.cyl(p + nrm * 0.12, p + nrm * (0.12 + r * 1.4), r, r * 0.75, mat, seg=8)
+    """Warning beacon: armoured base, steel collar, domed lens and a guard cage (shipkit.beacon)."""
+    sk_beacon(mb, Vector(p), Vector(nrm), r, mat, 'deck_dark', 'steel')
+
+
+AXES = (Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1)))
+
+
+def fx(mb, c, s, mat, nrm, kind='lamp', body='wall_dark', segs=None, grid=(1, 1)):
+    """Emissive fixture in place of an axis-aligned emissive box (centre c, size s) whose visible face points along
+    the axis-aligned `nrm`; the fixture fills the same box.  kind: lamp (housed lens), bar (segmented light bar),
+    panel (recessed luminaire, grid of diffuser cells), screen (bezel + recessed display)."""
+    n = Vector(nrm).normalized()
+    ia = max(range(3), key=lambda i: abs(n[i]))
+    h = s[ia]
+    ib = [i for i in range(3) if i != ia]
+    il = max(ib, key=lambda i: s[i])
+    ic = ib[0] if ib[1] == il else ib[1]
+    size, fwd = (s[ic], s[il], h), AXES[il]
+    base = Vector(c) - n * (h / 2)
+    if kind == 'lamp':
+        lamp_fixture(mb, base, n, size, mat, body, fwd=fwd, lift=h / 2)
+    elif kind == 'bar':
+        light_bar(mb, base, n, size, mat, body, fwd=fwd, lift=h / 2, segs=segs)
+    elif kind == 'panel':
+        light_panel(mb, base, n, size, mat, body, fwd=fwd, lift=h / 2, grid=grid, depth=0.5)
+    else:   # screen
+        window_bay(mb, base, n, size, mat, body, fwd=fwd, lift=h / 2, panes=grid[1], rows=grid[0], dark_prob=0.0,
+                   blind_prob=0.0, depth=0.45, border=min(size[0], size[1]) * 0.1)
 
 
 def crate(mb, c, s, mat, yaw=0.0):
@@ -352,7 +378,7 @@ def build_bulkhead_door(mb, zf, sg, R):
     for x in (x0 + 2, xc, x1 - 2):
         beacon(mb, (x, y1 + 2.0, zi - sg * 0.4), nrm=(0, 1, 0))
     for k in range(8):
-        mb.box((x0 + 3 + k * 2.9, y1 + 0.3, zi - sg * 1.15), (1.6, 0.25, 0.08), 'blue_light')
+        fx(mb, (x0 + 3 + k * 2.9, y1 + 0.3, zi - sg * 1.15), (1.6, 0.25, 0.08), 'blue_light', (0, 0, -sg), 'bar', segs=4)
     # door floor sill + guide track
     hazard_band(mb, (x0, YF + 0.01, zf - sg * 2.2), (x1, YF + 0.01, zf - sg * 2.2), 1.6, stripe=1.3)
     # personnel doors on the other levels of this wall
@@ -361,8 +387,8 @@ def build_bulkhead_door(mb, zf, sg, R):
         for xx in (x - 1.35, x + 1.35):
             mb.box((xx, y + 2.3, zi - sg * 0.2), (0.4, 4.6, 0.5), 'hazard', bevel=0.03)
         mb.box((x, y + 4.8, zi - sg * 0.2), (3.1, 0.4, 0.5), 'hazard_k')
-        mb.box((x, y + 5.25, zi - sg * 0.25), (0.6, 0.25, 0.2), 'amber')
-        mb.box((x + 1.9, y + 1.5, zi - sg * 0.25), (0.35, 0.5, 0.1), 'blue_light')
+        fx(mb, (x, y + 5.25, zi - sg * 0.25), (0.6, 0.25, 0.2), 'amber', (0, 0, -sg))
+        fx(mb, (x + 1.9, y + 1.5, zi - sg * 0.25), (0.35, 0.5, 0.1), 'blue_light', (0, 0, -sg), 'screen')
 
 
 def build_decks(mb, R):
@@ -392,7 +418,7 @@ def build_decks(mb, R):
         for z in RIBS[::2]:
             beacon(mb, (xe + 0.3, yt - 0.6, z), nrm=(1, 0, 0), r=0.18)
         for z in RIBS[:-1]:
-            mb.box((xe + 0.26, yt - 1.2, z + 4.5), (0.06, 0.12, 3.0), 'blue_light')
+            fx(mb, (xe + 0.26, yt - 1.2, z + 4.5), (0.06, 0.12, 3.0), 'blue_light', (1, 0, 0), 'bar', segs=6)
         # painted walkway lines
         z = ZA + 1
         while z < ZB - 2:
@@ -524,7 +550,7 @@ def build_ceiling_systems(mb, R):
                     stripe=1.4, base=False)
         mb.box((x_trolley, yg - 1.3, zc), (3.4, 1.6, 3.8), 'machine', bevel=0.1)     # trolley
         mb.cyl((x_trolley - 1.2, yg - 1.3, zc - 1.95), (x_trolley - 1.2, yg - 1.3, zc + 1.95), 0.6, 0.6, 'rib', seg=12)
-        mb.box((x_trolley + 1.72, yg - 1.1, zc), (0.1, 0.4, 1.2), 'amber')
+        fx(mb, (x_trolley + 1.72, yg - 1.1, zc), (0.1, 0.4, 1.2), 'amber', (1, 0, 0), 'bar', body='machine', segs=3)
         for dx, dz in ((-0.5, -0.5), (0.5, -0.5), (-0.5, 0.5), (0.5, 0.5)):
             mb.cyl((x_trolley + dx, yg - 2.1, zc + dz), (x_trolley + dx * 0.4, hook_y + 1.3, zc + dz * 0.4), 0.05,
                    0.05, 'cable', seg=5)
@@ -543,7 +569,7 @@ def build_ceiling_systems(mb, R):
             if x > 40 and in_hole(YC, zm, 6) and R.random() < 0.5:
                 continue
             mb.box((x, YC - 0.45, zm), (2.6, 0.6, 5.2), 'rib', bevel=0.05)
-            mb.box((x, YC - 0.8, zm), (2.1, 0.1, 4.7), 'lamp')
+            fx(mb, (x, YC - 0.8, zm), (2.1, 0.1, 4.7), 'lamp', (0, -1, 0), 'panel', body='rib', grid=(2, 4))
     # pipes along the ceiling
     for x, r, m in ((8.5, 0.55, 'pipe'), (9.8, 0.4, 'pipe_coolant'), (26.0, 0.45, 'pipe'), (27.1, 0.3, 'pipe_fuel')):
         mb.cyl((x, YC - 0.8 - r, ZA), (x, YC - 0.8 - r, ZB), r, r, m, seg=10)
@@ -590,8 +616,8 @@ def build_walls(mb, R):
                 for dz in (-1.6, 1.6):
                     mb.box((5.5, y0 + 2.4, zm + dz), (0.5, 4.8, 0.45), 'hazard', bevel=0.03)
                 mb.box((5.5, y0 + 5.0, zm), (0.5, 0.45, 3.6), 'hazard_k')
-                mb.box((5.8, y0 + 5.45, zm), (0.25, 0.25, 0.7), 'amber')
-                mb.box((5.6, y0 + 1.6, zm + 2.2), (0.1, 0.5, 0.35), 'blue_light')
+                fx(mb, (5.8, y0 + 5.45, zm), (0.25, 0.25, 0.7), 'amber', (1, 0, 0))
+                fx(mb, (5.6, y0 + 1.6, zm + 2.2), (0.1, 0.5, 0.35), 'blue_light', (1, 0, 0), 'screen')
             elif kind == 1:   # lockers
                 for k in range(5):
                     mb.box((5.8, y0 + 1.2, zm - 2.4 + k * 1.2), (1.0, 2.4, 1.1), 'panel_light' if k % 2 else 'wall',
@@ -599,15 +625,16 @@ def build_walls(mb, R):
             elif kind == 2:   # electrical cabinet with status lights
                 mb.box((5.9, y0 + 1.8, zm), (1.2, 3.6, 4.0), 'wall_dark', bevel=0.05)
                 for k in range(4):
-                    mb.box((6.52, y0 + 2.6 + (k % 2) * 0.5, zm - 1.2 + (k // 2) * 2.4), (0.05, 0.2, 1.4), 'blue_light')
+                    fx(mb, (6.52, y0 + 2.6 + (k % 2) * 0.5, zm - 1.2 + (k // 2) * 2.4), (0.05, 0.2, 1.4), 'blue_light',
+                       (1, 0, 0), 'bar', segs=4)
                 mb.box((6.52, y0 + 1.2, zm), (0.05, 0.9, 3.4), 'panel_light')
             else:             # console + screen
                 mb.box((6.3, y0 + 0.55, zm), (1.8, 1.1, 3.0), 'wall', bevel=0.05)
                 mb.box((6.1, y0 + 1.5, zm), (1.2, 0.8, 3.0), 'wall_dark', rot=(0, 0, -30))
-                mb.box((5.55, y0 + 2.6, zm), (0.1, 1.2, 2.2), 'blue_light')
+                fx(mb, (5.55, y0 + 2.6, zm), (0.1, 1.2, 2.2), 'blue_light', (1, 0, 0), 'screen', grid=(1, 2))
         # high wall light bars
-        mb.box((5.4, 33.5, zm), (0.3, 0.4, 5.0), 'lamp')
-        mb.box((5.4, -2.0 if i % 2 else 13.8, zm + 3.0), (0.2, 0.25, 1.4), 'blue_light')
+        fx(mb, (5.4, 33.5, zm), (0.3, 0.4, 5.0), 'lamp', (1, 0, 0), 'bar', body='machine', segs=5)
+        fx(mb, (5.4, -2.0 if i % 2 else 13.8, zm + 3.0), (0.2, 0.25, 1.4), 'blue_light', (1, 0, 0), 'bar', segs=3)
     # numbered bay markers on the back wall (big light stencils) = simple bars
     for i, z in enumerate(RIBS[1:-1:2]):
         for k in range((i % 3) + 1):
@@ -633,7 +660,7 @@ def build_control_room(mb, R):
         z = z0 + k * (z1 - z0) / n
         ob(mb, (x1 + 1.35, y0 + 3.1, z), (x1 + 0.15, y1 - 1.3, z), 0.3, 0.3, 'wall_dark', up=(0, 0, 1))
     mb.box((x1 + 1.3, y0 + 3.2, (z0 + z1) / 2), (0.4, 0.35, z1 - z0), 'wall_dark')
-    mb.box((x1 + 0.35, y0 + 0.4, (z0 + z1) / 2), (0.1, 0.3, z1 - z0 - 2), 'blue_light')
+    fx(mb, (x1 + 0.35, y0 + 0.4, (z0 + z1) / 2), (0.1, 0.3, z1 - z0 - 2), 'blue_light', (1, 0, 0), 'bar', segs=24)
     # antenna / roof equipment
     for z in (28.0, 44.0, 58.0):
         mb.box((9.0, y1 + 1.2, z), (3.0, 1.0, 3.0), 'wall_dark', bevel=0.05)
@@ -656,7 +683,7 @@ def build_catwalks(mb, R):
         mb.box((x, yc - 0.6, zc), (0.3, 0.3, 2.8), 'rib')
     beacon(mb, (x1, yc + 1.2, zc), nrm=(0, 1, 0), r=0.16)
     for x in (10, 20, 30, 40, 50):
-        mb.box((x, yc - 0.55, zc), (1.4, 0.08, 0.5), 'lamp')
+        fx(mb, (x, yc - 0.55, zc), (1.4, 0.08, 0.5), 'lamp', (0, -1, 0), 'panel', body='rib', grid=(1, 3))
     # longitudinal catwalk along the back wall at y = 28 (x 5.5..8)
     yl = 28.0
     mb.box((6.9, yl - 0.1, (ZA + ZB) / 2), (2.6, 0.12, ZB - ZA), 'grating')
@@ -693,7 +720,7 @@ def build_cradles(mb, R, spots):
         for sg in (-1, 1):
             for dz in (-(L + 2) / 2 + 0.3, (L + 2) / 2 - 0.3):
                 beacon(mb, (x + sg * 3.0, y + 0.6, z + dz), r=0.15)
-        mb.box((x + 3.25, y + 0.35, z), (0.06, 0.25, 2.0), 'blue_light')
+        fx(mb, (x + 3.25, y + 0.35, z), (0.06, 0.25, 2.0), 'blue_light', (1, 0, 0), 'bar', segs=5)
         # blast deflector behind the craft
         ob(mb, (x - 3.5, y + 1.45, z - L / 2 - 2.6), (x + 3.5, y + 1.45, z - L / 2 - 2.6), 0.5, 3.2, 'rib',
            up=(0, 1, 0.5))
@@ -730,7 +757,7 @@ def maint_arm(mb, base, yaw, a1, a2, a3=30.0):
                 nrm=Ry @ Vector((1, 0, 0)), stripe=0.5, base=False)
     tube(mb, [sh + Vector((0, 0.3, 0)) + Ry @ Vector((0.5, 0, 0)), sh + d1 * 3 + Ry @ Vector((0.55, 0.3, 0)),
               el + Ry @ Vector((0.5, 0.2, 0))], 0.08, 'cable', seg=5)
-    mb.box(tip - d3 * 0.3 + Vector((0, 0.3, 0)), (0.15, 0.1, 0.15), 'blue_light')
+    fx(mb, tip - d3 * 0.3 + Vector((0, 0.3, 0)), (0.15, 0.1, 0.15), 'blue_light', (0, 1, 0), body='machine')
 
 
 def build_storage(mb, R):
@@ -765,7 +792,7 @@ def build_storage(mb, R):
         mb.cyl((x, YF + 6.2, z), (x, YF + 7.0, z), 2.84, 2.84, 'hazard', seg=24)
         tube(mb, [(x, YF + 13.6, z), (x, YF + 14.8, z), (7.5, YF + 14.8, z), (7.5, -13.0, z)], 0.25, 'pipe_fuel', seg=6)
         mb.box((x + 2.9, YF + 4.5, z), (0.3, 1.2, 0.8), 'wall_dark')
-        mb.box((x + 3.06, YF + 4.7, z), (0.05, 0.3, 0.5), 'blue_light')
+        fx(mb, (x + 3.06, YF + 4.7, z), (0.05, 0.3, 0.5), 'blue_light', (1, 0, 0), 'screen')
     # fuel bowser + hose on the main floor
     mb.box((36.5, YF + 1.2, 58.0), (2.4, 2.0, 5.0), 'machine', bevel=0.12)
     mb.cyl((36.5, YF + 1.8, 55.5), (36.5, YF + 1.8, 60.5), 0.9, 0.9, 'tank', seg=12)
@@ -820,7 +847,8 @@ def craft(name, L=16.0, variant=0):
         for zz in (-6.8, -3.5):
             mb.cyl((x, yp, zz * k), (x, yp, (zz + 0.3) * k), 1.05 * k, 1.05 * k, 'craft_dark', seg=14)
         # side sensor blister + nav light
-        mb.box((sg * 3.52 * k, yp, -4.8 * k), (0.12 * k, 0.25 * k, 0.5 * k), 'amber' if sg > 0 else 'blue_light')
+        fx(mb, (sg * 3.52 * k, yp, -4.8 * k), (0.12 * k, 0.25 * k, 0.5 * k), 'amber' if sg > 0 else 'blue_light',
+           (sg, 0, 0), body='craft_dark')
     mb.nozzle((0, (y0 + 0.8) * k, -7.6 * k), (0, 0, -1), 0.8 * k, 'craft_dark', 'craft_dark', length=0.6 * k,
               flare=1.05, seg=16)
     # canopy + frame
@@ -954,7 +982,9 @@ def partition(mb, R, z, xa, y0, y1, service=False, door=True):
         xd = xa + R.uniform(2.0, 5.0)
         mb.box((xd, y0 + 1.1, z), (1.3, 2.2, th + 0.08), 'wall_dark')
         mb.box((xd, y0 + 2.35, z), (1.7, 0.3, th + 0.12), 'hazard_k')
-        mb.box((xd + 0.9, y0 + 1.3, z), (0.12, 0.25, th + 0.14), 'blue_light' if R.random() < 0.6 else 'amber')
+        m = 'blue_light' if R.random() < 0.6 else 'amber'
+        for sz in (1, -1):         # status lamp on both faces of the partition
+            fx(mb, (xd + 0.9, y0 + 1.3, z + sz * (th / 2 + 0.035)), (0.12, 0.25, 0.07), m, (0, 0, sz))
 
 
 def lamps(mb, r, R):
@@ -967,10 +997,9 @@ def lamps(mb, r, R):
             z = z0 + (k + 0.5) * L / n
             if r['dark']:
                 if k % 2 == 0:
-                    mb.box((x, y1 - 0.08, z), (0.5, 0.12, 0.5), 'amber')
-            else:
-                mb.box((x, y1 - 0.06, z), (1.0, 0.1, 2.6), 'lamp')
-                mb.box((x, y1 - 0.02, z), (1.3, 0.06, 2.9), 'wall_dark')
+                    fx(mb, (x, y1 - 0.08, z), (0.5, 0.12, 0.5), 'amber', (0, -1, 0))
+            else:          # recessed ceiling luminaire (was lamp slab + dark backing plate)
+                fx(mb, (x, y1 - 0.055, z), (1.3, 0.11, 2.9), 'lamp', (0, -1, 0), 'panel', grid=(1, 3))
 
 
 def room_shell(mb, r, R):
@@ -1035,7 +1064,7 @@ def furn_machinery(mb, r, R):
             mb.cyl((x0 + 2.4, y0 + 0.7, z), (x0 + 2.9, y0 + 0.7, z), 0.35, 0.35, 'rib', seg=8)
     xc = min(SX1 - 2.0, xg + rad + 3.0)
     mb.box((xc, y0 + 1.0, z0 + 0.6), (1.4, 2.0, 0.7), 'wall_dark')
-    mb.box((xc, y0 + 1.4, z0 + 0.97), (1.0, 0.6, 0.04), 'blue_light')
+    fx(mb, (xc, y0 + 1.4, z0 + 0.97), (1.0, 0.6, 0.04), 'blue_light', (0, 0, 1), 'screen')
     hazard_band(mb, (xg + rad + 0.6, y0, za), (xg + rad + 0.6, y0, zb), 0.5, stripe=1.5, base=False)
     beacon(mb, (x0 + 0.1, y1 - 0.9, zb), nrm=(1, 0, 0), r=0.16)
 
@@ -1075,11 +1104,12 @@ def furn_corridor(mb, r, R):
     while z < z1 - 1.5:
         mb.box((x0 + 0.05, y0 + 1.1, z), (0.12, 2.2, 1.4), 'wall_dark')
         mb.box((x0 + 0.08, y0 + 2.35, z), (0.14, 0.2, 1.8), 'hazard' if R.random() < 0.3 else 'panel_light')
-        mb.box((x0 + 0.12, y0 + 1.3, z + 0.95), (0.05, 0.2, 0.15), 'blue_light')
+        fx(mb, (x0 + 0.12, y0 + 1.3, z + 0.95), (0.05, 0.2, 0.15), 'blue_light', (1, 0, 0))
         z += R.uniform(4.0, 6.0)
     mb.cyl((x0 + 0.25, y0 + 0.95, z0 + 0.3), (x0 + 0.25, y0 + 0.95, z1 - 0.3), 0.04, 0.04, 'steel', seg=5, caps=False)
     mb.box(((x0 + SX1) / 2, y0 + 0.012, (z0 + z1) / 2), (0.15, 0.03, z1 - z0 - 0.6), 'floor_line')
-    mb.box((x0 + 0.1, y1 - 0.1, (z0 + z1) / 2), (0.15, 0.1, z1 - z0 - 0.6), 'lamp')
+    fx(mb, (x0 + 0.1, y1 - 0.1, (z0 + z1) / 2), (0.15, 0.1, z1 - z0 - 0.6), 'lamp', (0, -1, 0), 'bar',
+       segs=max(2, int((z1 - z0) / 1.6)))
     for k, (dx, rr, m) in enumerate(((1.8, 0.18, 'pipe'), (2.4, 0.12, 'cable'), (2.8, 0.12, 'cable'))):
         mb.cyl((x0 + dx, y1 - 0.25, z0 + 0.2), (x0 + dx, y1 - 0.25, z1 - 0.2), rr, rr, m, seg=6, caps=False)
 
@@ -1105,7 +1135,7 @@ def furn_conduit(mb, r, R):
         for dx, dz, sx, sz in ((0, -0.75, 1.6, 0.12), (0, 0.75, 1.6, 0.12), (-0.75, 0, 0.12, 1.6), (0.75, 0, 0.12, 1.6)):
             mb.box((xl + dx, y, zl + dz), (sx, 0.05, sz), 'hazard')
         mb.box((xl, y, zl), (1.3, 0.03, 1.3), 'hazard_k')
-    mb.box((x0 + 0.1, (y0 + y1) / 2, zc - 2.6), (0.1, 0.25, 0.25), 'amber')
+    fx(mb, (x0 + 0.1, (y0 + y1) / 2, zc - 2.6), (0.1, 0.25, 0.25), 'amber', (1, 0, 0))
 
 
 def furn_mess(mb, r, R):
@@ -1122,7 +1152,7 @@ def furn_mess(mb, r, R):
     mb.box((x0 + 0.6, y0 + 0.5, (z0 + z1) / 2), (1.0, 1.0, (z1 - z0) * 0.6), 'wall')
     mb.box((x0 + 0.6, y0 + 1.02, (z0 + z1) / 2), (1.1, 0.05, (z1 - z0) * 0.6 + 0.1), 'steel')
     for k in range(3):
-        mb.box((x0 + 0.05, y0 + 1.9, z0 + 2 + k * 1.2), (0.05, 0.5, 0.8), 'blue_light')
+        fx(mb, (x0 + 0.05, y0 + 1.9, z0 + 2 + k * 1.2), (0.05, 0.5, 0.8), 'blue_light', (1, 0, 0), 'screen')
 
 
 def furn_control(mb, r, R):
@@ -1132,14 +1162,18 @@ def furn_control(mb, r, R):
         z = z0 + 1.8 + k * 2.6
         mb.box((x0 + 0.9, y0 + 0.5, z), (1.2, 1.0, 2.2), 'wall_dark')
         mb.box((x0 + 0.75, y0 + 1.25, z), (0.8, 0.6, 2.2), 'wall', rot=(0, 0, 25))
-        mb.box((x0 + 1.12, y0 + 1.45, z), (0.05, 0.4, 1.8), 'blue_light', rot=(0, 0, 25))
+        nz = Vector((math.cos(25 * D2R), math.sin(25 * D2R), 0))          # console face (box rotated 25 deg)
+        window_bay(mb, Vector((x0 + 1.12, y0 + 1.45, z)) - nz * 0.025, nz, (0.4, 1.8, 0.05), 'blue_light', 'wall_dark',
+                   fwd=Vector((0, 0, 1)), lift=0.025, panes=2, dark_prob=0.0, blind_prob=0.0, depth=0.45, border=0.04)
         xs = x0 + 2.2
         mb.box((xs, y0 + 0.5, z), (0.5, 0.08, 0.5), 'fabric')
         mb.box((xs + 0.25, y0 + 0.85, z), (0.08, 0.7, 0.5), 'fabric')
         mb.box((xs, y0 + 0.25, z), (0.08, 0.5, 0.08), 'steel')
-    mb.box((x0 + 0.03, y0 + (y1 - y0) * 0.6, (z0 + z1) / 2), (0.05, 1.2, min(6.0, z1 - z0 - 2)), 'blue_light')
+    fx(mb, (x0 + 0.03, y0 + (y1 - y0) * 0.6, (z0 + z1) / 2), (0.05, 1.2, min(6.0, z1 - z0 - 2)), 'blue_light', (1, 0, 0),
+       'screen', grid=(1, 3))
     mb.box((x0 + (SX1 - x0) * 0.55, y0 + 0.5, (z0 + z1) / 2), (2.0, 1.0, 3.0), 'wall_dark')    # plot table
-    mb.box((x0 + (SX1 - x0) * 0.55, y0 + 1.02, (z0 + z1) / 2), (1.8, 0.04, 2.8), 'window')
+    fx(mb, (x0 + (SX1 - x0) * 0.55, y0 + 1.02, (z0 + z1) / 2), (1.8, 0.04, 2.8), 'window', (0, 1, 0), 'screen',
+       grid=(2, 3))                                                                                # plot table top
 
 
 def furn_stairs(mb, r, R):
@@ -1535,7 +1569,7 @@ def p_toolcart():
     mb.box((0.15, h + 0.1, -0.15), (0.3, 0.12, 0.14), 'hazard', bevel=0.01)                      # drill body
     mb.cyl((0.0, h + 0.1, -0.15), (-0.15, h + 0.1, -0.15), 0.02, 0.015, 'steel', seg=6)
     mb.box((-0.3, h + 0.08, 0.15), (0.2, 0.08, 0.15), 'rubber')
-    mb.box((-0.3, h + 0.125, 0.15), (0.12, 0.01, 0.08), 'blue_light')                            # tablet screen
+    fx(mb, (-0.3, h + 0.125, 0.15), (0.12, 0.01, 0.08), 'blue_light', (0, 1, 0), 'screen', body='rubber')  # tablet
     return finish_prop(mb, 'toolcart')
 
 
@@ -1582,7 +1616,8 @@ def person(name, pose, suit, accent, helmet='helmet', pack=True):
     ob(mb, pel + sp * 0.08, chest - sp * 0.12, 0.34, 0.22, accent if accent != suit else suit, up=fw, bevel=0.04)
     ob(mb, chest - sp * 0.2, chest + sp * 0.08, 0.46, 0.3, suit, up=fw, bevel=0.06)
     ob(mb, chest - sp * 0.12 + fw * 0.16, chest + sp * 0.0 + fw * 0.16, 0.2, 0.06, 'suit_dark', up=fw)
-    mb.box(chest - sp * 0.06 + fw * 0.195, (0.06, 0.04, 0.02), 'blue_light')
+    lamp_fixture(mb, chest - sp * 0.06 + fw * 0.185, fw, (0.06, 0.04, 0.02), 'blue_light', 'suit_dark', fwd=sp,
+                 lift=0.01)                                                                        # chest-unit lamp
     if pack:
         ob(mb, chest - sp * 0.3 - fw * 0.27, chest + sp * 0.1 - fw * 0.27, 0.4, 0.22, 'suit_grey' if suit != 'suit_grey'
            else 'suit_dark', up=fw, bevel=0.05)

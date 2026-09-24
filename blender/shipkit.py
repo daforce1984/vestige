@@ -477,8 +477,8 @@ def beacon(mb, pos, n, r, mat, body=None, trim=None, cage=True, fwd=Vector((0, -
     o, b, t, nn = L
     p = Vector(pos)
     mb.cyl(p - nn * 0.25 * r, p + nn * 0.32 * r, 1.3 * r, 1.18 * r, body, seg=8)
-    mb.cyl(p + nn * 0.3 * r, p + nn * 0.46 * r, 1.08 * r, 1.04 * r, trim, seg=10)
-    seg = 10
+    mb.cyl(p + nn * 0.3 * r, p + nn * 0.46 * r, 1.08 * r, 1.04 * r, trim, seg=8)
+    seg = 8
     circ = lambda rr, z: [_w(L, math.cos(i / seg * 2 * math.pi) * rr, math.sin(i / seg * 2 * math.pi) * rr, z)
                           for i in range(seg)]
     z0 = 0.44 * r
@@ -488,7 +488,7 @@ def beacon(mb, pos, n, r, mat, body=None, trim=None, cage=True, fwd=Vector((0, -
         for ang in (0.25 * math.pi, 0.75 * math.pi):
             d = b * math.cos(ang) + t * math.sin(ang)
             e = nn.cross(d).normalized() * 0.06 * r
-            prof = [(-1.0, 0.0), (-0.95, 0.5), (-0.6, 0.92), (0.0, 1.08), (0.6, 0.92), (0.95, 0.5), (1.0, 0.0)]
+            prof = [(-1.0, 0.0), (-0.62, 0.95), (0.62, 0.95), (1.0, 0.0)]
             pts = [p + nn * z0 + d * (x * r * 0.98) + nn * (y * r * 0.98) for x, y in prof]
             for a_, b_ in zip(pts, pts[1:]):
                 mb.hexa([a_ - e, b_ - e, b_ + e, a_ + e,

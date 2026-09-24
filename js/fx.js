@@ -155,7 +155,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
   if (!pts || !pts.length) return;
   if ((entry.stretch || 0) > 0.01) return;                   // mid-warp: the hull is stretched, no fire ahead of the ship
   const isShip = name !== 'gundam' && name !== 'enemy_ms';
-  if (isShip) {                                              // ships: throttle follows the real speed (off when stopped)
+  if (isShip && !entry.forceThrottle) {                      // ships: throttle follows the real speed (off when stopped)
     throttle *= shipSpeedK(R, name, entry, model);
     if (throttle < 0.03) {                                   // idle: the nozzles stay warm — a faint, slow glow pulse, no plume
       const time = R._time || R._now || 0;

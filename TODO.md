@@ -209,3 +209,5 @@
 - [x] 147. RONIN #1 no longer fires on the approach (bolts, laser audio, vambrace parries removed).
 - [x] 148. Dreadnought reveal close-up: no planet in the background (B3 dropped from the wide-shot treatment).
 - [x] 149. Hands really hold the weapons: Sigma's open model hand is replaced (while the mace is out) by the articulated hand closed into a fist round the haft (bore aligned to the mace line); RONIN's two-handed grip is now baked into the pose keys (both arms solved onto the modelled hilt of the katana, left-arm-only pass at contact keys after the contact solver) — smooth between keys, grip error mostly < 1 m.
+- [x] 150. Belly pass (30–40): the flagship is already under way (thrusters forced on), the camera skims just under the keel at constant speed looking up/aft — structure streams past fast, yet the 637 m hull takes the whole 10 s.
+- [x] 151. Title card holds 14.8 s (371.8–386.6): film +5 s (STORY_DURATION 387), fade 384.5–387, ending pad/master fade extended.

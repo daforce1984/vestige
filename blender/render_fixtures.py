@@ -59,7 +59,7 @@ for f in ('interceptor', 'interceptor_b', 'interceptor_c', 'enemy_fighter', 'ene
                 ('below', (0, 1.0, -0.6), 4.0, -140, -30)]
 SHOTS['interceptor'].append(('fins', (0, 0.4, 0.9), 2.0, -30, 50))
 SHOTS['mother_bay'] = [
-    ('ceiling', (30, -40, 30), 22, 90, -25), ('wall', (10, -40, 5), 20, 80, 5), ('deck', (35, -60, -15), 25, 100, 20),
+    ('ceiling', (30, -40, 35), 16, 90, -35), ('wall', (6.5, -73.1, 18.2), 4.5, 70, 8), ('deck', (28.3, -55, -1.2), 4, 65, -10),
 ]
 
 

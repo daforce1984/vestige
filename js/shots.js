@@ -1033,16 +1033,22 @@ shot(16, 30, 'A2 THE ARRIVAL', (c) => {
 shot(30, 40, 'A3 belly pass', (c) => {
   const { t, u, R } = c;
   const b = R.models.mothership.bounds;
-  // dolly slowly under the hull from bow to stern, looking up; interceptors cross underneath
-  const z = lerp(b.max[2] + 40, b.min[2] + 60, easeInOut(u));
-  camLook(c, motherPoint([0, 0, 0], t, [b.min[0] * 0.35, b.min[1] - 55, z]), motherPoint([0, 0, 0], t, [b.min[0] * 0.1, b.min[1] + 20, z - 160]), 62, 0.12);
-  handheld(c, 0.1);
+  // the flagship is ALREADY under way: the camera hangs just below the keel and the hull streams past overhead —
+  // plates, hatches and lights rush by fast, yet the ship takes the whole ten seconds to go by (it is that long)
+  const L = b.max[2] - b.min[2];
+  const z = lerp(b.max[2] + 25, b.min[2] - 20, (t - 30) / 10);          // constant speed from the first frame
+  const y = b.min[1] - 5;                                              // skimming just under the keel
+  const pos = motherPoint([0, 0, 0], t, [-18, y, z]);
+  const look = motherPoint([0, 0, 0], t, [-8, y + 26, z - 70]);       // up and aft: the hull rushes at us overhead
+  camLook(c, pos, look, 60, 0.1);
+  handheld(c, 0.12);
+  c.post.motionBlur = 1.2; c.post.mbNear = 0;
   for (let k = 0; k < 3; k++) {
-    const p = motherPoint([0, 0, 0], t, [-60 + k * 30, b.min[1] - 30 - k * 4, z + 120 - (t - 30) * 30 - k * 15]);
+    const p = motherPoint([0, 0, 0], t, [-40 + k * 26, b.min[1] - 26 - k * 4, z + 160 - (t - 30) * 20 - k * 22]);
     const e = R.add(fighterModel(false, k), mat(M.new(), p, rotY([0, 0, 0], [0, 0, -1], motherYaw(t))));
     if (e) engineGlows(R, fighterModel(false, k), e, HIIG_ENGINE, 0.7, 1, 4);
   }
-  c.env.shadowCenter = motherPoint([0, 0, 0], t, [0, 0, z]); c.env.shadowRadius = 260;
+  c.env.shadowCenter = motherPoint([0, 0, 0], t, [0, 0, z]); c.env.shadowRadius = 220;
   c.env.fill = [0.35, 0.37, 0.45, 0.5];
 });
 shot(40, 50, 'A4 fleet assembles', (c) => {
@@ -1864,7 +1870,7 @@ shot(347.3, 358, 'F2 HOME', (c) => {
   c.env.shadowCenter = mp; c.env.shadowRadius = 600;
   c.env.fill = [0.35, 0.37, 0.45, 0.5];
 });
-shot(358, 382.5, 'S23 title', (c) => {
+shot(358, 387.5, 'S23 title', (c) => {
   const { t } = c;
   // the sunrise over Earth's limb; after the narration ends (366.6) the camera tilts slowly up into open space,
   // then the title appears (371.8)
@@ -1878,7 +1884,7 @@ shot(358, 382.5, 'S23 title', (c) => {
   c.env.planet = { dir: PLANET, radius: PL_R, col: [0.3, 0.5, 1.0], earth: true };
   c.env.stars = 0.6 + k * 0.3; c.env.sunDisc = 0;                  // the sky's own sun disc is replaced by the flare below
   c.post.exposure = 0.75;
-  c.post.fade = 1 - smooth(379.5, 382, t);
+  c.post.fade = 1 - smooth(384.5, 387, t);
   // SUNRISE over the limb (reference): the sun and its lens flare are drawn by the final-pass flare shader
   const rise = smooth(358.5, 362, t);
   const S = SUN_RISE(), sp = madd([0, 0, 0], S, 1000);

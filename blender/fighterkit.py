@@ -18,7 +18,7 @@ import math
 import bmesh
 from mathutils import Vector, Matrix
 from lib import MB, reg, rng, lerp, D2R
-from shipkit import Hull, plate, frame, digits, lamp_fixture, light_bar, louvre_glow, beacon
+from shipkit import Hull, plate, frame, digits, lamp_fixture
 
 V = Vector
 W = Matrix.Identity(4)      # world frame for cy()/bx() with world coordinates
@@ -432,9 +432,13 @@ def antenna(mb, p, d, L, K, tip='lamp_white'):
 
 
 def navlamp(mb, p, n, K, mat, r=0.05):
-    """Nav / strobe light: machined base, metal bezel ring and a domed lens (shipkit.beacon without the cage)."""
+    """Nav / strobe light: machined base, metal bezel collar gripping a domed lens.  The base and the lens keep the
+    exact extents of the original lamp (the fighter is re-centred on its bounding box, so extremity lamps must not
+    move the bbox - the engine faces would shift)."""
     p, n = V(p), V(n).normalized()
-    beacon(mb, p, n, r, K[mat], K['gunmetal'], K['metal'], cage=False)
+    mb.cyl(p - n * 0.02, p + n * 0.035, r * 1.25, r * 1.15, K['gunmetal'], seg=12)
+    tube(mb, p + n * (0.035 + r * 0.12), n, r * 0.9, r * 1.08, r * 0.24, K['metal'], seg=12)       # bezel collar
+    mb.sphere(p + n * 0.035, r, K[mat], seg=12, rings=6)
 
 
 def conduit(mb, a, b, r, K, clamps=4, mat='metal'):
