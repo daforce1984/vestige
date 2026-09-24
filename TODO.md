@@ -185,3 +185,4 @@
 - [x] 123. RONIN #1 blows apart right after the mace smash (179.15, no long smeared crumple: crush capped), chunks thrown along the swing (shatter impulse option); audio/shake moved with it.
 - [x] 124. RONIN #2's entrance: the backlight glow disc + red thruster star removed; mech nozzle glows tightened.
 - [x] 125. Finisher follow-through: the mace arm ends across the body with a soft elbow and lowers (no wrap-back); mech rim light ×0.3.
+- [x] 126. Arc shader: soft window across the ribbon and along its ends (no visible quad edges), wander kept inside.

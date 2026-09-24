@@ -1126,11 +1126,11 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
       let n2 = u * 31.0; let i2 = floor(n2);
       d += (mix(hash31(vec3f(i2, sd, 2.0)), hash31(vec3f(i2 + 1.0, sd, 2.0)), fract(n2)) - 0.5) * 0.4;
       d += (vnoise(vec3f(u * 120.0, sd, 3.0)) - 0.5) * 0.08;
-      d *= 1.05 * pin;
+      d *= 0.7 * pin;                                                  // stays well inside the ribbon
       let dm = abs(v - d);
       let jitter = 0.85 + 0.15 * vnoise(vec3f(u * 40.0, t * 30.0, sd));                       // current flicker along it
       lum += (exp(-pow(dm / 0.045, 2.0)) * 1.6 + exp(-dm * 9.0) * 0.45) * wgt * jitter;
-      glow += exp(-dm * 3.0) * 0.18 * wgt;
+      glow += exp(-dm * 4.5) * 0.18 * wgt;
       // two forks leaving the main channel and dying out
       for (var b = 0; b < 2; b++) {
         let ub = 0.18 + 0.55 * hash31(vec3f(sd, f32(b), 1.0));
@@ -1146,9 +1146,11 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
       }
     }
     let endK = (exp(-u * 60.0) + exp(-(1.0 - u) * 60.0)) * exp(-v * v * 30.0);   // hot terminal spots (round, not the whole ribbon)
-    col = (vec3f(1.0, 0.97, 1.0) * clamp(lum - 0.9, 0.0, 3.0) * 0.8 + tint * (lum + glow) + tint * endK * 0.6) * s.d.a;
+    // soft window: nothing reaches the ribbon's edges or its capsule ends, so the quad boundary can never show
+    let win = (1.0 - smoothstep(0.6, 0.95, abs(v))) * smoothstep(0.0, 0.02, u) * smoothstep(1.0, 0.98, u) * step(0.0, i.uv.x) * step(i.uv.x, L);
+    col = (vec3f(1.0, 0.97, 1.0) * clamp(lum - 0.9, 0.0, 3.0) * 0.8 + tint * (lum + glow) + tint * endK * 0.6) * s.d.a * win;
     alpha = 0.0;
-    dist = vec2f(0.0, v) * glow * 0.01 * s.d.a;
+    dist = vec2f(0.0, v) * glow * 0.01 * s.d.a * win;
   } else if (shape == 3) {
     // beam capsule: uv.x along (world units), uv.y across (-1..1)
     let L = i.ext.x; let r = i.ext.y;
