@@ -222,7 +222,7 @@ def windows(mb, hull, s0, s1, p, mat='window', off=0.9, pitch=1.6, size=(0.3, 0.
     while s < s1:
         if not (gaps and any(a <= s <= b for a, b in gaps)) and not (R and R.random() < dropout):
             pos, n = hull.pt(s, p, off)
-            window_bay(mb, pos, n, size, mat, frame_mat, lift=0.0)
+            window_bay(mb, pos, n, size, mat, frame_mat, lift=0.3 * size[2])   # pane plane clears the skin
         s += pitch
 
 
@@ -441,7 +441,7 @@ def light_panel(mb, pos, n, size, mat, frame_mat=None, fwd=Vector((0, -1, 0)), l
 
 
 def louvre_glow(mb, pos, n, size, glow, slat=None, frame_mat=None, fwd=Vector((0, -1, 0)), lift=None, pitch=None,
-                ang=42.0, spin=0.0):
+                ang=45.0, chord=1.0, spin=0.0):
     """Heat / exhaust vent: framed recess with the glow on its floor, seen only between angled dark slats."""
     a, l, h = size
     slat = _mat_or(slat, DARK_MATS)
@@ -460,7 +460,7 @@ def louvre_glow(mb, pos, n, size, glow, slat=None, frame_mat=None, fwd=Vector((0
     ca, sa = math.cos(math.radians(ang)), math.sin(math.radians(ang))
     u = t * ca + nn * sa            # slat chord direction
     v = -t * sa + nn * ca           # slat thickness direction
-    w2, e2 = p * 0.62, p * 0.07
+    w2, e2 = p * chord / 2, p * 0.07
     zc = zf + (h - zf) * 0.5
     zc = min(zc, h - w2 * sa - e2)
     for i in range(k):

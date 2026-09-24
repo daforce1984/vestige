@@ -942,25 +942,34 @@ export function duelEnemy1(t) {
 // SAMURAI GRIP: RONIN holds the katana in BOTH hands — the left hand is solved (FK coordinate descent, joint-limited)
 // onto the hilt just below the right fist, aligned with the blade. Only the left arm moves: the blade and every solved
 // contact stay exactly where the choreography put them.
-const TH_VARS = [['arm_L_upper', 0], ['arm_L_upper', 1], ['arm_L_upper', 2], ['arm_L_lower', 0], ['hand_L', 0], ['hand_L', 1], ['hand_L', 2]];
+const TH_VARS = [['arm_L_upper', 0], ['arm_L_upper', 1], ['arm_L_upper', 2], ['arm_L_lower', 0], ['hand_L', 0], ['hand_L', 1], ['hand_L', 2],
+  ['arm_R_upper', 0], ['arm_R_upper', 1], ['arm_R_upper', 2], ['arm_R_lower', 0], ['hand_R', 0], ['hand_R', 1]];
+const EV_T = () => EV.filter((e) => e[1] !== 'shake').map((e) => e[0]);
 function twoHand(s) {
+  return s;   // (grip is baked into the pose keys — see gripBake; per-frame IK popped between solutions)
   if (SOLVING || !s || !s.vis || !(s.saber > 0.5)) return s;
+  // SAMURAI GRIP: both fists on the hilt. The katana is modelled into RONIN's right fist (hand_R mesh): hilt axis in
+  // hand_R space from the pommel (−0.2, −2.0, −2.0) up through the fist, direction ≈ (−0.02, 0.31, 0.95). The left fist
+  // closes on it 1.5 m lower. Both arms may move (the stance draws in to the centre line), but the blade is held where
+  // the choreography put it — rigidly at contact frames, loosely in between.
   const fk0 = duelFK(s, 'enemy_ms');
-  const [a, , dir] = fk0.saber;
-  const tgt = sub(a, scl(dir, 2.1));                                  // one fist-width below the right hand, on the hilt
+  const B0 = fk0.saber[0].slice(), B1 = fk0.saber[1].slice();
+  let near = 0; for (const te of EV_T()) near = Math.max(near, 1 - smooth(0.05, 0.3, Math.abs((s._t ?? 0) - te)));
+  const wBlade = 0.15 + 40 * near;
   const pose = s.pose;
   for (const [p] of TH_VARS) pose[p] = (pose[p] || [0, 0, 0]).slice();
   const cost = () => {
     const fk = duelFK(s, 'enemy_ms');
-    const g = M.transformPoint([0, 0, 0], fk.hand_L, [0, -1.2, 0.6]);
-    const hd = nrm(M.transformDir([0, 0, 0], fk.hand_L, [0, 0, 1]));
-    return V.dist(g, tgt) ** 2 + 6 * (1 - V.dot(hd, dir));
+    const tgt = M.transformPoint([0, 0, 0], fk.hand_R, [-0.2, -1.88, -1.45]);
+    const dir = nrm(M.transformDir([0, 0, 0], fk.hand_R, [-0.02, 0.31, 0.95]));
+    const g = M.transformPoint([0, 0, 0], fk.hand_L, [0.2, -1.4, 0]);
+    const hd = nrm(M.transformDir([0, 0, 0], fk.hand_L, [0.02, 0.31, 0.95]));
+    return V.dist(g, tgt) ** 2 + 6 * (1 - V.dot(hd, dir)) + wBlade * (V.dist(fk.saber[0], B0) ** 2 + 0.3 * V.dist(fk.saber[1], B1) ** 2);
   };
-  // two starts: the current left arm, and the right arm mirrored across (the hilt is next to the right fist)
   const cur = TH_VARS.map(([p, k]) => pose[p][k]);
   let best = cost(), bestV = cur.slice();
   const mir = { arm_L_upper: 'arm_R_upper', arm_L_lower: 'arm_R_lower', hand_L: 'hand_R' };
-  TH_VARS.forEach(([p, k]) => { const r = pose[mir[p]] || [0, 0, 0]; pose[p][k] = k === 0 ? r[0] : -r[k]; });
+  TH_VARS.forEach(([p, k]) => { if (mir[p]) { const r = pose[mir[p]] || [0, 0, 0]; pose[p][k] = k === 0 ? r[0] : -r[k]; } });
   const cm = cost(); if (cm < best) { best = cm; bestV = TH_VARS.map(([p, k]) => pose[p][k]); }
   TH_VARS.forEach(([p, k], i) => { pose[p][k] = bestV[i]; });
   for (let step = 0.5; step > 0.008; step *= 0.6) {
@@ -976,7 +985,9 @@ function twoHand(s) {
       if (!imp) break;
     }
   }
-  s.twoHandErr = Math.sqrt(Math.max(0, best));
+  const fk = duelFK(s, 'enemy_ms');
+  const tg = M.transformPoint([0, 0, 0], fk.hand_R, [-0.2, -1.88, -1.45]), g = M.transformPoint([0, 0, 0], fk.hand_L, [0.2, -1.4, 0]);
+  s.twoHandErr = V.dist(g, tg); s.bladeShift = V.dist(fk.saber[0], B0);
   return s;
 }
 function duelEnemy1_(t) {
@@ -1247,6 +1258,41 @@ const SOLVE = [
   { t: 190.9, kind: 'blade-blade', hs: [0.2, 0.5], es: [0.45, 0.85], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0], ['hero', 'pose', 'arm_L_lower', 0]] },
   { t: 192.4, kind: 'blade-part', blade: 'hero', part: ['e2', 'torso', [0, 1, 0]], u: [0.6, 0.78], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'arm_L_lower', 0], ['hero', 'pose', 'hand_L', 0], ['e2', 'pos', [1, 0, 0], 4], ['e2', 'pos', [0, 1, 0], 4], ['e2', 'pos', [0, 0, 1], 4]] },
 ];
+// ---------------------------------------------------------------- SAMURAI GRIP bake (two hands on the katana)
+// Solved on the POSE KEYS (so the motion between keys stays smooth): both arms may move to bring the left fist onto
+// the hilt just below the right, keeping the blade near where it was; after the contact solver, the keys at contact
+// times get a left-arm-only pass so the blade stays exactly on its solved contact.
+const GRIP_R = [-0.2, -1.88, -1.45], GRIP_DIR_R = [-0.02, 0.31, 0.95], GRIP_L = [0.2, -1.4, 0], GRIP_DIR_L = [0.02, 0.31, 0.95];
+function gripErr(fk) {
+  const tgt = M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R), dir = nrm(M.transformDir([0, 0, 0], fk.hand_R, GRIP_DIR_R));
+  const g = M.transformPoint([0, 0, 0], fk.hand_L, GRIP_L), hd = nrm(M.transformDir([0, 0, 0], fk.hand_L, GRIP_DIR_L));
+  return V.dist(g, tgt) ** 2 + 6 * (1 - V.dot(hd, dir));
+}
+function gripBake(who, t, parts, wBlade) {
+  const tr = TRACKS[who].pose, key = keyAt(tr, t);
+  const vars = [];
+  for (const p of parts) for (const k of (p.includes('lower') ? [0] : [0, 1, 2])) vars.push([PIDX[p] + k, JOINT_LIMITS[p]?.[k] || [-3.5, 3.5]]);
+  SOLVING = true;
+  const fk0 = fkAt(who, t), B0 = fk0.saber[0].slice(), B1 = fk0.saber[1].slice();
+  const cost = () => { const fk = fkAt(who, t); return gripErr(fk) + wBlade * (V.dist(fk.saber[0], B0) ** 2 + 0.3 * V.dist(fk.saber[1], B1) ** 2); };
+  let best = cost();
+  for (let step = 0.45; step > 0.01; step *= 0.55) {
+    for (let it = 0; it < 4; it++) {
+      let imp = false;
+      for (const [i, L] of vars) for (const sg of [1, -1]) {
+        const v0 = key[1][i]; key[1][i] = clamp(v0 + sg * step, L[0], L[1]); tr.dirty = true;
+        const c = cost(); if (c < best - 1e-6) { best = c; imp = true; break; } key[1][i] = v0; tr.dirty = true;
+      }
+      if (!imp) break;
+    }
+  }
+  SOLVING = false;
+  return Math.sqrt(gripErr(fkAt(who, t)));
+}
+const ARMS_BOTH = ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R'], ARM_L = ['arm_L_upper', 'arm_L_lower', 'hand_L'];
+const GRIP_ON = { e1: (t) => t >= 177.05 && t <= 179.9, e2: (t) => t >= 181.5 && t <= 192.6 };
+export const GRIP_REPORT = [];
+for (const who of ['e1', 'e2']) for (const k of TRACKS[who].pose.keys) if (GRIP_ON[who](k[0])) GRIP_REPORT.push([who, k[0], +gripBake(who, k[0], ARMS_BOTH, 0.35).toFixed(2)]);
 export const SOLVE_REPORT = SOLVE.map((ev) => {
   const residual = solveContact(ev);
   for (const tc of ev.copyTo || []) {   // hold the solved aim steady from the end of the raise to the shot
@@ -1256,6 +1302,12 @@ export const SOLVE_REPORT = SOLVE.map((ev) => {
   }
   return { t: ev.t, kind: ev.kind, residual };
 });
+// contact keys: the right arm now holds the solved blade — close the left fist on the hilt with the left arm only
+for (const ev of SOLVE) for (const who of ['e1', 'e2']) {
+  if (!GRIP_ON[who](ev.t)) continue;
+  if (!TRACKS[who].pose.keys.some((q) => Math.abs(q[0] - ev.t) < 1e-6)) continue;
+  GRIP_REPORT.push([who + '*', ev.t, +gripBake(who, ev.t, ARM_L, 0).toFixed(2)]);
+}
 /** world position + unit direction of the hero's rifle muzzle at film time t */
 export function duelMuzzle(t) {
   const s = duelHero(t);

@@ -100,14 +100,29 @@ def blade(mb, cs, chords, thick, K, body='paint_a', edge='metal', fwd=(0, -1, 0)
     return frames
 
 
-def slit_vents(mb, M, n, w, l, pitch, K):
-    """Row of glowing orange vent slits in a charcoal frame (enemy heat-dump language)."""
+def slit_vents(mb, M, n, w, l, pitch, K, lift=0.0):
+    """Heat-dump louvre (enemy language): brass-edged charcoal frame, the orange glow on the recessed floor seen
+    between n angled dark slats (same footprint as the old row of glowing slit boxes)."""
     L = n * pitch
-    bx(mb, M, (0, 0, 0.02), (w + 0.08, L + 0.06, 0.04), K['gunmetal'], bev=0.01)
+    if lift:
+        M = M @ Matrix.Translation((0, 0, lift))
+    a, b = w + 0.08, L + 0.06
+    ai, bi = w + 0.02, L + 0.0
+    ring = lambda x, y, z: [M @ V((x / 2, y / 2, z)), M @ V((-x / 2, y / 2, z)), M @ V((-x / 2, -y / 2, z)),
+                            M @ V((x / 2, -y / 2, z))]
+    mb.loft([ring(a, b, 0.0), ring(a, b, 0.05), ring(ai, bi, 0.05), ring(ai, bi, 0.022)], K['trim'], cap0=False,
+            cap1=False)                                                    # brass bezel
+    bx(mb, M, (0, 0, 0.012), (ai, bi, 0.02), K['gunmetal'])               # dark recessed floor
     for k in range(n):
         y = -L / 2 + pitch * (k + 0.5)
-        bx(mb, M, (0, y, 0.035), (w, l, 0.02), K['heat'])
-        bx(mb, M, (0, y + l / 2 + 0.012, 0.046), (w + 0.02, 0.02, 0.02), K['metal'])
+        bx(mb, M, (0, y, 0.03), (w, l, 0.02), K['heat'])                   # glowing slit (as before)
+        # angled dark louvre blade over the slit: the glow shows in the gap below its lower edge
+        y0, y1 = y + l / 2 + 0.012, y - l * 0.15
+        z0, z1 = 0.034, 0.066
+        t = 0.009
+        hx(mb, M, [(-w / 2 - 0.01, y0, z0), (w / 2 + 0.01, y0, z0), (w / 2 + 0.01, y1, z1), (-w / 2 - 0.01, y1, z1),
+                   (-w / 2 - 0.01, y0 + t, z0 + t), (w / 2 + 0.01, y0 + t, z0 + t), (w / 2 + 0.01, y1 + t, z1 + t),
+                   (-w / 2 - 0.01, y1 + t, z1 + t)], K['gunmetal'])
 
 
 def diamond_thruster(mb, c, d, r, L, K):
@@ -278,7 +293,7 @@ def enemy_fighter_b():
     for sx in (1, -1):
         slit_vents(mb, HX(Wg, -3.3, sx * 1.9), 5, 0.7, 0.1, 0.2, K)
     for k in range(3):
-        slit_vents(mb, Mat((0, -1.4 + k * 0.9, 1.19)), 3, 0.7, 0.08, 0.2, K)
+        slit_vents(mb, Mat((0, -1.4 + k * 0.9, 1.19)), 3, 0.7, 0.08, 0.2, K, lift=0.035)
     antenna(mb, (0.3, 2.0, 1.15), (0.1, 0.4, 1), 0.8, K, tip='lamp')
     antenna(mb, (-0.3, 2.2, 1.15), (-0.1, 0.4, 1), 0.5, K, tip=None)
     # nose: twin cannons and sensor cluster

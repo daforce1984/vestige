@@ -7,7 +7,7 @@ Blender space: nose -Y (station s = -y), up +Z, +X = starboard (glTF +X)."""
 import math
 from mathutils import Vector, Matrix
 from lib import MB, reg, empty, rng, lerp, annulus, D2R
-from shipkit import Hull, plate, obox, deep_nozzle, turret, spine, windows
+from shipkit import Hull, plate, obox, deep_nozzle, turret, spine, windows, window_bay
 
 CH = [(1, -0.8), (1, 0.8), (0.9, 1), (-0.9, 1), (-1, 0.8), (-1, -0.8), (-0.9, -1), (0.9, -1)]   # chamfered box
 # CH edges: 0 stbd side, 1 stbd top chamfer, 2 top, 3 port top chamfer, 4 port side, 5 port low chamfer, 6 bottom, 7 stbd low
@@ -203,8 +203,8 @@ def bridge_tower(mb, s, zt, w, R, k, cx=0.0):
             windows(mb, H, s - tl + 0.8 * k, s + tl * 0.6, p, off=0.02 * k, pitch=0.7 * k,
                     size=(0.35 * k, 0.45 * k, 0.05 * k), R=R, dropout=0.15)
         pos, n = H.pt(s + tl * 0.6 + 0.4 * k, 2.5, 0)
-        obox(mb, Vector((cx, -(s + tl * 0.6 + 0.45 * k), z + th * 0.55)), Vector((0, -1, 0)),
-             (tw * 0.8, th * 0.28, 0.05 * k), 'window', lift=0.0, fwd=Vector((0, 0, 1)))
+        window_bay(mb, Vector((cx, -(s + tl * 0.6 + 0.4 * k), z + th * 0.55)), Vector((0, -1, 0)),
+                   (tw * 0.8, th * 0.28, 0.05 * k), 'window', 'belly', lift=0.015 * k, fwd=Vector((0, 0, 1)))
         z += th
     spine(mb, (cx + w * 0.08, -(s - 2 * k), z), (cx + w * 0.08, -(s - 2 * k), z + 9 * k), 0.12 * k, 'metal', nodes=3)
     spine(mb, (cx - w * 0.1, -(s - 1 * k), z), (cx - w * 0.1, -(s - 1 * k), z + 5 * k), 0.08 * k, 'metal', nodes=2)

@@ -208,3 +208,4 @@
 - [x] 146. RONIN holds the katana two-handed (samurai grip): left arm FK-solved onto the hilt below the right fist, aligned with the blade (two starts incl. mirrored right arm, joint-limited); blade/contacts unchanged.
 - [x] 147. RONIN #1 no longer fires on the approach (bolts, laser audio, vambrace parries removed).
 - [x] 148. Dreadnought reveal close-up: no planet in the background (B3 dropped from the wide-shot treatment).
+- [x] 149. Hands really hold the weapons: Sigma's open model hand is replaced (while the mace is out) by the articulated hand closed into a fist round the haft (bore aligned to the mace line); RONIN's two-handed grip is now baked into the pose keys (both arms solved onto the modelled hilt of the katana, left-arm-only pass at contact keys after the contact solver) — smooth between keys, grip error mostly < 1 m.

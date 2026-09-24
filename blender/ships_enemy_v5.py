@@ -6,7 +6,7 @@ Blender space: nose -Y (station s = -y), up +Z."""
 import math
 from mathutils import Vector, Matrix
 from lib import MB, reg, empty, rng, lerp, annulus, D2R
-from shipkit import Hull, BOX8, plate, armor, cuts, obox, deep_nozzle, turret, spine, windows
+from shipkit import Hull, BOX8, plate, armor, cuts, obox, deep_nozzle, turret, spine, windows, lamp_fixture
 
 # profile with a recessed dorsal trench (floor at v=0.5 between rails)
 TRENCH = [(1, -0.5), (1, 0.45), (0.78, 1), (0.42, 1), (0.36, 0.5), (-0.36, 0.5), (-0.42, 1), (-0.78, 1),
@@ -38,14 +38,15 @@ def horseshoe(mb, y0, depth, r_in, r_out, a0, a1, mat, strip_mat, cz=0.0, seg_de
         p = lambda r, y: Vector((c * r, y, cz + s * r))
         rings.append([p(r_in, y0), p(r_out, y0 - depth * 0.15), p(r_out, y0 + depth), p(r_in, y0 + depth * 0.9)])
     mb.loft(rings, mat)
-    rings = []
-    for i in range(n + 1):   # thin lime strip on the inner edge
-        a = math.radians(lerp(a0 + 3, a1 - 3, i / n))
-        c, s = math.cos(a), math.sin(a)
-        p = lambda r, y: Vector((c * r, y, cz + s * r))
-        rings.append([p(r_in * 0.985, y0 + depth * 0.3), p(r_in * 1.01, y0 + depth * 0.3),
-                      p(r_in * 1.01, y0 + depth * 0.45), p(r_in * 0.985, y0 + depth * 0.45)])
-    mb.loft(rings, strip_mat)
+    # lime running lights on the inner edge: a row of discrete housed lamp units (was one continuous strip)
+    k = max(6, int((a1 - a0 - 6) / 7.5))
+    step = math.radians((a1 - a0 - 6) / k)
+    for i in range(k + 1):
+        a = math.radians(a0 + 3) + step * i
+        d = Vector((math.cos(a), 0, math.sin(a)))
+        tng = Vector((-math.sin(a), 0, math.cos(a)))
+        lamp_fixture(mb, Vector((0, y0 + depth * 0.375, cz)) + d * r_in, -d,
+                     (depth * 0.15, r_in * step * 0.62, r_in * 0.028), strip_mat, 'mech', fwd=tng, lift=r_in * 0.011)
 
 
 def decals(mb, hull, R, s0, s1, n_tri, n_hatch, n_light, p_choices, off, scale):
@@ -58,7 +59,7 @@ def decals(mb, hull, R, s0, s1, n_tri, n_hatch, n_light, p_choices, off, scale):
              lift=0.0, bevel=0.02 * scale)
     for _ in range(n_light):
         pos, nn = hull.pt(R.uniform(s0, s1), R.choice(p_choices), off)
-        obox(mb, pos, nn, (0.12 * scale, 0.3 * scale, 0.04 * scale), 'lime', lift=0.0)
+        lamp_fixture(mb, pos, nn, (0.12 * scale, 0.3 * scale, 0.04 * scale), 'lime', 'mech', lift=0.016 * scale)
 
 
 def trench_machinery(mb, hull, s0, s1, off, R, scale, lance=False):
@@ -206,7 +207,7 @@ def enemy_dreadnought():
         while s < 205:   # inner-face conduits + lime indicator lights
             pos, n = T.pt(s, inner, 0.8)
             obox(mb, pos, n, (4.0, 7.0, 1.2), R.choice(['mech', 'ring', 'olive']), bevel=0.3)
-            obox(mb, T.pt(s + 5, inner + 0.3, 0.8)[0], n, (0.6, 1.4, 0.2), 'lime', lift=0.0)
+            lamp_fixture(mb, T.pt(s + 5, inner + 0.3, 0.8)[0], n, (0.6, 1.4, 0.2), 'lime', 'ring', lift=0.08)
             s += 13
         obox(mb, Vector((sd * 26, -214.5, 0)), Vector((0, -1, 0)), (6, 12, 0.6), 'ring', lift=0.0, fwd=Vector((0, 0, 1)))
     mb.sphere((0, -80, 0), 9, 'lance', seg=24, rings=12)

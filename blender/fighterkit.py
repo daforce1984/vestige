@@ -18,7 +18,7 @@ import math
 import bmesh
 from mathutils import Vector, Matrix
 from lib import MB, reg, rng, lerp, D2R
-from shipkit import Hull, plate, frame, digits
+from shipkit import Hull, plate, frame, digits, lamp_fixture, light_bar, louvre_glow, beacon
 
 V = Vector
 W = Matrix.Identity(4)      # world frame for cy()/bx() with world coordinates
@@ -381,7 +381,8 @@ def gear_bay(mb, M, w, l, K, paint):
         for k in range(3):
             cy(mb, M, (sx * (w / 2 + 0.03), -l / 3 + k * l / 3 - 0.05, 0.02),
                (sx * (w / 2 + 0.03), -l / 3 + k * l / 3 + 0.05, 0.02), 0.015, 0.015, K['metal'], seg=6)
-    bx(mb, M, (0, -l / 2 - 0.07, 0.01), (0.1, 0.03, 0.02), K['lamp'])
+    lamp_fixture(mb, M @ V((0, -l / 2 - 0.07, 0.0)), M.col[2].xyz, (0.1, 0.03, 0.02), K['lamp'], K['gunmetal'],
+                 fwd=M.col[1].xyz, lift=0.01)                               # gear-down indicator
 
 
 def gun(mb, p, d, L, r, K, body='gunmetal', barrels=1, spread=0.0, up=(0, 0, 1)):
@@ -431,9 +432,9 @@ def antenna(mb, p, d, L, K, tip='lamp_white'):
 
 
 def navlamp(mb, p, n, K, mat, r=0.05):
+    """Nav / strobe light: machined base, metal bezel ring and a domed lens (shipkit.beacon without the cage)."""
     p, n = V(p), V(n).normalized()
-    mb.cyl(p - n * 0.02, p + n * 0.035, r * 1.25, r * 1.15, K['gunmetal'], seg=12)
-    mb.sphere(p + n * 0.035, r, K[mat], seg=12, rings=6)
+    beacon(mb, p, n, r, K[mat], K['gunmetal'], K['metal'], cage=False)
 
 
 def conduit(mb, a, b, r, K, clamps=4, mat='metal'):
@@ -456,9 +457,13 @@ def a_frame(mb, a, b, c_, t, K, mat='trim'):
     mb.sphere(c_, t * 1.6, K['gunmetal'], seg=8, rings=4)
 
 
-def fin_bank(mb, M, w, l, n, h, K, fin='heat', frame_mat='gunmetal'):
-    """Radiator: base tray + n thin fins (along local y) + side rails."""
+def fin_bank(mb, M, w, l, n, h, K, fin='gunmetal', frame_mat='gunmetal', glow='heat'):
+    """Radiator: base tray whose floor glows (`glow`) between n thin dark fins (along local y) + side rails."""
     bx(mb, M, (0, 0, 0.04), (w, l, 0.08), K[frame_mat], bev=0.015)
+    if glow:
+        hx(mb, M, [(-w * 0.47, -l / 2, 0.075), (w * 0.47, -l / 2, 0.075), (w * 0.47, l / 2, 0.075),
+                   (-w * 0.47, l / 2, 0.075), (-w * 0.47, -l / 2, 0.086), (w * 0.47, -l / 2, 0.086),
+                   (w * 0.47, l / 2, 0.086), (-w * 0.47, l / 2, 0.086)], K[glow])
     for k in range(n):
         y = -l / 2 + l * (k + 0.5) / n
         bx(mb, M, (0, y, 0.08 + h / 2), (w * 0.94, 0.03, h), K[fin])

@@ -4,7 +4,7 @@ Blender space: nose -Y, up +Z, +X = port (red lamp), -X = starboard (green lamp)
 import math
 from mathutils import Vector, Matrix
 from lib import MB, rng, lerp, D2R
-from shipkit import digits
+from shipkit import digits, lamp_fixture, light_bar
 from fighterkit import (V, W, mats_ours, prof_super, prof_chamfer, prof_flatbottom, SHull, plates, Mat, HM, bx, wbox,
                         cy, hx, tube, strip, rail_on, hoop_on, nozzle, hex_housing, vent, rcs, blister, hatch,
                         gear_bay, gun, missile, antenna, navlamp, conduit, a_frame, fin_bank, tri_decal, stencil_bars,
@@ -74,7 +74,8 @@ def interceptor_a():
     # canopy side sills and amber cockpit lights
     for sx in (1, -1):
         bx(mb, Mat((sx * 0.36, -1.35, 0.78)), (0, 0, 0), (0.12, 0.2, 0.06), K['gunmetal'], bev=0.02)
-        bx(mb, Mat((sx * 0.36, -1.43, 0.79)), (0, 0, 0.03), (0.06, 0.04, 0.02), K['lamp'])
+        lamp_fixture(mb, V((sx * 0.36, -1.43, 0.81)), V((0, 0, 1)), (0.06, 0.04, 0.02), K['lamp'], K['gunmetal'],
+                     lift=0.01)
     # nose sensor cone + pitot
     cy(mb, W, (0, -3.88, 0.02), (0, -4.05, 0.02), 0.16, 0.12, K['metal'], seg=16)
     cy(mb, W, (0, -4.05, 0.02), (0, -4.35, 0.02), 0.03, 0.012, K['metal'], seg=8)
@@ -177,7 +178,8 @@ def interceptor_a():
             nozzle(mb, c + d * 0.62, d, 0.19, K, petals=10, seg=20)
             wbox(mb, (cx + dx, 1.7, -0.75), (0.12, 0.6, 0.18), K['gunmetal'], bev=0.02)
             for sg in (1, -1):   # yellow slit lights on the housings
-                bx(mb, Mat(c + V((sg * 0.25, -0.1, 0)), (sg, 0, 0), d), (0, 0, 0), (0.025, 0.55, 0.02), K['lamp'])
+                light_bar(mb, c + V((sg * 0.24, -0.1, 0)), V((sg, 0, 0)), (0.025, 0.55, 0.02), K['lamp'],
+                          K['gunmetal'], fwd=d, lift=0.01, segs=5)
         # aft cap: service hatch, vents, tail ring
         Mt = Mat((cx, 3.455, 0.05), (0, 1, 0), (0, 0, 1))
         hatch(mb, Mt, 0.62, 0.42, K, 'paint_b')

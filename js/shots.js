@@ -530,6 +530,28 @@ const E2_BLOW = BLOWS[2] && BLOWS[2].ev;
 // first person: armoured hands with real fingers clawing into the shield (the model's fists are solid blocks)
 const CURL = -1;                                          // pose rx sign that bends a finger toward the palm (+Z)
 const _hm = new Float32Array(16);
+// GRIP: the model's hand is an open claw, so while a weapon is held it is replaced by the articulated hand with every
+// finger wrapped round the haft. The weapon runs along the hand's +Z (duelFK saber line at hand-local y −1.2); the
+// articulated hand's closed-fist bore runs along its X at (y −1.3, z 0.55), so it is turned −90° about Y and shifted
+// to put that bore exactly on the haft.
+const _gm = new Float32Array(16), _gr = new Float32Array(16);
+function gripHand(R, ge, side, zOff) {
+  if (!R.models.mech_hand) return;
+  ge.hidden = { ...(ge.hidden || {}), ['hand_' + side]: 1 };
+  const hw = R.partWorld('gundam', ge, 'hand_' + side);
+  const sg = side === 'L' ? 1 : -1;
+  M.fromTRS(_gr, [0.55 * sg, 0.1, 0.4 + zOff], Q.fromEuler([0, 0, 0, 1], 0, -Math.PI / 2 * sg, 0), 1);
+  M.mul(_gm, hw, _gr);
+  const h = R.add('mech_hand', _gm);
+  if (!h) return;
+  h.hidden = { [side === 'L' ? 'thumbR_1' : 'thumbL_1']: 1, [side === 'L' ? 'thumbR_2' : 'thumbL_2']: 1 };
+  h.seed = 5.5; h.wear = 1;
+  const pose = {};
+  for (let i = 0; i < 4; i++) { pose[`f${i}_1`] = [CURL * 1.2, 0, 0]; pose[`f${i}_2`] = [CURL * 1.3, 0, 0]; pose[`f${i}_3`] = [CURL * 1.0, 0, 0]; }
+  const th = side === 'L' ? 'thumbL' : 'thumbR';
+  pose[th + '_1'] = [CURL * 0.9, 0, (side === 'L' ? -1 : 1) * 0.9]; pose[th + '_2'] = [CURL * 0.9, 0, 0];
+  h.pose = pose;
+}
 function drawPovHands(R, t, ge, s) {
   if (!R.models.mech_hand) return;
   const film = FILM_NOW, u = Math.max(0, tearU(film));
@@ -611,6 +633,7 @@ export function drawGundam(R, t, s, opts = {}) {
       R.light(head, 50, bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 5 * hot);
     }
     GUN.saber = [a, madd(a, dir, 12.9 * sc)];
+    if (!s.fpv && k > 0.5) gripHand(R, e, 'L', 0);   // a real closed fist round the haft (replaces the open model hand)
   } else GUN.saber = null;
   GUN.gundam = e;
   return e;
@@ -1918,6 +1941,7 @@ export function frame(R, film) {
   }
   s.fn(ctx);
   if (WIDE_SHOTS.has(s.name)) wideTreatment(ctx);
+  if (globalThis.__CAM) { const q = globalThis.__CAM(t); if (q) camLook(ctx, q.pos, q.target, q.fov || 30, 0); }   // debug inspection camera (dev only)
   R.camPos = ctx.cam.pos;                                  // fx helpers keep streaks off the lens
   // near plane relative to subject distance for depth precision
   ctx.cam.near = Math.max(0.2, Math.min(4, V.dist(ctx.cam.pos, ctx.cam.target) * 0.01));
