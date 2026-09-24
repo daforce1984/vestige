@@ -1847,6 +1847,26 @@ export function findShot(t) {
   return SHOTS[SHOTS.length - 1];
 }
 
+// wide establishing shots: the camera is lifted to look down on the action at an oblique angle, and a big planet
+// fills part of the background behind the subject (lit side toward the camera)
+const WIDE_SHOTS = new Set(['A4 fleet assembles', 'B3 DREADNOUGHT REVEAL', 'B4 standoff', 'S9c wide battle', 'S18a shockwave',
+  'S20 enemy flees', 'X the enemy arrives (wide)']);
+function wideTreatment(c) {
+  const cam = c.cam, T = cam.target;
+  const d = V.sub([0, 0, 0], cam.pos, T), dist = V.len(d);
+  const h = Math.hypot(d[0], d[2]), e = Math.atan2(d[1], h);
+  const e2 = Math.max(e, 0.3);                                    // at least ~17° above the subject
+  const k = Math.cos(e2) * dist / Math.max(h, 1e-3);
+  const P = [T[0] + d[0] * k, T[1] + Math.sin(e2) * dist, T[2] + d[2] * k];
+  const f = V.norm([0, 0, 0], V.sub([0, 0, 0], T, P));
+  const r = V.norm([0, 0, 0], V.cross([0, 0, 0], f, [0, 1, 0])), u = V.cross([0, 0, 0], r, f);
+  camLook(c, P, T, cam.fov / DEG, 0.07);                         // a slight dutch tilt: the oblique look
+  if (c.env.planet && c.env.planet.dir === MOON) {
+    const side = V.dot(r, SUN) >= 0 ? 1 : -1;                     // put it on the sunward side so its face is lit
+    const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], f, V.scale([0, 0, 0], r, 0.34 * side)), V.scale([0, 0, 0], u, -0.05)));
+    c.env.planet = { dir, radius: PL_R * 0.55, col: [0.5, 0.5, 0.52], earth: false, kind: 'moon' };
+  }
+}
 export function frame(R, film) {
   FILM_NOW = film;
   const t = storyT(film);
@@ -1862,6 +1882,7 @@ export function frame(R, film) {
     GUN.exitLocal = ex ? ex.pos : [60, 0, 60];
   }
   s.fn(ctx);
+  if (WIDE_SHOTS.has(s.name)) wideTreatment(ctx);
   R.camPos = ctx.cam.pos;                                  // fx helpers keep streaks off the lens
   // near plane relative to subject distance for depth precision
   ctx.cam.near = Math.max(0.2, Math.min(4, V.dist(ctx.cam.pos, ctx.cam.target) * 0.01));
