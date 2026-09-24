@@ -343,7 +343,7 @@ export class Renderer {
     for (const { s, g } of parsed) {
       verts.set(g.verts, vo); idx.set(g.indices, io);
       const model = {
-        name: s.name, detail: s.detail ?? 1, parts: g.parts, materials: g.materials, empties: g.empties, bounds: g.bounds,
+        name: s.name, detail: s.detail ?? 1, hullClass: s.hullDetail ? { hull: 1, plate: 2, hull2: 3, greeble: 4, trim: 5 } : null, parts: g.parts, materials: g.materials, empties: g.empties, bounds: g.bounds,
         baseVertex: vo / 8, baseIndex: io, entries: [], partIndex: {}, draws: [], prepass: !!s.prepass,
       };
       // engine nozzle faces are drawn as glow sprites too; keep the surface emission modest so they don't bloom into disks
@@ -601,7 +601,7 @@ export class Renderer {
           const cr = e.crush;          // world-space crumple: [x, y, z, radius, amount, dirX, dirY, dirZ]
           if (cr) { I[o + 49] = cr[4]; I[o + 50] = cr[5]; I[o + 51] = cr[6]; I[o + 52] = cr[0]; I[o + 53] = cr[1]; I[o + 54] = cr[2]; I[o + 55] = cr[3]; }
           else { I[o + 49] = 0; }
-          I[o + 56] = e.shadeK ?? 1; I[o + 57] = e.soot || 0; I[o + 58] = 0; I[o + 59] = 0;
+          I[o + 56] = e.shadeK ?? 1; I[o + 57] = e.soot || 0; I[o + 58] = model.hullClass ? (model.hullClass[d.matName] || 0) : 0; I[o + 59] = 0;
           n++;
         }
         if (n > first) draws.push(model.baseIndex + d.first, d.count, model.baseVertex, first, n - first, model.prepass ? 1 : 0);

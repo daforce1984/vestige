@@ -383,6 +383,158 @@ fn panel(lp: vec3f, ln: vec3f, s: f32, seed: f32) -> vec3f {
   return vec3f(line, vary, r2);
 }
 
+
+// ================================================================== cinematic hull detail (flagship, shade.z = class)
+// Procedural armour in METRES of model space, anti-aliased by the pixel footprint pw (no derivatives inside, so it
+// can run in non-uniform flow): staggered plate courses with sub-plates, recessed seams with bevelled raised edges,
+// rivet rows, and per-plate decals that match the material — hazard stripes, stencilled hull numbers, maintenance
+// text blocks, vent grilles, access hatches, chevrons, the fleet emblem — weathered (chipped paint, grime streaks,
+// worn bare-metal edges). Returns colour/rough/metal edits + a tangent-plane normal tilt.
+struct HD { col: vec3f, mixk: f32, rough: f32, metal: f32, tilt: vec2f, ao: f32, paint: vec3f };
+fn seg7(p: vec2f, d: i32) -> f32 {           // 7-segment digit, p in [0,1]x[0,1.8]; returns 1 inside a lit segment
+  // segment bits: a b c d e f g (top, top-right, bottom-right, bottom, bottom-left, top-left, middle)
+  var bits = array<u32, 10>(0x3Fu, 0x06u, 0x5Bu, 0x4Fu, 0x66u, 0x6Du, 0x7Du, 0x07u, 0x7Fu, 0x6Fu);
+  let m = bits[u32(clamp(d, 0, 9))];
+  let w = 0.16;
+  var on = 0.0;
+  let hx = abs(p.x - 0.5) < 0.42; let vx0 = abs(p.x - 0.08) < w * 0.5; let vx1 = abs(p.x - 0.92) < w * 0.5;
+  if ((m & 1u) != 0u && hx && abs(p.y - 1.72) < w * 0.5) { on = 1.0; }
+  if ((m & 2u) != 0u && vx1 && p.y > 0.92 && p.y < 1.72) { on = 1.0; }
+  if ((m & 4u) != 0u && vx1 && p.y > 0.08 && p.y < 0.88) { on = 1.0; }
+  if ((m & 8u) != 0u && hx && abs(p.y - 0.08) < w * 0.5) { on = 1.0; }
+  if ((m & 16u) != 0u && vx0 && p.y > 0.08 && p.y < 0.88) { on = 1.0; }
+  if ((m & 32u) != 0u && vx0 && p.y > 0.92 && p.y < 1.72) { on = 1.0; }
+  if ((m & 64u) != 0u && hx && abs(p.y - 0.9) < w * 0.5) { on = 1.0; }
+  return on;
+}
+fn boxd(p: vec2f, c: vec2f, h: vec2f) -> f32 { let d = abs(p - c) - h; return length(max(d, vec2f(0.0))) + min(max(d.x, d.y), 0.0); }
+fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
+  var o: HD; o.paint = vec3f(0.0); o.col = vec3f(0.0); o.mixk = 0.0; o.rough = 0.0; o.metal = -1.0; o.tilt = vec2f(0.0); o.ao = 1.0;
+  let aa = clamp(1.0 - pw * 4.0, 0.0, 1.0);                         // fine detail fades before it can alias
+  let aa2 = clamp(1.0 - pw * 12.0, 0.0, 1.0);
+  // --- plate courses: rows 4.5 m, staggered, plate widths vary per row
+  let H = 4.5;
+  let ry = floor(uv.y / H);
+  let W = 6.0 + 6.0 * hash31(vec3f(ry, seed, 3.0));
+  let xo = uv.x + hash31(vec3f(ry, seed, 7.0)) * W;
+  var cell = vec2f(floor(xo / W), ry);
+  var q = vec2f(xo - cell.x * W, uv.y - ry * H);
+  var sz = vec2f(W, H);
+  let hc = hash31(vec3f(cell, seed + 1.0));
+  if (hc > 0.62) {                                                   // split into 2 x 2 sub-plates
+    let sx = step(W * 0.5, q.x); let sy = step(H * 0.5, q.y);
+    sz = sz * 0.5; q = q - vec2f(sx, sy) * sz; cell = cell * 2.0 + vec2f(sx, sy) + 100.0;
+  }
+  let h = hash31(vec3f(cell, seed + 2.0)); let h2 = hash31(vec3f(cell, seed + 5.0));
+  let de = min(min(q.x, sz.x - q.x), min(q.y, sz.y - q.y));        // distance to the plate edge (m)
+  // plate-to-plate variation (albedo, sheen)
+  // big courses (24 x 12 m) shift the tone a little, plates vary within them: the hull reads as assembled armour
+  let bc = floor(uv / vec2f(24.0, 12.0));
+  let bh = hash31(vec3f(bc, seed + 21.0));
+  o.col = vec3f((0.78 + 0.44 * h) * (0.88 + 0.24 * bh)); o.mixk = 0.0;
+  o.rough = (h2 - 0.5) * 0.36;
+  // recessed seam + bevelled raised edge (normal tilts away from the seam)
+  let seamW = 0.045;
+  let seam = (1.0 - smoothstep(seamW, seamW + pw * 1.5 + 0.01, de)) * mix(0.55, 1.0, aa);
+  let raised = step(0.35, h);
+  let bev = (1.0 - smoothstep(seamW, seamW + 0.16, de)) * raised * aa;
+  var ed = vec2f(0.0);
+  if (de == q.x) { ed = vec2f(-1.0, 0.0); } else if (de == sz.x - q.x) { ed = vec2f(1.0, 0.0); } else if (de == q.y) { ed = vec2f(0.0, -1.0); } else { ed = vec2f(0.0, 1.0); }
+  o.tilt = -ed * bev * 0.55;
+  o.ao = 1.0 - seam * 0.75;
+  // rivet rows 0.2 m in from every edge, every 0.45 m
+  if (aa2 > 0.0 && de < 0.3) {
+    let along = select(q.y, q.x, abs(ed.y) > 0.5);
+    let rv = length(vec2f((fract(along / 0.45) - 0.5) * 0.45, de - 0.2));
+    let rivet = (1.0 - smoothstep(0.035, 0.05, rv)) * aa2;
+    o.tilt += normalize(vec2f((fract(along / 0.45) - 0.5), de - 0.2) + 1e-4) * rivet * 0.5;
+    o.col *= 1.0 + rivet * 0.35;
+  }
+  // worn bare-metal edges along raised plates (chipped by noise)
+  if (de < seamW + 0.09 && raised > 0.0 && aa > 0.0) {
+    let wear = (1.0 - smoothstep(seamW + 0.02, seamW + 0.09, de)) * smoothstep(0.45, 0.7, vnoise(vec3f(uv * 3.0, seed))) * aa;
+    o.col = mix(o.col, vec3f(2.2), wear * 0.6); o.rough -= wear * 0.2;
+  }
+  // --- decals (paint: dielectric, satin), chosen per plate & class
+  var paint = vec3f(0.0); var pa = 0.0;
+  let big = sz.x > 6.5 && sz.y > 4.0;
+  if (h < 0.045 && cls != 4.0) {                                     // hazard band along the lower edge
+    if (q.y < 0.7 && q.y > 0.1) { let st = step(0.5, fract((q.x + q.y) / 0.62)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
+  } else if (h < 0.1 && big) {                                       // stencilled hull number
+    let n0 = i32(hash31(vec3f(cell, 11.0)) * 10.0); let n1 = i32(hash31(vec3f(cell, 12.0)) * 10.0); let n2 = i32(hash31(vec3f(cell, 13.0)) * 10.0);
+    let p0 = (q - vec2f(sz.x * 0.5 - 1.75, sz.y * 0.5 - 0.95)) / 0.95;
+    var dg = 0.0;
+    if (p0.y > 0.0 && p0.y < 1.85) {
+      let k = floor(p0.x / 1.3); let px = vec2f(p0.x - k * 1.3, p0.y);
+      if (k == 0.0) { dg = seg7(px, n0); } else if (k == 1.0) { dg = seg7(px, n1); } else if (k == 2.0) { dg = seg7(px, n2); }
+    }
+    paint = vec3f(0.55, 0.56, 0.58); pa = dg * mix(0.5, 1.0, aa);
+  } else if (h < 0.2) {                                              // maintenance text block (fake type rows)
+    let t = q - vec2f(0.45, sz.y - 1.15);
+    if (t.x > 0.0 && t.x < 2.2 && t.y > 0.0 && t.y < 0.72) {
+      let row = floor(t.y / 0.15);
+      let inRow = step(fract(t.y / 0.15), 0.58);
+      let word = hash31(vec3f(floor(t.x / 0.09), row, h * 50.0));
+      let len = 0.6 + 0.4 * hash31(vec3f(row, h, 3.0));
+      paint = vec3f(0.5, 0.5, 0.48); pa = inRow * step(0.22, word) * step(t.x, 2.2 * len) * aa2;
+      if (row == 4.0) { paint = vec3f(0.6, 0.42, 0.06); }                      // yellow header line
+    }
+  } else if (h < 0.27 && (cls == 2.0 || cls == 4.0 || cls == 3.0)) { // vent grille: dark slots with louvre tilt
+    let v = q - sz * 0.5;
+    if (abs(v.x) < 0.85 && abs(v.y) < 0.5) {
+      let sl = fract((v.y + 0.5) / 0.11);
+      let slot = step(0.35, sl);
+      o.col *= mix(1.0, 0.25, slot * aa); o.ao *= mix(1.0, 0.55, slot);
+      o.tilt += vec2f(0.0, (sl - 0.5) * 0.8 * aa);
+    }
+    let fr = abs(boxd(q, sz * 0.5, vec2f(0.9, 0.55)));
+    o.ao *= 1.0 - (1.0 - smoothstep(0.02, 0.05 + pw, fr)) * 0.6;
+  } else if (h < 0.32) {                                             // access hatch: seam outline, handle, yellow corners
+    let c = sz * 0.5;
+    let bd = boxd(q, c, vec2f(0.6, 0.8)) - 0.12;
+    o.ao *= 1.0 - (1.0 - smoothstep(0.015, 0.04 + pw, abs(bd))) * 0.7;
+    let hd = boxd(q, c + vec2f(0.0, 0.45), vec2f(0.22, 0.04));
+    o.col *= 1.0 + (1.0 - smoothstep(0.0, 0.02 + pw, hd)) * 0.6;
+    let corner = step(abs(bd + 0.1), 0.05) * step(0.5, abs(q.x - c.x)) * step(0.62, abs(q.y - c.y));
+    paint = vec3f(0.6, 0.42, 0.05); pa = corner;
+  } else if (h < 0.345 && cls != 4.0) {                              // direction chevrons >>>
+    let v = q - vec2f(0.6, sz.y * 0.5);
+    let k = fract(v.x / 0.55);
+    let chev = step(abs(k - 0.5 - abs(v.y) * 0.8), 0.09) * step(0.0, v.x) * step(v.x, 1.65) * step(abs(v.y), 0.3);
+    paint = vec3f(0.6, 0.6, 0.6); pa = chev * aa;
+  } else if (h < 0.36 && big && cls == 1.0) {                        // fleet emblem: ring, inner triangle (original design)
+    let v = q - sz * 0.5;
+    let r = length(v);
+    let ring = step(abs(r - 1.6), 0.13);
+    let tri = step(max(abs(v.x) * 0.87 + v.y * 0.5, -v.y) , 0.75) * step(0.45, max(abs(v.x) * 0.87 + v.y * 0.5, -v.y));
+    paint = vec3f(0.62, 0.64, 0.66); pa = max(ring, tri) * mix(0.6, 1.0, aa);
+  }
+  // large registration numerals on a few big flank courses (5 m tall, readable from a distance)
+  if (vertical && (cls == 1.0 || cls == 3.0) && bh < 0.07) {
+    let bq = uv - bc * vec2f(24.0, 12.0);
+    let p0 = (bq - vec2f(12.0 - 3.6, 6.0 - 2.6)) / 2.9;
+    if (p0.y > 0.0 && p0.y < 1.85 && p0.x > 0.0 && p0.x < 2.6) {
+      let k = floor(p0.x / 1.3); let px = vec2f(p0.x - k * 1.3, p0.y);
+      let dA = i32(hash31(vec3f(bc, 31.0)) * 10.0); let dB = i32(hash31(vec3f(bc, 32.0)) * 10.0);
+      let dg = select(seg7(px, dB), seg7(px, dA), k == 0.0);
+      if (dg > 0.0) { paint = vec3f(0.5, 0.52, 0.55); pa = max(pa, dg); }
+    }
+  }
+  if (pa > 0.0) {
+    let chip = smoothstep(0.3, 0.62, vnoise(vec3f(uv * 2.2, seed + 9.0)) * 0.7 + vnoise(vec3f(uv * 9.0, seed)) * 0.3);   // paint survives here
+    pa *= mix(0.25, 1.0, chip);
+  }
+  // grime streaks running down vertical walls (from vents, seams, decals)
+  if (vertical) {
+    let st = smoothstep(0.55, 0.85, vnoise(vec3f(uv.x * 1.3, uv.y * 0.07, seed + 2.0))) * (0.5 + 0.5 * hash31(vec3f(floor(uv.x * 6.0), 0.0, seed)));
+    o.col *= 1.0 - st * 0.35; o.rough += st * 0.12;
+  }
+  o.mixk = pa;
+  if (pa > 0.0) { o.metal = 0.15; o.rough += 0.1; }
+  o.paint = paint * (0.75 + 0.25 * h2);
+  return o;
+}
+
 fn shadowAt(wp: vec3f, n: vec3f) -> f32 {
   if (F.sunDir.w < 0.5) { return 1.0; }
   let sp = F.shadowVP * vec4f(wp + n * 0.35, 1.0);
@@ -452,7 +604,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   let inst = I[i.ii];
   // derivatives must run in uniform control flow: evaluate panel detail first
   let pnl = panel(i.lp, normalize(i.ln), max(inst.p0.z, 0.25), inst.p1.w);
-  let curv = length(fwidth(normalize(i.ln))) / max(length(fwidth(i.lp)), 1e-4);   // edge sharpness (uniform flow)
+  let pwLP = length(fwidth(i.lp));                                    // pixel footprint in model metres (uniform flow)
+  let curv = length(fwidth(normalize(i.ln))) / max(pwLP, 1e-4);   // edge sharpness (uniform flow)
   // baked PBR textures (sampled in uniform control flow, selected below)
   let tA1 = textureSample(texA1, texSmp, i.uv); let tM1 = textureSample(texM1, texSmp, i.uv);
   let tA2 = textureSample(texA2, texSmp, i.uv); let tM2 = textureSample(texM2, texSmp, i.uv);
@@ -478,6 +631,22 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   if (texSet > 0 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01) {
     let ta = select(tA2, tA1, texSet == 1); let tm = select(tM2, tM1, texSet == 1);
     base = pow(ta.rgb, vec3f(2.2)); texAO = tm.r; rough = tm.g; metal = tm.b;
+  }
+  // cinematic hull detail (flagship: shade.z = material class 1 hull, 2 plate, 3 hull2, 4 greeble, 5 trim)
+  let hullOn = inst.shade.z > 0.5 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01 && pwLP < 1.5;   // beyond ~1.5 m/pixel the plating is sub-pixel: skip it
+  if (hullOn) {
+    let ln = normalize(i.ln); let a = abs(ln);
+    var uvp: vec2f; var tU = vec3f(0.0, 0.0, 1.0); var tV = vec3f(0.0, 1.0, 0.0);
+    if (a.x > a.y && a.x > a.z) { uvp = i.lp.zy; tU = vec3f(0.0, 0.0, 1.0); tV = vec3f(0.0, 1.0, 0.0); }
+    else if (a.y > a.z) { uvp = i.lp.xz; tU = vec3f(1.0, 0.0, 0.0); tV = vec3f(0.0, 0.0, 1.0); }
+    else { uvp = i.lp.xy; tU = vec3f(1.0, 0.0, 0.0); tV = vec3f(0.0, 1.0, 0.0); }
+    let hd = hullDetail(uvp, inst.shade.z, inst.p1.w, pwLP, a.y < 0.6);
+    base = mix(base * hd.col, hd.paint, hd.mixk);
+    rough = clamp(rough + hd.rough, 0.12, 1.0);
+    if (hd.metal >= 0.0) { metal = mix(metal, hd.metal, hd.mixk); }
+    texAO *= hd.ao;
+    let wt = normalize((inst.m * vec4f(tU * hd.tilt.x + tV * hd.tilt.y, 0.0)).xyz + vec3f(1e-6));
+    n = normalize(n + wt * length(hd.tilt));
   }
   // procedural asteroid (texSet = -1, tools/make_asteroids.py geometry): triplanar-free 3D regolith colour + bump.
   // Model space is ~unit radius, so every frequency scales with the rock.
@@ -553,12 +722,11 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   let isEmissive = dot(inst.emis.rgb, vec3f(1.0)) > 0.01;
   var ao = 1.0;
   if (det > 0.0 && !isEmissive) {
-    base *= (1.0 + pnl.y * 0.8) * (1.0 - pnl.x * 0.14);
-    let grime = fbm(i.lp / (det * 7.0) + inst.p1.w, 4);
+    if (!hullOn) { base *= (1.0 + pnl.y * 0.8) * (1.0 - pnl.x * 0.14); }   // (the flagship has its own plating)
+    let grime = fbm(i.lp / (det * 7.0) + inst.p1.w, select(4, 2, hullOn));
     let streaks = vnoise(vec3f(i.lp.x / (det * 1.5), i.lp.y / (det * 12.0), i.lp.z / (det * 1.5)));
     base *= mix(0.55, 1.08, smoothstep(0.25, 0.75, grime)) * mix(0.85, 1.0, streaks);
-    rough = clamp(rough + pnl.y * 0.8, 0.15, 1.0);
-    ao = 1.0 - pnl.x * 0.12;
+    if (!hullOn) { rough = clamp(rough + pnl.y * 0.8, 0.15, 1.0); ao = 1.0 - pnl.x * 0.12; }
   }
   // damage: scorch + glowing cracks
   var dmg = inst.p0.y;

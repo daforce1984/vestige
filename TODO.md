@@ -177,3 +177,4 @@
       (eased, no screen wash), 3 km light, expanding shock ring + ripple; the cut-in that hid it moved to 308.4; louder chain audio.
 - [x] 117. Failed ion charges: brief inflow, then filaments peel off and race 1.1 km down the line toward the gravity well
       (Bézier streams, accelerating/stretching); B5 camera swings side-on to the drain line.
+- [x] 118. Flagship cinematic hull detail (shader, shade.z material class): staggered plate courses + sub-plates, recessed seams with bevelled raised edges, rivet rows, worn edges, tone courses, decals per plate/material (hazard bands, stencilled numbers, maintenance text, vent grilles, access hatches, chevrons, fleet emblem, 5 m registration numerals), chipped paint, grime streaks; AA by pixel footprint, skipped when sub-pixel.
