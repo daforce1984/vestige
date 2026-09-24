@@ -1,6 +1,7 @@
 import { Renderer } from './renderer.js';
 import { frame, findShot, DURATION, SHOTS } from './shots.js';
 import { storyT, filmT } from './timemap.js';
+import { duelCamera } from './duel.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
   'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
@@ -101,7 +102,8 @@ document.body.appendChild(sceneTag);
 function showSceneTag() {
   const ft = now(), sh = findShot(storyT(ft)), i = SCENE_ORDER.indexOf(sh);
   const mm = Math.floor(ft / 60), ss = (ft % 60).toFixed(1).padStart(4, '0');
-  sceneTag.innerHTML = `<b>SCENE ${i + 1}</b> / ${SCENE_ORDER.length}<span>${sh.name}</span><em>${mm}:${ss}  (story ${storyT(ft).toFixed(2)} s)</em>`;
+  const dc = sh.name.includes('DUEL') ? duelCamera(storyT(ft)) : null;   // the duel is one scene with many cuts: name the cut too
+  sceneTag.innerHTML = `<b>SCENE ${i + 1}</b> / ${SCENE_ORDER.length}<span>${sh.name}${dc ? ' · ' + dc.name : ''}</span><em>${mm}:${ss}  (story ${storyT(ft).toFixed(2)} s)</em>`;
   sceneTag.classList.add('on');
 }
 function hideSceneTag() { sceneTag.classList.remove('on'); }
