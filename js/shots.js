@@ -2269,7 +2269,7 @@ function deathCam(c, i, dist, ang, fov) {
   c.env.shadowCenter = p; c.env.shadowRadius = 90;
 }
 cut(121.8, 123.6, 'X enemy fire over the line', (c) => { lineRide(c, 4, 0.2, 30, 18, 48, -0.1); shake(c, 0.5, 9); });
-cut(80.6, 88.5, 'X the enemy arrives (wide)', (c) => {
+cut(80.0, 88.5, 'X the enemy arrives (wide)', (c) => {
   // high over our fleet's shoulder, looking down the gap: the whole enemy force rips in — frigates, the line, the dreadnought
   const { t, u } = c;
   // high off the enemy's flank, looking down on the whole arrival zone: every frigate and line ship rips in, and the
