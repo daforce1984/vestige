@@ -234,6 +234,9 @@ function recoveryPos(t) {
   return motherPoint([0, 0, 0], t, x);
 }
 // the fly-by point off the melted flank: 85 m out from the wound along the hull normal, a little above
+// the charge starts off the wound (flagship at t = 240, fixed point so the line to the well is one straight line)
+let _diveStart = null;
+function diveStart() { return _diveStart || (_diveStart = divePass(240)); }
 function divePass(t) {
   const W = motherPoint([0, 0, 0], t, LANCE_HIT), n = V.norm([0, 0, 0], motherDir(t, [1, 0, 0]));
   return addv(madd(W, n, 122), [0, 30, 0]);                          // close past the camera (S16a sits at 150 m)
@@ -315,31 +318,24 @@ function gundamStateRaw(t, s) {
     s.thr = 0.3;
     if (t > 216 && t < 226) s.pose.head = [0.1, 0.35 * smooth(216, 218, t), 0];
   } else if (t < 240) {
-    s.pos = addv(CP, [6, -4 + Math.sin(t * 0.7), -34]);
+    // (off screen 226–240) he moves up beside the flagship's melted flank, where the charge will start
+    s.pos = lerpv(addv(CP, [6, -4 + Math.sin(t * 0.7), -34]), diveStart(), easeInOut(sat((t - 226.5) / 11)));
     const u = easeInOut(sat((t - 229) / 6));
     s.fwd = [Math.sin(u * Math.PI) * 1, 0, -Math.cos(u * Math.PI)];
     blendPose('stand', 'flight', smooth(237.5, 240, t), s.pose);
     breathe(s.pose, t, 1 - u);
     s.thr = 0.3 + smooth(238, 239.5, t) * 0.7;
-  } else if (t < 245.5) {
-    // the charge begins by sweeping past the flagship's melted flank (DIVE_PASS), then on toward the well
-    const start = addv(CP, [6, -4, -34]), P1 = divePass(t);
-    const u = (t - 240) / 5.5, e = u * u * (1.6 - 0.6 * u);                   // accelerating, arriving with speed
-    s.pos = lerpv(start, P1, e);
-    s.fwd = V.sub([0, 0, 0], divePass(245.5), start);
-    blendPose('flight', 'flight', 0, s.pose);
-    s.pitch = 0.9 * smooth(240, 242, t); s.thr = 1;
-    s.roll = Math.sin(t * 0.5) * 0.25;
   } else if (t < 262) {
-    const start = divePass(245.5);
+    // one straight charge from the duel site to the well: no kink, he just keeps accelerating dead ahead
+    const start = diveStart();
     const end = addv(WELL, [0, -10, -260]);
-    const u = (t - 245.5) / 16.5;
+    const u = (t - 240) / 22;
     const e = u < 0.2 ? 0.5 * (u / 0.2) * (u / 0.2) * 0.2 : 0.02 + (u - 0.2) / 0.8 * 0.98 * (1 - 0.35 * Math.pow((u - 0.2) / 0.8, 3)) + 0.35 * Math.pow((u - 0.2) / 0.8, 3) * 0.98 * ((u - 0.2) / 0.8);
     s.pos = lerpv(start, end, clamp(e, 0, 1));
     s.fwd = V.sub([0, 0, 0], end, start);
     blendPose('flight', 'flight', 0, s.pose);
     s.pitch = 0.9 * (1 - smooth(258, 262, t)); s.thr = 1;
-    s.roll = Math.sin(t * 0.5) * 0.25;
+    s.roll = Math.sin(t * 0.5) * 0.05;
   } else if (t < 278) {
     // BERSERK: feral lunges into the shield (263.4 / 265.0 / 266.6), shatter 268, rush 270–272.8, slash 273
     const z = berserkZ(t);
@@ -545,7 +541,7 @@ export function drawGundam(R, t, s, opts = {}) {
   e.matOverride = { eye: { base: [0.2, 0.9, 0.5], metal: 0, rough: 0.3, emissive: ec } };
   const pastHero = opts.pastState || ((tau) => { const q = gundamState(t - tau); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
-  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.7, 0.9, 2.0], 0.9 * (1 + 0.9 * (s.boostK || 0)), s.thr, 1.2 + 1.5 * (s.boostK || 0), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: true });
+  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.7, 0.9, 2.0], 0.9 * (1 + 0.9 * (s.boostK || 0)), s.thr, 1.2 + 1.5 * (s.boostK || 0), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
   const eye = emitWorld(R, 'gundam', e, 'eye');
   if (!s.fpv && eye && eyeK > 0.05) R.glow(eye, (s.visorFlare !== undefined ? 0.4 : 1.4 + bz * 1.6) * Math.min(eyeK, 1.2), [lerp(0.8, 5, bz) * eyeK, lerp(3, 0.3, bz) * eyeK, lerp(1.6, 0.2, bz) * eyeK], 0.5);
   if (!s.fpv && eyeK > 0.05 && (s.visorFlare !== undefined)) {        // visor band glow: every emitter point + a light spill
@@ -1412,19 +1408,19 @@ function diveFX(c, t, lvl, g) {
   return pk;
 }
 shot(240, 247, 'S16a dive start', (c) => {
-  // opens on the flagship's melted flank; Sigma launches from the far side, sweeps past the wound right by the lens,
-  // and the camera pans round to follow him away toward the well
+  // behind and beside him at the melted flank, looking down his straight line toward the well: the wound fills the
+  // near side of the frame, Sigma accelerates dead ahead and shrinks toward the well (no turns)
   const { t, u } = c;
   const g = gundamState(t);
-  const W = motherPoint([0, 0, 0], t, LANCE_HIT), n = V.norm([0, 0, 0], motherDir(t, [1, 0, 0])), along = V.norm([0, 0, 0], motherDir(t, [0, 0, 1]));
-  const cam = addv(madd(madd(W, n, 150), along, -90), [0, 38, 0]);
-  const toWound = addv(W, [0, 4, 0]);
-  const k = easeInOut(sat((t - 243.2) / 2.8));                      // pan from the wound onto Sigma as he passes
-  camLook(c, madd(cam, along, u * 20), V.lerp([0, 0, 0], V.lerp([0, 0, 0], toWound, addv(g.pos, [0, 6, 0]), 0.35), addv(g.pos, [0, 6, 0]), k), 50, 0.05);
-  shake(c, 0.2 + 0.6 * Math.exp(-Math.pow((t - 245.5) / 0.5, 2)), 10);  // the pass buffets the camera
+  const S = diveStart(), dir = V.norm([0, 0, 0], V.sub([0, 0, 0], addv(WELL, [0, -10, -260]), S));
+  const W = motherPoint([0, 0, 0], t, LANCE_HIT);
+  const aw = V.norm([0, 0, 0], V.sub([0, 0, 0], S, W));
+  const cam = addv(madd(madd(S, dir, -120), aw, 55), [0, 30, 0]);
+  camLook(c, madd(cam, dir, u * 30), addv(madd(S, dir, 260), [0, 6, 0]), 48, 0.03);
+  handheld(c, 0.12);
   const pk = diveFX(c, t, 0.08 + u * 0.18, g);
   c.post.lensA = wellLens(c, wellMass(t) * (1 + pk * 0.3), 0, true, 1);
-  c.env.shadowCenter = W; c.env.shadowRadius = 160;
+  c.env.shadowCenter = W; c.env.shadowRadius = 200;
 });
 shot(247, 255, 'S16b time dilation', (c) => {
   const { t, u } = c;
@@ -1730,7 +1726,11 @@ shot(320, 330, 'S21a debris silence', (c) => {
 shot(330, 340, 'S21b return', (c) => {
   const { t, u } = c;
   const g = gundamState(t);
-  camLook(c, addv(g.pos, [-34, 24, 80 - u * 10]), addv(g.pos, [0, 6, -40]), 36 + u * 6);   // farther third person
+  // behind him along the way he will go; the camera holds still once he comes to, so he slowly draws AWAY from it
+  const ta = Math.min(t, CREEP_T), ga = gundamState(ta).pos, cd = creepDir();
+  const sdv = V.norm([0, 0, 0], V.cross([0, 0, 0], cd, [0, 1, 0]));
+  const cp = addv(madd(madd(ga, cd, -85), sdv, -26), [0, 22, 0]);
+  camLook(c, cp, addv(madd(g.pos, cd, 50), [0, 4, 0]), 36 + u * 6);
   c.post.mbNear = 160; c.post.motionBlur = 0.6;
   handheld(c, 0.2);
   c.env.shadowCenter = g.pos; c.env.shadowRadius = 50;

@@ -185,7 +185,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     const c = [col[0] * k, col[1] * k, col[2] * k];
     if (opts && opts.past) {
       // curved plume: 8 samples of gas emitted over the last `span` seconds
-      const N = 8, span = opts.span ?? 0.12;
+      const N = isShip ? 0 : 8, span = opts.span ?? 0.12;       // ships: a single smooth cone (segments showed beads)
       const v = len / span;
       V.copy(_prev, tmp);
       for (let s2 = 1; s2 <= N; s2++) {
@@ -203,7 +203,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       }
       if (isShip) R.glow(tmp, r * 2.4, [c[0] * 1.1, c[1] * 1.1, c[2] * 1.1], 0.35);   // bright additive glow round the thick base
       else R.glow(tmp, r * 1.2, [c[0] * 0.6, c[1] * 0.6, c[2] * 0.6], 0.15);
-      if (isShip) crossPlume(R, tmp, tmp2, r, len * 0.6, c);
+      if (isShip) crossPlume(R, tmp, tmp2, r, len * 1.3, c);
       else { R.flame(tmp, V.scale(tmp3, tmp2, len * 0.45), r * 1.7, c, 1.4, i * 3.1, 1); crossPlume(R, tmp, tmp2, r * 0.8, len * 0.8, c); }
       if (opts.particles) {
         // sparks / embers blown out of the nozzle, following the same emission history
@@ -227,7 +227,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       }
       continue;
     }
-    if (isShip) { crossPlume(R, tmp, tmp2, r, len, c); R.glow(tmp, r * 2.6, [c[0] * 1.1, c[1] * 1.1, c[2] * 1.1], 0.35); R.glow(V.madd(tmp3, tmp, tmp2, len * 0.15), r * 2.2, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5], 0.5); continue; }   // hot glow round the thick base
+    if (isShip) { crossPlume(R, tmp, tmp2, r, len, c); R.glow(tmp, r * 2.2, [c[0] * 1.0, c[1] * 1.0, c[2] * 1.0], 0.35); continue; }   // one smooth cone + a glow AT the nozzle only (no bead mid-plume)
     V.scale(tmp3, tmp2, len);
     R.flame(tmp, tmp3, r * 1.7, c, 1.4, i * 3.1, 1);
     crossPlume(R, tmp, tmp2, r * 0.8, len * 1.1, c);                  // the same cone plume as the ships (hot, additive base)
