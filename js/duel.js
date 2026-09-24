@@ -304,16 +304,19 @@ for (const p in LIM_DEG) {
 //   'hold' → velocity 0.   'cr' (positions) → plain Catmull-Rom, no clamp (free arcs).   other tags → smooth.
 export const HITSTOPS = [
   // [t, freeze, release]   (24 fps: 0.083 = 2 fr, 0.125 = 3 fr, 0.167 = 4 fr)
-  [178.0, 0.083, 0.12], [178.2, 0.125, 0.18], [178.55, 0.1, 0.2],
-  [184.5, 0.167, 0.3], [186.0, 0.1, 0.2], [186.45, 0.083, 0.15], [187.6, 0.1, 0.2],
-  [188.2, 0.125, 0.2], [188.85, 0.083, 0.15], [189.45, 0.1, 0.2],
-  [179.0, 0.167, 0.3],                      // mace smash on RONIN #1
-  [190.9, 0.2, 0.4], [192.4, 0.33, 0.5],   // slow-motion section: longer holds
+  // heavy machines don't freeze on contact, they SHOULDER through it: a 1-frame bite, then a long eased release
+  // (the old 2–4 frame freezes on every contact read as stutter at 24 fps)
+  [178.0, 0.042, 0.15], [178.2, 0.042, 0.3], [178.55, 0.042, 0.3],
+  [184.5, 0.083, 0.4], [186.0, 0.042, 0.3], [186.45, 0.042, 0.26], [187.6, 0.042, 0.3],
+  [188.2, 0.042, 0.3], [188.85, 0.042, 0.18], [189.45, 0.042, 0.3],
+  [179.0, 0.125, 0.45],                     // mace smash on RONIN #1
+  [190.9, 0.15, 0.5], [192.4, 0.25, 0.6],   // slow-motion section: longer holds
 ];
 export const SHOT_TIMES = [];          // Sigma fights with the mace only (no rifle)
 // impacts: filters are bypassed here so contacts / aims are exact and crisp
 export const IMPACTS = [...HITSTOPS.map((h) => h[0]), ...SHOT_TIMES, 189.08];
 const isImpact = (t) => IMPACTS.some((x) => Math.abs(x - t) < 1e-6);
+const isClashT = (t) => EV.some((e) => e[1] === 'clash' && Math.abs(e[0] - t) < 1e-6) || Math.abs(t - 189.08) < 1e-6;
 // fast whiff strikes also bypass the spring lag (crisp, exact), but keep their follow-through tangents
 const CRISP = [...IMPACTS, 177.6, 186.85, 187.2];
 // Hit-stop: freeze d, then an eased release (Hermite offset, speed ramps 0 → >1 → 1) so anchors keep their times.
@@ -345,7 +348,7 @@ function computeTangents(keys, dim, free) {
       }
       let mi = m, mo = m;
       if (tagNext === 'in' || tagIn === 'hold' || tagNext === 'hold') { mi = 0; mo = 0; }
-      if (tagIn === 'in' && i > 0) { mi = 1.6 * sl; mo = impact ? 0 : (tagNext === 'in' ? 0 : m); if (!impact) mi = mo; }
+      if (tagIn === 'in' && i > 0) { mi = 1.6 * sl; mo = impact ? (isClashT(k[0]) || tagNext === 'in' ? 0 : 0.3 * sl) : (tagNext === 'in' ? 0 : m); if (!impact) mi = mo; }
       k.mi[c] = mi; k.mo[c] = mo;
     }
   }
@@ -494,6 +497,32 @@ function squashFrom(track, strength = 1) {
     }
     return out;
   };
+}
+// weight / centre of mass. The weapon arm and chest carry the swing; the parts that do NOT carry the weapon react to
+// it with a lag (they never move the weapon, so solved contacts stay exact): the hips counter-rotate the chest's twist,
+// the legs brace (knees bend, stance widens) in proportion to the swing speed, the head holds the gaze steady.
+const _wa = new Float64Array(NCH), _wb = new Float64Array(NCH);
+const WCH = [PIDX.torso, PIDX.torso + 1, PIDX.torso + 2, PIDX._body, PIDX._body + 1, PIDX._body + 2];
+let twistK = 1;
+function weightShift(track, tw, out, weaponArm = 'arm_L_upper') {
+  const h = 1 / 24, lag = 1 / 24;
+  const chans = [...WCH, PIDX[weaponArm], PIDX[weaponArm] + 1, PIDX[weaponArm] + 2];
+  track(tw - lag - h, _wa, chans); track(tw - lag + h, _wb, chans);
+  const d = (c) => (_wb[c] - _wa[c]) / (2 * h);
+  const twist = d(PIDX.torso + 1) + d(PIDX._body + 1);                          // chest / body yaw rate (rad/s)
+  const swing = Math.hypot(d(PIDX[weaponArm]), d(PIDX[weaponArm] + 1), d(PIDX[weaponArm] + 2));   // weapon arm speed
+  const lean = d(PIDX.torso) + d(PIDX._body);                                  // chest pitch rate
+  let near = 1; for (const ti of IMPACTS) near = Math.min(near, smooth(0.04, 0.25, Math.abs(tw - ti)));   // exact at contacts (kicks use the legs)
+  twistK = near;
+  const brace = clamp(swing * 0.05, 0, 0.45) * near;
+  out[PIDX.pelvis + 1] -= clamp(twist * 0.07, -0.35, 0.35) * twistK;
+  out[PIDX.pelvis] -= clamp(lean * 0.04, -0.2, 0.2) * twistK;
+  out[PIDX.leg_L_upper] -= brace * 0.7; out[PIDX.leg_R_upper] -= brace * 0.45;
+  out[PIDX.leg_L_lower] += brace * 1.1; out[PIDX.leg_R_lower] += brace * 0.8;
+  out[PIDX.leg_L_upper + 2] += brace * 0.25; out[PIDX.leg_R_upper + 2] -= brace * 0.25;
+  out[PIDX.head + 1] -= clamp(twist * 0.05, -0.3, 0.3);
+  out[PIDX.head] -= clamp(lean * 0.03, -0.15, 0.15);
+  return out;
 }
 // continuous micro-motion (real time t, so even hit-stop holds tremble slightly): thruster-hover breathing + weight shift
 function micro(t, out, seed, amp = 1) {
@@ -798,6 +827,17 @@ function collisionOffset(who, tw) {
   return { off, jolt };
 }
 const _c_duelHero = new Map();
+// the launch run's evasive manoeuvre: an enemy ion bolt aimed at where Sigma WOULD be at DODGE.t; he rolls and jinks
+// sideways ~10 m (lead-in 0.5 s, back on the line by +1.1 s), the bolt tears through the empty space
+export const DODGE = { t: 166.65, side: 1 };
+export function dodgeRight(tw) { const d = nrm(sub(gundamLaunchPath(tw + 0.05), gundamLaunchPath(tw))); return nrm([d[2], 0, -d[0]]); }
+function dodgeOffset(tw) {
+  const u = (tw - (DODGE.t - 0.5)) / 1.6;
+  if (u <= 0 || u >= 1) return [0, 0, 0];
+  const k = 13 * DODGE.side * Math.sin(Math.PI * u) ** 2 * (1 - 0.35 * u);
+  const r = dodgeRight(tw);
+  return [r[0] * k, 2.5 * Math.sin(Math.PI * u) ** 2, r[2] * k];
+}
 export function duelHero(t) {
   if (!STATE_CACHE) return duelHero_(t);
   let r = _c_duelHero.get(t);
@@ -811,7 +851,7 @@ function duelHero_(t) {
   s.pos = heroRawPos(tw);
   const co = collisionOffset('hero', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => heroRawPos(warp(x)), t); s._pf = (x) => heroRawPos(warp(x)); s._t = t;
-  springPose(heroPose, tw, _pose); heroImp(tw, _pose); if (tw >= 170) heroSquash(tw, _pose); micro(t, _pose, 1.3);
+  springPose(heroPose, tw, _pose); heroImp(tw, _pose); if (tw >= 170) { heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper'); } micro(t, _pose, 1.3);
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   _pose[PIDX.hand_L] = maceWrist(_pose[PIDX.hand_L]);
   // facing
@@ -822,8 +862,9 @@ function duelHero_(t) {
     const toE = flat(sub(e1RawPos(tw), s.pos));
     f = nrm(lrp(path, toE, smooth(169.3, 170.3, tw)));
     s.roll = 0;
-    // barrel roll on the way in + gentle banking
-    _pose[PIDX._body + 2] += Math.sin(tw * 0.8) * 0.3 * (1 - smooth(169, 170, tw)) + 2 * Math.PI * (easeInOut(sat((tw - 166.2) / 0.9)) - (tw > 167.1 ? 1 : 0));   // full roll (value wraps back to 0)
+    // gentle banking, and one evasive barrel roll + side jink when an enemy ion bolt comes straight at him (DODGE)
+    _pose[PIDX._body + 2] += Math.sin(tw * 0.8) * 0.1 * (1 - smooth(169, 170, tw)) + DODGE.side * 2 * Math.PI * (easeInOut(sat((tw - DODGE.t + 0.5) / 0.95)) - (tw > DODGE.t + 0.45 ? 1 : 0));   // full roll (wraps back to 0)
+    s.pos = add(s.pos, dodgeOffset(tw));
   } else if (tw < 180.25) {
     f = flat(sub(e1RawPos(tw), s.pos));
   } else {
@@ -878,7 +919,7 @@ function duelEnemy1_(t) {
   s.pos = e1RawPos(tw);
   const co = collisionOffset('e1', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => e1RawPos(warp(x)), t); s._pf = (x) => e1RawPos(warp(x)); s._t = t;
-  springPose(e1Pose, tw, _pose); e1Imp(tw, _pose); e1Squash(tw, _pose); micro(t, _pose, 7.1, tw > 179 ? 0.3 : 1);
+  springPose(e1Pose, tw, _pose); e1Imp(tw, _pose); e1Squash(tw, _pose); weightShift(e1Pose, tw, _pose, 'arm_R_upper'); micro(t, _pose, 7.1, tw > 179 ? 0.3 : 1);
   if (tw > 179.0) ragdollArr(_pose, 179.0, tw, 1.2, 1);          // smashed: goes limp, limbs flail with the blow's momentum
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   let f;
@@ -913,7 +954,7 @@ function duelEnemy2_(t) {
   s.pos = e2RawPos(tw);
   const co = collisionOffset('e2', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => e2RawPos(warp(x)), t); s._pf = (x) => e2RawPos(warp(x)); s._t = t;
-  springPose(e2Pose, tw, _pose); e2Imp(tw, _pose); e2Squash(tw, _pose); micro(t, _pose, 3.7, tw > 192.4 ? 0.3 : 1);
+  springPose(e2Pose, tw, _pose); e2Imp(tw, _pose); e2Squash(tw, _pose); weightShift(e2Pose, tw, _pose, 'arm_R_upper'); micro(t, _pose, 3.7, tw > 192.4 ? 0.3 : 1);
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   _pose[PIDX._body] += e2Flip(tw);
   const h = heroRawPos(Math.min(tw, 192.4));

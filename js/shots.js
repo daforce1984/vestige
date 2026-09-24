@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, duelFK, maceWrist, ragdoll } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight } from './duel.js';
 import { storyT, tearU, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -228,9 +228,10 @@ function recoveryPos(t) {
   // short of the cradle); in the ship frame the rig is fixed, so Sigma settles exactly between the clamps
   const key = Math.round(t * 240);
   if (_rcache.has(key)) return motherPoint([0, 0, 0], t, _rcache.get(key));
-  const dt = 1 / 120, w = 3.0, z = 0.95;
+  const dt = 1 / 120, z = 0.95;
   let x = toMother(336, gundamDrift(336)), v = V.sub([0, 0, 0], toMother(336.01, gundamDrift(336.01)), x).map((c) => c * 100);
   for (let tt = 336; tt < t; tt += dt) {
+    const w = 3.0 * (0.25 + 0.75 * smooth(336, 338.3, tt));    // the pull builds: slow to get going, then a hard burn
     const tg = toMother(tt, recoveryTarget(tt));
     for (let k = 0; k < 3; k++) { v[k] += (w * w * (tg[k] - x[k]) - 2 * z * w * v[k]) * dt; x[k] += v[k] * dt; }
   }
@@ -240,7 +241,12 @@ function recoveryPos(t) {
   _rcache.set(key, x.slice());
   return motherPoint([0, 0, 0], t, x);
 }
-function gundamDrift(t) { const base = addv(WELL, [40, 60, -1150]); return addv(base, [Math.sin(t * 0.1) * 4, Math.sin(t * 0.13) * 3, -(t - 320) * 0.5]); }
+function gundamDrift0(t) { const base = addv(WELL, [40, 60, -1150]); return addv(base, [Math.sin(t * 0.1) * 4, Math.sin(t * 0.13) * 3, -(t - 320) * 0.5]); }
+// coming to: from 334.3 he starts to creep forward toward home, accelerating gently (a = 3 m/s²) before the burn
+const CREEP_T = 334.3, CREEP_A = 3;
+let _creepDir = null;
+function creepDir() { return _creepDir || (_creepDir = V.norm([0, 0, 0], V.sub([0, 0, 0], motherPoint([0, 0, 0], 336, DOCK.wide), gundamDrift0(336)))); }
+function gundamDrift(t) { const x = Math.max(0, t - CREEP_T); return madd(gundamDrift0(t), creepDir(), 0.5 * CREEP_A * x * x); }
 function motherDir(t, local) { return M.transformDir([0, 0, 0], motherMatrix(M.new(), t), local); }
 function recoveryBay(t) {
   const ex = GUN.motherModel?.empties?.hangar_exit;
@@ -368,17 +374,21 @@ function gundamStateRaw(t, s) {
     s.thr = 0; s.damage = 0.22;
     s.eye = 0.6 + 0.4 * Math.sin(t * 30);
   } else if (t < 346) {
-    const base = addv(WELL, [40, 60, -1150]);
-    s.pos = addv(base, [Math.sin(t * 0.1) * 4, Math.sin(t * 0.13) * 3, -(t - 320) * 0.5]);
-    s.fwd = [Math.sin(t * 0.05 + 1), 0.1, -Math.cos(t * 0.05 + 1)];
+    s.pos = gundamDrift(t);
+    s.fwd = V.norm([0, 0, 0], V.lerp([0, 0, 0], [Math.sin(t * 0.05 + 1), 0.1, -Math.cos(t * 0.05 + 1)], creepDir(), easeInOut(sat((t - 333.8) / 2.6))));   // slowly turns toward home
     s.roll = 0.3 + (t - 292) * 0.004;                         // a single, very slow roll — dead weight
-    blendPose('limp', 'flight', smooth(334, 338, t), s.pose);
+    blendPose('limp', 'flight', easeInOut(sat((t - 333.2) / 5)), s.pose);            // limbs gather slowly as he comes to
+    if (t > 331 && t < 336) {                                                          // the head lifts first, a hand flexes
+      const hk = smooth(331, 333.5, t) * (1 - smooth(334.5, 336, t));
+      s.pose.head = V.add([0, 0, 0], s.pose.head || [0, 0, 0], [-0.35 * hk, 0.15 * hk * Math.sin(t * 0.8), 0]);
+      s.pose.hand_R = V.add([0, 0, 0], s.pose.hand_R || [0, 0, 0], [0.4 * smooth(332.2, 332.8, t) * (1 - smooth(333.4, 334.2, t)), 0, 0]);
+    }
     const awake = smooth(333, 336, t);                        // unconscious: no idle breathing until he comes to
     if (t < 336) { const tmpP = ragdoll({}, 280.0, t, 1.3 * (1 - smooth(332, 336, t)), 9); for (const k in tmpP) { const a = s.pose[k] || (s.pose[k] = [0, 0, 0]); a[0] += tmpP[k][0]; a[1] += tmpP[k][1]; a[2] += tmpP[k][2]; } }
     breathe(s.pose, t, 0.5 * awake);
     s.damage = 0.22;
-    s.eye = t < 333 ? (hash(Math.floor(t * 5)) > 0.35 ? 0.9 : 0.25) * smooth(324, 326, t) : 1;
-    s.thr = smooth(334, 336, t);
+    s.eye = t < 331 ? (hash(Math.floor(t * 5)) > 0.35 ? 0.7 : 0.2) * smooth(324, 326, t) : 0.45 + 0.55 * smooth(331, 334, t);   // flickers, then steadies and brightens
+    s.thr = smooth(334.2, 337.4, t) * (t < 335.6 ? 0.55 + 0.45 * Math.abs(Math.sin(t * 17) * Math.sin(t * 5.3)) : 1);   // thrusters cough, then catch
     if (t > 336) {
       // recovery + stowing: swing wide of the hull, line up on the port launch bay, glide in, turn around (smooth yaw),
       // back down onto the docking pad, clamps lock (342.3–342.9), doors close (342.8–343.6)
@@ -398,7 +408,7 @@ function gundamStateRaw(t, s) {
       const land = smooth(341.8, 342.5, t);
       s.roll = 0.15 * Math.sin(t * 0.9) * (1 - smooth(339.5, 341, t));
       blendPose('flight', 'stand', land, s.pose);
-      s.boostK = smooth(336.1, 336.5, t) * (1 - smooth(339.4, 340.3, t));   // hard burn home
+      s.boostK = smooth(336.6, 338.2, t) * (1 - smooth(339.4, 340.3, t));   // the burn builds to full, then home
       s.thr = t < 340.2 ? 1 : t < 342.1 ? 0.6 + 0.4 * Math.sin(t * 20) * 0.2 : 0.6 * (1 - smooth(342.1, 342.5, t));   // braking flare, then cut
       if (t > 343.7) s.vis = false;                            // behind the closed doors
     }
@@ -1771,6 +1781,7 @@ export function frame(R, film) {
     if (ctx.debris || (wt > 280 && wt < 346)) drawDebrisField(R, wt);
     if (ctx.worldT === undefined && t > 62 && t < IMPLODE + 0.5 && !ctx.post.lensA) ctx.post.lensA = wellLens(ctx, wellMass(t), 1.2, true, 1);
     drawShield(R, wt, ctx);
+    drawDodgeBolt(R, wt);
     const g = gundamState(wt);
     if (g.berserk) ctx.post.berserk = Math.max(ctx.post.berserk || 0, g.berserk * (0.35 + 0.65 * berserkHitK(wt)));
   }
@@ -1783,6 +1794,19 @@ export function frame(R, film) {
   return ctx;
 }
 
+// ---------------- the enemy ion bolt Sigma dodges on the launch run (duel.js DODGE): aimed at his undodged path point,
+// from far ahead-left, at ion-bolt speed; it reaches that point at DODGE.t and keeps going
+function drawDodgeBolt(R, t) {
+  const T = DODGE.t;
+  if (t < T - 0.62 || t > T + 0.45) return;
+  const hit = V.add([0, 0, 0], addv(gundamLaunchPath(T), [0, 1, 0]), V.scale([0, 0, 0], dodgeRight(T), -5 * DODGE.side));   // tears through where he was
+  const fwd = V.norm([0, 0, 0], V.sub([0, 0, 0], gundamLaunchPath(T + 0.05), gundamLaunchPath(T)));
+  const r = dodgeRight(T);
+  const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], fwd, -0.85), V.scale([0, 0, 0], r, 0.5 * DODGE.side)));   // from ahead-left, crossing his line
+  const a = madd(hit, dir, -1300 * 0.62), b = madd(hit, dir, 1300 * 0.45);
+  const u = bolt(R, t, T - 0.62, T + 0.45, a, b, 70, 2.2, [3.4, 0.7, 0.4], 1.8);
+  if (u >= 0) { const hp = V.lerp([0, 0, 0], a, b, u); R.glow(hp, 16, [2.2, 0.5, 0.25], 0.5); R.light(hp, 90, [1, 0.3, 0.15], 4); }
+}
 // ---------------- energy shield around the well core (261–268), shatter 268–271
 function drawShield(R, t, c) {
   // hexagons only: lit around hits, torn open by the hands, then the whole grid flashes and fades at 268

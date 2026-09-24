@@ -141,3 +141,9 @@
       all enemy losses moved to the counterattack after the well dies (EF / EXTRA_E die 288–308). New lines v10w01,
       v10s01, v10w02 (ElevenLabs v3); power-down whines instead of volley sounds.
 - [x] 100. Warp sound (warp_out2) louder, unpitched, up front, with ducking (it was pitched down and masked).
+- [x] 101. Recovery: Sigma comes to slowly (visor steadies 331–334, head lifts, limbs gather over 5 s, thrusters cough
+      then catch), creeps forward at 3 m/s² from 334.3, the docking pull and the burn build up over 336–338.3.
+- [x] 102. Launch run barrel roll is now an evasive roll + 13 m jink away from an enemy ion bolt (duel.js DODGE, 166.65).
+- [x] 103. Duel weight: 1-frame contact bites with long eased releases instead of 2–4 frame freezes; hits carry 30 %
+      follow-through; hips counter-rotate the chest twist, legs brace with swing speed, head stabilises (weightShift);
+      contact residuals unchanged.

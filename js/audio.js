@@ -370,6 +370,10 @@ export const SAMPLE_CUES = [
   // ---- the second RONIN from above: warning pulse, sting, ignition roar, the dive
   ...[180.95, 181.15, 181.35].map((t) => [t, 'alarm', { dur: 0.16, fadeOut: 0.05, rate: 1.4, gain: 0.55, prio: 7, norand: true }]),
   [181.0, 'braam2',    { at: 0.15, rate: 1.1, gain: 0.8, prio: 8, norand: true }],
+  // launch run: an enemy ion bolt screams in, Sigma rolls out of its way (duel.js DODGE 166.65)
+  [166.03, 'laser_cannon:s2', { dur: 1.2, fadeOut: 0.5, rate: 0.7, gain: 0.5, far: 0.55, pan: 0.3, prio: 7, norand: true }],
+  [166.2, 'hl_thruster', { loop: true, dur: 1.2, rate: 1.0, rateTo: 1.35, gain: 0.8, fadeIn: 0.05, fadeOut: 0.5, prio: 8, norand: true }],
+  [166.5, 'flyby_fast', { rate: 0.75, gain: 1.1, pan0: 0.7, pan1: -0.6, prio: 9, norand: true }],
   [182.05, 'hl_thruster', { loop: true, dur: 1.4, rate: 0.9, rateTo: 1.4, gain: 0.9, fadeIn: 0.05, fadeOut: 0.5, prio: 8, norand: true }],
   [182.5, 'flyby_fast', { rate: 0.8, gain: 1.0, pan0: 0.6, pan1: -0.4, prio: 8, norand: true }],
   [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar
@@ -421,7 +425,9 @@ export const SAMPLE_CUES = [
   [306.3, 'debris_impact', { gain: 0.7, far: 0.2, pan: 0.3, prio: 7 }],
   // ---------------- enemy flee windows 311.5–317
   // ---------------- NEW ENDING: 344 the fleet jumps out, 347.5 arrival at Earth, narration from ~348.5
-  [336.1, 'hl_thruster', { loop: true, dur: 4.2, rate: 0.8, rateTo: 1.1, gain: 1.0, fadeIn: 0.25, fadeOut: 1.0, prio: 8, norand: true }],   // Sigma burns hard for home
+  // Sigma comes to: thrusters cough (334.2–335.6), catch, and the burn builds to full by ~338
+  ...[334.3, 334.75, 335.2].map((t, i) => [t, 'hl_thruster', { loop: true, dur: 0.3, rate: 0.6, gain: 0.35 + 0.1 * i, fadeIn: 0.03, fadeOut: 0.15, prio: 7, norand: true }]),
+  [335.6, 'hl_thruster', { loop: true, dur: 5.0, rate: 0.62, rateTo: 1.1, gain: 1.0, fadeIn: 1.8, fadeOut: 1.0, prio: 8, norand: true }],   // builds to a hard burn home
   [344.0, 'whoosh:c',  { rate: 0.9, gain: 0.8, prio: 8, norand: true }],
   [348,   'braam',     { rate: 0.8, gain: 0.6, fadeOut: 1.5, prio: 8, norand: true }],
   [348.2, 'flyby_large', { rate: 0.45, gain: 0.6, fadeIn: 2, pan0: -0.3, pan1: 0.3, prio: 7, norand: true }],   // mothership emerging, slow
