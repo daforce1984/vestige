@@ -172,6 +172,13 @@ class MB:
     def __init__(self):
         self.bm = bmesh.new()
         self.mats = []
+        self._keep = []      # lone faces whose authored winding must survive recalc_face_normals()
+
+    def keep(self, faces):
+        """Register single (unconnected) faces, e.g. window panes / glow floors: recalc_face_normals() cannot
+        orient an isolated flat face reliably, so to_object() restores the winding they were created with."""
+        for f in faces:
+            self._keep.append((f, f.loops[0].vert, f.loops[1].vert))
 
     # internal ---------------------------------------------------------
     def _mi(self, m):
@@ -309,6 +316,9 @@ class MB:
     def to_object(self, name, pivot=(0, 0, 0), smooth_angle=35.0):
         bm = self.bm
         bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+        for f, v0, v1 in getattr(self, '_keep', ()):
+            if f.is_valid and not any(l.vert == v0 and l.link_loop_next.vert == v1 for l in f.loops):
+                f.normal_flip()
         pivot = Vector(pivot)
         if pivot.length > 0:
             bm.transform(Matrix.Translation(-pivot))

@@ -846,12 +846,12 @@ function volleyParry(tw, out) {
     flick += sw * sd; twist += sw * sd * 0.6;
   });
   out[PIDX.arm_R_upper] += (-1.2) * guard;
-  out[PIDX.arm_R_upper + 1] += (0.45 + 0.75 * flick) * guard;
-  out[PIDX.arm_R_upper + 2] += (0.1 - 0.35 * flick) * guard;
+  out[PIDX.arm_R_upper + 1] += (0.45 + 1.25 * flick) * guard;          // big, full-arm swats
+  out[PIDX.arm_R_upper + 2] += (0.1 - 0.55 * flick) * guard;
   out[PIDX.arm_R_lower + 1] += 0.3 * flick * guard;
   out[PIDX.arm_R_lower] += -1.3 * guard;
   out[PIDX.hand_R] += -0.25 * guard;
-  out[PIDX.torso + 1] += (-0.12 + 0.12 * twist) * guard;
+  out[PIDX.torso + 1] += (-0.12 + 0.3 * twist) * guard;               // the shoulders turn into each swat
 }
 export function dodgeRight(tw) { const d = nrm(sub(gundamLaunchPath(tw + 0.05), gundamLaunchPath(tw))); return nrm([d[2], 0, -d[0]]); }
 // forearm comes up across the chest (0.3 s before), takes the bolt on the armour at DODGE.t and sweeps it outward;

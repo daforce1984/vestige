@@ -34,7 +34,8 @@ import bpy
 from mathutils import Vector
 import lib
 from lib import MB, reg, empty, rng, lerp, annulus, D2R
-from shipkit import Hull, plate, armor, cuts, obox, turret
+from shipkit import (Hull, plate, armor, cuts, obox, turret, lamp_fixture, light_bar, chevron_light, window_bay,
+                     light_panel, beacon)
 from hullkit import dome
 
 ASSETS = os.path.join(os.path.dirname(HERE), 'assets')
@@ -88,8 +89,20 @@ def blk(mb, s0, s1, x0, x1, z0, z1, mat, ins=0.0, ins_s=None, bevel=0.0):
     mb.hexa(b + t, mat, bevel=bevel)
 
 
-def light_row(mb, p0, p1, n, pitch, size, mat, R=None, dropout=0.0):
-    """Row of small emissive boxes along p0->p1 lying on a surface with normal n. size=(across, along, thick)."""
+LAMP_BODY, WIN_FRAME = 'hull2', 'greeble'       # non-emissive fixture bodies (housings / window bezels)
+
+
+def fixture(mb, pos, n, size, mat, fwd=Vector((0, -1, 0)), lift=0.0):
+    """Emissive fixture in place of an emissive box: `window` -> recessed window bay, lights -> housed lamp."""
+    if mat == 'window':
+        window_bay(mb, pos, n, size, 'window', WIN_FRAME, fwd=fwd, lift=lift)
+    else:
+        lamp_fixture(mb, pos, n, size, mat, LAMP_BODY, fwd=fwd, lift=lift)
+
+
+def light_row(mb, p0, p1, n, pitch, size, mat, R=None, dropout=0.0, kind=None):
+    """Row of emissive fixtures (window bays / housed lamps) along p0->p1 on a surface with normal n.
+    size=(across, along, thick) of each fixture's footprint."""
     p0, p1, n = Vector(p0), Vector(p1), Vector(n).normalized()
     d = p1 - p0
     L = d.length
@@ -100,7 +113,10 @@ def light_row(mb, p0, p1, n, pitch, size, mat, R=None, dropout=0.0):
     for i in range(k + 1):
         if R and R.random() < dropout:
             continue
-        obox(mb, p0 + f * (L * i / k), n, size, mat, lift=0.0, fwd=f)
+        if kind == 'chevron':      # direction markers pointing along p0 -> p1
+            chevron_light(mb, p0 + f * (L * i / k), n, size, mat, LAMP_BODY, fwd=f, lift=0.0)
+        else:
+            fixture(mb, p0 + f * (L * i / k), n, size, mat, fwd=f)
 
 
 # ------------------------------------------------------------------------------------------ structural grid
@@ -278,7 +294,7 @@ def deck(mb, H, R):
             for xs in (x - 3.8, x + 3.8):
                 blk(mb, a, b, xs - 0.7, xs + 0.7, zt - 0.5, zt + 1.6, 'trim', ins=0.3)
             light_row(mb, (x, Y(a + 3), zt + 0.1), (x, Y(b - 3), zt + 0.1), (0, 0, 1), 6.0,
-                      (1.2, 2.4, 0.25), 'amber')
+                      (1.2, 2.4, 0.25), 'amber', kind='chevron')
     # deck-edge amber rows along the chamfer break (the "edge lights" of the wedge)
     for side in (1, -1):
         for s in range(-276, 294, 6):
@@ -404,7 +420,8 @@ def sponson(mb, R, sg):
     for z in (zb + 10, (zb + zt) / 2, zt - 9):
         light_row(mb, (sg * 133.2, Y(s_le - 22), z), (sg * 133.2, Y(s_te + 10), z), (sg, 0, 0), 4.0,
                   (0.8, 2.4, 0.3), 'window', R=R, dropout=0.15)
-    mb.sphere((sg * 133.5, Y(s_le - 18), zt - 4), 1.6, 'blue_light' if sg > 0 else 'amber', seg=8, rings=4)
+    beacon(mb, Vector((sg * 133.2, Y(s_le - 18), zt - 4)), Vector((sg, 0, 0)), 1.4, 'blue_light' if sg > 0 else 'amber',
+           LAMP_BODY, 'trim')
     # trailing (aft) face lights + small engine
     s_le, s_te, zb, zt = sec(100)
     light_row(mb, (sg * 72, Y(-286.3), 30), (sg * 124, Y(-281.5), 20), (0, 1, 0), 5.0, (0.8, 2.2, 0.3), 'amber')
@@ -448,8 +465,7 @@ def strake(mb, R, sg):
     s = 150.0
     while s > -220:
         xo, zb, zt = at(s)
-        obox(mb, Vector((sg * (xo - 1.6), Y(s), zb - 0.1)), Vector((0, 0, -1)), (0.9, 3.0, 0.3), 'window',
-             lift=0.0)
+        fixture(mb, Vector((sg * (xo - 1.6), Y(s), zb - 0.1)), Vector((0, 0, -1)), (0.9, 3.0, 0.3), 'window')
         s -= 6.0
 
 
@@ -489,13 +505,18 @@ def stern(mb, H, R):
     for sg in (1, -1):
         engine_bell(mb, Vector((sg * 36, ys + 3.5, 4)), 20.0, 24)
     # lit hangar slot between the engines: protruding frame, dark back, warm light panel and strips
-    mb.box((0, ys + 0.6, 4), (22, 1.2, 46), 'amber')                       # lit back panel on the stern face
+    light_panel(mb, Vector((0, ys, 4)), Vector((0, 1, 0)), (22, 46, 1.2), 'amber', 'greeble', fwd=Vector((0, 0, 1)),
+                lift=0.6, grid=(3, 7), depth=0.55)                         # lit back panel: grid of luminaires
     for x in (-13, 13):                                                     # protruding frame -> recessed slot
         mb.box((x, ys + 4.5, 4), (4, 9.0, 54), 'hull2')
     for z in (29, -21):
         mb.box((0, ys + 4.5, z), (30, 9.0, 4), 'hull2')
     for k in range(7):                                                      # cross beams / interior strips
-        mb.box((0, ys + 1.5, -15 + k * 6.5), (22, 0.8, 0.7), 'trim' if k % 2 else 'window')
+        if k % 2:
+            mb.box((0, ys + 1.5, -15 + k * 6.5), (22, 0.8, 0.7), 'trim')
+        else:                                                               # segmented strip light on the beam
+            light_bar(mb, Vector((0, ys + 1.1, -15 + k * 6.5)), Vector((0, 1, 0)), (0.7, 22, 0.8), 'window', 'greeble',
+                      fwd=Vector((1, 0, 0)), lift=0.4, segs=9)
     # stern face plating + light rows
     for x0, x1, z0, z1 in ((-60, -16, 26, 42), (16, 60, 26, 42), (-60, -58, -24, 26), (58, 60, -24, 26)):
         blk(mb, s0 + 0.5, s0 - 1.5, x0, x1, z0, z1, 'plate')
@@ -505,7 +526,7 @@ def stern(mb, H, R):
         light_row(mb, (18, ys + 1.6, z), (56, ys + 1.6, z), (0, 1, 0), 3.2, (0.6, 2.0, 0.3), 'window', R=R,
                   dropout=0.2)
     for sg in (1, -1):
-        mb.sphere((sg * 64, ys + 1, 40), 1.4, 'blue_light', seg=8, rings=4)
+        beacon(mb, Vector((sg * 64, ys + 0.2, 40)), Vector((0, 1, 0)), 1.25, 'blue_light', LAMP_BODY, 'trim')
 
 
 # ------------------------------------------------------------------------------------------ bow cannon
@@ -525,7 +546,7 @@ def bow_cannon(mb, H, R):
         for z in (zc - 6, zc + 1, zc + 8):
             light_row(mb, (sg * 24.2, YB(290), z), (sg * 20.2, YB(322), z), (sg, -0.2, 0), 4.0, (0.6, 2.0, 0.3),
                       'window', R=R, dropout=0.2)
-        mb.sphere((sg * 17, YB(329), zc + 12.5), 1.2, 'blue_light', seg=8, rings=4)
+        beacon(mb, Vector((sg * 17, YB(327.5), zc + 11.95)), Vector((0, 0, 1)), 1.05, 'blue_light', LAMP_BODY, 'trim')
     # barrel body + armour collars
     mb.cyl((0, YB(290), zc), (0, YB(326), zc), 15.5, 13.5, 'hull', seg=32)
     for s, r in ((300, 17.0), (311, 16.2), (321, 15.4)):
@@ -573,7 +594,9 @@ def starboard_bay_wall(mb, R):
             if R.random() < 0.12:
                 continue
             L = (b - a) - 5
-            mb.box((x + 1.55, Y((a + b) / 2), z), (0.3, L, 1.1 if z not in (5.0, 32.0) else 2.2), 'window')
+            hz = 1.1 if z not in (5.0, 32.0) else 2.2
+            window_bay(mb, Vector((x + 1.4, Y((a + b) / 2), z)), Vector((1, 0, 0)), (hz, L, 0.3), 'window', WIN_FRAME,
+                       lift=0.15, rows=2 if hz > 2 else 1, border=0.2)
     # big closed hangar-door outline in the middle of the wall
     ds0, ds1, dz0, dz1 = 6.0, 78.0, -20.0, 22.0
     for s in (ds0, ds1):
@@ -582,11 +605,13 @@ def starboard_bay_wall(mb, R):
         mb.box((x + 1.2, Y((ds0 + ds1) / 2), z), (2.6, ds1 - ds0 + 2.8, 2.6), 'trim')
     for k in range(9):                                    # amber door-edge marker lights
         s = lerp(ds0 + 3, ds1 - 3, k / 8)
-        mb.box((x + 2.6, Y(s), dz0 - 2.0), (0.3, 1.6, 0.8), 'amber')
-        mb.box((x + 2.6, Y(s), dz1 + 2.0), (0.3, 1.6, 0.8), 'amber')
+        for z in (dz0 - 2.0, dz1 + 2.0):
+            lamp_fixture(mb, Vector((x + 2.45, Y(s), z)), Vector((1, 0, 0)), (0.8, 1.6, 0.3), 'amber', LAMP_BODY,
+                         lift=0.15)
     for s in (ds0 - 3.5, ds1 + 3.5):
         for z in (dz0 + 3, dz1 - 3):
-            mb.box((x + 1.2, Y(s), z), (0.4, 1.2, 1.2), 'blue_light')
+            lamp_fixture(mb, Vector((x + 1.0, Y(s), z)), Vector((1, 0, 0)), (1.2, 1.2, 0.4), 'blue_light', LAMP_BODY,
+                         lift=0.2)
     # hull number stencil blocks (just trim bars) above the door
     for k in range(5):
         mb.box((x + 1.6, Y(20 + k * 4.6), 38.5), (0.3, 3.2, 0.9), 'trim')
@@ -605,9 +630,11 @@ def port_launch_bay(mb, R):
     # (no lit horizontal strips on the back wall: the bay is lit by the dock rig's lamps and the energy curtain)
     for k in range(12):                                                  # deck guide lights
         s = lerp(sa + 3, sb - 3, k / 11)
-        mb.box((x - D - 1.5, Y(s), za + 0.1), (1.2, 1.6, 0.3), 'amber')
+        chevron_light(mb, Vector((x - D - 1.5, Y(s), za + 0.1)), Vector((0, 0, 1)), (1.6, 1.2, 0.3), 'amber',
+                      LAMP_BODY, fwd=Vector((-1, 0, 0)), lift=0.0)     # launch-direction chevrons
     for s in (sa - 2.5, sb + 2.5):
-        mb.box((x - D - 0.1, Y(s), zb + 2.5), (0.3, 1.5, 1.5), 'blue_light')
+        lamp_fixture(mb, Vector((x - D + 0.05, Y(s), zb + 2.5)), Vector((-1, 0, 0)), (1.5, 1.5, 0.3), 'blue_light',
+                     LAMP_BODY, lift=0.15)
     empty('hangar_exit', (x - D - 4, Y((sa + sb) / 2), (za + zb) / 2 - 4), rot=(0, 0, -90), size=6)
 
 
@@ -742,6 +769,10 @@ class LF:
         """Box with its bottom at height w."""
         obox(mb, self.p(u, v, w + sw / 2), self.n, (su, sv, sw), mat, lift=0.0, fwd=self.t)
 
+    def lamp(self, mb, u, v, w, su, sv, sw, mat):
+        """Housed lamp fixture in place of an emissive box (same footprint, bottom at height w)."""
+        lamp_fixture(mb, self.p(u, v, w + sw / 2), self.n, (su, sv, sw), mat, LAMP_BODY, fwd=self.t, lift=0.0)
+
     def cyl(self, mb, a, b, r0, r1=None, mat='trim', seg=8, caps=True):
         mb.cyl(self.p(*a), self.p(*b), r0, r0 if r1 is None else r1, mat, seg=seg, caps=caps)
 
@@ -769,7 +800,7 @@ def pd_battery(mb, F, n=3, pitch=5.0, sz=2.4, yaw=0.0):
     for k in range(n):
         pd_turret(mb, F, 0.0, (k - (n - 1) / 2) * pitch, 0.5, sz, yaw)
     for e in (-1, 1):
-        F.box(mb, 0.0, e * (L / 2 - 0.4), 0.5, 1.0, 0.5, 0.25, 'amber')
+        F.lamp(mb, 0.0, e * (L / 2 - 0.4), 0.5, 1.0, 0.5, 0.25, 'amber')
 
 
 def sensor_array(mb, F, W, L, nu, nv, lit=True):
@@ -781,7 +812,7 @@ def sensor_array(mb, F, W, L, nu, nv, lit=True):
             F.box(mb, -W / 2 + cu * (i + 0.5), -L / 2 + cv * (j + 0.5), 0.45, cu - 0.35, cv - 0.35, 0.3, 'plate')
     if lit:
         for e in (-1, 1):
-            F.box(mb, e * (W / 2 - 0.5), L / 2 - 0.5, 0.45, 0.6, 0.6, 0.35, 'blue_light')
+            F.lamp(mb, e * (W / 2 - 0.5), L / 2 - 0.5, 0.45, 0.6, 0.6, 0.35, 'blue_light')
 
 
 def radiator_bank(mb, F, W, L, pitch=1.6, fh=2.2):
@@ -805,7 +836,7 @@ def rcs_quad(mb, F, u, v, sz=3.2):
         a = (u + du * sz / 2, v + dv * sz / 2, w)
         b = (u + du * (sz / 2 + 0.55 * sz), v + dv * (sz / 2 + 0.55 * sz), w)
         F.cyl(mb, a, b, 0.14 * sz, 0.3 * sz, 'greeble', seg=6)
-    F.box(mb, u, v, 0.8 * sz, 0.5, 0.5, 0.3, 'amber')
+    F.lamp(mb, u, v, 0.8 * sz, 0.5, 0.5, 0.3, 'amber')
 
 
 def hatch(mb, F, W, L, u=0.0, v=0.0, light=True):
@@ -816,7 +847,7 @@ def hatch(mb, F, W, L, u=0.0, v=0.0, light=True):
         F.box(mb, u, v + e * (L / 2 - 0.2), 0.2, W - 0.8, 0.4, 0.3, 'trim')
     F.box(mb, u, v - L / 2 + 0.9, 0.2, W - 1.4, 0.5, 0.45, 'greeble')      # hinge bar
     if light:
-        F.box(mb, u + W / 2 - 0.6, v + L / 2 - 0.6, 0.5, 0.4, 0.4, 0.25, 'amber')
+        F.lamp(mb, u + W / 2 - 0.6, v + L / 2 - 0.6, 0.5, 0.4, 0.4, 0.25, 'amber')
 
 
 def cargo_hatch(mb, F, W, L):
@@ -833,7 +864,7 @@ def cargo_hatch(mb, F, W, L):
             F.box(mb, e * (W / 2 + 1.1), (k - 1) * L / 3, 0.0, 0.8, 1.6, 0.9, 'greeble')
     for a in (-1, 1):
         for b in (-1, 1):
-            F.box(mb, a * (W / 2 + 0.4), b * (L / 2 + 0.4), 1.0, 0.5, 0.5, 0.25, 'amber')
+            F.lamp(mb, a * (W / 2 + 0.4), b * (L / 2 + 0.4), 1.0, 0.5, 0.5, 0.25, 'amber')
 
 
 def docking_port(mb, F, r=4.0):
@@ -846,7 +877,7 @@ def docking_port(mb, F, r=4.0):
         F.box(mb, math.cos(a) * (r + 1.4), math.sin(a) * (r + 1.4), 0.6, 1.2, 1.2, 1.4, 'greeble')
     for a in (-1, 1):
         for b in (-1, 1):
-            F.box(mb, a * 1.1 * r, b * 1.1 * r, 0.6, 0.6, 0.6, 0.25, 'amber')
+            F.lamp(mb, a * 1.1 * r, b * 1.1 * r, 0.6, 0.6, 0.6, 0.25, 'amber')
 
 
 def vls_block(mb, F, nu, nv, cell=2.2):
@@ -857,8 +888,8 @@ def vls_block(mb, F, nu, nv, cell=2.2):
         for j in range(nv):
             F.box(mb, -W / 2 + 0.5 + cell * (i + 0.5), -L / 2 + 0.5 + cell * (j + 0.5), 0.8, cell - 0.45,
                   cell - 0.45, 0.2, 'plate' if (i + j) % 2 else 'greeble')
-    F.box(mb, W / 2 - 0.5, L / 2 - 0.5, 0.8, 0.5, 0.5, 0.3, 'amber')
-    F.box(mb, -W / 2 + 0.5, -L / 2 + 0.5, 0.8, 0.5, 0.5, 0.3, 'amber')
+    F.lamp(mb, W / 2 - 0.5, L / 2 - 0.5, 0.8, 0.5, 0.5, 0.3, 'amber')
+    F.lamp(mb, -W / 2 + 0.5, -L / 2 + 0.5, 0.8, 0.5, 0.5, 0.3, 'amber')
 
 
 def capacitor_bank(mb, F, nu, nv, pitch=2.8, r=1.0, h=2.4, feed=0.0):
@@ -906,7 +937,7 @@ def sensor_dome(mb, F, r):
     """Sensor blister: armoured ring base and a low dark dome."""
     F.cyl(mb, (0, 0, -F.sink), (0, 0, 0.6), r * 1.2, r * 1.15, 'trim', seg=12)
     F.cyl(mb, (0, 0, 0.6), (0, 0, 0.6 + r * 0.45), r, r * 0.55, 'glass', seg=12)
-    F.box(mb, r * 0.9, 0.0, 0.6, 0.5, 0.5, 0.3, 'amber')
+    F.lamp(mb, r * 0.9, 0.0, 0.6, 0.5, 0.5, 0.3, 'amber')
 
 
 # ------------------------------------------------------------------------------------------ linear runs
@@ -984,9 +1015,8 @@ def window_band(mb, S, H, side, s0, s1, p, R, dropout=0.15):
                     min(h[0].dot(hs[1][1]) for h in hs) > 0.25:
                 continue
             c, n = hs[1]
-            obox(mb, c, n, (2.0, ln + 0.6, 0.3), 'greeble', lift=0.0)
-            if R.random() >= dropout:
-                obox(mb, c + n * 0.12, n, (1.0, ln, 0.3), 'window', lift=0.0)
+            lit = R.random() >= dropout
+            window_bay(mb, c, n, (2.0, ln + 0.6, 0.3), 'window', WIN_FRAME, lift=0.0, lit=lit, border=0.5)
 
 
 def cast_rows(mb, S, R):
@@ -1003,7 +1033,7 @@ def cast_rows(mb, S, R):
             h = S.cast(p + n * 12.0, -n, 30.0)
             if h is None or abs((h[0] - p).dot(n)) > 4.0 or h[1].dot(n) < 0.6:
                 continue
-            obox(mb, h[0], h[1], size, mat, lift=0.0, fwd=f)
+            fixture(mb, h[0], h[1], size, mat, fwd=f)
 
 
 def ray_path(S, o_fn, d):

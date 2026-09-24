@@ -136,15 +136,43 @@ const STRIKES = [
     hit:  { torso: [0.7, 0.55, -0.2], head: [0.35, -0.2, 0], arm_L_upper: [-0.9, -0.5, 0.1], arm_L_lower: [-0.3, 0, 0], hand_L: [0.6, 0, -0.3], arm_R_upper: [-1.8, -0.2, -0.3], arm_R_lower: [-0.6, 0, 0],
             leg_L_upper: [0.4, 0, 0.2], leg_L_lower: [0.3, 0, 0], leg_R_upper: [0.1, 0, -0.2], leg_R_lower: [0.6, 0, 0] } },
 ];
+// the overhead DOUBLE-FIST hammer: fingers interlocked — both fists meet at one point above the head (wind) and come
+// down together in front of the chest (hit). Solved once with the duel FK so the hands really touch.
+let _CLASP = null;
+function claspPose(base, tgt) {
+  const pose = JSON.parse(JSON.stringify(base));
+  for (const k of ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']) pose[k] = pose[k] || [0, 0, 0];
+  const s0 = { pos: [0, 0, 0], fwd: [0, 0, 1], pose, saber: 0 };
+  const cost = () => {
+    const fk = duelFK(s0, 'gundam');
+    const hl = M.transformPoint([0, 0, 0], fk.hand_L, [0, -1.0, 0.3]), hr = M.transformPoint([0, 0, 0], fk.hand_R, [0, -1.0, 0.3]);
+    const dl = M.transformDir([0, 0, 0], fk.hand_L, [-1, 0, 0]), dr = M.transformDir([0, 0, 0], fk.hand_R, [1, 0, 0]);   // knuckles face each other
+    const face = V.dot(V.norm([0, 0, 0], dl), V.norm([0, 0, 0], V.sub([0, 0, 0], hr, hl))) + V.dot(V.norm([0, 0, 0], dr), V.norm([0, 0, 0], V.sub([0, 0, 0], hl, hr)));
+    return V.dist(hl, [tgt[0] + 0.7, tgt[1], tgt[2]]) ** 2 + V.dist(hr, [tgt[0] - 0.7, tgt[1], tgt[2]]) ** 2 + 2 * (2 - face);
+  };
+  const vars = [];
+  for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']) for (const k of (p.includes('lower') ? [0] : [0, 1, 2])) vars.push([p, k]);
+  let best = cost();
+  for (let step = 0.4; step > 0.004; step *= 0.6) for (let it = 0; it < 8; it++) for (const [p, k] of vars) {
+    for (const sg of [1, -1]) { pose[p][k] += sg * step; const c = cost(); if (c < best - 1e-6) { best = c; break; } pose[p][k] -= sg * step; }
+  }
+  return pose;
+}
+export function claspStrike() {
+  if (_CLASP) return _CLASP;
+  const S = STRIKES[0];
+  _CLASP = { wind: claspPose(S.wind, [0, 10.8, 3.2]), hit: claspPose(S.hit, [0, 1.5, 7.5]) };   // hip-relative (pos = hip)
+  return _CLASP;
+}
 function berserkStrike(t, pose) {
   for (let i = 0; i < B_HITS.length; i++) {
     const h = B_HITS[i];
     if (t < h - 0.75 || t > h + 1.1) continue;
-    const S = STRIKES[i % STRIKES.length];
+    const S = i % STRIKES.length === 0 ? claspStrike() : STRIKES[i % STRIKES.length];
     const wind = easeInOut(sat((t - (h - 0.75)) / 0.55));           // slow, heavy load-up
     const snap = easeIn(sat((t - (h - 0.16)) / 0.16));              // violent release into the barrier
     const rec = easeInOut(sat((t - (h + 0.25)) / 0.85));            // follow-through held, then back to feral
-    const jit = (k) => (hash(i * 13.1 + k) - 0.5) * 0.25;            // per-hit variation so no two look alike
+    const jit = (k) => (i % STRIKES.length === 0 ? 0 : (hash(i * 13.1 + k) - 0.5) * 0.25);   // per-hit variation (not on the clasped hammer: the fists must stay locked)
     for (const part of new Set([...Object.keys(S.wind), ...Object.keys(S.hit)])) {
       const w = S.wind[part] || pose[part] || [0, 0, 0], hh = S.hit[part] || pose[part] || [0, 0, 0];
       const cur = pose[part] || [0, 0, 0];
@@ -330,11 +358,13 @@ function gundamStateRaw(t, s) {
     const start = diveStart();
     const end = addv(WELL, [0, -10, -260]);
     const u = (t - 240) / 22;
-    const e = u < 0.2 ? 0.5 * (u / 0.2) * (u / 0.2) * 0.2 : 0.02 + (u - 0.2) / 0.8 * 0.98 * (1 - 0.35 * Math.pow((u - 0.2) / 0.8, 3)) + 0.35 * Math.pow((u - 0.2) / 0.8, 3) * 0.98 * ((u - 0.2) / 0.8);
+    // coil for a breath, then an explosive burst to full speed (continuous: the old curve jumped back at 244.5)
+    const B = 0.06, v = Math.max(0, u - B) / (1 - B), K = 18;
+    const e = u < B ? 0.004 * (u / B) * (u / B) : 0.004 + 0.996 * (v - (1 - Math.exp(-K * v)) / K) / (1 - (1 - Math.exp(-K)) / K);
     s.pos = lerpv(start, end, clamp(e, 0, 1));
     s.fwd = V.sub([0, 0, 0], end, start);
     blendPose('flight', 'flight', 0, s.pose);
-    s.pitch = 0.9 * (1 - smooth(258, 262, t)); s.thr = 1;
+    s.pitch = 0.9 * smooth(240.9, 241.5, t) * (1 - smooth(258, 262, t)); s.thr = t < 241.3 ? 0.4 : 1; s.boostK = smooth(241.2, 241.45, t);
     s.roll = Math.sin(t * 0.5) * 0.05;
   } else if (t < 278) {
     // BERSERK: feral lunges into the shield (263.4 / 265.0 / 266.6), shatter 268, rush 270–272.8, slash 273
@@ -1417,7 +1447,7 @@ shot(240, 247, 'S16a dive start', (c) => {
   const S = diveStart(), dir = V.norm([0, 0, 0], V.sub([0, 0, 0], addv(WELL, [0, -10, -260]), S));
   const W = motherPoint([0, 0, 0], t, LANCE_HIT);
   const aw = V.norm([0, 0, 0], V.sub([0, 0, 0], S, W));
-  const cam = addv(madd(madd(S, dir, -120), aw, 55), [0, 30, 0]);
+  const cam = addv(madd(madd(S, dir, -62), aw, 30), [0, 16, 0]);
   camLook(c, madd(cam, dir, u * 30), addv(madd(S, dir, 260), [0, 6, 0]), 48, 0.03);
   handheld(c, 0.12);
   const pk = diveFX(c, t, 0.08 + u * 0.18, g);
@@ -1817,7 +1847,7 @@ shot(358, 382.5, 'S23 title', (c) => {
   c.env.sunDir = SUN_HOME;
   const dir0 = V.norm([0, 0, 0], V.lerp([0, 0, 0], PLANET, SUN, 0.5 + sat((t - 358) / 9) * 0.04));   // original framing (unchanged)
   const upDir = V.norm([0, 0, 0], V.add([0, 0, 0], dir0, [0, 1.1, 0]));
-  const k = easeInOut(sat((t - 366.8) / 5.0));
+  const k = easeInOut(sat((t - 366.8) / 2.5));   // tilt up twice as fast
   const dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], dir0, upDir, k));
   camLook(c, [0, 0, 0], madd([0, 0, 0], dir, 1000), 34, 0.12 - k * 0.08);
   c.world = false;

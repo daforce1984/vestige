@@ -201,3 +201,7 @@
 - [x] 139. warp_out2 plays the user's file untouched (full 1.51 s, original level/pitch; build_sfx raw copy), no distance attenuation (far 0, no low-pass), dry bus, top priority; size still sets the level.
 - [x] 140. chargeInflow keeps flowing past its ramp (the ion core inflow was frozen: t0 = t−1); streaks fade in and dim/shorten as they are swallowed instead of popping out.
 - [x] 141. Vambrace parries are real swats: the forearm whips across through each bolt (±0.12 s) and the bolt ricochets along the swing direction.
+- [x] 142. Title: tilt up over Earth twice as fast (2.5 s).
+- [x] 143. Dive: continuous burst acceleration (the old curve jumped back at 244.5 — the "teleport"), boost spike at 241.2; S16a camera pulled in.
+- [x] 144. Parries: bigger full-arm swats with the shoulders turning into each one.
+- [x] 145. Berserk first strike is a true clasped double-fist hammer: both fists solved with FK to meet above/in front (gap ≈ fist width), no per-hit jitter on it.
