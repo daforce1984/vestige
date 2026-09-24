@@ -56,6 +56,12 @@
   #bar { height: 3px; margin-top: 3px; background: var(--accent); width: 0; }
   #hud { position: fixed; left: 8px; top: 6px; font: 12px ui-monospace, monospace; color: #9fb; text-shadow: 0 0 3px #000; pointer-events: none; }
   body.nohud #hud, body.nohud #progress { display: none; }
+  #scenetag { position: fixed; right: 18px; top: 16px; padding: 10px 14px; background: rgba(4,8,14,.72); border: 1px solid rgba(140,190,255,.35);
+    border-radius: 6px; font: 13px 'Share Tech Mono', ui-monospace, monospace; color: #cfe3ff; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 50; }
+  #scenetag.on { opacity: 1; }
+  #scenetag b { font-size: 20px; color: #fff; letter-spacing: .08em; }
+  #scenetag span { display: block; margin-top: 4px; color: #9fd0ff; }
+  #scenetag em { display: block; margin-top: 2px; font-style: normal; color: #7f93ad; font-size: 11px; }
   body.idle, body.idle * { cursor: none !important; }
   body.idle #progress { opacity: 0; }
 </style>

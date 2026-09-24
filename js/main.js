@@ -1,5 +1,5 @@
 import { Renderer } from './renderer.js';
-import { frame, findShot, DURATION } from './shots.js';
+import { frame, findShot, DURATION, SHOTS } from './shots.js';
 import { storyT, filmT } from './timemap.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
@@ -83,6 +83,7 @@ function now() {
 
 async function play(from) {
   playing = true;
+  if (typeof hideSceneTag === 'function') hideSceneTag();
   clockOffset = from; clockStart = performance.now();
   if (score) { try { score.start(from); } catch (e) { console.error(e); } }
 }
@@ -90,10 +91,23 @@ function pause() {
   const t = now();
   playing = false; clockOffset = t;
   if (score) score.stop();
+  showSceneTag();
 }
+// paused: which scene is this? (numbered in timeline order, with the shot's own code/name and the film time)
+const SCENE_ORDER = [...SHOTS].sort((a, b) => a.t0 - b.t0 || a.t1 - b.t1);
+const sceneTag = document.createElement('div');
+sceneTag.id = 'scenetag';
+document.body.appendChild(sceneTag);
+function showSceneTag() {
+  const ft = now(), sh = findShot(storyT(ft)), i = SCENE_ORDER.indexOf(sh);
+  const mm = Math.floor(ft / 60), ss = (ft % 60).toFixed(1).padStart(4, '0');
+  sceneTag.innerHTML = `<b>SCENE ${i + 1}</b> / ${SCENE_ORDER.length}<span>${sh.name}</span><em>${mm}:${ss}  (story ${storyT(ft).toFixed(2)} s)</em>`;
+  sceneTag.classList.add('on');
+}
+function hideSceneTag() { sceneTag.classList.remove('on'); }
 function seek(t) {
   t = Math.max(0, Math.min(DURATION, t));
-  if (playing) { if (score) score.stop(); play(t); } else clockOffset = t;
+  if (playing) { if (score) score.stop(); play(t); } else { clockOffset = t; showSceneTag(); }
 }
 
 // --------------------------------------------------------------- overlay text
@@ -234,12 +248,12 @@ $('#progress').addEventListener('click', (e) => seek((e.offsetX / e.currentTarge
 window.addEventListener('pagehide', () => { score?.stop(); R.dispose(); });
 boot();
 
-// the cursor is hidden for as long as the film plays and comes back when it is paused
-let cursorHidden = null;
+// cursor: always visible while paused; while playing it shows when the mouse moves and hides again after 5 s still
+let lastMouse = -1e9;
+window.addEventListener('mousemove', () => { lastMouse = performance.now(); syncCursor(); }, { passive: true });
 function syncCursor() {
-  if (cursorHidden === playing) return;
-  cursorHidden = playing;
-  document.body.classList.toggle('idle', playing);
+  const hide = playing && performance.now() - lastMouse > 5000;
+  if (document.body.classList.contains('idle') !== hide) document.body.classList.toggle('idle', hide);
 }
 setInterval(syncCursor, 100);
 // Esc in fullscreen is taken by the browser to leave fullscreen: treat that as "pause" too
