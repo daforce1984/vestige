@@ -228,3 +228,4 @@
 - [x] 166. Scene 64 camera never stops: one arc-length-parametrised move 358→370.8 (fleet → limb → sun → title) with a steady ~3.5–4°/s rise under the narration, a surge through the sun, easing onto the title; fleet kept in the world until the camera has risen past it.
 - [x] 167. Scene 64 fake glows removed: the atmosphere glow sprite, the god rays (marched over bloom during the swing) and the hard-edged warm glare disc of the flare (now a soft gaussian + faint tail); the flare and its ghosts fade out completely before the sun reaches the frame edge.
 - [x] 168. Scene 60→61: Sigma's exhaust history no longer reaches back across the 340 cut (his path jumps there), which drew a long light streak sweeping across the frame.
+- [x] 169. Bug: the hero's leftover beam-saber hilt had 'engine'-coloured faces, so 24 tiny thruster plumes fired from the hand/weapon; excluded from the engine emitters and the hilt part hidden (only the 3 backpack thrusters remain).

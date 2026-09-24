@@ -370,6 +370,8 @@ export class Renderer {
       this.modelList.push(model);
       model.emitPoints = {};
       for (const mname of ['engine', 'muzzle', 'eye']) model.emitPoints[mname] = emissiveClusters(g, mname);
+      // the hero's leftover beam-saber hilt carries 'engine'-coloured faces: they are not thrusters (they made plumes at the hand)
+      model.emitPoints.engine = model.emitPoints.engine.filter((p) => g.parts[p.part]?.name !== 'saber_hilt');
       vo += g.verts.length; io += g.indices.length;
     }
     const dev = this.device;

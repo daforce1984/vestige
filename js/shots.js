@@ -582,7 +582,7 @@ export function drawGundam(R, t, s, opts = {}) {
   const e = R.add('gundam', msMatrix(tmpM, s));
   if (!e) return null;
   e.pose = s.pose; e.damage = s.damage; e.seed = 5.5; e.wear = 1; e.texSet = R.texLoaded & 1 ? 1 : 0;
-  e.hidden = { rifle: 1 };                                   // Sigma carries only the mace
+  e.hidden = { rifle: 1, saber_hilt: 1 };                    // Sigma carries only the mace (the old beam-saber hilt is not drawn)
   if (s.fpv) {
     e.hidden = { rifle: 1, head: 1, torso: 1, backpack: 1, pelvis: 1, arm_L_upper: 1, arm_R_upper: 1, hand_L: 1, hand_R: 1 };   // POV: forearms + articulated hands
     drawPovHands(R, t, e, s);
