@@ -157,7 +157,18 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
   const isShip = name !== 'gundam' && name !== 'enemy_ms';
   if (isShip) {                                              // ships: throttle follows the real speed (off when stopped)
     throttle *= shipSpeedK(R, name, entry, model);
-    if (throttle < 0.03) return;
+    if (throttle < 0.03) {                                   // idle: the nozzles stay warm — a faint, slow glow pulse, no plume
+      const time = R._time || R._now || 0;
+      for (let i = 0; i < pts.length; i++) {
+        const ep = pts[i];
+        const pm = R.partWorld(name, entry, model.parts[ep.part].name);
+        M.transformPoint(tmp, pm, ep.pos);
+        const r = Math.max(ep.r, 0.3) * scale;
+        const pk = 0.16 + 0.08 * Math.sin(time * 1.6 + i * 0.9 + (entry.seed || 0));   // ~0.25 Hz breathing, per-nozzle phase
+        R.glow(tmp, r * 1.15, [col[0] * pk, col[1] * pk, col[2] * pk], 0.25);
+      }
+      return;
+    }
   }
   const time = R._time || 0;
   for (let i = 0; i < pts.length; i++) {
@@ -186,12 +197,12 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
         M.transformDir(_pa, pmp, [0, 0, -1]); V.norm(_pa, _pa);
         V.madd(_pn, _pn, _pa, v * tau);
         const f = 1 - s2 / (N + 1);
-        R.beam(_prev, _pn, r * (0.25 + 0.5 * f), [c[0] * f * f * 0.5, c[1] * f * f * 0.5, c[2] * f * f * 0.5], 0.9, 8, 0.6, 0.5);
+        R.beam(_prev, _pn, r * (0.6 + 0.95 * f), [c[0] * f * f * 0.5, c[1] * f * f * 0.5, c[2] * f * f * 0.5], 0.9, 6, 0.6, 0.5);   // fuller exhaust
         V.copy(_prev, _pn);
       }
       R.glow(tmp, r * 1.3, [c[0] * 0.8, c[1] * 0.8, c[2] * 0.8], 0.2);
       if (isShip) crossPlume(R, tmp, tmp2, r, len * 0.6, c);
-      else R.flame(tmp, V.scale(tmp3, tmp2, len * 0.35), r * 1.05, c, 1.4, i * 3.1, 1);
+      else R.flame(tmp, V.scale(tmp3, tmp2, len * 0.45), r * 1.7, c, 1.4, i * 3.1, 1);
       if (opts.particles) {
         // sparks / embers blown out of the nozzle, following the same emission history
         for (let p = 0; p < 14; p++) {
@@ -216,7 +227,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     }
     if (isShip) { crossPlume(R, tmp, tmp2, r, len, c); R.glow(tmp, r * 1.6, [c[0] * 0.7, c[1] * 0.7, c[2] * 0.7], 0.25); continue; }
     V.scale(tmp3, tmp2, len);
-    R.flame(tmp, tmp3, r * 1.05, c, 1.4, i * 3.1, 1);
+    R.flame(tmp, tmp3, r * 1.7, c, 1.4, i * 3.1, 1);
     R.glow(tmp, r * 1.1, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5], 0.1);
   }
 }
@@ -226,7 +237,7 @@ function crossPlume(R, nozzle, dir, r, len, c) {
   V.scale(_pax, dir, len);
   V.norm(_pa1, V.cross(_pa1, dir, Math.abs(dir[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]));
   V.cross(_pa2, dir, _pa1);
-  const w = r * 1.05;
+  const w = r * 1.9;                                          // as wide as the nozzle bell, not a needle
   R.plume(nozzle, _pax, [_pa1[0] * w, _pa1[1] * w, _pa1[2] * w], c, 1.3);
   R.plume(nozzle, _pax, [_pa2[0] * w, _pa2[1] * w, _pa2[2] * w], c, 1.3);
 }

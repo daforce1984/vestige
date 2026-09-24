@@ -881,7 +881,7 @@ struct VO {
   } else if (shape == 10) {
     // thruster plume plane (one arm of a cross): nozzle a, exhaust axis b (full length), half-width vector c
     let tt = corner.y * 0.5 + 0.5;                 // 0 nozzle .. 1 tip
-    wp = s.a.xyz + s.b.xyz * tt + s.c.xyz * corner.x * mix(1.0, 0.45, tt);
+    wp = s.a.xyz + s.b.xyz * tt + s.c.xyz * corner.x * mix(1.0, 0.7, tt);
     uv = vec2f(corner.x, tt);
   } else {
     let r = s.b.x; let rot = s.b.y;
