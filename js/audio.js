@@ -327,6 +327,12 @@ export const SAMPLE_CUES = [
     [t, 'hl_big_explosion', { rate: 1.05, gain: 1.0, prio: 9, norand: true }],
     [t + 0.05, 'expl_debris', { gain: 0.9, prio: 8, norand: true }],
   ]),
+  // the strike leader's wingmen die one by one (shots.js STRIKE): close, loud, each with a debris rattle
+  ...[[136.1, 0.5], [137.9, -0.4], [139.7, 0.2]].flatMap(([t, pan]) => [
+    [t, 'hl_explosion', { rate: 1.12, gain: 1.05, pan, prio: 9, duck: 0.8, norand: true }],
+    [t + 0.03, 'expl_debris', { rate: 1.1, gain: 0.55, pan, prio: 7, norand: true }],
+  ]),
+  ...Array.from({ length: 24 }, (_, n) => [134.3 + n * 0.26, 'laser_shot', { gain: 0.35, rate: 1.25, far: 0.25, pan: [-0.3, 0.1, 0.4][n % 3], prio: 5 }]),   // the bandits' guns
   // fighter kills (small)
   ...[138, 141.6, 145, 148.6, 152, 157, 163, 171, 178, 189].map((t, i) => [t, 'hl_explosion', { rate: 1.22, gain: 0.75, far: 0.3 + 0.1 * (i % 3), pan: 'rnd', prio: 5 }]),
   ...[138, 145, 152, 163, 178].map((t, i) => [t + 0.04, 'expl_debris', { rate: 1.15, gain: 0.3, far: 0.4, pan: 'rnd', prio: 3 }]),
@@ -373,8 +379,11 @@ export const SAMPLE_CUES = [
   [181.0, 'braam2',    { at: 0.15, rate: 1.1, gain: 0.8, prio: 8, norand: true }],
   // launch run: an enemy ion bolt screams in, Sigma rolls out of its way (duel.js DODGE 166.65)
   [166.03, 'laser_cannon:s2', { dur: 1.2, fadeOut: 0.5, rate: 0.7, gain: 0.5, far: 0.55, pan: 0.3, prio: 7, norand: true }],
-  [166.2, 'hl_thruster', { loop: true, dur: 1.2, rate: 1.0, rateTo: 1.35, gain: 0.8, fadeIn: 0.05, fadeOut: 0.5, prio: 8, norand: true }],
-  [166.5, 'flyby_fast', { rate: 0.75, gain: 1.1, pan0: 0.7, pan1: -0.6, prio: 9, norand: true }],
+  [166.35, 'flyby_fast', { rate: 0.8, gain: 0.8, pan0: 0.1, pan1: 0.5, dur: 0.5, fadeOut: 0.2, prio: 8, norand: true }],   // incoming
+  [166.65, 'metal_knock', { at: 'hit', rate: 0.72, gain: 1.2, pan: 0.3, prio: 10, norand: true }],                             // off the vambrace
+  [166.65, 'axe_metal1', { at: 'hit', rate: 0.85, gain: 0.8, pan: 0.3, prio: 9, norand: true }],
+  [166.66, '@sparkBurst', { vel: 0.8, pan: 0.35 }],
+  [166.7, 'flyby_fast', { rate: 1.1, gain: 0.7, pan0: 0.4, pan1: 0.95, prio: 8, norand: true }],                                // ricochet away
   [182.05, 'hl_thruster', { loop: true, dur: 1.4, rate: 0.9, rateTo: 1.4, gain: 0.9, fadeIn: 0.05, fadeOut: 0.5, prio: 8, norand: true }],
   [182.5, 'flyby_fast', { rate: 0.8, gain: 1.0, pan0: 0.6, pan1: -0.4, prio: 8, norand: true }],
   [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar

@@ -162,3 +162,9 @@
       and warped with the hull.
 - [x] 107. Every warp gets its own warp_out2 on its visual snap (only simultaneous < 0.15 s share); small ships lighter/panned — the enemy's fleeing line ships at 313.0 / 315.2 were silent (1.2 s clustering).
 - [x] 108. Wound rim conforms to the real hull (ray-cast skin under every column; no wall where the hole runs off the hull or deeper than the melt); FLEET COMMAND + SENSORS voices at 80 % (VOICE_TRIM).
+- [x] 109. Launch run: no barrel roll — Sigma bats the enemy ion bolt away with his right vambrace (parryPose; the bolt
+      is aimed at the solved wrist point, glances off with a spark fan and ricochets away; knock + ring + whoosh).
+- [x] 110. S10a: the strike leader flies a four-ship finger formation, jumped by three bandits; wingmen die at
+      136.1 / 137.9 / 139.7 (fireball + break-up), new line v10w03 "I'm the only one left!" (140.1).
+- [x] 111. Cold open: the calm view slowly tilts down and sinks a little (0.8–8.2 s) before the whip pan.
+- [x] 112. Final shot: the sun rests on Earth's upper limb at the horizontal centre of the frame, just touching it.

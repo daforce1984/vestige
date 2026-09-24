@@ -129,6 +129,16 @@
    "dur": 4.21
   },
   {
+   "id": "v10w03",
+   "t": 140.1,
+   "voice": "WING",
+   "radio": true,
+   "text": "[screaming, desperate] Four's gone— Three! Two, pull up— no! ...I'm alone. I'm the only one left!",
+   "ko": "4번 격추— 3번! 2번, 기수 올려— 안 돼! …나 혼자야. 나만 남았어!",
+   "stability": 0.0,
+   "dur": 6.19
+  },
+  {
    "id": "v7s04",
    "t": 146.4,
    "voice": "SENSOR",

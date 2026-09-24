@@ -831,6 +831,22 @@ const _c_duelHero = new Map();
 // sideways ~10 m (lead-in 0.5 s, back on the line by +1.1 s), the bolt tears through the empty space
 export const DODGE = { t: 166.65, side: 1 };
 export function dodgeRight(tw) { const d = nrm(sub(gundamLaunchPath(tw + 0.05), gundamLaunchPath(tw))); return nrm([d[2], 0, -d[0]]); }
+// forearm comes up across the chest (0.3 s before), takes the bolt on the armour at DODGE.t and sweeps it outward;
+// the body gives a little to the hit and the arm settles back with weight
+function parryPose(tw, out) {
+  const T = DODGE.t;
+  const up = smooth(T - 0.34, T - 0.06, tw), sweep = smooth(T - 0.02, T + 0.18, tw), back = smooth(T + 0.35, T + 1.0, tw);
+  const k = up * (1 - back), lt = tw - T;
+  const kick = lt > 0 && lt < 0.8 ? Math.exp(-lt * 6) * Math.sin(lt * 18) : 0;                  // impact shudder
+  out[PIDX.arm_R_upper] += (-1.25 + 0.25 * sweep) * k - 0.12 * kick;
+  out[PIDX.arm_R_upper + 1] += (0.55 - 0.9 * sweep) * k;                                          // across the chest -> swept out
+  out[PIDX.arm_R_upper + 2] += (0.15 - 0.45 * sweep) * k;
+  out[PIDX.arm_R_lower] += -1.35 * k + 0.1 * kick;                                                // forearm up, armour facing out
+  out[PIDX.hand_R] += -0.3 * k;
+  out[PIDX.torso + 1] += (-0.22 + 0.34 * sweep) * k;                                              // shoulder turns into it, then through
+  out[PIDX.torso] += 0.06 * kick; out[PIDX.head + 1] += -0.15 * k;
+  out[PIDX._body + 2] += 0.05 * kick;
+}
 function dodgeOffset(tw) {
   const u = (tw - (DODGE.t - 0.5)) / 1.6;
   if (u <= 0 || u >= 1) return [0, 0, 0];
@@ -862,9 +878,9 @@ function duelHero_(t) {
     const toE = flat(sub(e1RawPos(tw), s.pos));
     f = nrm(lrp(path, toE, smooth(169.3, 170.3, tw)));
     s.roll = 0;
-    // gentle banking, and one evasive barrel roll + side jink when an enemy ion bolt comes straight at him (DODGE)
-    _pose[PIDX._body + 2] += Math.sin(tw * 0.8) * 0.1 * (1 - smooth(169, 170, tw)) + DODGE.side * 2 * Math.PI * (easeInOut(sat((tw - DODGE.t + 0.5) / 0.95)) - (tw > DODGE.t + 0.45 ? 1 : 0));   // full roll (wraps back to 0)
-    s.pos = add(s.pos, dodgeOffset(tw));
+    // gentle banking; an enemy ion bolt comes straight at him and he simply bats it away with the right vambrace (DODGE)
+    _pose[PIDX._body + 2] += Math.sin(tw * 0.8) * 0.1 * (1 - smooth(169, 170, tw));
+    parryPose(tw, _pose);
   } else if (tw < 180.25) {
     f = flat(sub(e1RawPos(tw), s.pos));
   } else {

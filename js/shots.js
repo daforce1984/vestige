@@ -872,10 +872,11 @@ shot(0, 14, 'C0 cold open', (c) => {
   c.env.sunDisc = 0.12;
   const { t, R } = c;
   c.worldT = CO_T0 + t;
-  const calmDir = V.norm([0, 0, 0], [0.25, 0.55, 0.8]);            // away from the fight: quiet stars
+  const tilt = easeInOut(sat((t - 0.8) / 7.4));                      // the calm view slowly tilts down…
+  const calmDir = V.norm([0, 0, 0], [0.25, 0.55 - 0.3 * tilt, 0.8]);  // away from the fight: quiet stars
   const fightTgt = enemyFrigate(c.worldT, 3).pos;
   // close to the enemy line: ~260 m off an enemy frigate's bow, on our side of the fight
-  const pos = addv(fightTgt, [-95 + Math.sin(t * 0.1) * 4, 38, 250 - Math.max(0, t - 8.25) * 4]);
+  const pos = addv(fightTgt, [-95 + Math.sin(t * 0.1) * 4, 38 - 6 * tilt, 250 - Math.max(0, t - 8.25) * 4]);   // …and sinks a little
   const fightDir = V.norm([0, 0, 0], V.sub([0, 0, 0], addv(fightTgt, [30, 10, 0]), pos));
   const w = easeInOut(sat((t - 8.25) / 0.35));                        // whip pan
   const dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], calmDir, fightDir, w));
@@ -1083,27 +1084,58 @@ shot(127.8, 134, 'S9c wide battle', (c) => {
 });
 // interceptor strafing run along the enemy line, chased by a red fighter (scripted so it always reads)
 function strafeRun(t) { return [-520 + (t - 134) * 150, 40 + Math.sin(t * 1.3) * 18, -980 + Math.sin(t * 0.7) * 30]; }
+// the strike leader's four-ship finger formation is jumped from behind; three wingmen die one after another
+// [side, up, back] in the leader's frame, death time (null = the leader survives)
+const STRIKE = [[0, 0, 0, null], [-15, -2, 11, 139.7], [17, 1, 13, 137.9], [32, -3, 25, 136.1]];
+const BANDITS = [[-6, 5, 70], [14, 9, 84], [30, 2, 96]];
+function strikePos(t, off) {
+  const a = strafeRun(t), v = V.norm([0, 0, 0], V.sub([0, 0, 0], strafeRun(t + 0.05), a));
+  const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], v, [0, 1, 0])), up = V.cross([0, 0, 0], sd, v);
+  const wob = [Math.sin(t * 1.3 + off[0]) * 1.5, Math.sin(t * 1.7 + off[2]) * 1.0, 0];
+  return { p: V.add([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], a, V.scale([0, 0, 0], sd, off[0] + wob[0])), V.scale([0, 0, 0], up, off[1] + wob[1])), V.scale([0, 0, 0], v, -off[2])), v };
+}
 shot(134, 141, 'S10a dogfight chase', (c) => {
   const { t, R } = c;
-  const a = strafeRun(t), v = V.norm([0, 0, 0], V.sub([0, 0, 0], strafeRun(t + 0.05), a));
-  const roll = Math.sin(t * 1.7) * 0.7;
-  const e = R.add('interceptor', mat(M.new(), a, v, [0, 1, 0], roll));
-  const pastStrafe = (dt0) => (tau) => { const p0 = strafeRun(t - dt0 - tau), p1 = strafeRun(t - dt0 - tau + 0.05); return { m: mat(new Float32Array(16), p0, V.sub([0, 0, 0], p1, p0), [0, 1, 0], Math.sin((t - dt0 - tau) * 1.7) * 0.7) }; };
-  if (e) { R._time = t; engineGlows(R, 'interceptor', e, HIIG_ENGINE, 0.6, 1, 3, { past: pastStrafe(0) }); }
-  const b = strafeRun(t - 0.35); b[1] += 6; b[0] -= 4;
-  const ef = R.add('enemy_fighter', mat(M.new(), b, v, [0, 1, 0], -roll));
-  if (ef) engineGlows(R, 'enemy_fighter', ef, ENEMY_ENGINE, 0.6, 1, 3, { past: pastStrafe(0.35) });
-  // enemy fighter's guns
-  for (let k = 0; k < 10; k++) {
-    const tf = 134 + k * 0.62;
-    const from = V.add([0, 0, 0], strafeRun(tf - 0.35), [-4, 6, 0]);
-    const to = V.add([0, 0, 0], strafeRun(tf + 0.1), [(hash(k) - 0.5) * 10, (hash(k + 1) - 0.5) * 8, 0]);
-    bolt(R, t, tf, tf + 0.2, from, to, 12, 0.18, [3, 1.2, 0.4], 1);
+  const lead = strikePos(t, STRIKE[0]);
+  STRIKE.forEach((w, k) => {
+    const [x, y, z, die] = w;
+    const roll = Math.sin(t * 1.7 + k) * 0.6 + (die && t > die - 0.9 ? Math.sin(t * 9 + k) * 0.5 : 0);   // hit-jinking before the end
+    if (die && t > die) {                                                       // killed: fireball, the craft breaks up
+      const st = strikePos(die, [x, y, z]);
+      explosion(R, t, die, st.p, 14, 610 + k, 'small');
+      shatter(R, 'interceptor', mat(M.new(), st.p, st.v, [0, 1, 0], roll), t, die, 620 + k, [2, 1, 3], 1.4, { tint: [0.4, 0.7, 1] });
+      return;
+    }
+    const st = strikePos(t, [x, y, z]);
+    const e = R.add('interceptor', mat(M.new(), st.p, st.v, [0, 1, 0], roll));
+    const past = (tau) => { const q = strikePos(t - tau, [x, y, z]); return { m: mat(new Float32Array(16), q.p, q.v, [0, 1, 0], roll) }; };
+    if (e) { R._time = t; engineGlows(R, 'interceptor', e, HIIG_ENGINE, 0.6, 1, 3, { past }); }
+  });
+  // the bandits: three red fighters on their six, walking fire onto the wingmen
+  BANDITS.forEach((b, k) => {
+    const st = strikePos(t, b);
+    const ef = R.add('enemy_fighter', mat(M.new(), st.p, st.v, [0, 1, 0], -Math.sin(t * 1.5 + k) * 0.5));
+    const past = (tau) => { const q = strikePos(t - tau, b); return { m: mat(new Float32Array(16), q.p, q.v, [0, 1, 0], 0) }; };
+    if (ef) engineGlows(R, 'enemy_fighter', ef, ENEMY_ENGINE, 0.6, 1, 3, { past });
+  });
+  for (let n = 0; n < 24; n++) {
+    const tf = 134.3 + n * 0.26;
+    const tgtK = tf < 136.1 ? 3 : tf < 137.9 ? 2 : tf < 139.7 ? 1 : 0;          // each burst on the next victim
+    const shooter = BANDITS[n % 3];
+    const from = strikePos(tf, shooter).p;
+    const tp = strikePos(tf + 0.2, STRIKE[tgtK]).p;
+    const miss = tgtK === 0 ? 9 : (n % 3 === 0 ? 1 : 5);
+    const to = V.add([0, 0, 0], tp, [(hash(n) - 0.5) * miss * 2, (hash(n + 1) - 0.5) * miss * 1.4, 0]);
+    bolt(R, t, tf, tf + 0.2, from, to, 12, 0.2, [3, 1.2, 0.4], 1);
   }
-  const cam = V.add([0, 0, 0], V.madd([0, 0, 0], a, v, -26), [2, 7, 8]);
-  camLook(c, cam, V.madd([0, 0, 0], a, v, 30), 52, roll * 0.4);
+  const v = lead.v;
+  const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], v, [0, 1, 0]));
+  const roll = Math.sin(t * 1.7) * 0.6;
+  const cam = V.add([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], lead.p, v, -128), sd, -22), [0, 26, 0]);   // behind the bandits
+  camLook(c, cam, V.madd([0, 0, 0], lead.p, v, 10), 46, roll * 0.25);
   shake(c, 0.35, 12);
-  c.env.shadowCenter = a; c.env.shadowRadius = 60;
+  for (const w of STRIKE) if (w[3] && c.t > w[3] && c.t < w[3] + 0.6) shake(c, 0.9 * Math.exp(-(c.t - w[3]) * 5), 14);
+  c.env.shadowCenter = lead.p; c.env.shadowRadius = 90;
   c.post.shakeBlur = 0.0006;
 });
 shot(141, 145, 'S10b missiles swatted down', (c) => {
@@ -1683,13 +1715,28 @@ shot(343.8, 347.3, 'F1 the jump', (c) => {
 // seen from the fleet the lit fraction of the disc is (1 + cos θ)/2, θ = angle between the planet→sun and planet→camera
 // directions; 30 % day on TOP → cos θ = -0.4 (sun a little behind the planet), tilted toward the camera's up (the terminator runs across the upper third)
 // the sunrise sun for the final shot: just above Earth's limb, on the side the camera looks at, a little to the right
+// the sunrise sun for the final shot: resting on Earth's upper limb, dead centre of the frame (horizontally), its disc
+// just touching the horizon — found on the limb circle from the S23 camera (framing at ~363 s, roll 0.12)
+let _sunRise = null;
 function SUN_RISE() {
-  const dir0 = V.norm([0, 0, 0], V.lerp([0, 0, 0], PLANET, SUN, 0.5));
-  const up = V.norm([0, 0, 0], V.madd([0, 0, 0], dir0, PLANET, -V.dot(dir0, PLANET)));
-  const right = V.norm([0, 0, 0], V.cross([0, 0, 0], dir0, [0, 1, 0]));
-  const a = PL_R + 0.055, phi = -0.95;                  // round the limb toward the right, where it dips into the frame
-  const side = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], up, Math.cos(phi)), V.scale([0, 0, 0], right, -Math.sin(phi))));
-  return V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], PLANET, Math.cos(a)), V.scale([0, 0, 0], side, Math.sin(a))));
+  if (_sunRise) return _sunRise;
+  const f = V.norm([0, 0, 0], V.lerp([0, 0, 0], PLANET, SUN, 0.522));
+  const r0 = V.norm([0, 0, 0], V.cross([0, 0, 0], f, [0, 1, 0])), u0 = V.cross([0, 0, 0], r0, f);
+  const roll = 0.12, U = V.add([0, 0, 0], V.scale([0, 0, 0], u0, Math.cos(roll)), V.scale([0, 0, 0], r0, Math.sin(roll)));
+  const Rt = V.norm([0, 0, 0], V.cross([0, 0, 0], f, U));
+  const up = V.norm([0, 0, 0], V.madd([0, 0, 0], f, PLANET, -V.dot(f, PLANET)));
+  const right = V.norm([0, 0, 0], V.cross([0, 0, 0], up, PLANET));
+  const a = PL_R + 0.008;                                   // centre just above the limb: the disc sits ON the horizon
+  let best = null, bx = Infinity;
+  for (let k = 0; k < 3600; k++) {
+    const phi = (k / 3600) * 2 * Math.PI;
+    const side = V.add([0, 0, 0], V.scale([0, 0, 0], up, Math.cos(phi)), V.scale([0, 0, 0], right, Math.sin(phi)));
+    const sd = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], PLANET, Math.cos(a)), V.scale([0, 0, 0], side, Math.sin(a))));
+    const z = V.dot(sd, f), x = V.dot(sd, Rt) / z, y = V.dot(sd, U) / z;
+    if (z <= 0 || y <= 0) continue;                        // the upper limb only
+    if (Math.abs(x) < bx) { bx = Math.abs(x); best = sd; }
+  }
+  return (_sunRise = best);
 }
 const SUN_HOME = (() => {
   const toCam = V.scale([0, 0, 0], PLANET, -1);
@@ -1798,14 +1845,31 @@ export function frame(R, film) {
 // from far ahead-left, at ion-bolt speed; it reaches that point at DODGE.t and keeps going
 function drawDodgeBolt(R, t) {
   const T = DODGE.t;
-  if (t < T - 0.62 || t > T + 0.45) return;
-  const hit = V.add([0, 0, 0], addv(gundamLaunchPath(T), [0, 1, 0]), V.scale([0, 0, 0], dodgeRight(T), -5 * DODGE.side));   // tears through where he was
-  const fwd = V.norm([0, 0, 0], V.sub([0, 0, 0], gundamLaunchPath(T + 0.05), gundamLaunchPath(T)));
+  if (t < T - 0.62 || t > T + 0.9) return;
+  // contact point: the right vambrace (between forearm and hand) at T, from the solved FK of the parry pose
+  const hs = duelHero(T);
+  const fk = duelFK({ ...hs, saber: 1 }, 'gundam');
+  const hit = V.lerp([0, 0, 0], M.transformPoint([0, 0, 0], fk.arm_R_lower, [0, 0, 0]), M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]), 0.62);
+  const fwd = V.norm([0, 0, 0], hs.fwd);
   const r = dodgeRight(T);
-  const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], fwd, -0.85), V.scale([0, 0, 0], r, 0.5 * DODGE.side)));   // from ahead-left, crossing his line
-  const a = madd(hit, dir, -1300 * 0.62), b = madd(hit, dir, 1300 * 0.45);
-  const u = bolt(R, t, T - 0.62, T + 0.45, a, b, 70, 2.2, [3.4, 0.7, 0.4], 1.8);
-  if (u >= 0) { const hp = V.lerp([0, 0, 0], a, b, u); R.glow(hp, 16, [2.2, 0.5, 0.25], 0.5); R.light(hp, 90, [1, 0.3, 0.15], 4); }
+  const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], fwd, -0.9), V.scale([0, 0, 0], r, -0.35)));   // from ahead, a little right
+  const a = madd(hit, dir, -1300 * 0.62);
+  bolt(R, t, T - 0.62, T, a, hit, 70, 2.2, [3.4, 0.7, 0.4], 1.8);
+  if (t < T) { const hp = V.lerp([0, 0, 0], a, hit, (t - (T - 0.62)) / 0.62); R.glow(hp, 16, [2.2, 0.5, 0.25], 0.5); R.light(hp, 90, [1, 0.3, 0.15], 4); return; }
+  // deflected: it glances off the armour and tears away to his right and up, weaker
+  const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], r, 0.85), [0, 0.45, 0]), V.scale([0, 0, 0], fwd, 0.25)));
+  bolt(R, t, T, T + 0.55, hit, madd(hit, out, 700), 55, 1.6, [2.6, 0.6, 0.35], 1.4);
+  const lt = t - T, k = Math.exp(-lt * 7);
+  R.glow(hit, 5 + 6 * easeOut(sat(lt / 0.08)), [3.5 * k, 1.6 * k, 0.8 * k], 0.45);
+  R.light(hit, 70, [1, 0.55, 0.3], 10 * k);
+  if (lt < 0.25) R.ripple(hit, 3 + 14 * easeOut(lt / 0.25), [0.3, 0.3, 0.3], (1 - lt / 0.25) * 1.2);
+  for (let i = 0; i < 26; i++) {                                          // spark fan off the vambrace
+    const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 4.1 + 3), out, 1.2));
+    const life = 0.25 + hash(i + 9) * 0.5; if (lt > life) continue;
+    const u = lt / life, p = madd(hit, sd, (4 + 22 * hash(i + 2)) * easeOut(u)), q = madd(p, sd, -(1.5 + 3 * (1 - u)));
+    const b = 4.5 * (1 - u) * (1 - u);
+    R.beam(q, p, 0.1, [b, b * 0.6, b * 0.3], 1, 10);
+  }
 }
 // ---------------- energy shield around the well core (261–268), shatter 268–271
 function drawShield(R, t, c) {
