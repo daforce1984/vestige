@@ -31,10 +31,10 @@ export const ASF = [
   { p: [70, -130, 400], arrive: 47.5, seed: 8 },
 ];
 export const EF = [
-  { p: [-320, 60, -1050], arrive: 81, die: 124, seed: 11 },
-  { p: [300, -40, -1000], arrive: 81.4, die: 127, seed: 12 },
-  { p: [-120, -120, -1150], arrive: 81.8, die: 141, seed: 13 },
-  { p: [150, 130, -1120], arrive: 82.3, die: 148, seed: 14 },
+  { p: [-320, 60, -1050], arrive: 81, die: 290.3, seed: 11 },        // (all enemy losses come after the well collapses:
+  { p: [300, -40, -1000], arrive: 81.4, die: 293.9, seed: 12 },      //  until then our ion guns cannot hold a charge)
+  { p: [-120, -120, -1150], arrive: 81.8, die: 298.4, seed: 13 },
+  { p: [150, 130, -1120], arrive: 82.3, die: 304.9, seed: 14 },
   { p: [-430, -60, -1300], arrive: 82.7, flee: 312, seed: 15 },
   { p: [430, 40, -1320], arrive: 83.1, flee: 314, seed: 16 },
   { p: [20, 210, -1420], arrive: 83.5, flee: 316, seed: 17 },
@@ -859,15 +859,14 @@ function drawDogfight(R, t, tmpM) {
 
 // ---------------- ion cannon volleys
 export const VOLLEYS = [
-  // [t0, t1, frigate, target enemy index]
+  // [t0, t1, frigate, target enemy index]  t0 < 280: the charge FAILS (the well drains the coils; no beam leaves the muzzle)
   [120, 123.6, 0, 0], [120.1, 123.4, 2, 0], [120.05, 123.5, 1, 1], [120.15, 123.3, 3, 1],
-  [124.8, 127.1, 1, 1], [124.9, 127.2, 3, 1], [125, 127, 0, 2],
-  [129, 132.5, 0, 2], [129.3, 132, 2, 3], [129.6, 133, 1, 3],
-  [136, 139, 3, 2], [136.4, 139.5, 0, 4],
-  [150.5, 153.5, 2, 3], [151, 154, 1, 5],
-  [165, 168, 0, 4], [166, 169, 3, 5],
-  [182, 185, 1, 6], [196, 199, 2, 4],
+  [129, 132.5, 0, 2], [129.3, 132, 2, 3], [136, 139, 3, 2], [150.5, 153.5, 2, 3], [165, 168, 0, 4], [182, 185, 1, 6],
+  // after the well collapses the coils hold again: the volleys land and the enemy frigates die (EF[].die)
+  [288.9, 290.6, 0, 0], [289.0, 290.5, 2, 0], [292.5, 294.2, 1, 1], [292.6, 294.1, 3, 1],
+  [297.0, 298.7, 0, 2], [297.1, 298.6, 2, 2], [303.5, 305.2, 1, 3], [303.6, 305.1, 3, 3],
 ];
+export const VOLLEY_FAILS = (t0) => t0 < 280;
 export function ionMuzzle(R, t, i) {
   const e = GUN.ionEntries && GUN.ionEntries[i];
   const st = ionFrigate(t, i);
@@ -877,10 +876,34 @@ export function ionMuzzle(R, t, i) {
   }
   return V.madd([0, 0, 0], st.pos, st.fwd, modelLen(R, 'ion_frigate') * 0.5);
 }
+// the gravity well steals the charge: energy streams OUT of the muzzle and bends away toward the well
+export function drainOutflow(R, t, t0, from, k, seed) {
+  if (k <= 0.01) return;
+  const toWell = V.norm([0, 0, 0], V.sub([0, 0, 0], WELL, from));
+  for (let s = 0; s < 16; s++) {
+    const hs = hash(s * 1.7 + seed);
+    const ph = ((t - t0) * (1.4 + hs * 0.8) + hs) % 1;
+    const d0 = randDir([0, 0, 0], s * 5.1 + seed * 3.3);
+    const bend = ph * ph;
+    const p0 = V.add([0, 0, 0], V.madd([0, 0, 0], from, d0, 6 + 14 * (1 - bend)), V.scale([0, 0, 0], toWell, 12 + bend * 170));
+    const p1 = V.add([0, 0, 0], V.madd([0, 0, 0], from, d0, 6 + 14 * (1 - Math.max(0, ph - 0.1) ** 2)), V.scale([0, 0, 0], toWell, 12 + Math.max(0, ph - 0.1) ** 2 * 170));
+    const a = (1 - ph) * Math.min(1, ph * 6) * 2.2 * k;
+    R.beam(p1, p0, 0.45, [0.5 * a, 0.9 * a, 2.0 * a], 1, 10);
+  }
+}
 function drawIonVolleys(R, t) {
   for (const [t0, t1, fi, ti] of VOLLEYS) {
     if (t < t0 - 3 || t > t1 + 0.6) continue;
     const from = ionMuzzle(R, t < t0 ? t : t0, fi);
+    if (VOLLEY_FAILS(t0)) {                                   // failed charge: builds, stalls and sputters, then bleeds away
+      const c = 0.7 * sat((t - (t0 - 3)) / 2) * (1 - smooth(t0 - 1.6, t0 + 0.1, t));
+      const flick = 0.7 + 0.3 * Math.sin(t * 23 + fi) * Math.sin(t * 7.3 + fi * 2);
+      if (c > 0.01) R.glow(from, 4 + c * 10, [ION_COL[0] * c * 2.2 * flick, ION_COL[1] * c * 2.2 * flick, ION_COL[2] * c * 2.2 * flick], 0.8);
+      if (t < t0 - 0.8) chargeInflow(R, t, t0 - 3, 3, from, 60, 40, [0.5, 0.9, 2], 3, 14, 0.4, fi * 7);
+      drainOutflow(R, t, t0 - 1.2, from, smooth(t0 - 1.2, t0 - 0.6, t) * (1 - smooth(t0 + 1.2, t1, t)), fi * 5 + t0);
+      if (t > t0 && t < t0 + 0.5) { const sp = Math.exp(-(t - t0) * 6); R.glow(from, 6 * sp, [0.6 * sp, 0.9 * sp, 1.8 * sp], 0.5); }   // a feeble spit, nothing leaves
+      continue;
+    }
     // charge glow
     if (t < t0) {
       const c = sat((t - (t0 - 3)) / 3);
@@ -946,9 +969,11 @@ function drawEnemyFire(R, t) {
 // ---------------- missiles from assault frigates -> EF2 at ~141
 export const MISSILES = [];
 for (let k = 0; k < 16; k++) MISSILES.push({ from: k % 4, t0: 136 + (k % 8) * 0.18 + (k >= 8 ? 5.8 : 0), dur: 4.4 + hash(k) * 0.6, target: k >= 8 ? 3 : 2, seed: k });
+// the enemy's point defence swats every missile down short of its target (no counterattack gets through)
+const missileEnd = (m) => 0.45 + hash(m.seed * 3.9 + 1) * 0.3;
 export function missilePos(R, t, m) {
   const u = (t - m.t0) / m.dur;
-  if (u < 0 || u > 1) return null;
+  if (u < 0 || u > missileEnd(m)) return null;
   const a = assaultFrigate(m.t0, m.from).pos;
   const b = enemyFrigate(m.t0 + m.dur, m.target).pos;
   const c1 = V.add([0, 0, 0], a, [(hash(m.seed) - 0.5) * 300, 80 + hash(m.seed + 1) * 160, -120]);
@@ -963,14 +988,15 @@ export function missilePos(R, t, m) {
 }
 function drawMissiles(R, t) {
   for (const m of MISSILES) {
-    if (t < m.t0 || t > m.t0 + m.dur + 3) continue;
+    if (t < m.t0 || t > m.t0 + m.dur * missileEnd(m) + 3) continue;
     const p = missilePos(R, t, m);
     if (p) {
       R.glow(p, 5, [3, 2.2, 1.2], 0.5);
       trail(R, t, (tt) => (tt >= m.t0 ? missilePos(R, tt, m) : null), 1.6, 18, 3, [0.25, 0.25, 0.28], false, m.seed * 10);
     } else {
-      const hitp = missilePos(R, m.t0 + m.dur - 0.001, m);
-      if (hitp) explosion(R, t, m.t0 + m.dur, hitp, 9, 300 + m.seed, 'small');
+      const te = m.t0 + m.dur * missileEnd(m);
+      const hitp = missilePos(R, te - 0.001, m);
+      if (hitp) explosion(R, t, te, hitp, 6, 300 + m.seed, 'small');
     }
   }
 }
@@ -1004,7 +1030,7 @@ for (let i = 0; i < 18; i++) {
   });
 }
 export const EXTRA_E = [];
-const E_DIE = [122.6, 130.4, 135.2, 144.4, 149.2, 154, 161.5, 168.4, 176, 185, 199];
+const E_DIE = [288.4, 290.9, 292.2, 294.6, 296.3, 299.1, 301.8, 303.4, 306.1, 308.3];   // the counterattack after the well dies
 for (let i = 0; i < 22; i++) {
   const row = i % 4, col = Math.floor(i / 4);
   EXTRA_E.push({
@@ -1023,6 +1049,8 @@ for (const f of EXTRA_H) {
   // and clear of the (enlarged, 637 m × 270 m) flagship hull around the origin
   if (Math.abs(f.p[0]) < 185 && Math.abs(f.p[2]) < 470 && f.p[1] > -90 && f.p[1] < 150) f.p[0] = (f.p[0] < 0 ? -1 : 1) * (185 + Math.abs(f.p[0]) * 0.3);
 }
+const H_FEATURED_T = [124.4, 130.6, 144.6, 149.4];
+export const H_FEATURED = [];
 // our losses: most line ships die when the SECOND enemy ion bolt lands on them (so every kill is a visible hit)
 {
   const hits = EXTRA_H.map(() => []);
@@ -1033,7 +1061,14 @@ for (const f of EXTRA_H) {
     const d = V.dist(extraEPos(sh.t, sh.shooter).pos, extraHPos(sh.t, i).pos);
     hits[i].push(sh.t + d / ION_BOLT_SPEED);
   }
-  EXTRA_H.forEach((f, i) => { if (hash(i * 4.7 + 2) < 0.8 && hits[i].length >= 2) f.die = hits[i][1]; });
+  // featured deaths the cameras cut to (shots.js H_FEATURED): the hit landing nearest each time kills that ship
+  for (const T of H_FEATURED_T) {
+    let best = -1, bt = 0;
+    hits.forEach((hs, i) => { if (EXTRA_H[i].die) return; for (const x of hs) if (Math.abs(x - T) < Math.abs(bt - T) || best < 0) { if (Math.abs(x - T) < 1.2) { best = i; bt = x; } } });
+    if (best < 0) continue;
+    EXTRA_H[best].die = bt; H_FEATURED.push({ t: bt, i: best });
+  }
+  EXTRA_H.forEach((f, i) => { if (!f.die && hash(i * 4.7 + 2) < 0.9 && hits[i].length >= 2) f.die = hits[i][1]; });
 }
 export function extraHAlive(t, i) { const f = EXTRA_H[i]; return t >= f.arrive + 2 && !(f.die && t > f.die); }
 export function extraHPos(t, i) {

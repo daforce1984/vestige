@@ -15,7 +15,7 @@
 import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
-import { warpSchedule, EXTRA_H } from './world.js';
+import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
 import { DUEL_EVENTS, duelHero, duelEnemy1, duelEnemy2 } from './duel.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, TEAR_S0, TEAR_S1, TEAR_F1, FILM_DURATION, STORY_DURATION } from './timemap.js';
@@ -132,10 +132,16 @@ function battleTexture(windows) {
 }
 
 // ion volleys: [t, main-cannon?, beam body seconds]
-export const VOLLEYS = [[120, 0, 8], [124.8, 0, 3], [129, 0, 3.5], [136, 0, 3], [150.5, 0, 3], [165, 0, 3], [182, 0, 3], [196, 0, 3], [300, 1, 5]];
+// [t, main, body, fail]: before the well collapses (280) every ion charge FAILS — the well drains the coils (power-down whine,
+// no beam); after it the volleys land again and the flagship's main gun fires at 300
+export const VOLLEYS = [[120, 0, 0, 1], [129, 0, 0, 1], [136, 0, 0, 1], [150.5, 0, 0, 1], [165, 0, 0, 1], [182, 0, 0, 1],
+  [288.9, 0, 1.7], [292.5, 0, 1.7], [297.0, 0, 1.7], [300, 1, 5], [303.5, 0, 1.7]];
 // HEAVY ion volley: heavy_beam attack + beam_blast1/4 layer (pitched down) + hl_beam sustained body; secondary
 // laser_cannon shots from the other frigates. The main cannon plays every layer at ~0.6.
-function volley(t, main, body, i) {
+function volley(t, main, body, i, fail) {
+  if (fail) return [                                                       // stalled charge bleeding away: a falling whine
+    [t - 1.1, 'charge_up', { rate: 0.8, rateTo: 0.25, gain: 0.55, dur: 2.4, fadeOut: 1.0, far: 0.35, pan: i % 2 ? 0.4 : -0.4, prio: 6 }],
+  ];
   if (main) return [                                                       // the flagship's main ion cannon: 'beam'
     [t, 'beam', { at: 'hit', gain: 1.4, rate: 0.9, prio: 9, duck: 3, norand: true }],
     [t, 'hl_beam', { loop: true, rate: 0.6, dur: body, gain: 0.5, fadeIn: 0.3, fadeOut: 1.5, prio: 7 }],
@@ -169,12 +175,10 @@ export const CUES = [
   [76,    'groan',      { f: 38, dur: 3, pan: -0.4 }],
   [92,    'groan',      { f: 30, dur: 4, pan: 0.3, vel: 0.6 }],
   [104,   'groan',      { f: 50, dur: 2.5, pan: -0.3, vel: 0.45 }],        // fleet turns
-  [110,   'ionCharge',  { dur: 10, vel: 0.35 }],
+  [110,   'ionCharge',  { dur: 6.5, vel: 0.35 }],
   // ---------------- ACT III
   // sub-bass thump under every ion volley (the samples carry the beam; this carries the weight)
-  ...VOLLEYS.map(([t, main]) => [t, 'boom', { bus: 'sfx', f: main ? 30 : 38, vel: main ? 1 : 0.75, dur: main ? 5 : 2.6, verb: 0.35 }]),
-  [124,   'explosion',  { size: 'medium', pan: 0.4, vel: 0.6 }],
-  [127,   'explosion',  { size: 'medium', pan: -0.3, vel: 0.6 }],
+  ...VOLLEYS.filter((v) => !v[3]).map(([t, main]) => [t, 'boom', { bus: 'sfx', f: main ? 30 : 38, vel: main ? 1 : 0.75, dur: main ? 5 : 2.6, verb: 0.35 }]),
   [135,   'flyby',      { pan0: -0.9, pan1: 0.9, vel: 0.5 }],
   [143,   'flyby',      { pan0: 0.9, pan1: -0.9, f0: 1300, f1: 700, vel: 0.5 }],
   [150,   'hangarLights', { n: 3, gap: 0.55 }],
@@ -226,8 +230,10 @@ export const CUES = [
 // =====================================================================================
 const HB = heartbeatTimes(244, 262);
 // enemy frigate (capital) kills: [t, far]
-const CAPITAL_KILLS = [[122.6, 0], [124, 0], [127, 0.3], [130.4, 0.3], [135.2, 0.1], [141, 0], [144.4, 0.35], [148, 0.1], [149.2, 0.2],
-  [154, 0.4], [161.5, 0.35], [168.4, 0.3], [176, 0.4], [185, 0.3], [199, 0.25]];
+const hash01 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };   // = math.js hash
+// enemy capital losses (world.js EF / EXTRA_E die times — all after the well collapses): [t, far]
+const CAPITAL_KILLS = [...EF.filter((f) => f.die).map((f, i) => [f.die, [0, 0.2, 0.1, 0.3][i % 4]]),
+  ...EXTRA_E.filter((f) => f.die).map((f, i) => [f.die, 0.2 + 0.1 * (i % 3)])].sort((a, b) => a[0] - b[0]);
 export const SAMPLE_CUES = [
   // ---------------- ambience beds
   [0,     'space_amb', { loop: true, dur: 14, gain: 0.45, fadeIn: 3, prio: 9 }],     // dies at the 14.0 cut
@@ -289,23 +295,21 @@ export const SAMPLE_CUES = [
   [99.5,  'metal_groan', { far: 0.3, gain: 0.6, pan: 0.4, prio: 5 }],
   [104,   'metal_groan', { far: 0.5, gain: 0.5, pan: -0.5, rate: 0.85, prio: 5 }],
   // ---------------- charge 110–120
-  [110,   'hl_charge', { gain: 0.95, dur: 8, fadeOut: 0.3, prio: 8, norand: true }],
-  [117,   'charge_up', { gain: 0.9, prio: 8, norand: true }],
-  [117.3, 'charge_up', { gain: 0.6, rate: 1.15, pan: 0.5, far: 0.3, prio: 6 }],
-  [117.6, 'charge_up', { gain: 0.6, rate: 0.9, pan: -0.5, far: 0.3, prio: 6 }],
+  [110,   'hl_charge', { gain: 0.95, dur: 7.2, fadeOut: 1.6, prio: 8, norand: true }],
+  // ...the charge stalls at ~116 and bleeds away toward the well: falling whines, then a dead click after "FIRE!"
+  [116.1, 'charge_up', { rate: 0.9, rateTo: 0.3, gain: 0.85, dur: 3.4, fadeOut: 1.4, prio: 8, norand: true }],
+  [116.5, 'charge_up', { rate: 0.75, rateTo: 0.25, gain: 0.5, dur: 3, fadeOut: 1.2, pan: 0.5, far: 0.3, prio: 6 }],
+  [116.8, 'charge_up', { rate: 0.8, rateTo: 0.25, gain: 0.5, dur: 3, fadeOut: 1.2, pan: -0.5, far: 0.3, prio: 6 }],
+  [120.05, 'metal_knock', { rate: 0.5, gain: 0.5, prio: 7, norand: true }],
+  // point defence swats down every missile of the salvo (world.js MISSILES / missileEnd)
+  ...MISSILES.map((m, i) => [m.t0 + m.dur * (0.45 + hash01(m.seed * 3.9 + 1) * 0.3), 'hl_explosion', { rate: 1.35, gain: 0.45, far: 0.35 + 0.1 * (i % 3), pan: i % 2 ? 0.4 : -0.4, prio: 4 }]),
   // ---------------- volleys
-  ...VOLLEYS.flatMap(([t, main, body], i) => volley(t, main, body, i)),
+  ...VOLLEYS.flatMap(([t, main, body, fail], i) => volley(t, main, body, i, fail)),
   // ---------------- missiles
   ...[136, 136.6, 137.3, 141.8, 142.4, 143].map((t, i) => [t, 'missile', { pan0: i % 2 ? 0.6 : -0.6, pan1: i % 2 ? -0.4 : 0.5, gain: 0.8, far: (i % 3) * 0.15, prio: 6 }]),
-  // ---------------- ship kills
-  ...[
-    [122.6, 'expl_epic', 0], [122.65, 'expl_debris', 0.1], [124, 'expl_metal', 0], [127, 'expl_distant_huge', 0.3],
-    [130.4, 'expl_epic', 0.3], [135.2, 'expl_distant', 0.1], [141, 'expl_metal', 0], [141.05, 'expl_debris', 0.1],
-    [144.4, 'expl_distant_huge', 0.35], [148, 'expl_epic', 0.1], [149.2, 'expl_distant', 0.2], [154, 'expl_distant', 0.4],
-    [161.5, 'expl_metal', 0.35], [168.4, 'expl_distant_huge', 0.3], [176, 'expl_epic', 0.4],
-    [180.2, 'expl_metal', 0], [180.25, 'expl_debris', 0], [185, 'expl_distant', 0.3],
-    [194, 'expl_epic', 0], [194.05, 'expl_debris', 0], [199, 'expl_distant_huge', 0.25],
-  ].map(([t, s, far], i) => [t + 0.03, s, { far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], gain: 0.5, prio: 5 }]),   // Pixabay: secondary variety
+  // ---------------- ship kills (enemy losses only after the well collapses; the mech kills in the duel)
+  ...CAPITAL_KILLS.map(([t, far], i) => [t + 0.03, ['expl_epic', 'expl_metal', 'expl_distant_huge', 'expl_distant'][i % 4], { far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], gain: 0.5, prio: 5 }]),
+  ...[[180.2, 'expl_metal'], [180.25, 'expl_debris'], [194, 'expl_epic'], [194.05, 'expl_debris']].map(([t, sp]) => [t + 0.03, sp, { far: 0, gain: 0.5, prio: 5 }]),
   // homeland explosions (its conventions: size → playbackRate; capital = big_explosion 0.98→0.74 + explosion 0.86→0.76)
   ...CAPITAL_KILLS.flatMap(([t, far], i) => {
     const pan = [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6];
@@ -618,16 +622,17 @@ function warpCues() {
   // events within 1.2 s share one cue (a fleet arriving together is ONE deep warp, not a clatter of repeats);
   // line ships never get a cue of their own — they only add weight to their group. The enemy wave (80–84) is one hit.
   const ev = warpSchedule().filter((e) => !(e.t > 80 && e.t < 84.8 && e.size < 3)), out = [];
-  out.push([81.6, 'warp_out2', { gain: 1.3, rate: 0.78, prio: 9, duck: 2, norand: true }]);   // the whole enemy line arrives
+  out.push([81.6, 'warp_out2', { gain: 2.2, rate: 0.9, prio: 10, duck: 2, duckDb: -9, norand: true }]);   // the whole enemy line arrives
   for (let i = 0; i < ev.length;) {
     let j = i, size = 0, n = 0;
     while (j < ev.length && ev[j].t - ev[i].t < 1.2) { size = Math.max(size, ev[j].size); n++; j++; }
     i = j;
     if (size < 2) continue;
     const t = ev[j - 1 >= 0 ? i - n : 0].t;
-    const g = size === 3 ? 1.3 : 0.8;
-    out.push([t, 'warp_out2', { gain: Math.min(1.4, g + 0.05 * (n - 1)), rate: size === 3 ? 0.8 : 0.95,
-      far: size === 3 ? 0 : 0.12, pan: size === 3 ? 0 : Math.sin(t * 7.3) * 0.5, prio: size === 3 ? 9 : 7, norand: true, ...(size === 3 ? { duck: 2.5 } : {}) }]);
+    // loud and up front: the warp must read clearly over the bed (it used to be pitched down, far and masked)
+    const g = size === 3 ? 2.2 : 1.6;
+    out.push([t, 'warp_out2', { gain: Math.min(2.4, g + 0.08 * (n - 1)), rate: size === 3 ? 0.92 : 1.0,
+      pan: size === 3 ? 0 : Math.sin(t * 7.3) * 0.35, prio: 10, norand: true, duck: size === 3 ? 2.5 : 1.4, duckDb: size === 3 ? -9 : -6 }]);
   }
   return out;
 }

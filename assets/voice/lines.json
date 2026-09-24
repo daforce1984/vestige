@@ -79,14 +79,14 @@
    "dur": 4.83
   },
   {
-   "id": "v4w01",
-   "t": 109.4,
+   "id": "v10w01",
+   "t": 109.0,
    "voice": "WING",
    "radio": true,
-   "text": "[fast, tense] Charging... eighty... ninety... come on, come on... locked! Ready!",
-   "ko": "충전… 80… 90… 빨리, 빨리… 고정! 준비 완료!",
+   "text": "[fast, tense] Charging... sixty... seventy... it's dropping! The coils are bleeding out— something's pulling the charge right out of them!",
+   "ko": "충전… 60… 70… 떨어지고 있어! 코일에서 새고 있어— 뭔가가 에너지를 빨아가고 있어!",
    "stability": 0.0,
-   "dur": 8.99
+   "dur": 9.25
   },
   {
    "id": "v4c05",
@@ -99,12 +99,22 @@
    "dur": 1.72
   },
   {
-   "id": "v4w02",
-   "t": 124.6,
+   "id": "v10s01",
+   "t": 120.5,
+   "voice": "SENSOR",
+   "radio": true,
+   "text": "[panicked, fast] Nothing's firing! The well is draining our coils— we can't shoot back!",
+   "ko": "발사가 안 돼요! 우물이 코일을 빨아들여요— 반격할 수가 없어요!",
+   "stability": 0.0,
+   "dur": 4.13
+  },
+  {
+   "id": "v10w02",
+   "t": 125.0,
    "voice": "WING",
    "radio": true,
-   "text": "[excited, fast] Splash one! Next target, frigate three— no, two! Frigate two!",
-   "ko": "하나 격침! 다음 목표 프리깃 3— 아니, 2번! 2번!",
+   "text": "[screaming, desperate] Kestrel's gone! They're— they're just picking us off! We can't hit back!",
+   "ko": "케스트럴 격침! 놈들이… 우릴 하나씩 쏴 죽이고 있어! 반격을 못 해!",
    "stability": 0.0,
    "dur": 5.8
   },

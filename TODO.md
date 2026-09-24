@@ -135,3 +135,9 @@
 - [x] 96. Recovery: docking spring integrated in the flagship frame so Sigma seats exactly in the middle of the cradle.
 - [x] 97. No battle wreckage (shatter chunks) after the Earth arrival.
 - [x] 98. Title ×2 with a full technology credit block.
+- [x] 99. Story: until the well collapses (280) the gravity well drains every Hiigaran ion coil — charges stall and bleed
+      away toward the well (`drainOutflow`), no beam ever leaves a muzzle, missiles are swatted down by point defence,
+      only the enemy fires (denser `ION_SHOTS`), 16/18 line ships die, featured on-camera losses (`H_FEATURED`);
+      all enemy losses moved to the counterattack after the well dies (EF / EXTRA_E die 288–308). New lines v10w01,
+      v10s01, v10w02 (ElevenLabs v3); power-down whines instead of volley sounds.
+- [x] 100. Warp sound (warp_out2) louder, unpitched, up front, with ducking (it was pitched down and masked).

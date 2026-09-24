@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  EXTRA_H, EXTRA_E, extraHPos, extraEPos,
+  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -1038,25 +1038,32 @@ shot(110, 120, 'B5 ion muzzle charge', (c) => {
   handheld(c, 0.3);
   c.env.shadowCenter = st.pos; c.env.shadowRadius = 70;
   const R = c.R;
-  const k = sat((t - 110) / 10);
-  chargeInflow(R, t, 110, 10, m, 42, 90, [0.5, 0.9, 2], 3, 16, 0.15, 11);          // fast from the start, ever faster
-  R.glow(m, 3 + k * 7, [0.8 * k * 2, 1.3 * k * 2, 2.4 * k * 2], 0.5);
-  R.light(m, 60, ION_COL, 6 * k);
+  // the charge climbs... stalls... and the gravity well pulls it back out of the coils (nothing will fire at 120)
+  const k = sat((t - 110) / 6) * 0.85 * (1 - 0.8 * smooth(116.2, 119.5, t));
+  const flick = t > 115.6 ? 0.65 + 0.35 * Math.sin(t * 29) * Math.sin(t * 11.3) : 1;
+  if (t < 116.4) chargeInflow(R, t, 110, 6.4, m, 42, 90, [0.5, 0.9, 2], 3, 16, 0.15, 11);
+  drainOutflow(R, t, 115.8, m, smooth(115.8, 116.8, t), 11);
+  R.glow(m, 3 + k * 7, [0.8 * k * 2 * flick, 1.3 * k * 2 * flick, 2.4 * k * 2 * flick], 0.5);
+  R.light(m, 60, ION_COL, 6 * k * flick);
 });
-shot(120, 123.6, 'S9a volley', (c) => {
+shot(120, 123.6, 'S9a nothing fires', (c) => {
+  // the order is given and nothing leaves the muzzles: the charges bleed away toward the well while red fire pours in
   const { t, u } = c;
   camLook(c, [-330 + u * 30, 60, -60 - u * 60], [60, 0, -760], 50, -0.12);
-  shake(c, t < 121 ? 1.2 * (1 - (t - 120)) : 0.15, 9);
-  c.post.flash = t < 120.15 ? 0.6 * (1 - (t - 120) / 0.15) : 0;
+  handheld(c, 0.15);
   c.env.shadowCenter = [-150, 0, 0]; c.env.shadowRadius = 400;
-  c.post.streak = 0.4;
 });
-shot(123.6, 127.8, 'S9b enemy frigate dies', (c) => {
-  const { t, u } = c;
-  const p = EF[0].p;
-  camLook(c, addv(p, [230 - u * 40, 70, 260 - u * 30]), addv(p, [30, 0, 0]), 40);
-  shake(c, t > 124 && t < 125.5 ? 0.9 : 0.1, 8);
-  c.env.shadowCenter = p; c.env.shadowRadius = 200;
+// close on one of OUR line ships as an enemy bolt kills it (world.js H_FEATURED: deaths chosen for these cameras)
+function lossCam(c, k, dist, ang, fov) {
+  const f = H_FEATURED[k]; if (!f) return false;
+  const p = extraHPos(Math.min(c.t, f.t), f.i).pos;
+  camLook(c, addv(p, [Math.sin(ang) * dist, dist * 0.3, Math.cos(ang) * dist]), p, fov, 0.08);
+  c.env.shadowCenter = p; c.env.shadowRadius = 90;
+  return f.t;
+}
+shot(123.6, 127.8, 'S9b our frigate dies', (c) => {
+  const td = lossCam(c, 0, 250 - c.u * 30, 2.6, 40);
+  shake(c, td && c.t > td && c.t < td + 1.4 ? 0.9 : 0.1, 8);
 });
 shot(127.8, 134, 'S9c wide battle', (c) => {
   const { t, u } = c;
@@ -1089,12 +1096,14 @@ shot(134, 141, 'S10a dogfight chase', (c) => {
   c.env.shadowCenter = a; c.env.shadowRadius = 60;
   c.post.shakeBlur = 0.0006;
 });
-shot(141, 145, 'S10b missiles', (c) => {
+shot(141, 145, 'S10b missiles swatted down', (c) => {
+  // our last weapon that does not need a charge: the salvo streaks out and the enemy point defence swats it down
   const { t, u } = c;
-  const tg = EF[2].p;
-  camLook(c, addv(tg, [-160 + u * 30, 90, 330 - u * 50]), addv(tg, [0, 10, 40]), 44, -0.05);
-  shake(c, t > 141 && t < 142.2 ? 0.8 : 0.15, 8);
-  c.env.shadowCenter = tg; c.env.shadowRadius = 150;
+  const a = assaultFrigate(141.8, 3).pos, b = EF[3].p;
+  const mid = V.lerp([0, 0, 0], a, b, 0.28);
+  camLook(c, addv(mid, [150 - u * 20, 70, 40]), V.lerp([0, 0, 0], a, b, 0.6), 46, -0.05);
+  shake(c, 0.15, 8);
+  c.env.shadowCenter = mid; c.env.shadowRadius = 300;
 });
 shot(145, 150, 'S10c fighter cockpit-ish', (c) => {
   const { t, u } = c;
@@ -1979,7 +1988,7 @@ function deathCam(c, i, dist, ang, fov) {
   camLook(c, addv(p, [Math.sin(ang) * dist, dist * 0.3, Math.cos(ang) * dist]), p, fov, 0.08);
   c.env.shadowCenter = p; c.env.shadowRadius = 90;
 }
-cut(121.8, 123.6, 'X ion beams over the line', (c) => { lineRide(c, 4, 0.2, 30, 18, 48, -0.1); shake(c, 0.5, 9); });
+cut(121.8, 123.6, 'X enemy fire over the line', (c) => { lineRide(c, 4, 0.2, 30, 18, 48, -0.1); shake(c, 0.5, 9); });
 cut(80.6, 86.6, 'X the enemy arrives (wide)', (c) => {
   // high over our fleet's shoulder, looking down the gap: the whole enemy force rips in — frigates, the line, the dreadnought
   const { t, u } = c;
@@ -1991,15 +2000,15 @@ cut(80.6, 86.6, 'X the enemy arrives (wide)', (c) => {
   c.env.fill = [0.45, 0.4, 0.45, 0.55]; c.env.rim = [0.9, 0.6, 0.55, 0.6];
 });
 cut(125.6, 127.8, 'X tracer wall flythrough', (c) => { lineRide(c, 7, 1.2 - c.u * 0.6, -22, 8, 58, 0.15); shake(c, 0.3, 10); c.post.shakeBlur = 0.0008; });
-cut(129.8, 131.8, 'X enemy frigate dies', (c) => { deathCam(c, 1, 240 - c.u * 20, 0.6, 40); shake(c, c.t > 130.4 ? 0.9 : 0.2, 9); });
+cut(129.8, 131.8, 'X our frigate dies', (c) => { const td = lossCam(c, 1, 240 - c.u * 20, 0.6, 40); shake(c, td && c.t > td ? 0.9 : 0.2, 9); });
 cut(131.8, 134, 'X hull skim', (c) => {
   const { t, u } = c;
   const L = modelLen(c.R, 'mothership');
   camLook(c, motherPoint([0, 0, 0], t, [36, 112, -L * 0.3 + u * 140]), motherPoint([0, 0, 0], t, [-40, 80, L * 0.5]), 62, 0.2);   // low over the top deck
   shake(c, 0.4, 12); c.post.shakeBlur = 0.001; c.env.shadowRadius = 200;
 });
-cut(143.8, 145.4, 'X frigate dies close', (c) => { deathCam(c, 3, 230, -0.9, 42); shake(c, c.t > 144.4 ? 1 : 0.3, 10); });
-cut(148.6, 150, 'X second kill', (c) => { deathCam(c, 4, 260, 2.2, 38); shake(c, c.t > 149.2 ? 0.9 : 0.2, 9); });
+cut(143.8, 145.4, 'X frigate dies close', (c) => { const td = lossCam(c, 2, 230, -0.9, 42); shake(c, td && c.t > td ? 1 : 0.3, 10); });
+cut(148.6, 150, 'X another loss', (c) => { const td = lossCam(c, 3, 260, 5.3, 38); shake(c, td && c.t > td ? 0.9 : 0.2, 9); });
 cut(166.8, 169, 'X carnage over the planet', (c) => {
   const { t, u } = c;
   againstPlanet(c, [0, 0, -700], 1300 - u * 120, 60, 300, 40, 0.06, 0.05, true);
