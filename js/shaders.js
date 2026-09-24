@@ -881,7 +881,7 @@ struct VO {
   } else if (shape == 10) {
     // thruster plume plane (one arm of a cross): nozzle a, exhaust axis b (full length), half-width vector c
     let tt = corner.y * 0.5 + 0.5;                 // 0 nozzle .. 1 tip
-    wp = s.a.xyz + s.b.xyz * tt + s.c.xyz * corner.x * mix(1.0, 0.7, tt);
+    wp = s.a.xyz + s.b.xyz * tt + s.c.xyz * corner.x * mix(1.0, 0.12, tt);   // cone: full nozzle width → thin tip
     uv = vec2f(corner.x, tt);
   } else {
     let r = s.b.x; let rot = s.b.y;
@@ -1029,11 +1029,13 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
   } else if (shape == 10) {
     // plume: white-hot core at the nozzle, tapering, fading to the tip; soft sides so the plane never reads as a card
     let x = i.uv.x; let tt = i.uv.y;
-    let w = mix(0.55, 0.18, tt);
-    let across = exp(-pow(x / w, 2.0) * 2.2);
-    let along = pow(1.0 - tt, 1.6) * smoothstep(0.0, 0.04, tt + 0.02);
-    let core = exp(-pow(x / (w * 0.35), 2.0)) * pow(1.0 - tt, 4.0);
-    col = (tint * across * along + vec3f(1.0, 0.95, 0.9) * core * 0.6 * length(tint)) * s.d.a;
+    // cone plume (additive): the thick first third is bright and glowing, it thins and turns transparent to the tip
+    let w = 0.6;
+    let across = exp(-pow(x / w, 2.0) * 2.0);
+    let along = pow(1.0 - tt, 1.3) * smoothstep(0.0, 0.04, tt + 0.02);
+    let hot = exp(-tt * 5.0);                                           // the thick section: additive hot glow
+    let core = exp(-pow(x / 0.22, 2.0)) * pow(1.0 - tt, 3.0);
+    col = (tint * across * along * (1.0 + 1.6 * hot) + tint * exp(-pow(x / 0.9, 2.0)) * hot * 0.8 + vec3f(1.0, 0.95, 0.9) * core * 0.7 * length(tint)) * s.d.a;
     alpha = 0.0;
     dist = vec2f(x, 0.0) * 0.004 * along * s.d.a;
   } else if (shape == 9) {

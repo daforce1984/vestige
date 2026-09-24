@@ -197,12 +197,13 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
         M.transformDir(_pa, pmp, [0, 0, -1]); V.norm(_pa, _pa);
         V.madd(_pn, _pn, _pa, v * tau);
         const f = 1 - s2 / (N + 1);
-        R.beam(_prev, _pn, r * (0.6 + 0.95 * f), [c[0] * f * f * 0.5, c[1] * f * f * 0.5, c[2] * f * f * 0.5], 0.9, 6, 0.6, 0.5);   // fuller exhaust
+        const kb = f * f * 0.5 + (s2 <= 2 ? 0.35 * f : 0);           // cone: thick + bright near the nozzle, thin + faint at the end
+        R.beam(_prev, _pn, r * (0.2 + 1.45 * Math.pow(f, 1.3)), [c[0] * kb, c[1] * kb, c[2] * kb], 0.9, 6, 0.6, 0.5);
         V.copy(_prev, _pn);
       }
-      R.glow(tmp, r * 1.3, [c[0] * 0.8, c[1] * 0.8, c[2] * 0.8], 0.2);
+      R.glow(tmp, r * 2.4, [c[0] * 1.1, c[1] * 1.1, c[2] * 1.1], 0.35);   // bright additive glow round the thick base
       if (isShip) crossPlume(R, tmp, tmp2, r, len * 0.6, c);
-      else R.flame(tmp, V.scale(tmp3, tmp2, len * 0.45), r * 1.7, c, 1.4, i * 3.1, 1);
+      else { R.flame(tmp, V.scale(tmp3, tmp2, len * 0.45), r * 1.7, c, 1.4, i * 3.1, 1); crossPlume(R, tmp, tmp2, r * 0.8, len * 0.8, c); }
       if (opts.particles) {
         // sparks / embers blown out of the nozzle, following the same emission history
         for (let p = 0; p < 14; p++) {
@@ -225,10 +226,11 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       }
       continue;
     }
-    if (isShip) { crossPlume(R, tmp, tmp2, r, len, c); R.glow(tmp, r * 1.6, [c[0] * 0.7, c[1] * 0.7, c[2] * 0.7], 0.25); continue; }
+    if (isShip) { crossPlume(R, tmp, tmp2, r, len, c); R.glow(tmp, r * 2.6, [c[0] * 1.1, c[1] * 1.1, c[2] * 1.1], 0.35); R.glow(V.madd(tmp3, tmp, tmp2, len * 0.15), r * 2.2, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5], 0.5); continue; }   // hot glow round the thick base
     V.scale(tmp3, tmp2, len);
     R.flame(tmp, tmp3, r * 1.7, c, 1.4, i * 3.1, 1);
-    R.glow(tmp, r * 1.1, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5], 0.1);
+    crossPlume(R, tmp, tmp2, r * 0.8, len * 1.1, c);                  // the same cone plume as the ships (hot, additive base)
+    R.glow(tmp, r * 2.2, [c[0] * 0.9, c[1] * 0.9, c[2] * 0.9], 0.3);
   }
 }
 // two plume planes crossed along the thrust axis (reads as a volume from any angle), sized from the nozzle radius

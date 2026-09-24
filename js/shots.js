@@ -532,7 +532,7 @@ export function drawGundam(R, t, s, opts = {}) {
   e.matOverride = { eye: { base: [0.2, 0.9, 0.5], metal: 0, rough: 0.3, emissive: ec } };
   const pastHero = opts.pastState || ((tau) => { const q = gundamState(t - tau); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
-  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.7, 0.9, 2.0], 0.55 * (1 + 0.9 * (s.boostK || 0)), s.thr, 1.2 + 1.5 * (s.boostK || 0), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: true });
+  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.7, 0.9, 2.0], 0.9 * (1 + 0.9 * (s.boostK || 0)), s.thr, 1.2 + 1.5 * (s.boostK || 0), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: true });
   const eye = emitWorld(R, 'gundam', e, 'eye');
   if (!s.fpv && eye && eyeK > 0.05) R.glow(eye, (s.visorFlare !== undefined ? 0.4 : 1.4 + bz * 1.6) * Math.min(eyeK, 1.2), [lerp(0.8, 5, bz) * eyeK, lerp(3, 0.3, bz) * eyeK, lerp(1.6, 0.2, bz) * eyeK], 0.5);
   if (!s.fpv && eyeK > 0.05 && (s.visorFlare !== undefined)) {        // visor band glow: every emitter point + a light spill
@@ -595,7 +595,7 @@ function drawEnemyMS(R, t, s, idx) {
   if (!e) return null;
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
   const fn = idx === 1 ? enemyMS1 : enemyMS2;
-  engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE, 0.55, 0.8, 1.2, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
+  engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE, 0.9, 0.8, 1.2, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
   const BL = BLOWS[idx];
   if (BL && t > BL.ev.t) {
     const tm = R.partWorld('enemy_ms', e, 'torso');

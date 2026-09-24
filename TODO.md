@@ -179,3 +179,4 @@
       (Bézier streams, accelerating/stretching); B5 camera swings side-on to the drain line.
 - [x] 118. Flagship cinematic hull detail (shader, shade.z material class): staggered plate courses + sub-plates, recessed seams with bevelled raised edges, rivet rows, worn edges, tone courses, decals per plate/material (hazard bands, stencilled numbers, maintenance text, vent grilles, access hatches, chevrons, fleet emblem, 5 m registration numerals), chipped paint, grime streaks; AA by pixel footprint, skipped when sub-pixel.
 - [x] 119. Idle thrusters keep a faint slow glow pulse (per-nozzle phase); ship plumes ~1.8× wider (cross planes r·1.9, less taper), exhaust trails and mech flames fuller.
+- [x] 120. Thruster trails are cones: full nozzle width → thin tip, transparent toward the end; the thick first third is additive-bright with a glow halo (ships + mechs; mechs also get the cone plume, larger scale).
