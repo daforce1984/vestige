@@ -541,8 +541,9 @@ export function breathe(pose, t, amt = 1) {
 // the MOON: a real mesh (tools/make_moon.py) hanging far off the battle, fixed in the world — it sits in the sky the
 // same way from every camera (parallax-free at 110 km, but it turns and frames correctly with the camera). Scene 5
 // (the fleet assembles) until the jump to Earth.
-const MOON_DIR = V.norm([0, 0, 0], [-SUN[0] * 0.8 + 0.25, -0.45, -SUN[2] * 0.8 + 0.35]);
-const MOON_POS = V.madd([0, 0, 0], [0, 0, -800], MOON_DIR, 110000), MOON_R = 42000;
+// placed for scene 12 (B4 standoff): its vast limb rises behind both fleets in the upper half of that frame
+const MOON_DIR = V.norm([0, 0, 0], [-0.9595, 0.0814, -0.2696]);
+const MOON_POS = V.madd([0, 0, 0], [2443, 834, -774], MOON_DIR, 110000), MOON_R = 42000;
 const _moonM = M.new(), _moonQ = [0, 0, 0, 1];
 export function drawWorld(R, t, opts = {}) {
   R._time = t; _R = R;
@@ -550,7 +551,7 @@ export function drawWorld(R, t, opts = {}) {
   if (t >= 40 && t < EARTH_T && R.models.moon) {
     M.fromTRS(_moonM, MOON_POS, Q.fromEuler(_moonQ, 0.4, 1.1, 0.2), MOON_R);
     const mo = R.add('moon', _moonM);
-    if (mo) { mo.texSet = -1; mo.seed = 1.7; }
+    if (mo) { mo.texSet = -3; mo.seed = 1.7; }
   }
   const LM = modelLen(R, 'mothership');
   // ---------------- mothership
@@ -777,12 +778,12 @@ function drawDreadnought(R, t, tmpM) {
     return;
   }
   const e = R.add('enemy_dreadnought', mat(tmpM, hin.u < 1 ? hin.pos : pos, fwd));
-  e.seed = 40;
+  e.seed = 40; e.rimK = 0.3;                                      // its huge silhouette read as a glowing outline from afar
   if (hin.u < 1) { e.revealZ = hin.revealZ; e.revealDir = hin.dir; e.revealWidth = 4; e.tint = [2.5, 0.3, 0.2]; e.stretch = stretchIn(hin.u); }
   // the gravity-lance firing system (tools/make_dread_lance.py, blueprint blender/DREAD_LANCE_BLUEPRINT.svg)
   const ln = R.add('dread_lance', e.m);
   if (ln) {
-    ln.seed = 41; ln.revealZ = e.revealZ; ln.revealDir = e.revealDir; ln.revealWidth = e.revealWidth; ln.tint = e.tint; ln.stretch = e.stretch;
+    ln.seed = 41; ln.rimK = 0.3; ln.revealZ = e.revealZ; ln.revealDir = e.revealDir; ln.revealWidth = e.revealWidth; ln.tint = e.tint; ln.stretch = e.stretch;
     const ch = t < LANCE_FIRE ? sat((t - 200) / 16) : Math.max(0, 1 - (t - LANCE_FIRE) / 5);
     const g = 0.12 + 1.3 * ch * (0.85 + 0.15 * Math.sin(t * (6 + 20 * ch)));
     const blink = (Math.sin(t * 5) > 0 ? 1 : 0.15) * (0.4 + 0.6 * ch);

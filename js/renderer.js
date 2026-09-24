@@ -471,7 +471,7 @@ export class Renderer {
     e.flash = 0; e.damage = 0; e.revealDir = 0; e.revealZ = 0; e.revealWidth = 1; e.emissive = 1; e.seed = model.entries.length * 7.13;
     e.tint[0] = 0.4; e.tint[1] = 0.7; e.tint[2] = 1.0;
     e.pose = null; e.hidden = null; e.matOverride = null;
-    e.dmgR = 0; e.clip = null; e.clipHeat = 1; e.clipInv = false; e.stretch = 0; e.stretchOut = false; e.stretchAnchor = undefined; e.wear = 0; e.texSet = 0; e.crush = null; e.melt = null; e.shadeK = 1; e.soot = 0; e.hideMats = null;
+    e.dmgR = 0; e.clip = null; e.clipHeat = 1; e.clipInv = false; e.stretch = 0; e.stretchOut = false; e.stretchAnchor = undefined; e.wear = 0; e.texSet = 0; e.crush = null; e.melt = null; e.shadeK = 1; e.soot = 0; e.hideMats = null; e.rimK = 1;
     model.entries.push(e);
     return e;
   }
@@ -602,7 +602,7 @@ export class Renderer {
           const cr = e.crush;          // world-space crumple: [x, y, z, radius, amount, dirX, dirY, dirZ]
           if (cr) { I[o + 49] = cr[4]; I[o + 50] = cr[5]; I[o + 51] = cr[6]; I[o + 52] = cr[0]; I[o + 53] = cr[1]; I[o + 54] = cr[2]; I[o + 55] = cr[3]; }
           else { I[o + 49] = 0; }
-          I[o + 56] = e.shadeK ?? 1; I[o + 57] = e.soot || 0; I[o + 58] = model.hullClass ? (model.hullClass[d.matName] || 0) : 0; I[o + 59] = 0;
+          I[o + 56] = e.shadeK ?? 1; I[o + 57] = e.soot || 0; I[o + 58] = model.hullClass ? (model.hullClass[d.matName] || 0) : 0; I[o + 59] = e.rimK ?? 1;
           n++;
         }
         if (n > first) draws.push(model.baseIndex + d.first, d.count, model.baseVertex, first, n - first, model.prepass ? 1 : 0);

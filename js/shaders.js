@@ -650,7 +650,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   }
   // procedural asteroid (texSet = -1, tools/make_asteroids.py geometry): triplanar-free 3D regolith colour + bump.
   // Model space is ~unit radius, so every frequency scales with the rock.
-  if (texSet == -1) {
+  if (texSet == -1 || texSet == -3) {
+    let moonK = select(0.0, 1.0, texSet == -3);                       // -3: the moon (seen from 110 km: smoother, brighter highlands)
     let q = i.lp;
     let big = fbm(q * 2.2 + inst.p1.w, 4);
     let mid = fbm(q * 7.0 + 3.1 + inst.p1.w, 3);
@@ -668,8 +669,9 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     var gw = (inst.m * vec4f(gx, gy, gz, 0.0)).xyz;
     gw = gw / max(length(inst.m[0].xyz), 1e-3);
     gw = gw - n * dot(gw, n);
-    n = normalize(n - gw * 0.022);
-    texAO = mix(0.55, 1.0, smoothstep(0.2, 0.6, hq));   // pits hold shadow
+    n = normalize(n - gw * 0.022 * (1.0 - 0.8 * moonK));
+    texAO = mix(mix(0.55, 1.0, smoothstep(0.2, 0.6, hq)), 1.0, moonK * 0.85);   // pits hold shadow (barely, on the moon)
+    base = mix(base, base * 2.3 + vec3f(0.02), moonK);
   }
   // battle wear (mechs): chipped paint on edges, grime in crevices + streaks, scorch marks
   let wear = select(inst.tint.w, 0.0, texSet > 0);
@@ -769,14 +771,14 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // environment reflection with a brushed-metal streak (anisotropic look along the hull's long axis)
   let Rv = reflect(-V, n);
   let brushed = 0.75 + 0.5 * vnoise(vec3f(i.lp.x * 0.6, i.lp.y * 0.6, i.lp.z * 0.02) + inst.p1.w);
-  let rockK = select(1.0, 0.12, texSet == -1);                        // dusty rock: almost no sheen
+  let rockK = select(1.0, 0.12, texSet == -1 || texSet == -3);                        // dusty rock: almost no sheen
   let reflK = fres * (1.0 - rough * 0.8) * brushed * mix(0.2, 0.85, metal) * rockK;
   var envC = envRefl(Rv, rough);
   if (F.interior.w > 0.5) { envC = envInterior(i.wp, Rv, rough); }
   col += envC * reflK * ao * mix(0.35, 1.0, sh);
   // rim (nebula backlight) for silhouettes
   let rim = pow(1.0 - max(dot(n, V), 0.0), 2.5);
-  col += F.rimCol.rgb * rim * F.rimCol.w * ao * (0.5 + 0.5 * base) * mix(0.3, 1.0, rockK) * select(1.0, 0.3, texSet > 0);   // mechs: subtle rim
+  col += F.rimCol.rgb * rim * F.rimCol.w * ao * (0.5 + 0.5 * base) * mix(0.3, 1.0, rockK) * select(1.0, 0.3, texSet > 0) * inst.shade.w;   // mechs: subtle rim; shade.w = per-entry rim scale
   // cinematic fill from slightly above the camera: keeps the dark side of hulls readable
   let fillDir = normalize(V + vec3f(0.0, 0.35, 0.0));
   let fl = clamp((dot(n, fillDir) + F.fill.w) / (1.0 + F.fill.w), 0.0, 1.0);

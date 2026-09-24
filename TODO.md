@@ -218,3 +218,5 @@
 - [x] 156. Scene 29 (S11d fly-by): the blue containment field is across the flagship's port launch bay as Sigma launches (fades on 150–151.5, ripple as he punches through at 159.55, off by 161.8).
 - [x] 157. Cold open: the camera sits off the dreadnought's flank, opens looking up into the stars and whips straight DOWN (pure tilt) onto the dreadnought broadside.
 - [x] 158. The moon is a real mesh (tools/make_moon.py → assets/moon.glb, 82k tris: maria, 260 craters, grit; regolith shader) fixed in the world 110 km off the battle (radius 42 km) — it frames/turns consistently with every camera; scene 5 → Earth jump. Frame-anchored sky moon and the default sky moon removed.
+- [x] 159. Moon detail ×2 (level-7 icosphere, 328k tris, 560 craters, finer grit); moon shading mode texSet −3 (brighter highlands, soft AO/bump); placed so its vast lit face fills the upper right of scene 12 (B4 standoff; that shot's key light comes from high behind the camera).
+- [x] 160. Dreadnought (and its lance) rim light ×0.3 (per-entry rimK → Inst.shade.w).

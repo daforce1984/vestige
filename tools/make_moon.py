@@ -1,5 +1,5 @@
 """The background moon as a real mesh -> assets/moon.glb (node 'moon', unit radius, centred at the origin).
-A level-6 icosphere (81 920 tris) shaped like a real moon: nearly round, broad dark maria (shallow basins),
+A level-7 icosphere (327 680 tris) shaped like a real moon: nearly round, broad dark maria (shallow basins),
 a power-law population of craters with raised rims and a few big ray-less basins, fine regolith grit.
 Shaded in the engine with the procedural regolith mode (texSet −1). usage: uv run --with numpy tools/make_moon.py"""
 import json, struct, pathlib, importlib.util
@@ -10,19 +10,19 @@ ast = importlib.util.module_from_spec(spec); spec.loader.exec_module(ast)
 def moon(seed=4):
     rng = np.random.default_rng(seed)
     nz = ast.Noise(seed)
-    V, F = ast.icosphere(6)
+    V, F = ast.icosphere(7)          # 327 680 tris (detail ×2)
     n = V.copy()
     h = 0.006 * nz.fbm(n * 1.5 + 3.0, 4)                         # gentle large-scale relief (it stays round)
     mare = np.clip(nz.fbm(n * 1.2 + 11.0, 3) * 1.6, 0, 1)          # dark lowland basins
     h -= 0.004 * mare
-    for k in range(260):                                          # craters: many small, few large
+    for k in range(560):                                          # craters: many small, few large
         c = rng.normal(size=3); c /= np.linalg.norm(c)
         ang = 0.012 + 0.22 * rng.random() ** 3.2
         depth = ang * (0.06 + 0.03 * rng.random())
         d = np.arccos(np.clip(n @ c, -1, 1)) / ang
         d = d * (1 + 0.05 * nz(n * 20 + k))
         h += np.where(d < 1, (d * d - 1) * depth, 0) + depth * 0.3 * np.exp(-((d - 1) / 0.2) ** 2)
-    h += 0.0012 * nz.fbm(n * 40.0 + 5.0, 3)
+    h += 0.0012 * nz.fbm(n * 40.0 + 5.0, 3) + 0.0005 * nz.fbm(n * 110.0 + 9.0, 2)   # fine grit
     P = n * (1 + h)[:, None]
     fn = np.cross(P[F[:, 1]] - P[F[:, 0]], P[F[:, 2]] - P[F[:, 0]])
     N = np.zeros_like(P)

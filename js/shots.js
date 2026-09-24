@@ -1140,6 +1140,7 @@ shot(80, 100, 'B3 DREADNOUGHT REVEAL', (c) => {
 });
 shot(100, 110, 'B4 standoff', (c) => {
   const { t, u } = c;
+  c.env.sunDir = V.norm([0, 0, 0], [0.75, 0.55, -0.35]);        // key from high behind the camera: the moon behind the fleets shows its lit face
   // side-on profile of the whole gap: our flagship on the left, the dreadnought on the right, bows facing
   const d = dreadPos(t), m = motherPoint([0, 0, 0], t, [0, 0, 0]);
   const mid = V.lerp([0, 0, 0], m, d, 0.5);
