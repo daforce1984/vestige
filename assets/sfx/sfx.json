@@ -370,10 +370,10 @@
   },
   "warp_out2": {
    "file": "warp_out2.mp3",
-   "ch": 1,
+   "ch": 2,
    "kind": "one",
    "hit": 0.0,
-   "dur": 1.4
+   "dur": 1.51
   },
   "beam": {
    "file": "beam.mp3",

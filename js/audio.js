@@ -649,8 +649,9 @@ function warpCues() {
   // and briefly pulls the rest of the mix down. Ships snapping in the same instant (< 0.15 s) share one cue.
   // The enemy's arrival wave (80–84) stays one single hit (no clatter).
   const ev = warpSchedule().filter((e) => !(e.t > 80 && e.t < 84.8 && e.size < 3)), out = [];
-  const LVL = { 1: 1.0, 2: 1.35, 3: 1.8 }, RATE = { 1: 1.06, 2: 0.98, 3: 0.9 }, DUCK = { 1: [0.8, -4], 2: [1.4, -7], 3: [2.5, -10] };
-  out.push([81.6, 'warp_out2', { bus: 'dry', gain: 5.7, rate: 0.88, prio: 10, duck: 2.2, duckDb: -10, norand: true }]);   // the whole enemy line arrives
+  const LVL = { 1: 1.0, 2: 1.35, 3: 1.8 }, RATE = { 1: 1, 2: 1, 3: 1 },   // full original sound: no pitch change, no distance attenuation
+   DUCK = { 1: [0.8, -4], 2: [1.4, -7], 3: [2.5, -10] };
+  out.push([81.6, 'warp_out2', { bus: 'dry', gain: 5.7, rate: 1, prio: 10, duck: 2.2, duckDb: -10, norand: true }]);   // the whole enemy line arrives
   for (let i = 0; i < ev.length;) {
     let j = i, size = 0, n = 0;
     while (j < ev.length && ev[j].t - ev[i].t < 0.15) { size = Math.max(size, ev[j].size); n++; j++; }
@@ -658,7 +659,7 @@ function warpCues() {
     i = j;
     const pan = size === 3 ? 0 : Math.sin(t * 7.3) * (size === 2 ? 0.3 : 0.45);
     const enemyK = t > 80 && t < 100 ? 3 : 1;                               // the enemy's arrival: 3× louder
-    out.push([t, 'warp_out2', { bus: 'dry', gain: Math.min(2.1, LVL[size] + 0.08 * (n - 1)) * enemyK, rate: RATE[size], pan, prio: 10, norand: true,
+    out.push([t, 'warp_out2', { bus: 'dry', gain: Math.min(2.1, LVL[size] + 0.08 * (n - 1)) * enemyK, rate: RATE[size], far: 0, verb: 0.1, pan, prio: 10, norand: true,
       duck: DUCK[size][0], duckDb: DUCK[size][1] }]);
   }
   return out;

@@ -75,7 +75,7 @@ SPEC = {
     'braam2':         dict(seg=(0.6, 6.4),  st=True,  kind='one'),
     # ---- v4: the user's own ../homeland/static sounds + heavy beam layers
     'atomic_impact':  dict(seg=(0.0, 3.4), st=True, kind='one'),
-    'warp_out2':      dict(seg=(0.0, 1.4), st=False, kind='one', hit=0.0),        # hyperspace in/out (user choice, from ../homeland)
+    'warp_out2':      dict(raw=True, kind='one', hit=0.0),                        # hyperspace in/out: the user's file, untouched (full length, full level)
     'beam':           dict(seg=(0.0, 6.3), st=False, kind='one', hit=0.8),        # main ion cannon firing (from ../homeland)
     'typing':         dict(seg=(0.55, 2.3), st=False, kind='one', target=-22),               # title-card typing (from ../homeland)
     'axe_metal1':     dict(seg=(0.03, 1.5), st=False, kind='one', hit=0.1),        # mech impacts (Pixabay, Yodguard)
@@ -147,6 +147,13 @@ def main():
         if sp.get('alias'):
             table[name] = {'alias': sp['alias']}
             credits.append((name, man.get(name) or man.get('hl_*', {}), [f"alias of {sp['alias']}.mp3 — the source file is byte-identical, so no separate file is built"], 0.0))
+            continue
+        if sp.get('raw'):                     # the user's own file, copied byte for byte (no trim, no level change)
+            import shutil
+            shutil.copyfile(os.path.join(SRC, name + '.mp3'), os.path.join(OUT, name + '.mp3'))
+            d = len(decode(name)) / SR
+            table[name] = {'file': name + '.mp3', 'ch': 2, 'kind': sp.get('kind', 'one'), 'hit': sp.get('hit', 0.0), 'dur': round(d, 4)}
+            credits.append((name, man.get(name) or man.get('hl_*', {}), ['used as is (untrimmed, original level)'], 0.0))
             continue
         src = decode(name)
         edits = []

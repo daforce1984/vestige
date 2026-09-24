@@ -198,3 +198,4 @@
 - [x] 136. Return after the well: no ember sparks off the arm thrusters while he comes to / flies home; camera placed behind him on his heading and held still so he slowly draws away (no asteroid in front of the lens).
 - [x] 137. Ship/fighter trails: one smooth cone per nozzle (the segmented past-trail capsules read as beads), nozzle glow only at the nozzle.
 - [x] 138. Enemy arrival: warp sounds 80–100 s ×3; the wide cut (80.6–88.5) is now high off the enemy flank looking down — every frigate/line ship warp-in plus the dreadnought side-on beside them for scale.
+- [x] 139. warp_out2 plays the user's file untouched (full 1.51 s, original level/pitch; build_sfx raw copy), no distance attenuation (far 0, no low-pass), dry bus, top priority; size still sets the level.
