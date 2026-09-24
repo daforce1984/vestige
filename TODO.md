@@ -216,3 +216,5 @@
 - [x] 154. From scene 5 (40 s) to the Earth arrival the same moon hangs in the background of every exterior shot (frame-anchored upper/lower corner per shot, chosen where it is most fully sunlit); no other planets (the brown planet and the per-shot moon placements removed; interiors excluded; Earth ending unchanged).
 - [x] 155. The background moon is enormous: angular radius ≈ 2.3× the half-FOV, centred off the frame corner so its limb sweeps across a third of the frame; albedo toned down.
 - [x] 156. Scene 29 (S11d fly-by): the blue containment field is across the flagship's port launch bay as Sigma launches (fades on 150–151.5, ripple as he punches through at 159.55, off by 161.8).
+- [x] 157. Cold open: the camera sits off the dreadnought's flank, opens looking up into the stars and whips straight DOWN (pure tilt) onto the dreadnought broadside.
+- [x] 158. The moon is a real mesh (tools/make_moon.py → assets/moon.glb, 82k tris: maria, 260 craters, grit; regolith shader) fixed in the world 110 km off the battle (radius 42 km) — it frames/turns consistently with every camera; scene 5 → Earth jump. Frame-anchored sky moon and the default sky moon removed.

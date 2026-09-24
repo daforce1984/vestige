@@ -538,9 +538,20 @@ export function breathe(pose, t, amt = 1) {
  * Adds all persistent exterior objects & effects for film time t.
  * opts: { skip: Set of names } lets shots hide things (e.g. while in hangar).
  */
+// the MOON: a real mesh (tools/make_moon.py) hanging far off the battle, fixed in the world — it sits in the sky the
+// same way from every camera (parallax-free at 110 km, but it turns and frames correctly with the camera). Scene 5
+// (the fleet assembles) until the jump to Earth.
+const MOON_DIR = V.norm([0, 0, 0], [-SUN[0] * 0.8 + 0.25, -0.45, -SUN[2] * 0.8 + 0.35]);
+const MOON_POS = V.madd([0, 0, 0], [0, 0, -800], MOON_DIR, 110000), MOON_R = 42000;
+const _moonM = M.new(), _moonQ = [0, 0, 0, 1];
 export function drawWorld(R, t, opts = {}) {
   R._time = t; _R = R;
   const tmpM = M.new();
+  if (t >= 40 && t < EARTH_T && R.models.moon) {
+    M.fromTRS(_moonM, MOON_POS, Q.fromEuler(_moonQ, 0.4, 1.1, 0.2), MOON_R);
+    const mo = R.add('moon', _moonM);
+    if (mo) { mo.texSet = -1; mo.seed = 1.7; }
+  }
   const LM = modelLen(R, 'mothership');
   // ---------------- mothership
   const me = t > 17 ? R.add('mothership', motherMatrix(tmpM, t)) : null;

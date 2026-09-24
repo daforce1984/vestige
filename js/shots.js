@@ -45,7 +45,7 @@ function spaceEnv(t) {
     time: t, sunDir: SUN, sunCol: [1.9, 1.62, 1.25], ambUp: [0.2, 0.25, 0.34], ambDown: [0.16, 0.11, 0.07], ambient: 1,
     rim: [0.55, 0.6, 0.7, 0.3], fill: [0.16, 0.16, 0.17, 0.4], nebula: 0, stars: 0.8, sunDisc: 1,
     sky: [0.010, 0.011, 0.013, 0.6],   // near-neutral: no blue gas in the backdrop
-    planet: { dir: MOON, radius: PL_R * 0.75, col: [0.5, 0.5, 0.52], earth: false, kind: 'moon' },
+    planet: null,                                    // no moon (only Earth at the end)
     shadows: true, shadowCenter: [0, 0, 0], shadowRadius: 400,
   };
 }
@@ -973,12 +973,16 @@ shot(0, 14, 'C0 cold open', (c) => {
   c.env.sunDisc = 0.12;
   const { t, R } = c;
   c.worldT = CO_T0 + t;
-  const tilt = easeInOut(sat((t - 0.8) / 7.4));                      // the calm view slowly tilts down…
-  const calmDir = V.norm([0, 0, 0], [0.25, 0.55 - 0.3 * tilt, 0.8]);  // away from the fight: quiet stars
-  const fightTgt = enemyFrigate(c.worldT, 3).pos;
-  // close to the enemy line: ~260 m off an enemy frigate's bow, on our side of the fight
-  const pos = addv(fightTgt, [-95 + Math.sin(t * 0.1) * 4, 38 - 6 * tilt, 250 - Math.max(0, t - 8.25) * 4]);   // …and sinks a little
-  const fightDir = V.norm([0, 0, 0], V.sub([0, 0, 0], addv(fightTgt, [30, 10, 0]), pos));
+  // the camera sits off the dreadnought's flank; it opens looking UP into quiet stars, slowly sinks, then whips
+  // straight DOWN (a pure tilt, no sideways swing) onto the dreadnought broadside with the battle raging around it
+  const tilt = easeInOut(sat((t - 0.8) / 7.4));
+  const D = dreadPos(c.worldT);
+  const fightTgt = addv(D, [0, 0, 60]);
+  const pos = addv(D, [640 + Math.sin(t * 0.1) * 4, 170 - 8 * tilt, 120 - Math.max(0, t - 8.25) * 5]);
+  const fightDir = V.norm([0, 0, 0], V.sub([0, 0, 0], fightTgt, pos));
+  const horiz = V.norm([0, 0, 0], [fightDir[0], 0, fightDir[2]]);
+  const pitchUp = 1.05 - 0.2 * tilt;                                    // radians above the horizon while calm
+  const calmDir = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], horiz, Math.cos(pitchUp)), [0, Math.sin(pitchUp), 0]));
   const w = easeInOut(sat((t - 8.25) / 0.35));                        // whip pan
   const dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], calmDir, fightDir, w));
   camLook(c, pos, V.madd([0, 0, 0], pos, dir, 200), lerp(34, 50, w), lerp(0.02, -0.06, w));
@@ -1958,7 +1962,7 @@ export function frame(R, film) {
   ctx.env = spaceEnv(t); ctx.post = basePost();
   ctx.world = true; ctx.hangar = null; ctx.debris = false; ctx.worldT = undefined; ctx.fpv = false; ctx.filmT = film; ctx.closeCore = false;
   ctx.cam.near = 0.3; ctx.cam.far = 400000;
-  const moonDir = moonFor(R, s, film);
+  const moonDir = null;                                   // (background moon removed)
   R.begin();
   R.camPos = null; R._now = t;
   if (!GUN.exitLocal) {
