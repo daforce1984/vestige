@@ -1893,11 +1893,15 @@ shot(358, 393.5, 'S23 title', (c) => {
   const S = SUN_RISE(), sp = madd([0, 0, 0], S, 1000);
   const upDir = V.norm([0, 0, 0], V.add([0, 0, 0], dir0, [0, 1.1, 0]));
   const k0 = easeInOut(sat((t - 358) / 3.2));                 // fleet → the limb
-  const k1 = easeInOut(sat((t - 366.8) / 1.4));               // fast tilt up onto the sun
-  const k2 = easeInOut(sat((t - 369.8) / 2.0));               // hold, then away to the title
+  // ONE continuous move after the narration (366.8–370.8): up through the rising sun (it crosses the centre of frame
+  // mid-move) and on round to the title — a quadratic Bézier through the sun, no stop
+  const k2 = easeInOut(sat((t - 366.8) / 4.0));
   let dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], f0, dir0, k0));
-  dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], dir, S, k1));
-  dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], dir, upDir, k2));
+  if (k2 > 0) {
+    const Cp = V.sub([0, 0, 0], V.scale([0, 0, 0], S, 2), V.scale([0, 0, 0], V.add([0, 0, 0], dir, upDir), 0.5));
+    const w = 1 - k2;
+    dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], dir, w * w), V.scale([0, 0, 0], Cp, 2 * w * k2)), V.scale([0, 0, 0], upDir, k2 * k2)));
+  }
   camLook(c, pos, madd(pos, dir, 1000), lerp(q.fov, 34, k0), lerp(0.04, 0.12, k0) - k2 * 0.08);
   c.world = t < 366;                                          // the fleet stays in shot until we leave it behind
   c.env.planet = { dir: PLANET, radius: PL_R, col: [0.3, 0.5, 1.0], earth: true };
