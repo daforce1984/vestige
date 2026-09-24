@@ -7,7 +7,7 @@ import json, struct, sys, os, glob, math
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(os.path.dirname(HERE), 'assets')
 
-BUDGET = {'mothership': 350000, 'enemy_dreadnought': 250000, 'ion_frigate': 60000, 'assault_frigate': 60000,
+BUDGET = {'mothership': 350000, 'enemy_dreadnought': 250000, 'ion_frigate': 90000, 'assault_frigate': 60000,
           'enemy_frigate': 60000, 'interceptor': 12000, 'enemy_fighter': 12000, 'gundam': 60000,
           'enemy_ms': 60000, 'gravity_well': 80000, 'hangar': 60000, 'debris': 20000,
           'mother_bay': 180000, 'bay_props': 45000}

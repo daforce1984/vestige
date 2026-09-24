@@ -941,15 +941,56 @@ export function drainOutflow(R, t, t0, from, k, seed) {
   }
   R.glow(V.madd([0, 0, 0], from, toWell, 25), 14 * k, [0.3 * k, 0.6 * k, 1.4 * k], 0.6);   // the leak at the mouth
 }
+// ION CANNON CHARGE, following the frigate's real gun (blender/ION_FRIGATE_DESIGN.md, model space, nose +z):
+// the four accelerator stages (z 6.8…23.2, three copper coils each, r 1.65, barrel axis y 0.9) wake one after
+// another from the breech forward, arcs jump from each stage's capacitor modules onto its coils, energy pulses race
+// up the barrel, and the charge gathers into a plasma core INSIDE the muzzle bore (z ≈ 30.6). c: 0..1 charge,
+// fail: the stages die back from the muzzle and the core bleeds away (the well drains it)
+const ION_BORE = [0, 0.9, 30.6];
+export function ionCharge(R, e, t, c, fail, seed) {
+  if (!e || c <= 0.005) return;
+  const P = (x, y, z) => M.transformPoint([0, 0, 0], e.m, [x, y, z]);
+  const ax = V.norm([0, 0, 0], M.transformDir([0, 0, 0], e.m, [0, 0, 1])), up = V.norm([0, 0, 0], M.transformDir([0, 0, 0], e.m, [0, 1, 0]));
+  const sd = V.cross([0, 0, 0], ax, up);
+  const CC = [0.45, 0.85, 2.2];
+  for (let k = 0; k < 4; k++) {
+    const on = sat((c - k * 0.16) / 0.2);                                   // breech first, then forward
+    if (on <= 0) continue;
+    const zc = 6.8 + 4.1 * (k + 0.5);
+    for (let j = -1; j <= 1; j++) {                                          // the stage's three coils
+      const z = zc + j;
+      const wave = 0.55 + 0.45 * Math.sin(t * (9 + 10 * c) - k * 1.3 - j * 0.6);
+      const b = on * wave * (fail ? 0.7 + 0.3 * Math.sin(t * 31 + k + j) : 1) * 1.6;
+      const r = 1.85;
+      R.ring(P(0, 0.9, z), V.scale([0, 0, 0], sd, r), V.scale([0, 0, 0], up, r), [CC[0] * b, CC[1] * b, CC[2] * b], 0.6);
+    }
+    if (on > 0.4) for (const sx of [1, -1]) {                               // capacitor module → coil flash-over
+      const a = P(sx * 2.6, -0.2, zc + (hash(k + sx + Math.floor(t * 5)) - 0.5) * 2.4), b2 = P(sx * 1.4, 0.9, zc + (hash(k * 3 + sx + Math.floor(t * 5)) - 0.5) * 2);
+      R.arc(a, b2, 0.9, [0.5, 0.9, 2.2], 0.7 * on, seed + k * 3 + (sx > 0 ? 1 : 2), 10 + 8 * c);
+    }
+  }
+  // energy pulses racing up the barrel into the focusing section and the bore
+  for (let q = 0; q < 6; q++) {
+    const ph = ((t * (0.9 + 1.6 * c) + q / 6) % 1);
+    const z = 7 + ph * 23.5, len = 1.2 + 3 * c;
+    const bb = c * (1 - ph * 0.3) * 1.6;
+    R.beam(P(0, 0.9, z - len), P(0, 0.9, z), 0.55 + 0.4 * c, [CC[0] * bb, CC[1] * bb, CC[2] * bb], 1, 20, 0.3, 1);
+  }
+  // the plasma core forming inside the muzzle bore (it never floats in front of the gun)
+  const core = P(ION_BORE[0], ION_BORE[1], ION_BORE[2]);
+  const pk = c * (0.85 + 0.15 * Math.sin(t * (14 + 30 * c)));
+  R.glow(core, 0.8 + 2.2 * c, [2.6 * pk, 3.0 * pk, 4.0 * pk], 0.3);
+  R.glow(core, 3 + 7 * c, [0.35 * pk, 0.7 * pk, 1.8 * pk], 0.7);
+  R.light(core, 60, ION_COL, 5 * c);
+  if (!fail) chargeInflow(R, t, t - 1, 1, core, 22, 26, [0.5, 0.9, 2], 4, 14, 0.25, seed);   // gathered from right around the crown
+}
 function drawIonVolleys(R, t) {
   for (const [t0, t1, fi, ti] of VOLLEYS) {
     if (t < t0 - 3 || t > t1 + 0.6) continue;
     const from = ionMuzzle(R, t < t0 ? t : t0, fi);
     if (VOLLEY_FAILS(t0)) {                                   // failed charge: builds, stalls and sputters, then bleeds away
-      const c = 0.7 * sat((t - (t0 - 3)) / 1) * (1 - smooth(t0 - 2.0, t0 + 0.1, t));
-      const flick = 0.7 + 0.3 * Math.sin(t * 23 + fi) * Math.sin(t * 7.3 + fi * 2);
-      if (c > 0.01) R.glow(from, 4 + c * 10, [ION_COL[0] * c * 2.2 * flick, ION_COL[1] * c * 2.2 * flick, ION_COL[2] * c * 2.2 * flick], 0.8);
-      if (t < t0 - 1.9) chargeInflow(R, t, t0 - 3, 1.1, from, 60, 40, [0.5, 0.9, 2], 3, 14, 0.4, fi * 7);   // brief inflow…
+      const c = 0.75 * sat((t - (t0 - 3)) / 1.1) * (1 - smooth(t0 - 2.0, t0 + 0.1, t));
+      ionCharge(R, GUN.ionEntries && GUN.ionEntries[fi], t, c, true, fi * 7 + 3);                // stages wake, then die back…
       drainOutflow(R, t, t0 - 2.1, from, smooth(t0 - 2.1, t0 - 1.5, t) * (1 - smooth(t0 + 1.2, t1, t)), fi * 5 + t0);   // …then sucked out toward the well
       if (t > t0 && t < t0 + 0.5) { const sp = Math.exp(-(t - t0) * 6); R.glow(from, 6 * sp, [0.6 * sp, 0.9 * sp, 1.8 * sp], 0.5); }   // a feeble spit, nothing leaves
       continue;
@@ -957,8 +998,7 @@ function drawIonVolleys(R, t) {
     // charge glow
     if (t < t0) {
       const c = sat((t - (t0 - 3)) / 3);
-      R.glow(from, 4 + c * 14, [ION_COL[0] * c * 3, ION_COL[1] * c * 3, ION_COL[2] * c * 3], 0.8);
-      chargeInflow(R, t, t0 - 3, 3, from, 60, 40, [0.5, 0.9, 2], 3, 14, 0.4, fi * 7);
+      ionCharge(R, GUN.ionEntries && GUN.ionEntries[fi], t, c, false, fi * 7 + 3);
       continue;
     }
     // the beam is locked at the moment of firing: muzzle and aim point never move afterwards

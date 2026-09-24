@@ -12,7 +12,7 @@ import lib
 ASSETS = os.path.join(os.path.dirname(HERE), 'assets')
 BUILDERS = {
     'mothership': ('ships_hiigaran_v5', 'mothership'),
-    'ion_frigate': ('ships_hiigaran_v5', 'ion_frigate'),
+    'ion_frigate': ('ships_ion_frigate', 'ion_frigate'),   # v10 redesign (ION_FRIGATE_DESIGN.md)
     'assault_frigate': ('ships_hiigaran_v5', 'assault_frigate'),
     # v6 fighter variants (fighters_ours.py / fighters_enemy.py; the v4 designs remain in small_craft.py)
     'interceptor': ('fighters_ours', 'interceptor_a'),
