@@ -170,7 +170,7 @@ export const CUES = [
   [8.6,   'boom',       { bus: 'sfx', f: 36, vel: 0.9, dur: 3.5, verb: 0.4 }],
   [8.6,   'battleBed',  { dur: 5.4, vel: 0.6 }],
   [29,    'hullRumble', { dur: 12, pan0: -0.8, pan1: 0.8, vel: 0.5 }],     // belly pass sub
-  [50,    'hangarAmb',  { dur: 14 }],
+  [50,    'hangarAmb',  { dur: 6.0 }],                                 // scene 6 only: fades out by the cut to scene 7 (57)
   // ---------------- ACT II
   // (red alert: the thin synth stinger + klaxon replaced by heavy hull horns in the sample cues)
   ...[63.04, 64.9, 66.8].map((t, i) => [t, 'boom', { bus: 'sfx', f: 28, vel: 0.9 - i * 0.15, dur: 2.2, verb: 0.5 }]),
