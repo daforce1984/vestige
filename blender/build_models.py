@@ -1,6 +1,7 @@
 """Build all GLB assets.  Usage (from WSL):
   "/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup \
       --python "$(wslpath -w blender/build_models.py)" [-- model1 model2 ...]
+Fighters only:  ... -- interceptor interceptor_b interceptor_c enemy_fighter enemy_fighter_b enemy_fighter_c
 """
 import sys, os, time, importlib
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -13,10 +14,15 @@ BUILDERS = {
     'mothership': ('ships_hiigaran_v5', 'mothership'),
     'ion_frigate': ('ships_hiigaran_v5', 'ion_frigate'),
     'assault_frigate': ('ships_hiigaran_v5', 'assault_frigate'),
-    'interceptor': ('small_craft', 'interceptor'),
+    # v6 fighter variants (fighters_ours.py / fighters_enemy.py; the v4 designs remain in small_craft.py)
+    'interceptor': ('fighters_ours', 'interceptor_a'),
+    'interceptor_b': ('fighters_ours', 'interceptor_b'),
+    'interceptor_c': ('fighters_ours', 'interceptor_c'),
     'enemy_frigate': ('ships_enemy_v5', 'enemy_frigate'),
     'enemy_dreadnought': ('ships_enemy_v5', 'enemy_dreadnought'),
-    'enemy_fighter': ('small_craft', 'enemy_fighter'),
+    'enemy_fighter': ('fighters_enemy', 'enemy_fighter_a'),
+    'enemy_fighter_b': ('fighters_enemy', 'enemy_fighter_b'),
+    'enemy_fighter_c': ('fighters_enemy', 'enemy_fighter_c'),
     'gundam': ('mobile_suits', 'gundam'),
     'enemy_ms': ('mobile_suits', 'enemy_ms'),
     'gravity_well': ('environment', 'gravity_well'),

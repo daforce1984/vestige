@@ -8,10 +8,10 @@ const MODELS = [
   { name: 'mothership', detail: 4.5, prepass: true, hullDetail: true },   // layered greebles: depth prepass keeps close-ups at 24 fps
   { name: 'ion_frigate', detail: 0.9 },
   { name: 'assault_frigate', detail: 0.8 },
-  { name: 'interceptor', detail: 0.25 },
+  { name: 'interceptor', detail: 0 }, { name: 'interceptor_b', detail: 0 }, { name: 'interceptor_c', detail: 0 },
   { name: 'enemy_frigate', detail: 0.9 },
   { name: 'enemy_dreadnought', detail: 2.4, scale: 1.65 },   // a little bigger than our flagship
-  { name: 'enemy_fighter', detail: 0.25 },
+  { name: 'enemy_fighter', detail: 0 }, { name: 'enemy_fighter_b', detail: 0 }, { name: 'enemy_fighter_c', detail: 0 },
   { name: 'gundam', detail: 0, keep: MS_KEEP },
   { name: 'enemy_ms', detail: 0, keep: MS_KEEP },
   { name: 'gravity_well', detail: 2.5, keep: ['ring', 'core', 'pylons'] },

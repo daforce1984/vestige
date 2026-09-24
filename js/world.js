@@ -715,6 +715,8 @@ export function debrisOnly(R, keepName) {
 
 // the six crown arc terminals (horn tips) in dreadnought model space before the ×1.65 load scale — tools/make_dread_lance.py
 const DREAD_HORNS = [[4.503, 2.6, 212.5], [0, 5.2, 212.5], [-4.503, 2.6, 212.5], [-4.503, -2.6, 212.5], [0, -5.2, 212.5], [4.503, -2.6, 212.5]];
+// fighter variants (tools: blender/fighters_ours.py / fighters_enemy.py): three designs per side, picked by index
+export function fighterModel(enemy, k) { return (enemy ? 'enemy_fighter' : 'interceptor') + ['', '_b', '_c'][((k % 3) + 3) % 3]; }
 export function dreadEmitter(R, t, entry) {
   return R.emptyWorld([0, 0, 0], 'enemy_dreadnought', entry, 'lance_emitter');
 }
@@ -869,8 +871,8 @@ function drawDogfight(R, t, tmpM) {
     fighterPos(a, k, t);           // target
     fighterPos(b, k, t - 0.9);     // chaser
     const hiChase = p.hiigChases;
-    const targetName = hiChase ? 'enemy_fighter' : 'interceptor';
-    const chaserName = hiChase ? 'interceptor' : 'enemy_fighter';
+    const targetName = fighterModel(hiChase, k);
+    const chaserName = fighterModel(!hiChase, k + 1);
     const alive = t < p.die;
     // velocity for orientation
     fighterPos(v, k, t + 0.05); V.sub(v, v, a);

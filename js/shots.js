@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow,
+  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -878,7 +878,7 @@ function drawColdOpenAction(R, t, cam, tgt) {
     const p = coFighter(t, k, cam, fwd, side);
     if (die && t > die[0]) { explosion(R, t, die[0], coFighter(die[0], k, cam, fwd, side), 9, 900 + k, 'small'); continue; }
     const q = coFighter(t + 0.05, k, cam, fwd, side);
-    const name = enemy ? 'enemy_fighter' : 'interceptor';
+    const name = fighterModel(enemy, k);
     const e = R.add(name, mat(tmpM, p, V.sub([0, 0, 0], q, p), [0, 1, 0], Math.sin((t - t0) * 2 + k) * 0.7));
     if (e) engineGlows(R, name, e, enemy ? ENEMY_ENGINE : HIIG_ENGINE, 0.8, 1, 3,
       { past: (tau) => { const a = coFighter(t - tau, k, cam, fwd, side), b2 = coFighter(t - tau + 0.05, k, cam, fwd, side); return { m: mat(new Float32Array(16), a, V.sub([0, 0, 0], b2, a), [0, 1, 0], 0) }; } });
@@ -954,8 +954,8 @@ function escortPos(t, k) {
 }
 function drawEscorts(R, t, n = 3, scaleGlow = 0.8) {
   for (let k = 0; k < n; k++) {
-    const e = R.add('interceptor', mat(M.new(), escortPos(t, k), [0, 0, 1], [0, 1, 0], Math.sin(t * 0.5 + k) * 0.1));
-    if (e) { R._time = t; engineGlows(R, 'interceptor', e, HIIG_ENGINE, scaleGlow, 1, 4); }
+    const e = R.add(fighterModel(false, k), mat(M.new(), escortPos(t, k), [0, 0, 1], [0, 1, 0], Math.sin(t * 0.5 + k) * 0.1));
+    if (e) { R._time = t; engineGlows(R, fighterModel(false, k), e, HIIG_ENGINE, scaleGlow, 1, 4); }
   }
 }
 shot(16, 30, 'A2 THE ARRIVAL', (c) => {
@@ -983,8 +983,8 @@ shot(30, 40, 'A3 belly pass', (c) => {
   handheld(c, 0.1);
   for (let k = 0; k < 3; k++) {
     const p = motherPoint([0, 0, 0], t, [-60 + k * 30, b.min[1] - 30 - k * 4, z + 120 - (t - 30) * 30 - k * 15]);
-    const e = R.add('interceptor', mat(M.new(), p, rotY([0, 0, 0], [0, 0, -1], motherYaw(t))));
-    if (e) engineGlows(R, 'interceptor', e, HIIG_ENGINE, 0.7, 1, 4);
+    const e = R.add(fighterModel(false, k), mat(M.new(), p, rotY([0, 0, 0], [0, 0, -1], motherYaw(t))));
+    if (e) engineGlows(R, fighterModel(false, k), e, HIIG_ENGINE, 0.7, 1, 4);
   }
   c.env.shadowCenter = motherPoint([0, 0, 0], t, [0, 0, z]); c.env.shadowRadius = 260;
   c.env.fill = [0.35, 0.37, 0.45, 0.5];
@@ -1154,20 +1154,20 @@ shot(134, 141, 'S10a dogfight chase', (c) => {
     if (die && t > die) {                                                       // killed: fireball, the craft breaks up
       const st = strikePos(die, [x, y, z]);
       explosion(R, t, die, st.p, 14, 610 + k, 'small');
-      shatter(R, 'interceptor', mat(M.new(), st.p, st.v, [0, 1, 0], roll), t, die, 620 + k, [2, 1, 3], 1.4, { tint: [0.4, 0.7, 1] });
+      shatter(R, fighterModel(false, k), mat(M.new(), st.p, st.v, [0, 1, 0], roll), t, die, 620 + k, [2, 1, 3], 1.4, { tint: [0.4, 0.7, 1] });
       return;
     }
     const st = strikePos(t, [x, y, z]);
-    const e = R.add('interceptor', mat(M.new(), st.p, st.v, [0, 1, 0], roll));
+    const e = R.add(fighterModel(false, k), mat(M.new(), st.p, st.v, [0, 1, 0], roll));
     const past = (tau) => { const q = strikePos(t - tau, [x, y, z]); return { m: mat(new Float32Array(16), q.p, q.v, [0, 1, 0], roll) }; };
-    if (e) { R._time = t; engineGlows(R, 'interceptor', e, HIIG_ENGINE, 0.6, 1, 3, { past }); }
+    if (e) { R._time = t; engineGlows(R, fighterModel(false, k), e, HIIG_ENGINE, 0.6, 1, 3, { past }); }
   });
   // the bandits: three red fighters on their six, walking fire onto the wingmen
   BANDITS.forEach((b, k) => {
     const st = strikePos(t, b);
-    const ef = R.add('enemy_fighter', mat(M.new(), st.p, st.v, [0, 1, 0], -Math.sin(t * 1.5 + k) * 0.5));
+    const ef = R.add(fighterModel(true, k), mat(M.new(), st.p, st.v, [0, 1, 0], -Math.sin(t * 1.5 + k) * 0.5));
     const past = (tau) => { const q = strikePos(t - tau, b); return { m: mat(new Float32Array(16), q.p, q.v, [0, 1, 0], 0) }; };
-    if (ef) engineGlows(R, 'enemy_fighter', ef, ENEMY_ENGINE, 0.6, 1, 3, { past });
+    if (ef) engineGlows(R, fighterModel(true, k), ef, ENEMY_ENGINE, 0.6, 1, 3, { past });
   });
   for (let n = 0; n < 24; n++) {
     const tf = 134.3 + n * 0.26;

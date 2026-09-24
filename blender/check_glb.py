@@ -22,6 +22,11 @@ REQ_NODES = {
                'arm_R_lower', 'hand_R', 'rifle', 'rifle_muzzle'],  # shield optional
 }
 REQ_NODES['enemy_ms'] = REQ_NODES['gundam']
+# v6 fighter variants (fighters_ours.py / fighters_enemy.py): 50-70k tris each, hard cap 80k, `engine` required
+for _f, _L in (('interceptor', 8), ('interceptor_b', 10), ('interceptor_c', 12), ('enemy_fighter', 9),
+               ('enemy_fighter_b', 11.5), ('enemy_fighter_c', 9.3)):
+    BUDGET[_f] = 80000
+    LENGTH[_f] = _L
 REQ_NODES['bay_props'] = ['crate0', 'crate1', 'container', 'barrel', 'tank', 'panel0', 'panel1', 'rib', 'cable',
                           'toolcart', 'seat', 'person0', 'person1', 'person2', 'person3']
 REQ_MATS = {'mothership': ['engine', 'window'], 'ion_frigate': ['engine', 'muzzle'], 'assault_frigate': ['engine'],
@@ -29,6 +34,8 @@ REQ_MATS = {'mothership': ['engine', 'window'], 'ion_frigate': ['engine', 'muzzl
             'enemy_fighter': ['engine'], 'gundam': ['eye', 'engine'], 'enemy_ms': ['eye'],
             'gravity_well': ['violet'], 'hangar': ['guide', 'lamp'],
             'mother_bay': ['lamp', 'amber', 'blue_light', 'scorch', 'hazard']}
+for _f in ('interceptor_b', 'interceptor_c', 'enemy_fighter_b', 'enemy_fighter_c'):
+    REQ_MATS[_f] = ['engine']
 PARENTS = {'pelvis': 'ms_root', 'leg_L_upper': 'pelvis', 'leg_L_lower': 'leg_L_upper', 'foot_L': 'leg_L_lower',
            'leg_R_upper': 'pelvis', 'leg_R_lower': 'leg_R_upper', 'foot_R': 'leg_R_lower', 'torso': 'ms_root',
            'head': 'torso', 'backpack': 'torso', 'arm_L_upper': 'torso', 'arm_L_lower': 'arm_L_upper',
