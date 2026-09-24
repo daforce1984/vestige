@@ -1,5 +1,5 @@
 // Persistent world state as pure functions of film time t (seconds). Seek-safe.
-import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG } from './math.js';
+import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, breakOff, chargeInflow } from './fx.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 export { explosion };
@@ -166,8 +166,11 @@ function warpExtras(k, from, to, pos, fwd, L, tA, dur, out) {
 function rotYv(a, fwd) { const yaw = Math.atan2(fwd[0], fwd[2]); const c = Math.cos(yaw), s = Math.sin(yaw); return [a[0] * c + a[2] * s, a[1], -a[0] * s + a[2] * c]; }
 function warpClose(t, tEnd, pos, L) {
   const R = _R; if (!R) return;
-  const age = t - tEnd;
-  if (age >= 0 && age < 0.6) R.ripple(pos, L * 0.5 * 4.2 * (0.3 + age * 1.5), [0, 0, 0], (1 - age / 0.6) * 1.1);
+  // space ripple scaled by the ship's bulk: a 60 m frigate barely shivers space, a 600 m capital ship shoves a big,
+  // slow, strong wave out (and a second, wider aftershock ring)
+  const age = t - tEnd, k = clamp(L / 70, 0.4, 9), dur = 0.45 + 0.28 * Math.sqrt(k), amp = 0.55 + 0.55 * Math.sqrt(k);
+  if (age >= 0 && age < dur) R.ripple(pos, L * (0.6 + 3.2 * easeOut(age / dur)), [0, 0, 0], (1 - age / dur) * amp);
+  if (k > 2.5 && age > 0.15 && age < 0.15 + dur * 1.6) { const a2 = (age - 0.15) / (dur * 1.6); R.ripple(pos, L * (1.5 + 6 * easeOut(a2)), [0, 0, 0], (1 - a2) * amp * 0.6); }
 }
 
 function hyperIn(t, tA, final, fwd, L, dur = 1) {

@@ -760,6 +760,11 @@ function drawMSBattle(R, t) {
         if (de) { de.hidden = debrisOnly(R, 'hull' + (i % 4)); de.damage = 0.5; }
       }
       if (ls < 1.2) R.fire(ev.pos, 3 + 6 * easeOut(ls / 1.2), ls, 192.4, [1, 1, 1], 0.9 * (1 - ls / 1.2));
+      if (ls < 0.35) {                                    // pile-driver: the blow punches clean THROUGH — a white-hot shaft out the back
+        const kp = 1 - ls / 0.35, len = 6 + 30 * easeOut(sat(ls / 0.12));
+        R.beam(ev.pos, madd(ev.pos, d, len), 0.9 * kp + 0.3, [4 * kp, 3 * kp, 2 * kp], 1, 12);
+        R.glow(madd(ev.pos, d, len), 4 * kp, [3 * kp, 1.8 * kp, 0.8 * kp], 0.4);
+      }
     }
   }
   explosion(R, t, 194, addv(enemyMS2(194).pos, [0, 6, -3]), 18, 502, 'ship');
