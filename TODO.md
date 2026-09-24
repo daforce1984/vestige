@@ -186,3 +186,5 @@
 - [x] 124. RONIN #2's entrance: the backlight glow disc + red thruster star removed; mech nozzle glows tightened.
 - [x] 125. Finisher follow-through: the mace arm ends across the body with a soft elbow and lowers (no wrap-back); mech rim light ×0.3.
 - [x] 126. Arc shader: soft window across the ribbon and along its ends (no visible quad edges), wander kept inside.
+- [x] 127. Dive: the line-noise interference is replaced by a GRAVITY ANOMALY final-pass warp — travelling gravitational-wave ripples from the well, frame-dragging swirl, radial red/blue gravitational shift, a faint time-dilation echo, bright ripple crests.
+- [x] 128. S16a: the charge opens on the flagship's melted flank; Sigma sweeps past the wound close to the lens (divePass) and the camera pans to follow him toward the well.

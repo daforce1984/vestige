@@ -233,6 +233,11 @@ function recoveryPos(t) {
   if (t > 342.45) x[1] -= 0.2 * Math.sin((t - 342.45) * 9) * Math.exp(-(t - 342.45) * 5);   // clunks down onto the pad
   return motherPoint([0, 0, 0], t, x);
 }
+// the fly-by point off the melted flank: 85 m out from the wound along the hull normal, a little above
+function divePass(t) {
+  const W = motherPoint([0, 0, 0], t, LANCE_HIT), n = V.norm([0, 0, 0], motherDir(t, [1, 0, 0]));
+  return addv(madd(W, n, 122), [0, 30, 0]);                          // close past the camera (S16a sits at 150 m)
+}
 function gundamDrift0(t) { const base = addv(WELL, [40, 60, -1150]); return addv(base, [Math.sin(t * 0.1) * 4, Math.sin(t * 0.13) * 3, -(t - 320) * 0.5]); }
 // coming to: from 334.3 he starts to creep forward toward home, accelerating gently (a = 3 m/s²) before the burn
 const CREEP_T = 334.3, CREEP_A = 3;
@@ -316,13 +321,21 @@ function gundamStateRaw(t, s) {
     blendPose('stand', 'flight', smooth(237.5, 240, t), s.pose);
     breathe(s.pose, t, 1 - u);
     s.thr = 0.3 + smooth(238, 239.5, t) * 0.7;
+  } else if (t < 245.5) {
+    // the charge begins by sweeping past the flagship's melted flank (DIVE_PASS), then on toward the well
+    const start = addv(CP, [6, -4, -34]), P1 = divePass(t);
+    const u = (t - 240) / 5.5, e = u * u * (1.6 - 0.6 * u);                   // accelerating, arriving with speed
+    s.pos = lerpv(start, P1, e);
+    s.fwd = V.sub([0, 0, 0], divePass(245.5), start);
+    blendPose('flight', 'flight', 0, s.pose);
+    s.pitch = 0.9 * smooth(240, 242, t); s.thr = 1;
+    s.roll = Math.sin(t * 0.5) * 0.25;
   } else if (t < 262) {
-    const start = addv(CP, [6, -4, -34]);
+    const start = divePass(245.5);
     const end = addv(WELL, [0, -10, -260]);
-    const u = (t - 240) / 22;
+    const u = (t - 245.5) / 16.5;
     const e = u < 0.2 ? 0.5 * (u / 0.2) * (u / 0.2) * 0.2 : 0.02 + (u - 0.2) / 0.8 * 0.98 * (1 - 0.35 * Math.pow((u - 0.2) / 0.8, 3)) + 0.35 * Math.pow((u - 0.2) / 0.8, 3) * 0.98 * ((u - 0.2) / 0.8);
     s.pos = lerpv(start, end, clamp(e, 0, 1));
-    s.pos[0] += Math.sin(t * 0.9) * 20 * (1 - u); s.pos[1] += Math.sin(t * 0.6) * 15 * (1 - u);
     s.fwd = V.sub([0, 0, 0], end, start);
     blendPose('flight', 'flight', 0, s.pose);
     s.pitch = 0.9 * (1 - smooth(258, 262, t)); s.thr = 1;
@@ -1385,7 +1398,7 @@ function diveFX(c, t, lvl, g) {
   const pk = hbPulse(t);
   c.post.radial = { pos: WELL, strength: lvl * 0.05 + pk * (0.02 + lvl * 0.04) };   // gentle: Sigma must stay sharp
   c.post.mbNear = 90;
-  c.post.interference = Math.min(0.35, interference(t, lvl) + pk * 0.2 * lvl);
+  c.post.interference = Math.min(0.8, 2.2 * (interference(t, lvl) + pk * 0.2 * lvl));   // drives the gravity-anomaly warp (final pass)
   c.post.ca = 0.4 * (0.002 + lvl * 0.004 + pk * 0.006);      // light touch: strong CA read as blur on Sigma
   c.post.vignette = 0.9 + lvl * 0.35 + pk * 0.2;
   c.post.exposure = (c.post.exposure ?? 1) * (1 - pk * 0.18);
@@ -1397,13 +1410,19 @@ function diveFX(c, t, lvl, g) {
   return pk;
 }
 shot(240, 247, 'S16a dive start', (c) => {
+  // opens on the flagship's melted flank; Sigma launches from the far side, sweeps past the wound right by the lens,
+  // and the camera pans round to follow him away toward the well
   const { t, u } = c;
   const g = gundamState(t);
-  camLook(c, addv(g.pos, [-22 + u * 10, 10, -40 - u * 10]), madd(g.pos, [0, 0, 1], 300), 56, 0.1 * Math.sin(t));
-  shake(c, 0.35, 10);
-  const pk = diveFX(c, t, 0.15 + u * 0.2, g);
+  const W = motherPoint([0, 0, 0], t, LANCE_HIT), n = V.norm([0, 0, 0], motherDir(t, [1, 0, 0])), along = V.norm([0, 0, 0], motherDir(t, [0, 0, 1]));
+  const cam = addv(madd(madd(W, n, 150), along, -90), [0, 38, 0]);
+  const toWound = addv(W, [0, 4, 0]);
+  const k = easeInOut(sat((t - 243.2) / 2.8));                      // pan from the wound onto Sigma as he passes
+  camLook(c, madd(cam, along, u * 20), V.lerp([0, 0, 0], V.lerp([0, 0, 0], toWound, addv(g.pos, [0, 6, 0]), 0.35), addv(g.pos, [0, 6, 0]), k), 50, 0.05);
+  shake(c, 0.2 + 0.6 * Math.exp(-Math.pow((t - 245.5) / 0.5, 2)), 10);  // the pass buffets the camera
+  const pk = diveFX(c, t, 0.08 + u * 0.18, g);
   c.post.lensA = wellLens(c, wellMass(t) * (1 + pk * 0.3), 0, true, 1);
-  c.env.shadowCenter = g.pos; c.env.shadowRadius = 50;
+  c.env.shadowCenter = W; c.env.shadowRadius = 160;
 });
 shot(247, 255, 'S16b time dilation', (c) => {
   const { t, u } = c;

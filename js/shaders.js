@@ -1404,20 +1404,37 @@ fn h12(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(12.9898, 78.233))) * 437
     }
     col = acc / wsum;
   }
-  // signal interference (comms breaking up near the well): tearing lines, RGB split, snow bands
+  // GRAVITY ANOMALY near the well (replaces the old line-noise interference): space itself misbehaves —
+  // gravitational-wave ripples run out from the well, frame-dragging shears the image round it, light is red/blue-
+  // shifted radially (not a horizontal RGB split), and a faint time-dilation echo trails every edge outward
   if (P.intf.x > 0.0) {
     let it = P.intf.x;
-    let fr = floor(P.intf.y * 24.0);
-    let line = floor(uv.y * 220.0);
-    let tear = step(1.0 - 0.12 * it, h12(vec2f(floor(uv.y * 30.0), fr)));
-    let off = (h12(vec2f(line, fr)) - 0.5) * 0.004 * it + tear * (h12(vec2f(fr, 2.0)) - 0.5) * 0.05 * it;
-    let rs = textureSampleLevel(sceneTex, smp, guv + vec2f(off + 0.004 * it, 0.0), 0.0).r;
-    let bs = textureSampleLevel(sceneTex, smp, guv + vec2f(off - 0.004 * it, 0.0), 0.0).b;
-    let gs = textureSampleLevel(sceneTex, smp, guv + vec2f(off, 0.0), 0.0).g;
-    col = mix(col, vec3f(rs, gs, bs), clamp(it * 1.5, 0.0, 1.0));
-    let band = step(1.0 - 0.06 * it, h12(vec2f(floor(uv.y * 60.0), fr + 9.0)));
-    col = mix(col, vec3f(h12(uv * 911.0 + fr)) * 0.6, band * 0.5);
-    col *= 1.0 - 0.12 * it * step(0.5, fract(uv.y * P.screen.y * 0.25));   // scanlines
+    let tm = P.intf.y;
+    let ctr = select(vec2f(0.5), P.radial.xy, P.radial.w > 0.5);
+    let asp = vec2f(P.screen.x / P.screen.y, 1.0);
+    let dv = (guv - ctr) * asp;
+    let r = length(dv) + 1e-4;
+    let dir = dv / r;
+    // ripples: travelling rings, stronger mid-frame, soft near the centre so the subject stays readable
+    let wave = sin(r * 38.0 - tm * 5.5) * 0.6 + sin(r * 17.0 - tm * 2.3 + 1.7) * 0.4;
+    let fall = smoothstep(0.03, 0.25, r) * exp(-r * 1.4);
+    var off = dir * wave * fall * 0.010 * it;
+    // frame dragging: a slow swirl whose twist grows toward the well
+    let ang = it * 0.06 / (r * 3.0 + 0.4) * sin(tm * 0.7 + r * 4.0);
+    let rot = vec2f(dv.x * cos(ang) - dv.y * sin(ang), dv.x * sin(ang) + dv.y * cos(ang)) - dv;
+    off += rot;
+    let base = guv + off / asp;
+    // radial gravitational shift: red stretched outward, blue pulled inward
+    let cs = dir / asp * 0.006 * it * smoothstep(0.02, 0.4, r);
+    let rs = textureSampleLevel(sceneTex, smp, base + cs, 0.0).r;
+    let gs = textureSampleLevel(sceneTex, smp, base, 0.0).g;
+    let bs = textureSampleLevel(sceneTex, smp, base - cs, 0.0).b;
+    // time-dilation echo: a faint ghost displaced outward along the gravity gradient
+    let echo = textureSampleLevel(sceneTex, smp, base + dir / asp * 0.018 * it, 0.0).rgb;
+    let warped = vec3f(rs, gs, bs) * (1.0 - 0.18 * it) + echo * vec3f(0.55, 0.7, 1.0) * 0.18 * it;
+    col = mix(col, warped, clamp(it * 2.2, 0.0, 1.0));
+    // the crest of each ripple briefly bends a little more light toward the lens: a faint bright ring
+    col *= 1.0 + max(wave, 0.0) * fall * 0.12 * it;
   }
   // shake blur
   if (P.gradeHi.w > 0.0) {
