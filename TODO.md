@@ -223,3 +223,4 @@
 - [x] 161. The enemy-arrival wide cut now starts at 80.0 (it began at 80.6, leaving a 0.6 s flash of the dreadnought-reveal camera before it).
 - [x] 162. Cold open: sun disc off (it slid through the lower-left of the frame during the tilt as a stray light blob).
 - [x] 163. Scene 5: the fleet drops out of hyperspace in a tight wave (40.5–43.3 frigates, line ships every 0.14 s from 40.7) — all out by ~44.3, before "exit complete" at 45.
+- [x] 164. Scenes 63→64 are one take (homeCam): the camera stays by the fleet and eases onto Earth's limb, then tilts up fast (1.4 s) until the rising sun sits dead centre, holds, turns away into open space and the title holds 20 s (371.8–391.8 story; film end +6 s). Music fades out under the title (unchanged). Fixed a 4-arg madd in the new code.

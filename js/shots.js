@@ -1859,44 +1859,57 @@ const SUN_HOME = (() => {
   const up = V.norm([0, 0, 0], V.madd([0, 0, 0], [0, 1, 0], PLANET, -V.dot([0, 1, 0], PLANET)));
   return V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], toCam, -0.4), V.scale([0, 0, 0], up, Math.sqrt(1 - 0.16))));
 })();
+// F2 → S23 is ONE TAKE: the home camera (homeCam) keeps drifting, eases round from the fleet onto the sunrise
+function homeCam(t) {
+  const u = Math.min(1, (t - 347.3) / 10.7);
+  const mp = motherPoint([0, 0, 0], Math.min(t, 358), [0, 0, 0]);
+  const side = V.norm([0, 0, 0], V.cross([0, 0, 0], PLANET, [0, 1, 0]));
+  const pos = V.add([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], mp, PLANET, -700 + u * 40 + Math.max(0, t - 358) * 6), side, 260), [0, -60, 0]);
+  return { pos, target: V.madd([0, 0, 0], mp, PLANET, 300 + u * 150), fov: 40 - u * 4 };
+}
 shot(347.3, 358, 'F2 HOME', (c) => {
   const { t, u, R } = c;
   // Earth. The mothership emerges slowly from the rift with escorts close to camera (Dune-style scale)
   c.env.planet = { dir: PLANET, radius: PL_R, col: [0.3, 0.5, 1.0], earth: true };
   c.env.sunDir = SUN_HOME;
   c.post.fade = smooth(347.3, 348.2, t);
-  const b = R.models.mothership.bounds;
   const mp = motherPoint([0, 0, 0], t, [0, 0, 0]);
-  const side = V.norm([0, 0, 0], V.cross([0, 0, 0], PLANET, [0, 1, 0]));
-  const pos = V.add([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], mp, PLANET, -700 + u * 40), side, 260), [0, -60, 0]);
-  camLook(c, pos, V.madd([0, 0, 0], mp, PLANET, 300 + u * 150), 40 - u * 4, 0.04);
-  handheld(c, 0.06);
+  const q = homeCam(t);
+  camLook(c, q.pos, q.target, q.fov, 0.04);
+  handheld(c, 0.06 * (1 - smooth(356, 358, t)));
   c.post.lensA = { enable: 0 };
   c.env.shadowCenter = mp; c.env.shadowRadius = 600;
   c.env.fill = [0.35, 0.37, 0.45, 0.5];
 });
-shot(358, 387.5, 'S23 title', (c) => {
+shot(358, 393.5, 'S23 title', (c) => {
   const { t } = c;
-  // the sunrise over Earth's limb; after the narration ends (366.6) the camera tilts slowly up into open space,
-  // then the title appears (371.8)
+  // ONE TAKE from F2: the camera keeps its place by the fleet and eases from the flagship onto Earth's limb (358–361);
+  // after the narration it tilts up FAST until the rising sun sits dead centre (366.8–368.2), holds on it, then
+  // turns away into open space where the title appears (369.8–371.8) and holds 20 s
   c.env.sunDir = SUN_HOME;
-  const dir0 = V.norm([0, 0, 0], V.lerp([0, 0, 0], PLANET, SUN, 0.5 + sat((t - 358) / 9) * 0.04));   // original framing (unchanged)
-  const upDir = V.norm([0, 0, 0], V.add([0, 0, 0], dir0, [0, 1.1, 0]));
-  const k = easeInOut(sat((t - 366.8) / 2.5));   // tilt up twice as fast
-  const dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], dir0, upDir, k));
-  camLook(c, [0, 0, 0], madd([0, 0, 0], dir, 1000), 34, 0.12 - k * 0.08);
-  c.world = false;
-  c.env.planet = { dir: PLANET, radius: PL_R, col: [0.3, 0.5, 1.0], earth: true };
-  c.env.stars = 0.6 + k * 0.3; c.env.sunDisc = 0;                  // the sky's own sun disc is replaced by the flare below
-  c.post.exposure = 0.75;
-  c.post.fade = 1 - smooth(384.5, 387, t);
-  // SUNRISE over the limb (reference): the sun and its lens flare are drawn by the final-pass flare shader
-  const rise = smooth(358.5, 362, t);
+  const q = homeCam(t), pos = q.pos;
+  const f0 = V.norm([0, 0, 0], V.sub([0, 0, 0], q.target, pos));
+  const dir0 = V.norm([0, 0, 0], V.lerp([0, 0, 0], PLANET, SUN, 0.5 + sat((t - 358) / 9) * 0.04));
   const S = SUN_RISE(), sp = madd([0, 0, 0], S, 1000);
-  c.R.glow(madd([0, 0, 0], V.norm([0, 0, 0], V.lerp([0, 0, 0], S, PLANET, 0.06)), 1000), 70, [1.2 * rise, 0.5 * rise, 0.1 * rise], 0.8);   // atmosphere catching the sunrise
-  c.post.flare = { pos: sp, intensity: 1.4 * rise };
-  c.post.streak = 0;                                                        // no sideways smear
-  c.post.godray = { pos: sp, intensity: 0.22 * rise, decay: 0.965 };
+  const upDir = V.norm([0, 0, 0], V.add([0, 0, 0], dir0, [0, 1.1, 0]));
+  const k0 = easeInOut(sat((t - 358) / 3.2));                 // fleet → the limb
+  const k1 = easeInOut(sat((t - 366.8) / 1.4));               // fast tilt up onto the sun
+  const k2 = easeInOut(sat((t - 369.8) / 2.0));               // hold, then away to the title
+  let dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], f0, dir0, k0));
+  dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], dir, S, k1));
+  dir = V.norm([0, 0, 0], V.lerp([0, 0, 0], dir, upDir, k2));
+  camLook(c, pos, madd(pos, dir, 1000), lerp(q.fov, 34, k0), lerp(0.04, 0.12, k0) - k2 * 0.08);
+  c.world = t < 366;                                          // the fleet stays in shot until we leave it behind
+  c.env.planet = { dir: PLANET, radius: PL_R, col: [0.3, 0.5, 1.0], earth: true };
+  c.env.stars = 0.6 + k2 * 0.3; c.env.sunDisc = 0;
+  c.post.exposure = 0.75;
+  c.post.fade = 1 - smooth(391.5, 393.3, t);
+  const rise = smooth(358.5, 362, t);
+  c.R.glow(madd(pos, V.norm([0, 0, 0], V.lerp([0, 0, 0], S, PLANET, 0.06)), 1000), 70, [1.2 * rise, 0.5 * rise, 0.1 * rise], 0.8);
+  c.post.flare = { pos: madd(pos, S, 1000), intensity: 1.4 * rise };
+  c.post.streak = 0;
+  c.post.godray = { pos: madd(pos, S, 1000), intensity: 0.22 * rise, decay: 0.965 };
+  c.env.shadowCenter = motherPoint([0, 0, 0], 358, [0, 0, 0]); c.env.shadowRadius = 600;
 });
 
 // the flagship charges its main gun only AFTER the order is given (v4c10 at 292.1, ~3.55 s)
