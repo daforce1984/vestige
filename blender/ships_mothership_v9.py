@@ -98,84 +98,99 @@ def light_row(mb, p0, p1, n, pitch, size, mat, R=None, dropout=0.0):
         obox(mb, p0 + f * (L * i / k), n, size, mat, lift=0.0, fwd=f)
 
 
+# ------------------------------------------------------------------------------------------ structural grid
+FR0, BAYL, FRAME = -44.0, 24.0, 6.0          # bulkheads every 24 m from the bay bulkhead s=-44, frames every 6 m
+WALL_T, CHAM_T, KEEL_T, TILE_H = 1.2, 1.1, 1.0, 0.7
+SPINE = [(293, 238, 9, 6), (238, 170, 13, 10), (170, 126, 17, 14), (126, 90, 17, 14), (90, -20, 19, 17),
+         (-20, -60, 22, 20), (-130, -200, 24, 19), (-200, -274, 20, 13)]
+STRAKE = [(176, 50, 50, 54), (126, 64, 51.5, 58), (40, 78, 51.5, 59), (-46, 94, 51.5, 59.5), (-120, 108, 44, 55),
+          (-200, 121, 32, 44), (-226, 121, 31, 42)]
+
+
+def grid(s0, s1, step=BAYL):
+    """Grid lines (multiples of `step` from FR0) strictly inside (s0, s1), with the ends added."""
+    k0 = math.ceil((s0 - FR0) / step + 1e-6)
+    out = [s0]
+    k = k0
+    while FR0 + k * step < s1 - 1e-6:
+        out.append(FR0 + k * step)
+        k += 1
+    out.append(s1)
+    # drop slivers at the ends
+    if len(out) > 2 and out[1] - out[0] < step * 0.3:
+        out.pop(1)
+    if len(out) > 2 and out[-1] - out[-2] < step * 0.3:
+        out.pop(-2)
+    return out
+
+
+def spine_hw(s):
+    if -132 <= s <= -58:
+        return 32.0                                # command block
+    for a, b, hw, hh in SPINE:
+        if b <= s <= a:
+            return float(hw)
+    return 0.0
+
+
+def strake_at(s):
+    """(x_out, z_bottom, z_top) of the strake at station s."""
+    st = STRAKE
+    for a, b in zip(st, st[1:]):
+        if b[0] <= s <= a[0]:
+            t = (a[0] - s) / (a[0] - b[0])
+            return tuple(lerp(u, v, t) for u, v in zip(a[1:], b[1:]))
+    return st[0][1:] if s > st[0][0] else st[-1][1:]
+
+
+def wall_skip(side, s0, s1):
+    """Wall spans reserved for the starboard hangar wall / port launch bay or hidden inside the sponsons."""
+    if s1 < -50:
+        return True
+    if side == 1 and s1 > FLAT_S[0] - 4 and s0 < FLAT_S[1] + 4:
+        return True
+    if side == -1 and s1 > 6 and s0 < 104:
+        return True
+    return False
+
+
 # ------------------------------------------------------------------------------------------ main hull
 def main_hull(mb, H, R):
+    """Hull loft + armour on a regular bulkhead grid: one plate per 24 m bay, three belts on the walls."""
     H.build(mb, 'hull')
-    # --- armour plates on chamfers, keel chamfers and walls (starboard wall skips the bay section)
-    mats = ['hull2', 'plate', 'hull', 'plate']
+    bays = grid(-282, 305)
+    # upper / lower chamfers: plate per bay split lengthwise; belt tone per edge
+    tone = {1: 'hull2', 3: 'hull2', 5: 'plate', 7: 'plate'}
     for e in (1, 3, 5, 7):
-        sc = cuts(-280, 305, R, 14, 34)
-        for a, b in zip(sc, sc[1:]):
-            if R.random() < 0.1:
-                continue
-            p0, p1 = e + 0.06, e + 0.94
-            if R.random() < 0.35:
-                pm = e + R.uniform(0.35, 0.65)
-                plate(mb, H, a + 0.6, b - 0.6, p0, pm - 0.03, R.choice(mats), thick=R.uniform(0.8, 2.0))
-                plate(mb, H, a + 0.6, b - 0.6, pm + 0.03, p1, R.choice(mats), thick=R.uniform(0.8, 2.0))
-            else:
-                plate(mb, H, a + 0.6, b - 0.6, p0, p1, R.choice(mats), thick=R.uniform(0.8, 2.2))
+        for i, (a, b) in enumerate(zip(bays, bays[1:])):
+            m = tone[e] if R.random() > 0.15 else 'hull'
+            t = CHAM_T + (0.3 if i % 2 else 0.0)
+            plate(mb, H, a + 0.6, b - 0.6, e + 0.06, e + 0.49, m, thick=t)
+            plate(mb, H, a + 0.6, b - 0.6, e + 0.53, e + 0.94, m, thick=t)
+    # walls: upper belt / citadel belt / lower belt
     for e, side in ((0, 1), (4, -1)):
-        sc = cuts(-280, 293, R, 12, 30)
-        for a, b in zip(sc, sc[1:]):
-            if side == 1 and b > FLAT_S[0] - 4 and a < FLAT_S[1] + 4:
-                continue   # starboard bay wall has its own treatment
-            if side == -1 and b > 8 and a < 102:
-                continue   # port launch bay
-            for (pa, pb) in ((e + 0.03, e + 0.3), (e + 0.34, e + 0.64), (e + 0.68, e + 0.97)):
-                if R.random() < 0.12:
-                    continue
-                plate(mb, H, a + 0.5, b - 0.5, pa, pb, R.choice(mats), thick=R.uniform(0.6, 1.6))
-    # --- window rows on the walls (deck levels)
-    for p in (0.2, 0.47, 0.82):
-        for side, e in ((1, 0), (-1, 4)):
-            pp = e + (p if side == 1 else 1 - p)
-            s = -278.0
-            while s < 283:
-                skip = (side == 1 and FLAT_S[0] - 4 < s < FLAT_S[1] + 4) or (side == -1 and 6 < s < 104)
-                if not skip and R.random() > 0.3:
-                    ln = R.uniform(4, 14)
-                    pos, n = H.pt(s + ln / 2, pp, 1.9)
-                    obox(mb, pos, n, (0.9, ln, 0.3), 'window', lift=0.0)
-                    s += ln + R.uniform(2, 6)
-                else:
-                    s += R.uniform(6, 18)
-    # --- keel: ventral spine blocks + lights
-    for a, b in zip(*[iter(cuts(-280, 280, R, 20, 40))] * 2):
-        w = R.uniform(14, 30)
-        blk(mb, a, b, -w / 2, w / 2, H.at((a + b) / 2)[2] - H.at((a + b) / 2)[1] / 2 + 1,
-            H.at((a + b) / 2)[2] - H.at((a + b) / 2)[1] / 2 - R.uniform(1.2, 3.0), R.choice(mats), ins=0.0)
+        belts = ((e + 0.03, e + 0.3), (e + 0.34, e + 0.64), (e + 0.68, e + 0.97))
+        btone = ('plate', 'hull2', 'plate') if side == 1 else ('plate', 'hull2', 'plate')[::-1]
+        for i, (a, b) in enumerate(zip(bays, bays[1:])):
+            if wall_skip(side, a, b):
+                continue
+            for k, (pa, pb) in enumerate(belts):
+                m = btone[k] if R.random() > 0.12 else 'hull'
+                plate(mb, H, a + 0.5, b - 0.5, pa, pb, m, thick=WALL_T + (0.25 if i % 2 else 0.0))
+    # keel: regular structural keel spine (one block per bay) + plate belts either side
+    for i, (a, b) in enumerate(zip(bays, bays[1:])):
+        zk = min(H.at(a)[2] - H.at(a)[1] / 2, H.at(b)[2] - H.at(b)[1] / 2)
+        blk(mb, a + 0.8, b - 0.8, -7, 7, zk + 1, zk - 2.2, 'hull2', ins=0.0)
+        plate(mb, H, a + 0.6, b - 0.6, 6.06, 6.36, 'plate', thick=KEEL_T)
+        plate(mb, H, a + 0.6, b - 0.6, 6.64, 6.94, 'plate', thick=KEEL_T)
+    # keel marker lights on a regular 12 m pitch
     for side in (1, -1):
         s = -270.0
         while s < 280:
             w, h, cz, _ = H.at(s)
-            pos = Vector((side * U_BOT * w / 2 * 0.7, Y(s), cz - h / 2 - 0.3))
-            obox(mb, pos, Vector((0, 0, -1)), (1.0, 3.0, 0.3), 'amber' if R.random() < 0.8 else 'blue_light',
-                 lift=0.0)
-            s += R.uniform(12, 26)
-    # small flank greebles (outside the starboard bay window and the port launch bay)
-    for _ in range(1400):
-        side = R.choice((1, -1))
-        s = R.uniform(-279, 293)
-        if side == 1 and FLAT_S[0] - 3 < s < FLAT_S[1] + 3:
-            continue
-        if side == -1 and 12 < s < 100:
-            continue
-        e = R.choice((0, 0, 1, 5, 7)) if side == 1 else R.choice((4, 4, 3, 5, 7))
-        if side == -1 and e == 7:
-            e = 5
-        if side == 1 and e == 5:
-            e = 7
-        pos, n = H.pt(s, e + R.uniform(0.05, 0.95), 1.2)
-        obox(mb, pos, n, (R.uniform(1, 3.5), R.uniform(2, 9), R.uniform(0.4, 1.8)), R.choice(
-            ['greeble', 'trim', 'plate', 'hull2']))
-    for _ in range(700):
-        s = R.uniform(-279, 293)
-        w, h, cz, _ = H.at(s)
-        x = R.uniform(-U_BOT, U_BOT) * w / 2 * 0.95
-        sz = R.uniform(0.6, 3.5)
-        mb.box((x, Y(s), cz - h / 2 - sz / 2 + 0.2), (R.uniform(1.5, 6), R.uniform(2, 10), sz),
-               R.choice(['greeble', 'trim', 'plate', 'hull2']))
+            pos = Vector((side * U_BOT * w / 2 * 0.7, Y(s), cz - h / 2 - KEEL_T - 0.1))
+            obox(mb, pos, Vector((0, 0, -1)), (1.0, 3.0, 0.3), 'amber', lift=0.0)
+            s += 12.0
 
 
 def deck_z(H, s):
@@ -187,84 +202,68 @@ def deck_half(H, s0, s1):
     return min(H.at(s0)[0], H.at(s1)[0], H.at((s0 + s1) / 2)[0]) / 2 * U_TOP
 
 
+def sblk(mb, a, b, xa0, xa1, xb0, xb1, za, zb, h, mat, ins=0.4):
+    """Deck tile following the deck slope between stations a < b: x span (xa0,xa1) at a and (xb0,xb1) at b,
+    bottom 0.5 below the deck surface (za at a, zb at b), top h above it, top face inset by `ins`."""
+    bot = [(xa0, Y(a), za - 0.5), (xa1, Y(a), za - 0.5), (xb1, Y(b), zb - 0.5), (xb0, Y(b), zb - 0.5)]
+    top = [(xa0 + ins, Y(a + ins), za + h), (xa1 - ins, Y(a + ins), za + h), (xb1 - ins, Y(b - ins), zb + h),
+           (xb0 + ins, Y(b - ins), zb + h)]
+    mb.hexa(bot + top, mat)
+
+
+DECK_XC = [0, 8, 16, 26, 34, 42, 50, 58]
+TRENCH = ((-60, 120),)                          # midship service trench at x = +-30
+
+
 def deck(mb, H, R):
-    """Layered deck plating: tiles of different heights, stacked sub-plates, trenches, vents, turrets."""
-    mats = ['hull2', 'plate', 'hull', 'plate', 'trim']
-    sc = cuts(-279, 293, R, 9, 24)
-    for a, b in zip(sc, sc[1:]):
-        zt = min(deck_z(H, a), deck_z(H, b))
-        xe = deck_half(H, a, b) - 1.0
-        # across-cuts: spine gap handled by the spine itself (tiles run under it)
-        xc = [-xe]
-        while xc[-1] < xe - 5:
-            xc.append(min(xe, xc[-1] + R.uniform(5, 16)))
-        xc[-1] = xe
-        for x0, x1 in zip(xc, xc[1:]):
-            if R.random() < 0.08:
-                continue  # exposed trench
-            if abs((x0 + x1) / 2) < 14 and R.random() < 0.7:
-                continue  # under the spine
-            hgt = R.choice([0.6, 0.9, 1.3, 1.8, 2.5, 3.2])
-            m = R.choice(mats[:4])
-            blk(mb, a + 0.5, b - 0.5, x0 + 0.4, x1 - 0.4, zt - 0.5, zt + hgt, m, ins=min(0.6, hgt * 0.4))
-            r = R.random()
-            if r < 0.5 and (b - a) > 8 and (x1 - x0) > 5:   # stacked second layer
-                sa = R.uniform(a + 1.5, (a + b) / 2 - 1)
-                sb = R.uniform((a + b) / 2 + 1, b - 1.5)
-                xa = R.uniform(x0 + 1, (x0 + x1) / 2 - 0.8)
-                xb = R.uniform((x0 + x1) / 2 + 0.8, x1 - 1)
-                h2 = R.uniform(0.8, 3.0)
-                blk(mb, sa, sb, xa, xb, zt + hgt - 0.2, zt + hgt + h2, R.choice(mats), ins=min(0.5, h2 * 0.35))
-                if R.random() < 0.3:
-                    cx, cs = (xa + xb) / 2, (sa + sb) / 2
-                    blk(mb, cs - 1.5, cs + 1.5, cx - 1.2, cx + 1.2, zt + hgt + h2 - 0.2, zt + hgt + h2 + 1.6,
-                        'greeble', ins=0.3)
-            elif r < 0.65 and (b - a) > 8:          # vent bank
-                n = int((b - a - 3) / 1.6)
-                fins(mb, Vector(((x0 + x1) / 2, Y(a + 1.5), zt + hgt - 0.1)), Vector((0, -1, 0)),
-                     Vector((0, 0, 1)), n, 1.6, 1.2, (x1 - x0) * 0.7, 0.5, 'greeble')
-            elif r < 0.72:                            # small light strip on the tile
-                obox(mb, Vector(((x0 + x1) / 2, Y((a + b) / 2), zt + hgt)), Vector((0, 0, 1)),
-                     (0.9, (b - a) * 0.6, 0.25), 'amber', lift=0.0)
-    # longitudinal trenches with amber lights (both sides of the spine)
+    """Main deck armour: regular tiles (12 m frames x 8/10 m lanes) following the deck slope; service trench."""
+    lane_mat = ['hull2', 'plate', 'hull2', 'plate', 'hull', 'plate', 'hull2']
+    rows = grid(-285, 305, 12.0)
+    for a, b in zip(rows, rows[1:]):
+        za, zb = deck_z(H, a), deck_z(H, b)
+        xea, xeb = H.at(a)[0] / 2 * U_TOP - 1.0, H.at(b)[0] / 2 * U_TOP - 1.0
+        in_trench = any(t0 <= (a + b) / 2 <= t1 for t0, t1 in TRENCH)
+        for li, (x0, x1) in enumerate(zip(DECK_XC, DECK_XC[1:])):
+            if in_trench and li == 3:
+                continue                            # trench lane
+            if max(spine_hw(a), spine_hw(b)) - 2.5 >= x1:
+                continue                            # under the spine / command block
+            if 243 <= b and a <= 311 and x1 <= 15:
+                continue                            # under the cannon brow
+            if x0 >= 42 and -226 <= (a + b) / 2 <= 170:
+                continue                            # under the strake
+            oa, ob = min(x1, xea), min(x1, xeb)
+            if min(oa, ob) < x0 + 2.5:
+                if max(oa, ob) < x0 + 2.5:
+                    continue
+            oa, ob = max(oa, x0 + 1.0), max(ob, x0 + 1.0)
+            m = lane_mat[li] if R.random() > 0.12 else 'hull'
+            for sg in (1, -1):
+                xs = sorted((sg * (x0 + 0.4), sg * (oa - 0.4)))
+                xt = sorted((sg * (x0 + 0.4), sg * (ob - 0.4)))
+                sblk(mb, a + 0.4, b - 0.4, xs[0], xs[1], xt[0], xt[1], za, zb, TILE_H, m)
+    # service trench (midship): recessed floor, raised kerbs, amber guide lights on a 6 m pitch
     for side in (1, -1):
         x = side * 30.0
-        for a, b in ((-270, -140), (-60, 120), (130, 250)):
+        for a, b in TRENCH:
             zt = min(deck_z(H, a), deck_z(H, b))
-            if abs(x) + 4 > deck_half(H, a, b):
-                continue
             blk(mb, a, b, x - 3.2, x + 3.2, zt - 1.0, zt + 0.1, 'greeble')
             for xs in (x - 3.8, x + 3.8):
-                blk(mb, a, b, xs - 0.7, xs + 0.7, zt - 0.5, zt + 3.4, 'trim', ins=0.3)
-            light_row(mb, (x, Y(a + 3), zt + 0.1), (x, Y(b - 3), zt + 0.1), (0, 0, 1), 7.0,
+                blk(mb, a, b, xs - 0.7, xs + 0.7, zt - 0.5, zt + 1.6, 'trim', ins=0.3)
+            light_row(mb, (x, Y(a + 3), zt + 0.1), (x, Y(b - 3), zt + 0.1), (0, 0, 1), 6.0,
                       (1.2, 2.4, 0.25), 'amber')
     # deck-edge amber rows along the chamfer break (the "edge lights" of the wedge)
     for side in (1, -1):
         s = -276.0
         while s < 293:
-            w, h, cz, _ = H.at(s)
-            pos, n = H.pt(s, 1.12 if side == 1 else 2.88, 2.4)
+            pos, n = H.pt(s, 1.12 if side == 1 else 2.88, CHAM_T + 0.35)
             obox(mb, pos, n, (1.0, 2.2, 0.3), 'amber', lift=0.0)
-            s += 5.5
-    # dorsal turrets
-    for s, x in ((210, 20), (210, -20), (150, 34), (150, -34), (-10, 40), (-10, -40), (-180, 44), (-180, -44)):
-        zt = deck_z(H, s)
-        turret(mb, Vector((x, Y(s), zt + 2.5)), Vector((0, 0, 1)), 6.5, 'trim', 'hull2', 'greeble', barrels=3,
-               blen=2.4)
-    # scattered small greebles everywhere on deck
-    for _ in range(4500):
-        s = R.uniform(-279, 293)
-        xe = deck_half(H, s - 2, s + 2) - 2
-        x = R.uniform(-xe, xe)
-        zt = deck_z(H, s)
-        sx, sy, sz = R.uniform(1, 4), R.uniform(1.5, 7), R.uniform(0.6, 4.2)
-        mb.box((x, Y(s), zt + sz / 2 - 0.2), (sx, sy, sz), R.choice(['greeble', 'trim', 'plate', 'hull2']))
+            s += 6.0
 
 
 def spine_and_bridge(mb, H, R):
     """Stepped central superstructure and the command block with canopy dome (~1/3 from the stern)."""
-    segs = [(293, 238, 9, 6), (238, 170, 13, 10), (170, 126, 17, 14), (126, 90, 17, 14), (90, -20, 19, 17), (-20, -60, 22, 20),
-            (-130, -200, 24, 19), (-200, -274, 20, 13)]
+    segs = SPINE
     for (a, b, hw, hh) in segs:
         zt = min(deck_z(H, a), deck_z(H, b))
         zb0 = max(zt - 1, BAY_Z[1] + 0.5) if b < BAY_S[1] else zt - 1   # keep clear of the bay volume
@@ -277,23 +276,15 @@ def spine_and_bridge(mb, H, R):
                       (side, 0, 0.35), 3.2, (0.7, 2.2, 0.3), 'window', R=R, dropout=0.25)
             light_row(mb, (side * (hw - 0.8), Y(a - 5), zt + hh * 0.25), (side * (hw - 0.8), Y(b + 5), zt + hh * 0.25),
                       (side, 0, 0.1), 4.0, (0.7, 2.6, 0.3), 'window', R=R, dropout=0.45)
-        # top greebles on the spine
+        # roof armour: three lanes, plates on the 6 m frame grid (machinery is added by the systems pass)
         ztop = zt + hh + 4.5
-        sc = cuts(b + 8, a - 8, R, 5, 14)
+        sc = grid(b + 8, a - 8, 12.0)
         xw = hw * 0.62 - 1.6
+        xc = [-xw, -xw / 3, xw / 3, xw]
         for sa, sb in zip(sc, sc[1:]):
-            xc = [-xw, R.uniform(-xw * 0.5, -1), R.uniform(1, xw * 0.5), xw]
-            for x0, x1 in zip(xc, xc[1:]):
-                if R.random() < 0.2:
-                    continue
-                hgt = R.choice([0.4, 0.8, 1.2, 2.0])
-                blk(mb, sa + 0.4, sb - 0.4, x0 + 0.3, x1 - 0.3, ztop - 0.3, ztop + hgt, R.choice(['plate', 'hull', 'trim']),
-                    ins=min(0.4, hgt * 0.4))
-        for _ in range(int(abs(a - b) / 5)):
-            s = R.uniform(b + 8, a - 8)
-            x = R.uniform(-hw * 0.45, hw * 0.45)
-            sx, sy, sz = R.uniform(1.5, 5), R.uniform(2, 8), R.uniform(0.8, 3.5)
-            mb.box((x, Y(s), ztop + sz / 2 - 0.2), (sx, sy, sz), R.choice(['greeble', 'trim', 'plate']))
+            for k, (x0, x1) in enumerate(zip(xc, xc[1:])):
+                blk(mb, sa + 0.4, sb - 0.4, x0 + 0.3, x1 - 0.3, ztop - 0.3, ztop + 0.6,
+                    'plate' if k != 1 else 'hull', ins=0.25)
     # spine ridge lights
     light_row(mb, (0, Y(285), deck_z(H, 285) + 10.6), (0, Y(250), deck_z(H, 250) + 10.6), (0, 0, 1), 6,
               (0.8, 2.0, 0.3), 'blue_light')
@@ -323,28 +314,24 @@ def spine_and_bridge(mb, H, R):
     dome(mb, (0, Y(-98), dz), 10.5, 'glass', base_mat='trim')
     light_row(mb, (-11.5, Y(-98) - 3, dz + 0.2), (11.5, Y(-98) - 3, dz + 0.2), (0, -1, 0.2), 2.0,
               (0.5, 1.2, 0.3), 'blue_light')
-    # antennae / sensor masts
-    antenna(mb, (14, Y(-118), dz), 7, 0.5, 'trim', bars=3, mat_bar='greeble')
-    antenna(mb, (-15, Y(-112), dz), 5, 0.45, 'trim', bars=2, mat_bar='greeble')
-    antenna(mb, (6, Y(-240), deck_z(H, -240) + 17), 9, 0.4, 'trim', bars=2)
-    antenna(mb, (-8, Y(60), deck_z(H, 60) + 21), 8, 0.4, 'trim', bars=2)
-    mb.sphere((15, Y(-118), dz + 7.6), 1.2, 'blue_light', seg=8, rings=4)
-    mb.sphere((-15, Y(-112), dz + 5.6), 1.0, 'amber', seg=8, rings=4)
     return dz + 10.5
 
 
 # ------------------------------------------------------------------------------------------ sponsons
+def spon_sec(x):
+    """Sponson section at |x|: (s_leading, s_trailing, z_bottom, z_top)."""
+    t = max(0.0, x - 62) / 71.0
+    s_le = -46 - t * 150          # swept leading edge: -46 at the hull -> -196 at the tip
+    s_te = -286 + t * 8
+    zb = -24 + t * 8
+    zt = 50 - t * 22              # top slopes down outward (angled shoulder)
+    return s_le, s_te, zb, zt
+
+
 def sponson(mb, R, sg):
     """Swept, angled armour 'shoulder' on one flank (sg=+1 starboard, -1 port), aft of s=-46."""
     xs = [56, 70, 92, 114, 128, 133]
-
-    def sec(x):
-        t = max(0.0, x - 62) / 71.0
-        s_le = -46 - t * 150          # swept leading edge: -46 at the hull -> -196 at the tip
-        s_te = -286 + t * 8
-        zb = -24 + t * 8
-        zt = 50 - t * 22              # top slopes down outward (angled shoulder)
-        return s_le, s_te, zb, zt
+    sec = spon_sec
 
     def ring(x, shrink=0.0):
         s_le, s_te, zb, zt = sec(x)
@@ -369,39 +356,14 @@ def sponson(mb, R, sg):
                (sg * (x1 - ins), Y(sb - ins), zb_ + h), (sg * (x0 + ins), Y(sb - ins), za + h)]
         mb.hexa(bot + top, m)
     xb_ = [63, 72, 83, 95, 106, 118, 129]
-    for x0, x1 in zip(xb_, xb_[1:]):
+    lane_mat = ['hull2', 'plate', 'hull2', 'plate', 'hull2', 'plate']
+    for li, (x0, x1) in enumerate(zip(xb_, xb_[1:])):
         smax = sec(x1)[0] - 17
         smin = sec(x1)[1] + 8
-        sc = cuts(smin, smax, R, 8, 22)
+        sc = grid(smin, smax, 12.0)
         for sa, sb in zip(sc, sc[1:]):
-            if R.random() < 0.08:
-                continue
-            h = R.choice([0.6, 1.0, 1.6, 2.4, 3.2])
-            splate(x0 + 0.4, x1 - 0.4, sa + 0.4, sb - 0.4, 0.0, h, R.choice(['hull2', 'plate', 'hull', 'plate']),
-                   min(0.6, h * 0.4))
-            r = R.random()
-            if r < 0.45 and sb - sa > 7:
-                ca, cb = R.uniform(x0 + 1, (x0 + x1) / 2 - 0.5), R.uniform((x0 + x1) / 2 + 0.5, x1 - 1)
-                da, db = R.uniform(sa + 1, (sa + sb) / 2 - 1), R.uniform((sa + sb) / 2 + 1, sb - 1)
-                h2 = R.uniform(0.8, 2.6)
-                splate(ca, cb, da, db, h - 0.2, h2, R.choice(['hull2', 'trim', 'plate']), 0.4)
-            elif r < 0.55:
-                obox(mb, Vector((sg * (x0 + x1) / 2, Y((sa + sb) / 2), zt_at((x0 + x1) / 2) + h)),
-                     Vector((0, 0, 1)), (0.9, (sb - sa) * 0.6, 0.25), 'amber', lift=0.0)
-    for _ in range(420):
-        x = R.uniform(64, 128)
-        s_le, s_te, zb, zt = sec(x)
-        s = R.uniform(s_te + 9, s_le - 18)
-        sx, sy, sz = R.uniform(1, 4), R.uniform(1.5, 7), R.uniform(0.8, 4.5)
-        mb.box((sg * x, Y(s), zt + sz / 2 - 0.3), (sx, sy, sz), R.choice(['greeble', 'trim', 'plate', 'hull2']))
-    for _ in range(4):
-        x = R.uniform(80, 118)
-        s_le, s_te, zb, zt = sec(x)
-        s = R.uniform(s_te + 20, s_le - 40)
-        fins(mb, Vector((sg * x, Y(s), zt + 1.5)), Vector((0, -1, 0)), Vector((0, 0, 1)), 10, 1.8, 1.6, 9, 0.5,
-             'greeble')
-    turret(mb, Vector((sg * 100, Y(-205), sec(100)[3] + 3.5)), Vector((0, 0, 1)), 6.0, 'trim', 'hull2', 'greeble',
-           barrels=2, blen=2.4)
+            m = lane_mat[li] if R.random() > 0.12 else 'hull'
+            splate(x0 + 0.4, x1 - 0.4, sa + 0.4, sb - 0.4, 0.0, TILE_H + 0.2, m, 0.35)
 
     # armour panels on the leading upper / lower chamfers and the aft top chamfer
     ctr = Vector((sg * 95, Y(-200), 10))
@@ -418,9 +380,9 @@ def sponson(mb, R, sg):
                     n = -n
                 g = 0.7
                 q = [c + (v - c) * 0.94 for v in q]
-                t = R.uniform(0.7, 1.8)
-                top = [c + (v - c) * 0.88 + n * t for v in q]
-                mb.hexa([v - n * 0.3 for v in q] + top, R.choice(['hull2', 'plate', 'plate']))
+                t = 1.1 + 0.3 * (k % 2)
+                top = [c + (v - c) * 0.9 + n * t for v in q]
+                mb.hexa([v - n * 0.3 for v in q] + top, 'hull2' if (i, k) != (2, 0) else 'plate')
     # amber edge lights: along the leading chamfer, the top leading break, the outer tip and the trailing edge
     xa, xb = 60, 128
     A, B = sec(xa), sec(xb)
@@ -440,7 +402,7 @@ def sponson(mb, R, sg):
     s_le, s_te, zb, zt = sec(133)
     for z in (zb + 10, (zb + zt) / 2, zt - 9):
         light_row(mb, (sg * 133.2, Y(s_le - 22), z), (sg * 133.2, Y(s_te + 10), z), (sg, 0, 0), 4.0,
-                  (0.8, 2.4, 0.3), 'window', R=R, dropout=0.25)
+                  (0.8, 2.4, 0.3), 'window', R=R, dropout=0.15)
     mb.sphere((sg * 133.5, Y(s_le - 18), zt - 4), 1.6, 'blue_light' if sg > 0 else 'amber', seg=8, rings=4)
     # trailing (aft) face lights + small engine
     s_le, s_te, zb, zt = sec(100)
@@ -452,50 +414,33 @@ def strake(mb, R, sg):
     """Upper armoured strake (above z=51 over the bay, so it never covers the starboard bay wall) that carries the
     wedge line from the forward hull out onto the sponson top -> continuous arrowhead planform."""
     # (s, x_out, z_bottom, z_top)
-    st = [(176, 50, 50, 54), (126, 64, 51.5, 58), (40, 78, 51.5, 59), (-46, 94, 51.5, 59.5), (-120, 108, 44, 55),
-          (-200, 121, 32, 44), (-226, 121, 31, 42)]
+    st = STRAKE
 
     def ring(s, xo, zb, zt):
         return [Vector((sg * x, Y(s), z)) for x, z in
                 ((36, zt + 0.5), (xo - 5, zt), (xo, zt - 3.5), (xo - 2, zb), (46, zb))]
     mb.loft([ring(*r) for r in st], 'hull2')
 
-    def at(s):
-        for a, b in zip(st, st[1:]):
-            if b[0] <= s <= a[0]:
-                t = (a[0] - s) / (a[0] - b[0])
-                return tuple(lerp(u, v, t) for u, v in zip(a[1:], b[1:]))
-        return st[-1][1:]
-    # plates on the strake top and an amber edge line
-    sc = cuts(-222, 168, R, 10, 24)
+    at = strake_at
+    # roof armour: 12 m frames x 12 m lanes, outer lane clipped to the swept edge
+    XS = [38, 50, 62, 74, 86, 98, 110, 122]
+    sc = grid(-222, 168, 12.0)
     for sa, sb in zip(sc, sc[1:]):
         xo_a, _, zt_a = at(sa)
         xo_b, _, zt_b = at(sb)
-        xo = min(xo_a, xo_b) - 6
-        if xo < 50:
-            continue
-        x0 = 44 + R.uniform(0, 4)
-        h = R.choice([0.5, 0.9, 1.4, 2.0])
-        za, zb_ = zt_a, zt_b
-        bot = [(sg * x0, Y(sa + 0.5), za - 0.4), (sg * xo, Y(sa + 0.5), za - 0.4), (sg * xo, Y(sb - 0.5), zb_ - 0.4),
-               (sg * x0, Y(sb - 0.5), zb_ - 0.4)]
-        top = [(sg * (x0 + 0.5), Y(sa + 1), za + h), (sg * (xo - 0.5), Y(sa + 1), za + h),
-               (sg * (xo - 0.5), Y(sb - 1), zb_ + h), (sg * (x0 + 0.5), Y(sb - 1), zb_ + h)]
-        mb.hexa(bot + top, R.choice(['plate', 'hull', 'hull2', 'plate']))
-        if R.random() < 0.5:
-            xm = R.uniform(x0 + 3, xo - 3)
-            sm = (sa + sb) / 2
-            mb.box((sg * xm, Y(sm), lerp(za, zb_, 0.5) + h + 0.8), (R.uniform(2, 5), R.uniform(3, 8), 2.0),
-                   R.choice(['greeble', 'trim']))
-    for _ in range(260):
-        sm = R.uniform(-220, 160)
-        xo, zb, zt = at(sm)
-        if xo < 56:
-            continue
-        x = R.uniform(46, xo - 7)
-        sz = R.uniform(0.6, 3.2)
-        mb.box((sg * x, Y(sm), zt + 1.0 + sz / 2), (R.uniform(1, 4), R.uniform(2, 8), sz),
-               R.choice(['greeble', 'trim', 'plate', 'hull2']))
+        for li, (x0, x1) in enumerate(zip(XS, XS[1:])):
+            oa, ob = min(x1, xo_a - 6), min(x1, xo_b - 6)
+            if max(oa, ob) < x0 + 3:
+                continue
+            oa, ob = max(oa, x0 + 1.5), max(ob, x0 + 1.5)
+            m = ('plate', 'hull2')[li % 2] if R.random() > 0.12 else 'hull'
+            h = 1.0
+            za, zb_ = zt_a, zt_b
+            bot = [(sg * (x0 + 0.4), Y(sa + 0.4), za - 0.4), (sg * oa, Y(sa + 0.4), za - 0.4),
+                   (sg * ob, Y(sb - 0.4), zb_ - 0.4), (sg * (x0 + 0.4), Y(sb - 0.4), zb_ - 0.4)]
+            top = [(sg * (x0 + 0.8), Y(sa + 0.8), za + h), (sg * (oa - 0.4), Y(sa + 0.8), za + h),
+                   (sg * (ob - 0.4), Y(sb - 0.8), zb_ + h), (sg * (x0 + 0.8), Y(sb - 0.8), zb_ + h)]
+            mb.hexa(bot + top, m)
     s = 165.0
     while s > -224:
         xo, zb, zt = at(s)
@@ -507,7 +452,7 @@ def strake(mb, R, sg):
         xo, zb, zt = at(s)
         obox(mb, Vector((sg * (xo - 1.6), Y(s), zb - 0.1)), Vector((0, 0, -1)), (0.9, 3.0, 0.3), 'window',
              lift=0.0)
-        s -= R.uniform(6, 14)
+        s -= 6.0
 
 
 # ------------------------------------------------------------------------------------------ engines / stern

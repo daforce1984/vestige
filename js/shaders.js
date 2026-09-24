@@ -847,8 +847,8 @@ struct VO {
   var wp: vec3f;
   var uv = corner;
   var ext = vec2f(0.0);
-  if (shape == 3) {
-    // streak / beam capsule from a.xyz to b.xyz, radius c.x
+  if (shape == 3 || shape == 12) {
+    // streak / beam capsule from a.xyz to b.xyz, radius c.x (12: arc discharge channel, same camera-facing ribbon)
     let p0 = s.a.xyz; let p1 = s.b.xyz; let r = s.c.x;
     let ax = p1 - p0;
     let L = max(length(ax), 1e-4);
@@ -1102,6 +1102,53 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     let q = vec3f(i.uv * 3.0, s.b.w + t * 2.5);
     let g = vec2f(vnoise(q + vec3f(0.1, 0.0, 0.0)) - vnoise(q - vec3f(0.1, 0.0, 0.0)), vnoise(q + vec3f(0.0, 0.1, 0.0)) - vnoise(q - vec3f(0.0, 0.1, 0.0)));
     dist = g * s.d.a * 0.03 * smoothstep(1.0, 0.3, r);
+  } else if (shape == 12) {
+    // ARC DISCHARGE: a fractal lightning channel between the two terminals — mid-point-style multi-octave wander
+    // pinned at both ends, a white-hot core with a coloured sheath and a wide ionisation glow, forked side branches,
+    // re-striking at c.z Hz with a short crossfade (never a single-frame strobe). c.x = channel half-width (wander
+    // room), c.y = seed
+    let L = i.ext.x;
+    let u = clamp(i.uv.x / max(L, 1e-3), 0.0, 1.0);
+    let v = i.uv.y;
+    let rate = max(s.c.z, 0.1);
+    let ph = t * rate + s.c.y * 7.13;
+    let k0 = floor(ph); let w = fract(ph);
+    var lum = 0.0; var glow = 0.0;
+    for (var ps = 0; ps < 2; ps++) {
+      let sd = s.c.y * 13.7 + (k0 + f32(ps)) * 3.91;
+      let wgt = select(1.0 - smoothstep(0.55, 1.0, w), smoothstep(0.0, 0.45, w), ps == 1);   // crossfade strikes
+      if (wgt <= 0.001) { continue; }
+      let pin = sin(3.14159 * u);
+      // jagged: a piecewise-linear random walk (sharp kinks, like a real stepped leader) at two scales + fine noise
+      var d = 0.0;
+      let n1 = u * 9.0; let i1 = floor(n1);
+      d += mix(hash31(vec3f(i1, sd, 1.0)), hash31(vec3f(i1 + 1.0, sd, 1.0)), fract(n1)) - 0.5;
+      let n2 = u * 31.0; let i2 = floor(n2);
+      d += (mix(hash31(vec3f(i2, sd, 2.0)), hash31(vec3f(i2 + 1.0, sd, 2.0)), fract(n2)) - 0.5) * 0.4;
+      d += (vnoise(vec3f(u * 120.0, sd, 3.0)) - 0.5) * 0.08;
+      d *= 1.05 * pin;
+      let dm = abs(v - d);
+      let jitter = 0.85 + 0.15 * vnoise(vec3f(u * 40.0, t * 30.0, sd));                       // current flicker along it
+      lum += (exp(-pow(dm / 0.045, 2.0)) * 1.6 + exp(-dm * 9.0) * 0.45) * wgt * jitter;
+      glow += exp(-dm * 3.0) * 0.18 * wgt;
+      // two forks leaving the main channel and dying out
+      for (var b = 0; b < 2; b++) {
+        let ub = 0.18 + 0.55 * hash31(vec3f(sd, f32(b), 1.0));
+        if (u > ub) {
+          let du = u - ub;
+          let dirb = select(-1.0, 1.0, hash31(vec3f(sd, f32(b), 2.0)) > 0.5);
+          var db = d + dirb * du * 1.6;
+          db += (vnoise(vec3f(u * 12.0, sd + f32(b) * 9.0, 3.0)) - 0.5) * 0.35 * du * 3.0;
+          let fade = 1.0 - smoothstep(0.0, 0.22, du);
+          let dbm = abs(v - db);
+          lum += (exp(-pow(dbm / 0.03, 2.0)) * 1.1 + exp(-dbm * 12.0) * 0.3) * fade * wgt;
+        }
+      }
+    }
+    let endK = (exp(-u * 60.0) + exp(-(1.0 - u) * 60.0)) * exp(-v * v * 30.0);   // hot terminal spots (round, not the whole ribbon)
+    col = (vec3f(1.0, 0.97, 1.0) * clamp(lum - 0.9, 0.0, 3.0) * 0.8 + tint * (lum + glow) + tint * endK * 0.6) * s.d.a;
+    alpha = 0.0;
+    dist = vec2f(0.0, v) * glow * 0.01 * s.d.a;
   } else if (shape == 3) {
     // beam capsule: uv.x along (world units), uv.y across (-1..1)
     let L = i.ext.x; let r = i.ext.y;

@@ -713,6 +713,8 @@ export function debrisOnly(R, keepName) {
   return (_debHidden[keepName] = h);
 }
 
+// the six crown arc terminals (horn tips) in dreadnought model space before the ×1.65 load scale — tools/make_dread_lance.py
+const DREAD_HORNS = [[4.503, 2.6, 212.5], [0, 5.2, 212.5], [-4.503, 2.6, 212.5], [-4.503, -2.6, 212.5], [0, -5.2, 212.5], [4.503, -2.6, 212.5]];
 export function dreadEmitter(R, t, entry) {
   return R.emptyWorld([0, 0, 0], 'enemy_dreadnought', entry, 'lance_emitter');
 }
@@ -754,6 +756,17 @@ function drawDreadnought(R, t, tmpM) {
   const e = R.add('enemy_dreadnought', mat(tmpM, hin.u < 1 ? hin.pos : pos, fwd));
   e.seed = 40;
   if (hin.u < 1) { e.revealZ = hin.revealZ; e.revealDir = hin.dir; e.revealWidth = 4; e.tint = [2.5, 0.3, 0.2]; e.stretch = stretchIn(hin.u); }
+  // the gravity-lance firing system (tools/make_dread_lance.py, blueprint blender/DREAD_LANCE_BLUEPRINT.svg)
+  const ln = R.add('dread_lance', e.m);
+  if (ln) {
+    ln.seed = 41; ln.revealZ = e.revealZ; ln.revealDir = e.revealDir; ln.revealWidth = e.revealWidth; ln.tint = e.tint; ln.stretch = e.stretch;
+    const ch = t < LANCE_FIRE ? sat((t - 200) / 16) : Math.max(0, 1 - (t - LANCE_FIRE) / 5);
+    const g = 0.12 + 1.3 * ch * (0.85 + 0.15 * Math.sin(t * (6 + 20 * ch)));
+    const blink = (Math.sin(t * 5) > 0 ? 1 : 0.15) * (0.4 + 0.6 * ch);
+    ln.matOverride = { lance_glow: { base: [0.1, 0.02, 0.14], metal: 0, rough: 0.3, emissive: [0.75 * g, 0.25 * g, 1.0 * g] },
+      lance_warn: { base: [0.3, 0.02, 0.02], metal: 0, rough: 0.4, emissive: [3 * blink, 0.25 * blink, 0.15 * blink] } };
+    GUN.dreadLance = ln;
+  }
   if (hin.alpha > 0) hyperWindow(R, hin.W, fwd, sz[0] * 0.75 + 20, sz[1] * 0.85 + 20, HYPER_RED, hin.alpha * 0.9);
   if (t > MAIN_FIRE) {
     e.damage = sat((t - MAIN_FIRE) / 5) * 0.9;
@@ -772,41 +785,34 @@ function drawDreadnought(R, t, tmpM) {
     const ch = sat((t - 200) / 16);
     const pulse = 0.8 + 0.2 * Math.sin(t * (10 + ch * 30));
     const k = t < LANCE_FIRE ? ch : Math.max(0, 1 - (t - LANCE_FIRE) / 6);
-    R.glow(em, (8 + 35 * k) * pulse, [LANCE_COL[0] * 2 * k, LANCE_COL[1] * 2 * k, LANCE_COL[2] * 2 * k], 0.5);
-    R.glow(em, (4 + 20 * k), [3 * k, 3 * k, 4 * k], 0.3);
+    R.glow(em, (8 + 30 * k) * pulse, [LANCE_COL[0] * 0.9 * k, LANCE_COL[1] * 0.9 * k, LANCE_COL[2] * 0.9 * k], 0.5);   // toned down: the machinery and the arcs must read
+    R.glow(em, (3 + 12 * k), [2 * k, 2 * k, 2.6 * k], 0.3);
     R.light(em, 600, LANCE_COL, 6 * k);
     if (t < LANCE_FIRE) {
       const aim = V.norm([0, 0, 0], V.sub([0, 0, 0], motherPoint([0, 0, 0], t, LANCE_HIT), em));
       const u1 = V.norm([0, 0, 0], V.cross([0, 0, 0], aim, [0, 1, 0])), u2 = V.cross([0, 0, 0], u1, aim);
       // accelerating inflow from all around
       chargeInflow(R, t, 200, LANCE_FIRE - 200, em, 360, 200, LANCE_COL, 2.5, 13, 1.1, 77);
-      // coil rings down the barrel: spin faster as the charge builds, lighting up in a travelling wave toward the muzzle
-      const spin = 2 * (t - 200) + 1.2 * Math.pow(t - 200, 2) / 16;
-      for (let j = 0; j < 5; j++) {
-        const c = V.madd([0, 0, 0], em, aim, 14 + j * 16);
-        const r = (28 - j * 3.2) * (1 - 0.25 * ch);
-        const a = spin * (j % 2 ? 1 : -1) + j;
-        const ax = V.add([0, 0, 0], V.scale([0, 0, 0], u1, Math.cos(a) * r), V.scale([0, 0, 0], u2, Math.sin(a) * r));
-        const ay = V.add([0, 0, 0], V.scale([0, 0, 0], u1, -Math.sin(a) * r), V.scale([0, 0, 0], u2, Math.cos(a) * r));
-        const wave = Math.pow(0.5 + 0.5 * Math.sin((t - 200) * (4 + 14 * ch) - j * 1.2), 3);
-        const b = (0.3 + 1.7 * wave) * ch;
-        R.ring(c, [ax[0], ax[1], ax[2], 0], [ay[0], ay[1], ay[2], 0], [LANCE_COL[0] * b, LANCE_COL[1] * b, LANCE_COL[2] * b], 0.9);
+      // (the coil stack is real geometry now — dread_lance.glb — its apertures glow via matOverride)
+      // ARC DISCHARGE (shader lightning, sprite 12): the six crown terminals arc to each other and into the core,
+      // the coil stack flashes over to the guide rails; density, reach and rate climb with the charge
+      const tipW = (k) => M.transformPoint([0, 0, 0], e.m, DREAD_HORNS[k].map((v) => v * 1.65));
+      const AC = [LANCE_COL[0] * 1.6, LANCE_COL[1] * 1.3, LANCE_COL[2] * 1.8];
+      for (let k = 0; k < 6; k++) {
+        const on = ch > 0.08 + k * 0.05;
+        if (!on) continue;
+        const a = tipW(k), b = tipW((k + 1) % 6);
+        R.arc(a, b, 3.2, AC, 0.9 * ch, 11 + k, 7 + 7 * ch);                          // terminal to terminal round the crown
+        if (ch > 0.35) R.arc(a, em, 4.5, AC, 1.1 * ch, 31 + k, 9 + 9 * ch);         // terminal into the core
+        if (ch > 0.7 && k % 2 === 0) R.arc(a, tipW((k + 3) % 6), 6, AC, 0.8 * ch, 51 + k, 12);   // across the crown
       }
-      // plasma arcs jumping between the fork prongs (re-rolled ~16×/s)
-      for (let j = 0; j < 6; j++) {
-        const rate = 3 + 2 * ch, cyc = (t - 200) * rate + j * 0.37, sd = Math.floor(cyc) * 3.1 + j * 7.7;
-        const env = Math.sin(Math.PI * (cyc % 1));                        // each arc fades in and out (no per-frame strobe)
-        if (hash(sd) > 0.35 + 0.6 * ch) continue;
-        const a0 = hash(sd + 1) * 6.283, a1 = a0 + Math.PI * (0.6 + 0.8 * hash(sd + 2));
-        const r = 34, pa = V.madd([0, 0, 0], V.madd([0, 0, 0], em, u1, Math.cos(a0) * r), u2, Math.sin(a0) * r);
-        const pb = V.madd([0, 0, 0], V.madd([0, 0, 0], em, u1, Math.cos(a1) * r), u2, Math.sin(a1) * r);
-        let prev = pa;
-        for (let q = 1; q <= 6; q++) {
-          const m = V.lerp([0, 0, 0], pa, pb, q / 6), jg = randDir([0, 0, 0], sd + q * 1.7);
-          const pt = q < 6 ? V.madd([0, 0, 0], V.madd([0, 0, 0], m, jg, 5), aim, -6 * Math.sin(q / 6 * Math.PI)) : pb;
-          R.beam(prev, pt, 0.5, [LANCE_COL[0] * 3 * ch * env, LANCE_COL[1] * 2.5 * ch * env, LANCE_COL[2] * 3 * ch * env], 1, 10);
-          prev = pt;
-        }
+      for (let j = 0; j < 6; j++) {                                                    // coil stack flash-overs to the rails
+        if (ch < 0.25 + j * 0.1) continue;
+        const z = [100, 124, 148, 170, 190, 136][j] * 1.65, r = (12 - ([100, 124, 148, 170, 190, 136][j] - 100) * 0.03 + 2) * 1.65;
+        const sgn = j % 2 ? 1 : -1, ang = hash(Math.floor(t * 3 + j)) * 6.283;
+        const p0 = M.transformPoint([0, 0, 0], e.m, [Math.cos(ang) * r, Math.sin(ang) * r, z]);
+        const p1 = M.transformPoint([0, 0, 0], e.m, [0, sgn * 14 * 1.65, z + (hash(j + 3) - 0.5) * 12]);
+        R.arc(p0, p1, 5, AC, 0.7 * ch, 71 + j, 6 + 6 * ch);
       }
       // spiral vortex contracting into the core
       for (let j = 0; j < 36; j++) {
@@ -817,7 +823,7 @@ function drawDreadnought(R, t, tmpM) {
         R.glow(p, 1.2 + 2 * ph, [LANCE_COL[0] * 2 * ph * ch, LANCE_COL[1] * 2 * ph * ch, LANCE_COL[2] * 2 * ph * ch], 0.4);
       }
       // layered core: white-hot heart + violet corona, and refraction pulses at an accelerating rhythm
-      R.glow(em, 3 + 9 * ch, [4 * ch, 3.6 * ch, 4.4 * ch], 0.25);
+      R.glow(em, 3 + 7 * ch, [2.4 * ch, 2.2 * ch, 2.8 * ch], 0.25);
       const pulseP = (t - 200) * (1 + 5 * ch * ch);
       const pa = pulseP % 1;
       R.ripple(em, 20 + 90 * pa, [0.4, 0.2, 0.5], (1 - pa) * 0.9 * ch);
