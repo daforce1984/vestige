@@ -222,3 +222,4 @@
 - [x] 160. Dreadnought (and its lance) rim light ×0.3 (per-entry rimK → Inst.shade.w).
 - [x] 161. The enemy-arrival wide cut now starts at 80.0 (it began at 80.6, leaving a 0.6 s flash of the dreadnought-reveal camera before it).
 - [x] 162. Cold open: sun disc off (it slid through the lower-left of the frame during the tilt as a stray light blob).
+- [x] 163. Scene 5: the fleet drops out of hyperspace in a tight wave (40.5–43.3 frigates, line ships every 0.14 s from 40.7) — all out by ~44.3, before "exit complete" at 45.
