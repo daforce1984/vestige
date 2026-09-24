@@ -221,3 +221,4 @@
 - [x] 159. Moon detail ×2 (level-7 icosphere, 328k tris, 560 craters, finer grit); moon shading mode texSet −3 (brighter highlands, soft AO/bump); placed so its vast lit face fills the upper right of scene 12 (B4 standoff; that shot's key light comes from high behind the camera).
 - [x] 160. Dreadnought (and its lance) rim light ×0.3 (per-entry rimK → Inst.shade.w).
 - [x] 161. The enemy-arrival wide cut now starts at 80.0 (it began at 80.6, leaving a 0.6 s flash of the dreadnought-reveal camera before it).
+- [x] 162. Cold open: sun disc off (it slid through the lower-left of the frame during the tilt as a stray light blob).

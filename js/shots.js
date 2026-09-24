@@ -970,7 +970,7 @@ function drawColdOpenAction(R, t, cam, tgt) {
   }
 }
 shot(0, 14, 'C0 cold open', (c) => {
-  c.env.sunDisc = 0.12;
+  c.env.sunDisc = 0;                            // (the sun disc slid through the lower-left of the frame during the tilt: a stray light blob)
   const { t, R } = c;
   c.worldT = CO_T0 + t;
   // the camera sits off the dreadnought's flank; it opens looking UP into quiet stars, slowly sinks, then whips
