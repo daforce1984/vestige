@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel, ionCharge,
+  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel, ionCharge, EARTH_T,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -1925,11 +1925,30 @@ function wideTreatment(c) {
   const f = V.norm([0, 0, 0], V.sub([0, 0, 0], T, P));
   const r = V.norm([0, 0, 0], V.cross([0, 0, 0], f, [0, 1, 0])), u = V.cross([0, 0, 0], r, f);
   camLook(c, P, T, cam.fov / DEG, 0.07);                         // a slight dutch tilt: the oblique look
-  if (c.env.planet && c.env.planet.dir === MOON) {
-    const side = V.dot(r, SUN) >= 0 ? 1 : -1;                     // put it on the sunward side so its face is lit
-    const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], f, V.scale([0, 0, 0], r, 0.34 * side)), V.scale([0, 0, 0], u, -0.05)));
-    c.env.planet = { dir, radius: PL_R * 0.55, col: [0.5, 0.5, 0.52], earth: false, kind: 'moon' };
+}
+const _moon = new Map();
+function moonFor(R, s, film) {
+  const tm = (s.t0 + s.t1) / 2;
+  if (tm < 40 || tm >= EARTH_T) return null;
+  if (_moon.has(s)) return _moon.get(s);
+  const save = { t: ctx.t, lt: ctx.lt, u: ctx.u, env: ctx.env, post: ctx.post };
+  ctx.R = R; ctx.t = tm; ctx.lt = tm - s.t0; ctx.u = 0.5; ctx.env = spaceEnv(tm); ctx.post = basePost();
+  ctx.world = true; ctx.hangar = null; ctx.worldT = undefined; ctx.fpv = false;
+  R.begin();
+  s.fn(ctx);
+  const cam = ctx.cam, f = V.norm([0, 0, 0], V.sub([0, 0, 0], cam.target, cam.pos));
+  const r = V.norm([0, 0, 0], V.cross([0, 0, 0], f, [0, 1, 0])), u = V.cross([0, 0, 0], r, f);
+  // pick the frame corner where the moon is most fully lit: lit fraction = (1 − SUN·dir) / 2
+  const half = Math.tan((cam.fov || 0.8) * 0.5), asp = (R.width || 16) / Math.max(1, R.height || 9);
+  let res = null, bestLit = -1;
+  for (const sx of [1, -1]) for (const sy of [1, -0.6]) {
+    const d = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], f, V.scale([0, 0, 0], r, 0.55 * half * asp * sx)), V.scale([0, 0, 0], u, 0.42 * half * sy)));
+    const lit = (1 - V.dot(SUN, d)) / 2 + (sy > 0 ? 0.08 : 0);            // prefer the upper corners a little
+    if (lit > bestLit) { bestLit = lit; res = { side: sx, up: sy }; }
   }
+  Object.assign(ctx, save);
+  _moon.set(s, res);
+  return res;
 }
 export function frame(R, film) {
   FILM_NOW = film;
@@ -1939,6 +1958,7 @@ export function frame(R, film) {
   ctx.env = spaceEnv(t); ctx.post = basePost();
   ctx.world = true; ctx.hangar = null; ctx.debris = false; ctx.worldT = undefined; ctx.fpv = false; ctx.filmT = film; ctx.closeCore = false;
   ctx.cam.near = 0.3; ctx.cam.far = 400000;
+  const moonDir = moonFor(R, s, film);
   R.begin();
   R.camPos = null; R._now = t;
   if (!GUN.exitLocal) {
@@ -1947,6 +1967,17 @@ export function frame(R, film) {
   }
   s.fn(ctx);
   if (WIDE_SHOTS.has(s.name)) wideTreatment(ctx);
+  // from scene 5 on (the fleet assembles, 40 s) the same MOON hangs in the background of every exterior shot — nothing
+  // else; its place in the frame is fixed per shot (from the shot's mid-point camera) on the sunward side
+  if (moonDir && ctx.world && !ctx.hangar && !(ctx.env.planet && ctx.env.planet.earth) && !ctx.env.interior) {
+    // anchored to the frame: always in the upper corner on the sunward side (its lit face toward us)
+    const cam = ctx.cam, f = V.norm([0, 0, 0], V.sub([0, 0, 0], cam.target, cam.pos));
+    const r = V.norm([0, 0, 0], V.cross([0, 0, 0], f, [0, 1, 0])), u = V.cross([0, 0, 0], r, f);
+    const side = moonDir.side, half = Math.tan(cam.fov * 0.5), asp = R.width / Math.max(1, R.height);
+    const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], f, V.scale([0, 0, 0], r, 0.55 * half * asp * side)), V.scale([0, 0, 0], u, 0.42 * half * moonDir.up)));
+    ctx.env.planet = { dir, radius: Math.min(PL_R * 0.45, 0.62 * half), col: [0.5, 0.5, 0.52], earth: false, kind: 'moon' };
+  }
+  else if (t >= 40 && ctx.env.planet && !ctx.env.planet.earth) ctx.env.planet = null;
   if (globalThis.__CAM) { const q = globalThis.__CAM(t); if (q) camLook(ctx, q.pos, q.target, q.fov || 30, 0); }   // debug inspection camera (dev only)
   R.camPos = ctx.cam.pos;                                  // fx helpers keep streaks off the lens
   // near plane relative to subject distance for depth precision

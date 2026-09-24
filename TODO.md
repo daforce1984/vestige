@@ -212,3 +212,5 @@
 - [x] 150. Belly pass (30–40): the flagship is already under way (thrusters forced on), the camera skims just under the keel at constant speed looking up/aft — structure streams past fast, yet the 637 m hull takes the whole 10 s.
 - [x] 151. Title card holds 14.8 s (371.8–386.6): film +5 s (STORY_DURATION 387), fade 384.5–387, ending pad/master fade extended.
 - [x] 152. Emissive fixtures on every ship/fighter/bay (blender/shipkit.py lamp_fixture, light_bar, lamp_row, chevron_light, window_bay, light_panel, louvre_glow, beacon) replace plain glowing boxes; tri budgets kept; wound rim regenerated.
+- [x] 153. Warp in/out sound is now the user's warp_out.mp3: first 3.8 s kept, faded out from 1.6 s (tools/build_sfx.py entry; original kept in assets/sfx_src).
+- [x] 154. From scene 5 (40 s) to the Earth arrival the same moon hangs in the background of every exterior shot (frame-anchored upper/lower corner per shot, chosen where it is most fully sunlit); no other planets (the brown planet and the per-shot moon placements removed; interiors excluded; Earth ending unchanged).
