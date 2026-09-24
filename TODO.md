@@ -188,3 +188,4 @@
 - [x] 126. Arc shader: soft window across the ribbon and along its ends (no visible quad edges), wander kept inside.
 - [x] 127. Dive: the line-noise interference is replaced by a GRAVITY ANOMALY final-pass warp — travelling gravitational-wave ripples from the well, frame-dragging swirl, radial red/blue gravitational shift, a faint time-dilation echo, bright ripple crests.
 - [x] 128. S16a: the charge opens on the flagship's melted flank; Sigma sweeps past the wound close to the lens (divePass) and the camera pans to follow him toward the well.
+- [x] 129. Flagship surface redesigned by function (blender/MOTHERSHIP_SYSTEMS.md): dreadnought-style armour plating (shipkit.armor bands, gaps, sub-plates), zoned equipment (capacitor racks, PD batteries, VLS, sensor arrays/domes, radiator banks, hatches, docking ports, walkways, conduits, RCS), no antennas; 116k tris; wound rim regenerated on the new skin.

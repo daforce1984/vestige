@@ -3,7 +3,10 @@
 Silhouette (top view): narrow blunt bow ending in a heavy ring-armoured ion cannon, hull widening aft into a
 parallel-sided mid-body, then large swept, angled armour sponsons ("shoulders") on both flanks toward the stern.
 A stepped central spine runs the length of the deck with a command block + dark canopy dome ~1/3 from the stern.
-Dense layered deck plating, trenches, vent banks, turrets and antennae; dark gunmetal / blue-black satin metal;
+Surface: dreadnought-style armour (shipkit.armor: long plates in bands along the stations, real gaps, sub-plates)
+on hull, deck, strake and sponsons, carrying purpose-built machinery placed by a zoning plan (MOTHERSHIP_SYSTEMS.md):
+capacitor racks, PD batteries, VLS cells, phased arrays, radiator fields, conduits, hatches, docking ports, RCS quads,
+shield emitters -- no masts or antennae; dark gunmetal / blue-black satin metal;
 many small amber window/light strips, a few cool-blue accents; two big blue-white engines + two small ones,
 and a lit hangar slot between the engines.
 
@@ -20,7 +23,9 @@ Blender space here: bow toward -Y (station s = -y = glTF z), up +Z (= glTF y), +
 Usage (from WSL, project root):
   "/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup \
       --python "$(wslpath -w blender/ships_mothership_v9.py)" [-- render | renderonly] [--extra]
-Writes assets/mothership.glb; with 'render' also blender/previews/v9_mothership_{top,front34,wall}.png.
+Writes assets/mothership.glb; with 'render' also blender/previews/v9_mothership_{top,front34,wall}.png
+(--extra adds rear, bow, detail_mid, detail_aft, detail_fwd, belly). Other args: nosave, probe (dorsal heightmap),
+--debug-sites (print every rejected equipment site).
 """
 import sys, os, math
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +34,7 @@ import bpy
 from mathutils import Vector
 import lib
 from lib import MB, reg, empty, rng, lerp, annulus, D2R
-from shipkit import Hull, plate, obox, turret
+from shipkit import Hull, plate, armor, cuts, obox, turret
 from hullkit import dome
 
 ASSETS = os.path.join(os.path.dirname(HERE), 'assets')
@@ -100,7 +105,7 @@ def light_row(mb, p0, p1, n, pitch, size, mat, R=None, dropout=0.0):
 
 # ------------------------------------------------------------------------------------------ structural grid
 FR0, BAYL, FRAME = -44.0, 24.0, 6.0          # bulkheads every 24 m from the bay bulkhead s=-44, frames every 6 m
-WALL_T, CHAM_T, KEEL_T, TILE_H = 1.2, 1.1, 1.0, 0.7
+WALL_T, CHAM_T, KEEL_T = 1.2, 1.1, 1.0
 SPINE = [(293, 238, 9, 6), (238, 170, 13, 10), (170, 126, 17, 14), (126, 90, 17, 14), (90, -20, 19, 17),
          (-20, -60, 22, 20), (-130, -200, 24, 19), (-200, -274, 20, 13)]
 STRAKE = [(176, 50, 50, 54), (126, 64, 51.5, 58), (40, 78, 51.5, 59), (-46, 94, 51.5, 59.5), (-120, 108, 44, 55),
@@ -124,14 +129,6 @@ def grid(s0, s1, step=BAYL):
     return out
 
 
-def spine_hw(s):
-    if -132 <= s <= -58:
-        return 32.0                                # command block
-    for a, b, hw, hh in SPINE:
-        if b <= s <= a:
-            return float(hw)
-    return 0.0
-
 
 def strake_at(s):
     """(x_out, z_bottom, z_top) of the strake at station s."""
@@ -143,54 +140,106 @@ def strake_at(s):
     return st[0][1:] if s > st[0][0] else st[-1][1:]
 
 
-def wall_skip(side, s0, s1):
-    """Wall spans reserved for the starboard hangar wall / port launch bay or hidden inside the sponsons."""
-    if s1 < -50:
-        return True
-    if side == 1 and s1 > FLAT_S[0] - 4 and s0 < FLAT_S[1] + 4:
-        return True
-    if side == -1 and s1 > 6 and s0 < 104:
-        return True
-    return False
+
+# ------------------------------------------------------------------------------------------ armour kit
+DEFER = []      # light rows that sit on armour: placed by ray casting once the armour exists (systems pass)
+
+
+def defer_row(p0, p1, n, pitch, size, mat, dropout=0.0):
+    DEFER.append((Vector(p0), Vector(p1), Vector(n).normalized(), pitch, size, mat, dropout))
+
+
+def cuts_at(a, b, R, lmin, lmax, fixed=()):
+    """cuts() between a and b, forced to break at the `fixed` stations (so skipped regions end on a seam)."""
+    pts = [a] + sorted(f for f in fixed if a + lmin * 0.5 < f < b - lmin * 0.5) + [b]
+    out = [a]
+    for u, v in zip(pts, pts[1:]):
+        out += cuts(u, v, R, min(lmin, (v - u)), lmax)[1:]
+    return out
+
+
+def gp(H, s, e, metres=0.45):
+    """gap_p (index space) giving ~2 x `metres` between neighbouring plates on edge e."""
+    return metres / max(1.0, H.edge_len(s, e))
+
+
+class RingHull(Hull):
+    """Hull-like parametrisation of any lofted section so shipkit.plate()/armor() can armour it:
+    ring_fn(s) -> counter-clockwise 2D ring; to_world(s, q) -> Blender point."""
+
+    def __init__(self, ring_fn, to_world, s0, s1):
+        self.ring_fn, self.to_world = ring_fn, to_world
+        self.n = len(ring_fn(s0))
+        self.st = [(s0, 1.0, 1.0, 0.0, 0.0), (s1, 1.0, 1.0, 0.0, 0.0)]
+        self.smooth, self.cx0, self.cz0 = False, 0.0, 0.0
+
+    def poly(self, s, off=0.0):
+        P = [Vector(q) for q in self.ring_fn(s)]
+        if off == 0.0:
+            return P, (0.0, 0.0)
+        n = len(P)
+        Q = []
+        for i in range(n):
+            e0, e1 = P[i] - P[i - 1], P[(i + 1) % n] - P[i]
+            n0, n1 = Vector((e0.y, -e0.x)), Vector((e1.y, -e1.x))
+            if n0.length < 1e-9 or n1.length < 1e-9:
+                Q.append(P[i])
+                continue
+            n0.normalize()
+            n1.normalize()
+            m = n0 + n1
+            if m.length < 1e-6:
+                m = n1
+            m.normalize()
+            Q.append(P[i] + m * (off / max(0.35, m.dot(n1))))
+        return Q, (0.0, 0.0)
+
+    def _w(self, s, q, c):
+        return self.to_world(s, q)
+
+
+def ccw(pts):
+    area = sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(pts, pts[1:] + pts[:1]))
+    return pts if area > 0 else pts[::-1]
+
+
+UP_MAT = lambda i, j, R: 'hull2' if R.random() < 0.78 else 'plate'
+DN_MAT = lambda i, j, R: 'plate' if R.random() < 0.7 else 'hull'
 
 
 # ------------------------------------------------------------------------------------------ main hull
 def main_hull(mb, H, R):
-    """Hull loft + armour on a regular bulkhead grid: one plate per 24 m bay, three belts on the walls."""
+    """Hull loft + dreadnought-style armour: long plates in bands along the stations, real gaps, sub-plates."""
     H.build(mb, 'hull')
-    bays = grid(-282, 305)
-    # upper / lower chamfers: plate per bay split lengthwise; belt tone per edge
-    tone = {1: 'hull2', 3: 'hull2', 5: 'plate', 7: 'plate'}
-    for e in (1, 3, 5, 7):
-        for i, (a, b) in enumerate(zip(bays, bays[1:])):
-            m = tone[e] if R.random() > 0.15 else 'hull'
-            t = CHAM_T + (0.3 if i % 2 else 0.0)
-            plate(mb, H, a + 0.6, b - 0.6, e + 0.06, e + 0.49, m, thick=t)
-            plate(mb, H, a + 0.6, b - 0.6, e + 0.53, e + 0.94, m, thick=t)
-    # walls: upper belt / citadel belt / lower belt
-    for e, side in ((0, 1), (4, -1)):
-        belts = ((e + 0.03, e + 0.3), (e + 0.34, e + 0.64), (e + 0.68, e + 0.97))
-        btone = ('plate', 'hull2', 'plate') if side == 1 else ('plate', 'hull2', 'plate')[::-1]
-        for i, (a, b) in enumerate(zip(bays, bays[1:])):
-            if wall_skip(side, a, b):
-                continue
-            for k, (pa, pb) in enumerate(belts):
-                m = btone[k] if R.random() > 0.12 else 'hull'
-                plate(mb, H, a + 0.5, b - 0.5, pa, pb, m, thick=WALL_T + (0.25 if i % 2 else 0.0))
-    # keel: regular structural keel spine (one block per bay) + plate belts either side
-    for i, (a, b) in enumerate(zip(bays, bays[1:])):
+    # chamfers (upper + lower) share one set of station cuts so the plate seams line up across the edges
+    sc = cuts(-282, 305, R, 24, 44)
+    for e in (1, 3):
+        armor(mb, H, sc, [e + 0.02, e + 0.98], UP_MAT, R, thick=CHAM_T, gap_s=0.9, gap_p=0.0, sub_prob=0.22,
+              sub_mat='plate')
+    for e in (5, 7):
+        armor(mb, H, sc, [e + 0.02, e + 0.5, e + 0.98], DN_MAT, R, thick=CHAM_T, gap_s=0.9, gap_p=gp(H, 0, e),
+              sub_prob=0.15, sub_mat='hull')
+    # walls: three belts; starboard skips the hangar wall, port skips the launch bay; aft is inside the sponsons
+    wall_mat = lambda i, j, R: ('plate', 'hull2', 'plate')[j] if R.random() < 0.78 else 'hull'
+    for e, spans in ((0, ((124.5, 293.0),)), (4, ((-45.0, 5.5), (104.5, 293.0)))):
+        for a, b in spans:
+            armor(mb, H, cuts(a, b, R, 22, 40), [e + 0.02, e + 0.34, e + 0.66, e + 0.98], wall_mat, R,
+                  thick=WALL_T, gap_s=0.9, gap_p=gp(H, 0, e), sub_prob=0.22, sub_mat='hull2')
+    # keel: armour belts either side of a structural keel spine (one block per bulkhead bay)
+    armor(mb, H, cuts(-282, 300, R, 24, 44), [6.02, 6.21, 6.41], DN_MAT, R, thick=KEEL_T, gap_s=0.9,
+          gap_p=gp(H, 0, 6), sub_prob=0.15, sub_mat='hull')
+    armor(mb, H, cuts(-282, 300, R, 24, 44), [6.59, 6.79, 6.98], DN_MAT, R, thick=KEEL_T, gap_s=0.9,
+          gap_p=gp(H, 0, 6), sub_prob=0.15, sub_mat='hull')
+    bays = grid(-282, 300)
+    for a, b in zip(bays, bays[1:]):
         zk = min(H.at(a)[2] - H.at(a)[1] / 2, H.at(b)[2] - H.at(b)[1] / 2)
-        blk(mb, a + 0.8, b - 0.8, -7, 7, zk + 1, zk - 2.2, 'hull2', ins=0.0)
-        plate(mb, H, a + 0.6, b - 0.6, 6.06, 6.36, 'plate', thick=KEEL_T)
-        plate(mb, H, a + 0.6, b - 0.6, 6.64, 6.94, 'plate', thick=KEEL_T)
-    # keel marker lights on a regular 12 m pitch
+        blk(mb, a + 0.8, b - 0.8, -7, 7, zk + 1, zk - 2.4, 'hull2', ins=0.0)
+    # keel marker lights on a regular 12 m pitch (placed on the armour later)
     for side in (1, -1):
-        s = -270.0
-        while s < 280:
+        for s in range(-270, 282, 12):
             w, h, cz, _ = H.at(s)
-            pos = Vector((side * U_BOT * w / 2 * 0.7, Y(s), cz - h / 2 - KEEL_T - 0.1))
-            obox(mb, pos, Vector((0, 0, -1)), (1.0, 3.0, 0.3), 'amber', lift=0.0)
-            s += 12.0
+            defer_row((side * U_BOT * w / 2 * 0.7, Y(s), cz - h / 2), (side * U_BOT * w / 2 * 0.7, Y(s), cz - h / 2),
+                      (0, 0, -1), 1.0, (1.0, 3.0, 0.3), 'amber')
 
 
 def deck_z(H, s):
@@ -198,50 +247,28 @@ def deck_z(H, s):
     return cz + h / 2
 
 
-def deck_half(H, s0, s1):
-    return min(H.at(s0)[0], H.at(s1)[0], H.at((s0 + s1) / 2)[0]) / 2 * U_TOP
 
-
-def sblk(mb, a, b, xa0, xa1, xb0, xb1, za, zb, h, mat, ins=0.4):
-    """Deck tile following the deck slope between stations a < b: x span (xa0,xa1) at a and (xb0,xb1) at b,
-    bottom 0.5 below the deck surface (za at a, zb at b), top h above it, top face inset by `ins`."""
-    bot = [(xa0, Y(a), za - 0.5), (xa1, Y(a), za - 0.5), (xb1, Y(b), zb - 0.5), (xb0, Y(b), zb - 0.5)]
-    top = [(xa0 + ins, Y(a + ins), za + h), (xa1 - ins, Y(a + ins), za + h), (xb1 - ins, Y(b - ins), zb + h),
-           (xb0 + ins, Y(b - ins), zb + h)]
-    mb.hexa(bot + top, mat)
-
-
-DECK_XC = [0, 8, 16, 26, 34, 42, 50, 58]
+# deck lanes in edge-2 index space (2.0 = starboard deck edge, 3.0 = port): outer band, trench lane, conduit
+# channel beside the spine foot, spine lanes.  At the mid-body 0.01 = 1 m.
+DECK_P = [2.01, 2.16, 2.24, 2.30, 2.37, 2.5, 2.63, 2.70, 2.76, 2.84, 2.99]
+CHANNEL_P = (2.265, 2.735)                      # power / coolant trunk lanes (plates skipped there)
 TRENCH = ((-60, 120),)                          # midship service trench at x = +-30
+CHANNEL_S = ((-20, 176), (-262, -140))          # where the channel lanes carry a trunk
 
 
 def deck(mb, H, R):
-    """Main deck armour: regular tiles (12 m frames x 8/10 m lanes) following the deck slope; service trench."""
-    lane_mat = ['hull2', 'plate', 'hull2', 'plate', 'hull', 'plate', 'hull2']
-    rows = grid(-285, 305, 12.0)
-    for a, b in zip(rows, rows[1:]):
-        za, zb = deck_z(H, a), deck_z(H, b)
-        xea, xeb = H.at(a)[0] / 2 * U_TOP - 1.0, H.at(b)[0] / 2 * U_TOP - 1.0
-        in_trench = any(t0 <= (a + b) / 2 <= t1 for t0, t1 in TRENCH)
-        for li, (x0, x1) in enumerate(zip(DECK_XC, DECK_XC[1:])):
-            if in_trench and li == 3:
-                continue                            # trench lane
-            if max(spine_hw(a), spine_hw(b)) - 2.5 >= x1:
-                continue                            # under the spine / command block
-            if 243 <= b and a <= 311 and x1 <= 15:
-                continue                            # under the cannon brow
-            if x0 >= 42 and -110 <= (a + b) / 2 <= 170:
-                continue                            # under the strake
-            oa, ob = min(x1, xea), min(x1, xeb)
-            if min(oa, ob) < x0 + 2.5:
-                if max(oa, ob) < x0 + 2.5:
-                    continue
-            oa, ob = max(oa, x0 + 1.0), max(ob, x0 + 1.0)
-            m = lane_mat[li] if R.random() > 0.12 else 'hull'
-            for sg in (1, -1):
-                xs = sorted((sg * (x0 + 0.4), sg * (oa - 0.4)))
-                xt = sorted((sg * (x0 + 0.4), sg * (ob - 0.4)))
-                sblk(mb, a + 0.4, b - 0.4, xs[0], xs[1], xt[0], xt[1], za, zb, TILE_H, m)
+    """Main deck armour (same logic as the hull): long plates in lanes that taper with the deck, sub-plates,
+    service trench and conduit channels left open."""
+    skip = []
+    for a, b in TRENCH:
+        skip += [(a, b, 2.16, 2.24), (a, b, 2.76, 2.84)]
+    for a, b in CHANNEL_S:
+        skip += [(a, b, 2.24, 2.30), (a, b, 2.70, 2.76)]
+    skip += [(-110, 170, 2.0, 2.16), (-110, 170, 2.84, 3.0)]       # under the strake
+    fixed = [x for ab in TRENCH + CHANNEL_S for x in ab] + [-110, 170]
+    sc = cuts_at(-285, 305, R, 24, 44, fixed)
+    armor(mb, H, sc, DECK_P, UP_MAT, R, thick=1.0, gap_s=0.9, gap_p=gp(H, 0, 2), skip=skip, sub_prob=0.22,
+          sub_mat='plate')
     # service trench (midship): recessed floor, raised kerbs, amber guide lights on a 6 m pitch
     for side in (1, -1):
         x = side * 30.0
@@ -254,11 +281,9 @@ def deck(mb, H, R):
                       (1.2, 2.4, 0.25), 'amber')
     # deck-edge amber rows along the chamfer break (the "edge lights" of the wedge)
     for side in (1, -1):
-        s = -276.0
-        while s < 293:
-            pos, n = H.pt(s, 1.12 if side == 1 else 2.88, CHAM_T + 0.35)
-            obox(mb, pos, n, (1.0, 2.2, 0.3), 'amber', lift=0.0)
-            s += 6.0
+        for s in range(-276, 294, 6):
+            pos, n = H.pt(s, 1.12 if side == 1 else 2.88, 0.0)
+            defer_row(pos, pos, n, 1.0, (1.0, 2.2, 0.3), 'amber')
 
 
 def spine_and_bridge(mb, H, R):
@@ -276,15 +301,19 @@ def spine_and_bridge(mb, H, R):
                       (side, 0, 0.35), 3.2, (0.7, 2.2, 0.3), 'window', R=R, dropout=0.25)
             light_row(mb, (side * (hw - 0.8), Y(a - 5), zt + hh * 0.25), (side * (hw - 0.8), Y(b + 5), zt + hh * 0.25),
                       (side, 0, 0.1), 4.0, (0.7, 2.6, 0.3), 'window', R=R, dropout=0.45)
-        # roof armour: three lanes, plates on the 6 m frame grid (machinery is added by the systems pass)
+        # roof armour: three lanes of long plates with gaps and sub-plates (same logic as the hull)
         ztop = zt + hh + 4.5
-        sc = grid(b + 8, a - 8, 12.0)
         xw = hw * 0.62 - 1.6
         xc = [-xw, -xw / 3, xw / 3, xw]
-        for sa, sb in zip(sc, sc[1:]):
-            for k, (x0, x1) in enumerate(zip(xc, xc[1:])):
-                blk(mb, sa + 0.4, sb - 0.4, x0 + 0.3, x1 - 0.3, ztop - 0.3, ztop + 0.6,
-                    'plate' if k != 1 else 'hull', ins=0.25)
+        for k, (x0, x1) in enumerate(zip(xc, xc[1:])):
+            sc = cuts(b + 7, a - 7, R, 12, 24)
+            for sa, sb in zip(sc, sc[1:]):
+                m = UP_MAT(0, k, R)
+                blk(mb, sa + 0.45, sb - 0.45, x0 + 0.35, x1 - 0.35, ztop - 0.3, ztop + 0.8, m, ins=0.35)
+                if R.random() < 0.22 and sb - sa > 8:
+                    L = sb - sa
+                    blk(mb, sa + L * 0.25, sb - L * 0.25, x0 + (x1 - x0) * 0.2, x1 - (x1 - x0) * 0.2, ztop + 0.6,
+                        ztop + 1.2, 'plate', ins=0.25)
     # spine ridge lights
     light_row(mb, (0, Y(285), deck_z(H, 285) + 10.6), (0, Y(250), deck_z(H, 250) + 10.6), (0, 0, 1), 6,
               (0.8, 2.0, 0.3), 'blue_light')
@@ -344,60 +373,32 @@ def sponson(mb, R, sg):
     rings = [ring(x) for x in xs[:-1]] + [ring(xs[-1], 4.0)]
     mb.loft(rings, 'hull')
 
-    # layered armour plates on the sloped sponson top (+ stacked sub-plates, trenches, vents)
-    def zt_at(x):
-        return sec(x)[3]
-
-    def splate(x0, x1, sa, sb, lift0, h, m, ins):
-        za, zb_ = zt_at(x0) + lift0, zt_at(x1) + lift0
-        bot = [(sg * x0, Y(sa), za - 0.5), (sg * x1, Y(sa), zb_ - 0.5), (sg * x1, Y(sb), zb_ - 0.5),
-               (sg * x0, Y(sb), za - 0.5)]
-        top = [(sg * (x0 + ins), Y(sa + ins), za + h), (sg * (x1 - ins), Y(sa + ins), zb_ + h),
-               (sg * (x1 - ins), Y(sb - ins), zb_ + h), (sg * (x0 + ins), Y(sb - ins), za + h)]
-        mb.hexa(bot + top, m)
-    xb_ = [63, 72, 83, 95, 106, 118, 129]
-    lane_mat = ['hull2', 'plate', 'hull2', 'plate', 'hull2', 'plate']
-    for li, (x0, x1) in enumerate(zip(xb_, xb_[1:])):
-        smax = sec(x1)[0] - 17
-        smin = sec(x1)[1] + 8
-        sc = grid(smin, smax, 12.0)
-        for sa, sb in zip(sc, sc[1:]):
-            m = lane_mat[li] if R.random() > 0.12 else 'hull'
-            splate(x0 + 0.4, x1 - 0.4, sa + 0.4, sb - 0.4, 0.0, TILE_H + 0.2, m, 0.35)
-
-    # armour panels on the leading upper / lower chamfers and the aft top chamfer
-    ctr = Vector((sg * 95, Y(-200), 10))
-    for (i, j, nv) in ((0, 1, 2), (5, 0, 2), (2, 3, 1)):
-        xs_p = [66, 78, 90, 102, 114, 126]
-        for xa, xb in zip(xs_p, xs_p[1:]):
-            ra, rb = ring(xa), ring(xb)
-            for k in range(nv):
-                f0, f1 = k / nv, (k + 1) / nv
-                q = [ra[i].lerp(ra[j], f0), rb[i].lerp(rb[j], f0), rb[i].lerp(rb[j], f1), ra[i].lerp(ra[j], f1)]
-                c = sum(q, Vector()) / 4
-                n = (q[1] - q[0]).cross(q[3] - q[0]).normalized()
-                if n.dot(c - ctr) < 0:
-                    n = -n
-                g = 0.7
-                q = [c + (v - c) * 0.94 for v in q]
-                t = 1.1 + 0.3 * (k % 2)
-                top = [c + (v - c) * 0.9 + n * t for v in q]
-                mb.hexa([v - n * 0.3 for v in q] + top, 'hull2' if (i, k) != (2, 0) else 'plate')
-    # amber edge lights: along the leading chamfer, the top leading break, the outer tip and the trailing edge
+    # armour: the sponson section is lofted span-wise, so plates run outboard in bands across the shoulder
+    def sring(x):                       # CCW ring in (station s, z); edges: 0 lead-upper chamfer, 1 top,
+        s_le, s_te, zb, zt = sec(x)      # 2 aft chamfer, 3 trailing face, 4 bottom, 5 lead-lower chamfer
+        zc = (zb + zt) / 2 - 3
+        return [(s_le, zc), (s_le - 16, zt), (s_te + 7, zt), (s_te, zt - 7), (s_te, zb + 5), (s_le - 22, zb)]
+    SH = RingHull(sring, lambda x, q: Vector((sg * x, Y(q[0]), q[1])), 56, 133)
+    spn = cuts(63, 128, R, 14, 24)
+    armor(mb, SH, spn, [1.01, 1.2, 1.4, 1.6, 1.8, 1.99], UP_MAT, R, thick=1.1, gap_s=0.9, gap_p=0.004,
+          sub_prob=0.22, sub_mat='plate')
+    armor(mb, SH, spn, [0.03, 0.97], UP_MAT, R, thick=1.1, gap_s=0.9, gap_p=0.0, sub_prob=0.15, sub_mat='plate')
+    armor(mb, SH, spn, [2.03, 2.97], UP_MAT, R, thick=1.0, gap_s=0.9, gap_p=0.0)
+    armor(mb, SH, spn, [5.03, 5.5, 5.97], DN_MAT, R, thick=1.0, gap_s=0.9, gap_p=0.01, sub_prob=0.15, sub_mat='hull')
+    armor(mb, SH, spn, [4.01, 4.34, 4.67, 4.99], DN_MAT, R, thick=0.9, gap_s=0.9, gap_p=0.004)
+    # amber edge lights: along the leading chamfer, the top leading break (placed on the armour later)
     xa, xb = 60, 128
     A, B = sec(xa), sec(xb)
     for f in (0.35, 0.7):
         p0 = Vector((sg * xa, Y(lerp(A[0], A[0] - 16, f)), lerp((A[2] + A[3]) / 2 - 3, A[3], f)))
         p1 = Vector((sg * xb, Y(lerp(B[0], B[0] - 16, f)), lerp((B[2] + B[3]) / 2 - 3, B[3], f)))
-        n = Vector((sg * 0.25, -1.0, 1.0)).normalized()
-        light_row(mb, p0 + n * 0.4, p1 + n * 0.4, n, 4.5, (1.0, 2.4, 0.4), 'amber')
-    p0 = Vector((sg * xa, Y(A[0] - 18), A[3] + 0.2))
-    p1 = Vector((sg * xb, Y(B[0] - 18), B[3] + 0.2))
-    light_row(mb, p0, p1, (0, 0, 1), 6.0, (1.0, 2.4, 0.3), 'amber', R=R, dropout=0.2)
-    # lower leading edge row
+        defer_row(p0, p1, Vector((sg * 0.25, -1.0, 1.0)), 4.5, (1.0, 2.4, 0.4), 'amber')
+    p0 = Vector((sg * xa, Y(A[0] - 18), A[3]))
+    p1 = Vector((sg * xb, Y(B[0] - 18), B[3]))
+    defer_row(p0, p1, (0, 0, 1), 6.0, (1.0, 2.4, 0.3), 'amber', dropout=0.2)
     p0 = Vector((sg * xa, Y(A[0] - 10), A[2] + 3))
     p1 = Vector((sg * xb, Y(B[0] - 10), B[2] + 3))
-    light_row(mb, p0, p1, Vector((0, -1, -0.6)), 6.0, (0.9, 2.0, 0.3), 'amber', R=R, dropout=0.3)
+    defer_row(p0, p1, Vector((0, -1, -0.6)), 6.0, (0.9, 2.0, 0.3), 'amber', dropout=0.3)
     # outer tip face: window grid + nav light
     s_le, s_te, zb, zt = sec(133)
     for z in (zb + 10, (zb + zt) / 2, zt - 9):
@@ -422,30 +423,27 @@ def strake(mb, R, sg):
     mb.loft([ring(*r) for r in st], 'hull2')
 
     at = strake_at
-    # roof armour: 12 m frames x 12 m lanes, outer lane clipped to the swept edge
-    XS = [38, 50, 62, 74, 86, 98, 110, 122]
-    sc = grid(-222, 168, 12.0)
-    for sa, sb in zip(sc, sc[1:]):
-        xo_a, _, zt_a = at(sa)
-        xo_b, _, zt_b = at(sb)
-        for li, (x0, x1) in enumerate(zip(XS, XS[1:])):
-            oa, ob = min(x1, xo_a - 6), min(x1, xo_b - 6)
-            if max(oa, ob) < x0 + 3:
-                continue
-            oa, ob = max(oa, x0 + 1.5), max(ob, x0 + 1.5)
-            m = ('plate', 'hull2')[li % 2] if R.random() > 0.12 else 'hull'
-            h = 1.0
-            za, zb_ = zt_a, zt_b
-            bot = [(sg * (x0 + 0.4), Y(sa + 0.4), za - 0.4), (sg * oa, Y(sa + 0.4), za - 0.4),
-                   (sg * ob, Y(sb - 0.4), zb_ - 0.4), (sg * (x0 + 0.4), Y(sb - 0.4), zb_ - 0.4)]
-            top = [(sg * (x0 + 0.8), Y(sa + 0.8), za + h), (sg * (oa - 0.4), Y(sa + 0.8), za + h),
-                   (sg * (ob - 0.4), Y(sb - 0.8), zb_ + h), (sg * (x0 + 0.8), Y(sb - 0.8), zb_ + h)]
-            mb.hexa(bot + top, m)
+
+    def rring(s):          # CCW ring in (x, z)
+        xo, zb, zt = at(s)
+        return ccw([(sg * x, z) for x, z in ((36, zt + 0.5), (xo - 5, zt), (xo, zt - 3.5), (xo - 2, zb), (46, zb))])
+    SH = RingHull(rring, lambda s, q: Vector((q[0], Y(s), q[1])), -226, 176)
+    # edge indices after the CCW fix: find roof / outer chamfer / outer face by their midpoints
+    r0 = rring(0.0)
+    mids = [((r0[i][0] + r0[(i + 1) % 5][0]) / 2, (r0[i][1] + r0[(i + 1) % 5][1]) / 2) for i in range(5)]
+    roof = max(range(5), key=lambda i: mids[i][1])
+    face = max(range(5), key=lambda i: abs(mids[i][0]) - (100 if i == roof else 0))
+    cham = [i for i in range(5) if i not in (roof, face) and abs(mids[i][0]) > 70 and mids[i][1] > 55]
+    sc = cuts(-222, 172, R, 22, 40)
+    armor(mb, SH, sc, [roof + 0.02, roof + 0.36, roof + 0.68, roof + 0.98], UP_MAT, R, thick=1.0, gap_s=0.9,
+          gap_p=0.008, sub_prob=0.22, sub_mat='plate')
+    for e in cham + [face]:
+        armor(mb, SH, sc, [e + 0.04, e + 0.96], UP_MAT, R, thick=0.9, gap_s=0.9, gap_p=0.0)
     s = 165.0
     while s > -224:
         xo, zb, zt = at(s)
-        obox(mb, Vector((sg * (xo - 0.2), Y(s), zt - 3.0)), Vector((sg, 0, 0.4)), (1.0, 2.4, 0.35), 'amber',
-             lift=0.0)
+        defer_row(Vector((sg * xo, Y(s), zt - 3.0)), Vector((sg * xo, Y(s), zt - 3.0)), Vector((sg, 0, 0.4)), 1.0,
+                  (1.0, 2.4, 0.35), 'amber')
         s -= 5.0
     s = 150.0
     while s > -220:
@@ -616,10 +614,13 @@ def port_launch_bay(mb, R):
 # ==========================================================================================================
 # SYSTEMS: purpose-built machinery placed by the zoning plan (see blender/MOTHERSHIP_SYSTEMS.md)
 # ==========================================================================================================
+DEBUG_SITES = '--debug-sites' in sys.argv
+
+
 class Surf:
     """Ray caster over the finished structure + armour; places components on the plate they are bolted to."""
 
-    def __init__(self, mb, tol=0.7):
+    def __init__(self, mb, tol=2.0):
         from mathutils.bvhtree import BVHTree
         self.T = BVHTree.FromBMesh(mb.bm)
         self.tol = tol
@@ -644,38 +645,52 @@ class Surf:
     def flank(self, sg, s, z):
         return self.cast((sg * 400.0, Y(s), z), (-sg, 0, 0))
 
-    def _fit(self, hits, t, up, tol, tag):
+    def _fit(self, hits, t, up, tol, tag, face):
+        """Accept a site if the sampled points lie on one surface: dominant normal shared by >= 5 of 9 samples and
+        the height spread along it within `tol` (plate seams and chamfered plate edges are bridged by the plinth)."""
         st = self.stats.setdefault(tag, [0, 0])
         if any(h is None for h in hits):
             st[1] += 1
+            if DEBUG_SITES:
+                print('  reject %s: miss' % tag, [h is None for h in hits], flush=True)
             return None
-        o, n = hits[0]
-        ds = [(h[0] - o).dot(n) for h in hits[1:]]
-        if max(abs(d) for d in ds) > tol or any(h[1].dot(n) < 0.7 for h in hits[1:]):
+        face = Vector(face).normalized()      # prefer the plate tops (facing the rays) over plate-edge chamfers
+        n = max((h[1] for h in hits), key=lambda m: sum(g[1].dot(m) for g in hits) + 3.0 * m.dot(face))
+        best = sum(1 for g in hits if g[1].dot(n) > 0.95)
+        ds = [h[0].dot(n) for h in hits]
+        top, low = max(ds), min(ds)
+        if best < (3 if len(hits) and (hits[1][0] - hits[-1][0]).length > 7 else 2) or top - low > tol:
             st[1] += 1
+            if DEBUG_SITES:
+                print('  reject %s at %s agree=%d spread=%.2f' % (tag, tuple(round(c, 1) for c in hits[0][0]), best,
+                                                                 top - low), flush=True)
+                if top - low > 3:
+                    for h in hits:
+                        print('     ', tuple(round(c, 1) for c in h[0]), tuple(round(c, 2) for c in h[1]))
             return None
         st[0] += 1
-        hi, lo = max(0.0, max(ds)), min(0.0, min(ds))
-        F = LF(o + n * hi, n, t, up)
-        F.sink = hi - lo + 0.35
+        c = hits[0][0]
+        o = c + n * (top - c.dot(n))
+        F = LF(o, n, t, up)
+        F.sink = top - low + 0.35
         return F
 
     def site_top(self, x, s, W, L, tag='top', tol=None):
         """Flat site on a dorsal surface: W across (x), L along (s)."""
         pts = [(0, 0)] + [(a * W / 2, b * L / 2) for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0)]
         hits = [self.top(x + a, s + b) for a, b in pts]
-        return self._fit(hits, (0, -1, 0), (1, 0, 0), tol or self.tol, tag)
+        return self._fit(hits, (0, -1, 0), (1, 0, 0), tol or self.tol, tag, (0, 0, 1))
 
     def site_under(self, x, s, W, L, tag='under', tol=None):
         pts = [(0, 0)] + [(a * W / 2, b * L / 2) for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0)]
         hits = [self.under(x + a, s + b) for a, b in pts]
-        return self._fit(hits, (0, -1, 0), (1, 0, 0), tol or self.tol, tag)
+        return self._fit(hits, (0, -1, 0), (1, 0, 0), tol or self.tol, tag, (0, 0, -1))
 
     def site_flank(self, sg, s, z, L, Hh, tag='flank', tol=None):
         """Site on a side surface: L along s, Hh along z."""
         pts = [(0, 0)] + [(a * L / 2, b * Hh / 2) for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0)]
         hits = [self.flank(sg, s + a, z + b) for a, b in pts]
-        return self._fit(hits, (0, -1, 0), (0, 0, 1), tol or self.tol, tag)
+        return self._fit(hits, (0, -1, 0), (0, 0, 1), tol or self.tol, tag, (sg, 0, 0))
 
     def site_hull(self, H, s, p, L, W, tag='hull', tol=None):
         """Site on hull edge p (index space) at station s: L along s, W across (world metres)."""
@@ -687,7 +702,7 @@ class Surf:
             pos, n = H.pt(s + a, p + b, 0.0)
             hits.append(self.cast(pos + n * 60.0, -n))
         up = Vector((0, 0, 1)) if abs(H.pt(s, p)[1].z) < 0.7 else Vector((1, 0, 0))
-        return self._fit(hits, (0, -1, 0), up, tol or self.tol, tag)
+        return self._fit(hits, (0, -1, 0), up, tol or self.tol, tag, H.pt(s, p)[1])
 
     def heightmap(self):
         """Debug: ASCII map of the dorsal surface (one row per 8 m station, one column per 4 m of x)."""
@@ -765,7 +780,8 @@ def sensor_array(mb, F, W, L, nu, nv, lit=True):
         for j in range(nv):
             F.box(mb, -W / 2 + cu * (i + 0.5), -L / 2 + cv * (j + 0.5), 0.45, cu - 0.35, cv - 0.35, 0.3, 'plate')
     if lit:
-        F.box(mb, 0.0, L / 2 + 0.5, 0.0, W * 0.7, 0.5, 0.35, 'blue_light')
+        for e in (-1, 1):
+            F.box(mb, e * (W / 2 - 0.5), L / 2 - 0.5, 0.45, 0.6, 0.6, 0.35, 'blue_light')
 
 
 def radiator_bank(mb, F, W, L, pitch=1.6, fh=2.2):
@@ -779,28 +795,6 @@ def radiator_bank(mb, F, W, L, pitch=1.6, fh=2.2):
         F.cyl(mb, (e * (W / 2 - 0.6), -L / 2 + 1.3, 0.9), (e * (W / 2 - 0.6), L / 2 - 1.3, 0.9), 0.45, mat='trim',
               seg=6, caps=False)
         F.box(mb, 0.0, e * (L / 2 - 0.6), 0.35, W, 1.2, 1.5, 'hull2')
-
-
-def antenna_mast(mb, F, u, v, h, r=0.45, yards=3, beacon='blue_light'):
-    """Comms / sensor mast: footing, tapered mast, cross yards, beacon."""
-    F.box(mb, u, v, -F.sink, 2.4, 2.4, 1.2 + F.sink, 'hull2')
-    F.cyl(mb, (u, v, 1.0), (u, v, 1.0 + h), r, r * 0.45, 'trim', seg=6)
-    for i in range(yards):
-        w = 1.0 + h * (0.35 + 0.55 * i / max(1, yards))
-        L = h * 0.32 * (1 - 0.45 * i / max(1, yards))
-        F.box(mb, u, v, w, L, r * 0.9, r * 0.9, 'greeble')
-    mb.sphere(F.p(u, v, 1.0 + h), r * 1.3, beacon, seg=6, rings=3)
-
-
-def dish(mb, F, u, v, r, tilt=0.5, face=(0.0, 1.0)):
-    """Comms dish on a pedestal, tilted `tilt` rad toward local direction face=(du, dv)."""
-    F.cyl(mb, (u, v, -F.sink), (u, v, r * 0.9), r * 0.28, r * 0.22, 'trim', seg=8)
-    d = (F.b * face[0] + F.t * face[1]).normalized()
-    ax = (F.n * math.cos(tilt) + d * math.sin(tilt)).normalized()
-    c = F.p(u, v, r * 0.9)
-    mb.cyl(c, c + ax * (r * 0.4), r * 0.3, r, 'hull2', seg=12)
-    mb.cyl(c + ax * (r * 0.4), c + ax * (r * 1.3), r * 0.08, r * 0.05, 'greeble', seg=5)
-    mb.sphere(c + ax * (r * 1.3), r * 0.12, 'blue_light', seg=6, rings=3)
 
 
 def rcs_quad(mb, F, u, v, sz=3.2):
@@ -969,26 +963,339 @@ def walkway(mb, pts, out, width=1.8, rail=1.2):
         obox(mb, p + side * (width / 2 - 0.1) + n * (0.4 + rail / 2), n, (0.15, 0.15, rail), 'trim', lift=0.0)
 
 
-def window_band(mb, H, side, s0, s1, p, R, off=WALL_T + 0.05, dropout=0.15):
-    """Crew-deck window band on a wall: dark recessed strip per bay, 3 windows per 24 m bay on a 6 m pitch."""
+def window_band(mb, S, H, side, s0, s1, p, R, dropout=0.15):
+    """Crew-deck window band on a wall: 3 windows per 24 m bay on the 6 m frame pitch (the bulkhead slot stays
+    blank), each in a dark frame, placed on whatever armour plate is there (skipped where it would sit in a seam)."""
     e = 0 if side == 1 else 4
     pp = e + (p if side == 1 else 1 - p)
-    for a, b in zip(grid(s0, s1), grid(s0, s1)[1:]):
+    g = grid(s0, s1)
+    for a, b in zip(g, g[1:]):
         if b - a < 10:
             continue
-        pos, n = H.pt((a + b) / 2, pp, off)
-        obox(mb, pos, n, (2.4, b - a - 2.0, 0.35), 'greeble', lift=0.0)
-        k = int((b - a) / FRAME)
+        k = int(round((b - a) / FRAME))
         for i in range(1, k):
-            if R.random() < dropout:
-                continue
             s = a + i * (b - a) / k
-            pos, n = H.pt(s, pp, off + 0.2)
-            obox(mb, pos, n, (1.0, (b - a) / k - 1.6, 0.3), 'window', lift=0.0)
+            ln = (b - a) / k - 1.4
+            hs = []
+            for ds in (-ln / 2, 0.0, ln / 2):
+                pos, n = H.pt(s + ds, pp, 0.0)
+                hs.append(S.cast(pos + n * 30.0, -n, 60.0))
+            if any(h is None for h in hs) or max(h[0].dot(hs[1][1]) for h in hs) - \
+                    min(h[0].dot(hs[1][1]) for h in hs) > 0.25:
+                continue
+            c, n = hs[1]
+            obox(mb, c, n, (2.0, ln + 0.6, 0.3), 'greeble', lift=0.0)
+            if R.random() >= dropout:
+                obox(mb, c + n * 0.12, n, (1.0, ln, 0.3), 'window', lift=0.0)
+
+
+def cast_rows(mb, S, R):
+    """Place the deferred light rows on top of the armour (ray cast along -n onto whatever plate is there)."""
+    for p0, p1, n, pitch, size, mat, dropout in DEFER:
+        d = p1 - p0
+        L = d.length
+        f = d / L if L > 1e-3 else Vector((0, -1, 0))
+        k = max(0, int(L / pitch)) if L > 1e-3 else 0
+        for i in range(k + 1):
+            if dropout and R.random() < dropout:
+                continue
+            p = p0 + f * (L * i / k) if k else p0
+            h = S.cast(p + n * 12.0, -n, 30.0)
+            if h is None or abs((h[0] - p).dot(n)) > 4.0 or h[1].dot(n) < 0.6:
+                continue
+            obox(mb, h[0], h[1], size, mat, lift=0.0, fwd=f)
+
+
+def ray_path(S, o_fn, d):
+    """Path function s -> (point, normal) riding on the outermost armour near station s (3 rays, +-1.3 m)."""
+    d = Vector(d).normalized()
+
+    def fn(s):
+        best = None
+        for ds in (-1.3, 0.0, 1.3):
+            h = S.cast(o_fn(s + ds), d)
+            if h and (best is None or h[0].dot(-d) > best[0].dot(-d)):
+                best = h
+        if best is None:
+            return None
+        pnt = best[0].copy()
+        pnt.y = Y(s)
+        return pnt, (best[1] if best[1].dot(-d) > 0.8 else -d)
+    return fn
+
+
+def top_path(S, x):
+    return ray_path(S, lambda s: Vector((x, Y(s), 300.0)), (0, 0, -1))
+
+
+def under_path(S, x):
+    return ray_path(S, lambda s: Vector((x, Y(s), -300.0)), (0, 0, 1))
+
+
+def wall_path(S, H, side, p):
+    return ray_path(S, lambda s: H.pt(s, p, 0.0)[0] + Vector((side * 30.0, 0, 0)), (-side, 0, 0))
+
+
+def channel_path(H, p):
+    """Open conduit channel in the deck armour: pipes lie on the hull skin itself."""
+    return lambda s: H.pt(s, p, 0.0)
+
+
+def up_p(side):          # upper chamfer / low chamfer parameters per side
+    return {'cham': 1.5 if side == 1 else 3.5, 'low': 7.5 if side == 1 else 5.5}
+
+
+def wall_p(side, p):
+    return (0 + p) if side == 1 else (4 + 1 - p)
+
+
+def pair(fn):
+    """fn(sg) -> site or None, evaluated for both flanks; the pair is kept only if both sides fit (symmetry)."""
+    Fs = [(sg, fn(sg)) for sg in (1, -1)]
+    return Fs if all(F for _, F in Fs) else []
+
+
+def heavy_turret(mb, S, x, s, size=6.5, yaw=0.0):
+    for sg, F in pair(lambda sg: S.site_top(sg * x, s, size * 1.4, size * 1.4, 'heavy_turret')):
+        F.cyl(mb, (0, 0, -F.sink), (0, 0, 0.3), size * 0.9, size * 0.85, 'hull2', seg=12)
+        turret(mb, F.p(0, 0, size * 0.25), F.n, size, 'trim', 'hull2', 'greeble', barrels=3, blen=2.4, yaw=sg * yaw)
+
+
+# ------------------------------------------------------------------------------------------ zone A: main gun
+def zone_bow(mb, H, R, S):
+    # cannon capacitor racks beside the brow, bus-fed straight into the breech
+    for s in (252.0, 264.0, 276.0):
+        for sg, F in pair(lambda sg: S.site_top(sg * 19.2, s, 6.4, 9.2, 'capacitor')):
+            capacitor_bank(mb, F, 2, 3)
+            F.box(mb, (-sg if F.b.x > 0 else sg) * 4.0, 0.0, 0.4, 1.8, 2.0, 1.2, 'greeble')
+    # fire-control phased arrays on the forward walls (field of view along the barrel line)
+    for s in (251.0, 265.0):
+        cz = H.at(s)[2]
+        for sg, F in pair(lambda sg: S.site_flank(sg, s, cz + 4.0, 12.0, 16.0, 'fc_array')):
+            sensor_array(mb, F, 16.0, 12.0, 4, 3)
+    # breech coolant louvres just aft of the arrays
+    cz = H.at(238)[2]
+    for sg, F in pair(lambda sg: S.site_flank(sg, 238.0, cz + 4.0, 8.0, 18.0, 'breech_vent')):
+        G = LF(F.o, F.n, (0, 0, 1))
+        G.sink = F.sink
+        vent_louvre(mb, G, 8.0, 18.0, 1.0)
+    # PD pairs under the barrel line (low chamfers); RCS quads at the four bow corners
+    for s in (252.0, 268.0):
+        for sg, F in pair(lambda sg: S.site_hull(H, s, up_p(sg)['low'], 10.0, 4.0, 'pd_low')):
+            pd_battery(mb, F, 2, 5.0, 2.4)
+    for s, key in ((284.0, 'low'), (268.0, 'cham')):
+        for sg, F in pair(lambda sg: S.site_hull(H, s, up_p(sg)[key], 4.0, 4.0, 'rcs')):
+            rcs_quad(mb, F, 0.0, 0.0, 3.2)
+    # targeting blister on the brow
+    F = S.site_top(0.0, 298.0, 4.0, 4.0, 'fc_dome')
+    if F:
+        sensor_dome(mb, F, 2.4)
+
+
+# ------------------------------------------------------------------------------------------ zone B: forward battery
+def zone_forward(mb, H, R, S):
+    heavy_turret(mb, S, 22.5, 210.0)
+    heavy_turret(mb, S, 27.0, 156.0)
+    # VLS missile cells over the forward magazines
+    for s, x, nu, nv in ((190.0, 30.0, 4, 6), (228.0, 22.0, 4, 5), (172.0, 25.0, 3, 5)):
+        for sg, F in pair(lambda sg: S.site_top(sg * x, s, nu * 2.2 + 1.0, nv * 2.2 + 1.0, 'vls')):
+            vls_block(mb, F, nu, nv)
+    # PD batteries in threes on the upper chamfer, one per bulkhead bay
+    for s in (184.0, 208.0, 232.0):
+        for sg, F in pair(lambda sg: S.site_hull(H, s, up_p(sg)['cham'], 15.0, 4.0, 'pd_cham')):
+            pd_battery(mb, F, 3, 5.0, 2.3)
+    # ventral PD pairs on the low chamfers
+    for s in (196.0, 148.0):
+        for sg, F in pair(lambda sg: S.site_hull(H, s, up_p(sg)['low'], 10.0, 4.0, 'pd_low')):
+            pd_battery(mb, F, 2, 5.0, 2.4)
+    # long-range sensors on the forward spine roof: flush array + two low blisters (no masts)
+    F = S.site_top(0.0, 204.0, 6.0, 20.0, 'spine_array')
+    if F:
+        sensor_array(mb, F, 6.0, 20.0, 2, 6)
+    for s in (224.0, 184.0):
+        F = S.site_top(0.0, s, 4.0, 4.0, 'spine_dome')
+        if F:
+            sensor_dome(mb, F, 2.2)
+
+
+# ------------------------------------------------------------------------------------------ zone C: hangars / midship
+def zone_midship(mb, H, R, S):
+    # hangar-lift / cargo hatches on the strake roof over the hangars (alternating bays)
+    for s in (112.0, 64.0, 16.0, -32.0):
+        for sg, F in pair(lambda sg: S.site_top(sg * 51.0, s, 12.0, 16.0, 'lift_hatch')):
+            cargo_hatch(mb, F, 10.0, 14.0)
+    # PD pairs on the strake edge in the bays between the hatches
+    for s in (88.0, 40.0, -8.0):
+        xo = strake_at(s)[0]
+        for sg, F in pair(lambda sg: S.site_top(sg * (xo - 13.0), s, 4.5, 10.0, 'pd_strake')):
+            pd_battery(mb, F, 2, 5.0, 2.4, yaw=sg * 0.6)
+    # hangar atmosphere / exhaust vent banks beside the PD pairs (the hangar deck is directly below)
+    for s in (88.0, 40.0, -8.0):
+        for sg, F in pair(lambda sg: S.site_top(sg * 51.0, s, 8.0, 12.0, 'hangar_vent')):
+            vent_louvre(mb, F, 8.0, 12.0, 1.0)
+    for sg in (1, -1):
+        # power trunk (reactor -> cannon) in the open deck channel at the spine foot
+        cp = CHANNEL_P[0] if sg == 1 else CHANNEL_P[1]
+        conduit(mb, run_pts(channel_path(H, cp), -17.0, 173.0), 3, 0.55, 1.3)
+        # maintenance walkway + coolant trunk along the strake's inner edge
+        walkway(mb, run_pts(top_path(S, sg * 39.6), -100.0, 164.0), -sg)
+        conduit(mb, run_pts(top_path(S, sg * 42.8), -102.0, 162.0), 2, 0.5, 1.3)
+    for s in (-17.5, 175.0):                      # trunk junction boxes
+        for sg, F in pair(lambda sg: S.site_top(H.pt(s, CHANNEL_P[0] if sg == 1 else CHANNEL_P[1])[0].x, s, 5.0, 4.0,
+                                                'junction')):
+            manifold(mb, F, 5.0, 4.0, 2.0, 3)
+    # comms: flush phased-array panels and low blisters on the midship spine roof (no masts / dishes)
+    for s in (68.0, 24.0):
+        F = S.site_top(0.0, s, 8.0, 20.0, 'spine_array')
+        if F:
+            sensor_array(mb, F, 8.0, 20.0, 3, 6)
+    for s in (48.0, 0.0):
+        F = S.site_top(0.0, s, 5.0, 5.0, 'spine_dome')
+        if F:
+            sensor_dome(mb, F, 2.6)
+    # spine roof access hatches
+    for s in (112.0, 100.0):
+        F = S.site_top(0.0, s, 3.0, 4.0, 'spine_hatch')
+        if F:
+            hatch(mb, F, 3.0, 4.0)
+
+
+# ------------------------------------------------------------------------------------------ zone D: command
+def zone_command(mb, H, R, S):
+    # command roof behind the canopy: flush comms array + two sensor blisters (no masts / dishes)
+    F = S.site_top(0.0, -116.0, 14.0, 6.0, 'cmd_array')
+    if F:
+        sensor_array(mb, F, 14.0, 6.0, 5, 2)
+    for x, s in ((14.0, -114.0), (-14.0, -114.0)):
+        F = S.site_top(x, s, 4.0, 4.0, 'cmd_dome')
+        if F:
+            sensor_dome(mb, F, 1.8)
+    # secondary (flank) sensor arrays + PD + hatch on the strake roof beside the command block
+    for s in (-56.0, -104.0):
+        for sg, F in pair(lambda sg: S.site_top(sg * 58.0, s, 12.0, 16.0, 'flank_array')):
+            sensor_array(mb, F, 12.0, 16.0, 3, 4)
+    xo = strake_at(-80.0)[0]
+    for sg, F in pair(lambda sg: S.site_top(sg * (xo - 14.0), -80.0, 4.5, 10.0, 'pd_strake')):
+        pd_battery(mb, F, 2, 5.0, 2.4, yaw=sg * 0.8)
+    for sg, F in pair(lambda sg: S.site_top(sg * 55.0, -80.0, 6.0, 8.0, 'strake_hatch')):
+        hatch(mb, F, 6.0, 8.0)
+
+
+# ------------------------------------------------------------------------------------------ zone E: engineering
+def zone_engineering(mb, H, R, S):
+    rows = (-152.0, -176.0, -200.0, -224.0, -248.0)
+    # reactor-deck radiator field (two columns beside the reactor spine) + manifolds between the rows
+    for s in rows:
+        for x in (35.0, 48.0):
+            for sg, F in pair(lambda sg: S.site_top(sg * x, s, 11.0, 20.0, 'radiator_deck')):
+                radiator_bank(mb, F, 11.0, 20.0)
+    for s in rows[:-1]:
+        for x in (35.0, 48.0):
+            for sg, F in pair(lambda sg: S.site_top(sg * x, s - 12.0, 6.0, 3.0, 'manifold')):
+                manifold(mb, F, 6.0, 3.0, 1.8, 3)
+    for sg in (1, -1):              # coolant trunk in the open channel beside the reactor spine
+        cp = CHANNEL_P[0] if sg == 1 else CHANNEL_P[1]
+        conduit(mb, run_pts(channel_path(H, cp), -141.0, -261.0), 2, 0.6, 1.4)
+    # engine-room exhaust louvres on the stern deck
+    for x in (35.0, 48.0):
+        for sg, F in pair(lambda sg: S.site_top(sg * x, -272.0, 11.0, 14.0, 'engine_vent')):
+            vent_louvre(mb, F, 11.0, 14.0, 1.0)
+    # strake roof (outboard, over the sponsons): radiator columns + aft heavy turret
+    for s in (-164.0, -188.0, -212.0):
+        for x in (80.0, 95.0):
+            for sg, F in pair(lambda sg: S.site_top(sg * x, s, 12.0, 20.0, 'radiator_strake')):
+                radiator_bank(mb, F, 12.0, 20.0)
+    heavy_turret(mb, S, 96.0, -138.0, 6.0, yaw=0.5)
+    # sponson tops aft of the strake: radiator field on the sloped shoulder
+    for s in (-240.0, -262.0):
+        for x in (77.5, 89.0, 100.5, 112.0):
+            for sg, F in pair(lambda sg: S.site_top(sg * x, s, 10.0, 18.0, 'radiator_sponson')):
+                radiator_bank(mb, F, 10.0, 18.0)
+    # RCS quads: sponson tips (fore + aft corner) and stern deck corners
+    for x, s in ((125.0, -206.0), (125.0, -268.0), (52.0, -286.0)):
+        for sg, F in pair(lambda sg: S.site_top(sg * x, s, 4.0, 4.0, 'rcs')):
+            rcs_quad(mb, F, 0.0, 0.0, 3.2)
+
+
+# ------------------------------------------------------------------------------------------ flanks & keel
+def zone_flanks(mb, H, R, S):
+    for sg in (1, -1):
+        s_fwd0 = 128.0 if sg == 1 else 104.0
+        # crew-deck window bands (three decks) on the forward walls; the docking-port bay stays clear mid-deck
+        for p in (0.2, 0.47, 0.82):
+            window_band(mb, S, H, sg, 148.0 if p == 0.47 else s_fwd0, 236.0, p, R)
+        if sg == -1:
+            for p in (0.2, 0.82):
+                window_band(mb, S, H, sg, -44.0, 4.0, p, R)
+        # pipe bundle along the top of each wall, under the chamfer
+        pp = wall_p(sg, 0.93)
+        conduit(mb, run_pts(wall_path(S, H, sg, pp), s_fwd0 + 2.0, 290.0), 2, 0.45, 1.1)
+        if sg == -1:
+            conduit(mb, run_pts(wall_path(S, H, sg, pp), -42.0, 2.0), 2, 0.45, 1.1)
+        # forward deck-edge walkway
+        walkway(mb, run_pts(ray_path(S, lambda s: Vector((sg * (H.at(s)[0] / 2 * U_TOP - 3.4), Y(s), 300.0)),
+                                     (0, 0, -1)), 178.0, 244.0), sg)
+    # airlock hatches in the upper belt on every other bulkhead (crew EVA access to the chamfer walkways)
+    for s in (160.0, 208.0):
+        w, h, cz, _ = H.at(s)
+        z = cz + (V_LO + (V_HI - V_LO) * 0.7) * h / 2
+        for sg, F in pair(lambda sg: S.site_flank(sg, s, z, 4.0, 5.0, 'airlock')):
+            G = LF(F.o, F.n, (0, 0, 1))
+            G.sink = F.sink
+            hatch(mb, G, 3.2, 4.2)
+    # docking ports on the citadel belt (starboard fwd; port fwd + aft of the launch bay)
+    for sg, s in ((1, 136.0), (-1, 136.0), (-1, -32.0)):
+        w, h, cz, _ = H.at(s)
+        z = cz + (V_LO + (V_HI - V_LO) * 0.49) * h / 2
+        F = S.site_flank(sg, s, z, 10.0, 10.0, 'docking_port')
+        if F:
+            docking_port(mb, F, 4.0)
+
+
+def zone_keel(mb, H, R, S):
+    # cargo transfer hatches and ventral docking ports under the hangars
+    for s in (100.0, 52.0, 4.0):
+        for sg, F in pair(lambda sg: S.site_under(sg * 22.0, s, 18.0, 22.0, 'keel_cargo')):
+            cargo_hatch(mb, F, 16.0, 20.0)
+    for s in (76.0, 28.0):
+        for sg, F in pair(lambda sg: S.site_under(sg * 22.0, s, 10.0, 10.0, 'keel_dock')):
+            docking_port(mb, F, 4.0)
+    # forward ventral sensor blisters
+    for s in (212.0, 248.0):
+        for sg, F in pair(lambda sg: S.site_under(sg * 16.0, s, 9.0, 9.0, 'keel_sensor')):
+            sensor_dome(mb, F, 3.6)
+    # engineering keel: reactor maintenance hatches + coolant dump louvres
+    for s in (-152.0, -176.0, -200.0, -224.0, -248.0):
+        for sg, F in pair(lambda sg: S.site_under(sg * 22.0, s, 7.0, 9.0, 'keel_hatch')):
+            hatch(mb, F, 7.0, 9.0)
+        for sg, F in pair(lambda sg: S.site_under(sg * 34.0, s, 7.0, 12.0, 'keel_vent')):
+            vent_louvre(mb, F, 7.0, 12.0, 1.0)
+    for sg in (1, -1):              # keel conduits beside the keel spine
+        conduit(mb, run_pts(under_path(S, sg * 9.6), -272.0, 282.0), 2, 0.5, 1.2)
+    # ventral PD on the low chamfers amidships / aft
+    for s in (100.0, 4.0, -92.0):
+        for sg, F in pair(lambda sg: S.site_hull(H, s, up_p(sg)['low'], 10.0, 4.0, 'pd_low')):
+            pd_battery(mb, F, 2, 5.0, 2.4)
+
+
+def zone_edges(mb, H, R, S):
+    """Shield emitter nodes on every bulkhead line along the strake's outer edge; deferred marker light rows."""
+    for s in [148.0 - 24.0 * k for k in range(16)]:
+        xo = strake_at(s)[0]
+        for sg, F in pair(lambda sg: S.site_top(sg * (xo - 8.5), s, 5.5, 5.5, 'emitter')):
+            shield_emitter(mb, F, 2.0)
+    cast_rows(mb, S, R)
 
 
 def systems(mb, H, R, S):
-    pass
+    zone_bow(mb, H, R, S)
+    zone_forward(mb, H, R, S)
+    zone_midship(mb, H, R, S)
+    zone_command(mb, H, R, S)
+    zone_engineering(mb, H, R, S)
+    zone_flanks(mb, H, R, S)
+    zone_keel(mb, H, R, S)
+    zone_edges(mb, H, R, S)
 
 
 # ------------------------------------------------------------------------------------------ build
@@ -1010,14 +1317,36 @@ def mothership(probe=False):
     port_launch_bay(mb, R)
     empty('wound', (WALL_X, Y(40.0), 10.0), size=6)
     # functional systems, placed on the finished armour by ray casting (zoning plan: MOTHERSHIP_SYSTEMS.md)
+    mouth0 = mouth_faces(mb)
     S = Surf(mb)
     if probe:
         S.heightmap()
+        for s in (112.0, 64.0, -32.0):
+            for sg in (1, -1):
+                row = []
+                for x in range(40, 66, 2):
+                    h = S.top(sg * x, s)
+                    row.append('%.1f' % h[0].z if h else '-')
+                print('PROBE s=%g sg=%d' % (s, sg), ' '.join(row))
     systems(mb, H, R, S)
     print('SITES placed/rejected:', S.stats, flush=True)
+    print('LAUNCH BAY MOUTH: faces before systems = %d, after = %d (must be equal)' % (mouth0, mouth_faces(mb)),
+          flush=True)
     obj = mb.to_object('mothership', smooth_angle=26)
     fix_engine_normals(obj)
     return [obj]
+
+
+def mouth_faces(mb):
+    """Faces touching the port launch bay mouth box (glTF x -74..-62, y -17..26, z 22..92)."""
+    n = 0
+    for f in mb.bm.faces:
+        for v in f.verts:
+            c = v.co
+            if -74 < c.x < -62 and -17 < c.z < 26 and 22 < -c.y < 92:
+                n += 1
+                break
+    return n
 
 
 def fix_engine_normals(obj):
@@ -1107,6 +1436,10 @@ def render_previews(glb):
     if '--extra' in sys.argv:
         rs.shot(Vector((0, 0, 0)), 340, 150, 22, 0.62, os.path.join(OUT, 'v9_mothership_rear.png'))
         rs.shot(Vector((0, Y(293), 5)), 60, -30, 12, 0.9, os.path.join(OUT, 'v9_mothership_bow.png'))
+        rs.shot(Vector((30, Y(60), 55)), 70, -35, 38, 0.9, os.path.join(OUT, 'v9_mothership_detail_mid.png'))
+        rs.shot(Vector((60, Y(-215), 45)), 75, 140, 40, 0.9, os.path.join(OUT, 'v9_mothership_detail_aft.png'))
+        rs.shot(Vector((25, Y(240), 35)), 60, -40, 30, 0.9, os.path.join(OUT, 'v9_mothership_detail_fwd.png'))
+        rs.shot(Vector((0, 0, 0)), 340, 60, -28, 0.62, os.path.join(OUT, 'v9_mothership_belly.png'))
 
 
 def main():
