@@ -691,7 +691,9 @@ function drawMSBattle(R, t) {
       bolt(R, t, tf, ti, from, to, 14, 0.35, [3, 1.4, 0.4], 1);
       if (t >= ti) {
         const lt = t - ti, inc = V.norm([0, 0, 0], V.sub([0, 0, 0], to, from));
-        const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], inc, -0.3), randDir([0, 0, 0], k * 5.3 + 2)));
+        // ricochet the way the arm is swinging (the swat throws it aside), plus a little of the glancing reflection
+        const sv = V.sub([0, 0, 0], vambrace(ti + 0.03), vambrace(ti - 0.03));
+        const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], V.norm([0, 0, 0], sv), 1.0), V.add([0, 0, 0], V.scale([0, 0, 0], inc, 0.35), V.scale([0, 0, 0], randDir([0, 0, 0], k * 5.3 + 2), 0.15))));
         bolt(R, t, ti, ti + 0.3, to, madd(to, out, 380), 10, 0.25, [2.4, 1.0, 0.3], 0.8);
         const kf = Math.exp(-lt * 14);
         R.glow(to, 1.5 + 2.5 * easeOut(sat(lt / 0.05)), [3 * kf, 1.8 * kf, 0.8 * kf], 0.4);

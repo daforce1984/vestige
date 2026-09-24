@@ -839,14 +839,16 @@ function volleyParry(tw, out) {
   if (guard <= 0) return;
   let flick = 0, twist = 0;
   E1_BOLTS.forEach((ti, k) => {
-    const x = (tw - ti) / 0.09;
-    const g = Math.exp(-x * x);                              // meets the bolt, then relaxes (0.09 s either side)
+    // a real SWAT: the forearm whips across (0.12 s before → 0.12 s after the bolt), meeting it mid-swing, then eases back
+    const x = (tw - ti) / 0.12;
     const sd = k % 2 ? 1 : -1;
-    flick += g * sd; twist += g * sd * 0.6;
+    const sw = x < -1.5 || x > 2.5 ? 0 : Math.tanh(x * 1.6) * Math.exp(-Math.max(0, x) * 0.9) * (x < -1 ? (x + 1.5) * 2 : 1);
+    flick += sw * sd; twist += sw * sd * 0.6;
   });
   out[PIDX.arm_R_upper] += (-1.2) * guard;
-  out[PIDX.arm_R_upper + 1] += (0.45 + 0.35 * flick) * guard;
-  out[PIDX.arm_R_upper + 2] += (0.1 - 0.2 * flick) * guard;
+  out[PIDX.arm_R_upper + 1] += (0.45 + 0.75 * flick) * guard;
+  out[PIDX.arm_R_upper + 2] += (0.1 - 0.35 * flick) * guard;
+  out[PIDX.arm_R_lower + 1] += 0.3 * flick * guard;
   out[PIDX.arm_R_lower] += -1.3 * guard;
   out[PIDX.hand_R] += -0.25 * guard;
   out[PIDX.torso + 1] += (-0.12 + 0.12 * twist) * guard;

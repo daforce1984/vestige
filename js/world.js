@@ -985,7 +985,7 @@ export function ionCharge(R, e, t, c, fail, seed) {
   R.glow(core, 0.8 + 2.2 * c, [2.6 * pk, 3.0 * pk, 4.0 * pk], 0.3);
   R.glow(core, 3 + 7 * c, [0.35 * pk, 0.7 * pk, 1.8 * pk], 0.7);
   R.light(core, 60, ION_COL, 5 * c);
-  if (!fail) chargeInflow(R, t, t - 1, 1, core, 22, 26, [0.5, 0.9, 2], 4, 14, 0.25, seed);   // gathered from right around the crown
+  if (!fail) chargeInflow(R, t, 0, 1, core, 22, 26, [0.5, 0.9, 2], 4 + 6 * c, 10, 0.25, seed);   // gathered from right around the crown (continuous flow)
 }
 function drawIonVolleys(R, t) {
   for (const [t0, t1, fi, ti] of VOLLEYS) {

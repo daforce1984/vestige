@@ -285,7 +285,8 @@ export function bolt(R, t, t0, t1, a, b, len, radius, col, intensity = 1) {
  * accelerating: rate(u) = r0 + (r1 - r0)·u², u = (t - t0)/dur. Streaks lengthen with speed. */
 export function chargeInflow(R, t, t0, dur, pos, radius, n, col, r0 = 3, r1 = 15, width = 0.2, seed = 0) {
   const lt = Math.max(0, Math.min(t - t0, dur)), u = lt / dur;
-  const P = r0 * lt + (r1 - r0) * dur * u * u * u / 3;           // ∫ rate dt  (cycles)
+  // ∫ rate dt (cycles); past the ramp it keeps flowing at the final rate (it used to freeze there)
+  const P = r0 * lt + (r1 - r0) * dur * u * u * u / 3 + r1 * Math.max(0, t - t0 - dur);
   const rate = r0 + (r1 - r0) * u * u;
   const k = 0.45 + 0.55 * u;
   for (let i = 0; i < n; i++) {
@@ -298,8 +299,8 @@ export function chargeInflow(R, t, t0, dur, pos, radius, n, col, r0 = 3, r1 = 15
       const px = pos[0] + d[0] * r - R.camPos[0], py = pos[1] + d[1] * r - R.camPos[1], pz = pos[2] + d[2] * r - R.camPos[2];
       if (px * px + py * py + pz * pz < (radius * 0.45) * (radius * 0.45)) continue;
     }
-    const len = Math.min(r, radius * (0.06 + rate * 0.012));
-    const b = k * (0.3 + 0.7 * ph) * 3;
+    const len = Math.min(r * (1 - 0.7 * smooth(0.6, 1, ph)), radius * (0.06 + rate * 0.012));
+    const b = k * (0.3 + 0.7 * ph) * 3 * smooth(0, 0.12, ph) * (1 - smooth(0.62, 0.98, ph));   // fade in, then dim out as it is swallowed
     R.beam(V.madd(tmp2, pos, d, r + len), V.madd(tmp3, pos, d, r), width, [col[0] * b, col[1] * b, col[2] * b], 1, 10);
   }
 }
