@@ -1022,7 +1022,7 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     var ripple = 0.0;
     if (age >= 0.0 && age < 2.0) {
       let rd = length(q * vec2f(1.0, 0.62));
-      ripple = exp(-pow((rd - age * 0.9) / 0.06, 2.0)) * (1.0 - age / 2.0) * 2.5;
+      ripple = exp(-pow((rd - age * 0.9) / 0.06, 2.0)) * (1.0 - age / 2.0) * 2.5 * smoothstep(0.08, 0.3, age);   // a ring from the start (no bright dot at the centre)
     }
     let sheet = 0.06 + 0.05 * band + 0.18 * lattice * (0.6 + 0.4 * band) + 0.9 * frameGlow + ripple;
     col = tint * sheet * s.d.a;

@@ -181,7 +181,11 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     M.transformDir(tmp2, pm, [0, 0, -1]);
     V.norm(tmp2, tmp2);
     const len = r * (1.7 + throttle * 5.0) * Math.max(0.5, trail * 0.6);
-    const k = throttle * flick;
+    // seen straight down the exhaust axis the plume planes collapse into a flat glowing disc: fade it end-on
+    let endOn = 1;
+    if (R.camPos) { const vx = R.camPos[0] - tmp[0], vy = R.camPos[1] - tmp[1], vz = R.camPos[2] - tmp[2], vl = Math.hypot(vx, vy, vz) || 1;
+      endOn = 0.25 + 0.75 * Math.min(1, (1 - Math.abs((vx * tmp2[0] + vy * tmp2[1] + vz * tmp2[2]) / vl)) * 3); }
+    const k = throttle * flick * endOn;
     const c = [col[0] * k, col[1] * k, col[2] * k];
     if (opts && opts.past) {
       // curved plume: 8 samples of gas emitted over the last `span` seconds

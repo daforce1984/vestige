@@ -229,3 +229,4 @@
 - [x] 167. Scene 64 fake glows removed: the atmosphere glow sprite, the god rays (marched over bloom during the swing) and the hard-edged warm glare disc of the flare (now a soft gaussian + faint tail); the flare and its ghosts fade out completely before the sun reaches the frame edge.
 - [x] 168. Scene 60→61: Sigma's exhaust history no longer reaches back across the 340 cut (his path jumps there), which drew a long light streak sweeping across the frame.
 - [x] 169. Bug: the hero's leftover beam-saber hilt had 'engine'-coloured faces, so 24 tiny thruster plumes fired from the hand/weapon; excluded from the engine emitters and the hilt part hidden (only the 3 backpack thrusters remain).
+- [x] 170. Recovery bay: the field's pass-through ripple starts as a ring (it began as a bright filled dot that read as a light ball by Sigma's hand); visor glow smaller; dock lamp dimmer; mech plumes fade when seen end-on.

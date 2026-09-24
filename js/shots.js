@@ -596,7 +596,7 @@ export function drawGundam(R, t, s, opts = {}) {
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
   if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.7, 0.9, 2.0], 0.9 * (1 + 0.9 * (s.boostK || 0)), s.thr, 1.2 + 1.5 * (s.boostK || 0), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
   const eye = emitWorld(R, 'gundam', e, 'eye');
-  if (!s.fpv && eye && eyeK > 0.05) R.glow(eye, (s.visorFlare !== undefined ? 0.4 : 1.4 + bz * 1.6) * Math.min(eyeK, 1.2), [lerp(0.8, 5, bz) * eyeK, lerp(3, 0.3, bz) * eyeK, lerp(1.6, 0.2, bz) * eyeK], 0.5);
+  if (!s.fpv && eye && eyeK > 0.05) R.glow(eye, (s.visorFlare !== undefined ? 0.4 : 0.55 + bz * 2.4) * Math.min(eyeK, 1.2), [lerp(0.5, 5, bz) * eyeK, lerp(1.6, 0.3, bz) * eyeK, lerp(1.0, 0.2, bz) * eyeK], 0.35);   // visor: a small glint (a big ball read as a stray light next to him)
   if (!s.fpv && eyeK > 0.05 && (s.visorFlare !== undefined)) {        // visor band glow: every emitter point + a light spill
     const pts = R.models.gundam.emitPoints.eye || [];
     for (let i = 0; i < pts.length; i++) {

@@ -350,7 +350,7 @@ function drawDock(R, t, me) {
     const open = 1 - easeInOut(sat((t - 342.55) / 0.5));
     rig.pose = { clampL: [0, 0, -1.5 * open], clampR: [0, 0, -1.5 * open] };
     const blink = 0.6 + 0.4 * Math.sin(t * 9);
-    rig.matOverride = { dock_light: { base: [0.3, 0.7, 1], metal: 0, rough: 0.3, emissive: t < 343.05 ? [0.35 * blink * 3, 0.85 * blink * 3, 1.4 * blink * 3] : [0.1, 0.9, 0.4] } };
+    rig.matOverride = { dock_light: { base: [0.3, 0.7, 1], metal: 0, rough: 0.3, emissive: t < 343.05 ? [0.35 * blink * 0.9, 0.85 * blink * 0.9, 1.4 * blink * 0.9] : [0.1, 0.9, 0.4] } };   // (3× read as a floating ball of light by his hand)
   }
   // blue containment field across the bay mouth (fades on as Sigma approaches; ripples as he pushes through)
   if (t > 150 && t < 162) {                                   // the same field across the port bay when Sigma LAUNCHES
