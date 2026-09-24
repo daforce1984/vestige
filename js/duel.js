@@ -834,6 +834,7 @@ export const DODGE = { t: 166.65, side: 1 };
 // right vambrace — the forearm stays up in a guard and flicks out to meet each impact, alternating sides
 export const E1_BOLTS = Array.from({ length: 24 }, (_, k) => 172 + k * 0.26 + 0.35);
 function volleyParry(tw, out) {
+  return;                                                   // (no gunfire any more → no parries)
   if (tw < 171.7 || tw > 178.0) return;
   const guard = smooth(171.7, 172.2, tw) * (1 - smooth(177.35, 177.8, tw));
   if (guard <= 0) return;
@@ -938,6 +939,46 @@ export function duelEnemy1(t) {
   if (r === undefined) { r = duelEnemy1_(t); if (AUTO_READY && r) r = applyImpulses('e1', t, r); if (_c_duelEnemy1.size > 64) _c_duelEnemy1.clear(); _c_duelEnemy1.set(t, r); }
   return r;
 }
+// SAMURAI GRIP: RONIN holds the katana in BOTH hands — the left hand is solved (FK coordinate descent, joint-limited)
+// onto the hilt just below the right fist, aligned with the blade. Only the left arm moves: the blade and every solved
+// contact stay exactly where the choreography put them.
+const TH_VARS = [['arm_L_upper', 0], ['arm_L_upper', 1], ['arm_L_upper', 2], ['arm_L_lower', 0], ['hand_L', 0], ['hand_L', 1], ['hand_L', 2]];
+function twoHand(s) {
+  if (SOLVING || !s || !s.vis || !(s.saber > 0.5)) return s;
+  const fk0 = duelFK(s, 'enemy_ms');
+  const [a, , dir] = fk0.saber;
+  const tgt = sub(a, scl(dir, 2.1));                                  // one fist-width below the right hand, on the hilt
+  const pose = s.pose;
+  for (const [p] of TH_VARS) pose[p] = (pose[p] || [0, 0, 0]).slice();
+  const cost = () => {
+    const fk = duelFK(s, 'enemy_ms');
+    const g = M.transformPoint([0, 0, 0], fk.hand_L, [0, -1.2, 0.6]);
+    const hd = nrm(M.transformDir([0, 0, 0], fk.hand_L, [0, 0, 1]));
+    return V.dist(g, tgt) ** 2 + 6 * (1 - V.dot(hd, dir));
+  };
+  // two starts: the current left arm, and the right arm mirrored across (the hilt is next to the right fist)
+  const cur = TH_VARS.map(([p, k]) => pose[p][k]);
+  let best = cost(), bestV = cur.slice();
+  const mir = { arm_L_upper: 'arm_R_upper', arm_L_lower: 'arm_R_lower', hand_L: 'hand_R' };
+  TH_VARS.forEach(([p, k]) => { const r = pose[mir[p]] || [0, 0, 0]; pose[p][k] = k === 0 ? r[0] : -r[k]; });
+  const cm = cost(); if (cm < best) { best = cm; bestV = TH_VARS.map(([p, k]) => pose[p][k]); }
+  TH_VARS.forEach(([p, k], i) => { pose[p][k] = bestV[i]; });
+  for (let step = 0.5; step > 0.008; step *= 0.6) {
+    for (let it = 0; it < 5; it++) {
+      let imp = false;
+      for (const [p, k] of TH_VARS) {
+        const L = JOINT_LIMITS[p]?.[k] || [-3.5, 3.5];
+        for (const sg of [1, -1]) {
+          const v0 = pose[p][k]; pose[p][k] = clamp(v0 + sg * step, L[0], L[1]);
+          const c = cost(); if (c < best - 1e-6) { best = c; imp = true; break; } pose[p][k] = v0;
+        }
+      }
+      if (!imp) break;
+    }
+  }
+  s.twoHandErr = Math.sqrt(Math.max(0, best));
+  return s;
+}
 function duelEnemy1_(t) {
   if (t < DUEL_T0 || t >= DUEL_T1) return null;
   const s = base(t > 160 && t < 180.3);
@@ -974,7 +1015,7 @@ function duelEnemy1_(t) {
   s.thr = tw > 179 ? 0.15 + 0.5 * (Math.sin(t * 37) > 0.3 ? 1 : 0) : clamp(0.4 + s.boost * 0.6, 0, 1);
   s.damage = 0.1 * smooth(178.2, 178.3, t) + 0.15 * smooth(178.55, 178.6, t) + 0.5 * smooth(179.0, 179.2, t);
   s.eye = tw > 179 ? (Math.sin(t * 43) > 0 ? 0.9 : 0.15) : 1;
-  return finish(s, _pose, f);
+  return twoHand(finish(s, _pose, f));
 }
 
 const _c_duelEnemy2 = new Map();
@@ -1008,7 +1049,7 @@ function duelEnemy2_(t) {
   s.thr = tw > 192.4 ? 0.1 : clamp(0.45 + s.boost * 0.55, 0, 1);
   s.damage = 0.12 * smooth(188.2, 188.3, t) + 0.6 * smooth(192.4, 193.2, t);
   s.eye = tw > 192.5 ? Math.max(0, 1 - (tw - 192.5) / 1.2) * (Math.sin(t * 50) > -0.2 ? 1 : 0.2) : 1;
-  return finish(s, _pose, f);
+  return twoHand(finish(s, _pose, f));
 }
 
 // ============================================================================ forward kinematics (same math as renderer + msMatrix)

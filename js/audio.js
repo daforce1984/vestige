@@ -347,10 +347,6 @@ export const SAMPLE_CUES = [
   [157.9, 'hl_thruster', { loop: true, dur: 12.1, rate: 0.95, rateTo: 1.15, gain: 0.4, fadeIn: 0.4, fadeOut: 2, prio: 6, norand: true }],
   [161,   'flyby_fast', { at: 'hit', gain: 1, pan0: -0.9, pan1: 0.9, prio: 8, norand: true }],
   // ---------------- mech duel
-  // …and every one is swatted off Sigma's vambrace: a hard metallic ping + spark crackle at each impact
-  ...Array.from({ length: 24 }, (_, k) => [172 + k * 0.26 + 0.35, 'metal_knock', { at: 'hit', rate: 1.25 + 0.1 * Math.sin(k * 1.7), gain: 0.55, pan: -0.2, prio: 8, norand: true }]),
-  ...Array.from({ length: 24 }, (_, k) => [172 + k * 0.26 + 0.36, '@sparkBurst', { vel: 0.35, pan: -0.2 }]),
-  ...Array.from({ length: 24 }, (_, k) => [172 + k * 0.26, k % 3 ? 'laser_shot' : 'laser_shot2', { dur: 0.6, fadeOut: 0.2, rate: 1.05 + 0.1 * Math.sin(k * 2.3), gain: 0.7, far: 0.15, pan: 0.45, prio: 7 }]),   // enemy mech wrist laser (one per bolt, shots.js)
   [190,   'whoosh_rev', { rate: 0.6, gain: 0.7, prio: 7, norand: true }],
   // ---------------- lance 200–216
   [200,   'rumble_dark', { loop: true, dur: 16, gain: 1.1, fadeIn: 3, rate: 0.9, prio: 9, norand: true }],

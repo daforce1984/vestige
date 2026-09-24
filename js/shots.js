@@ -709,7 +709,7 @@ function drawMSBattle(R, t) {
     }
   }
   // E1 machine gun
-  if (e1.vis && t > 172 && t < 178.5 && g.vis) {
+  if (false && e1.vis && t > 172 && t < 178.5 && g.vis) {   // (RONIN #1 no longer fires on the approach)
     for (let k = 0; k < 24; k++) {
       const tf = 172 + k * 0.26;
       if (t < tf || t > tf + 0.5) continue;
@@ -1103,6 +1103,7 @@ shot(80, 100, 'B3 DREADNOUGHT REVEAL', (c) => {
   c.env.fill = [0.3, 0.26, 0.26, 0.45]; c.env.rim = [0.95, 0.35, 0.3, 0.9];
   c.post.gradeShadows = [1.05, 0.94, 0.96];
   c.env.sunDisc = 0.08;
+  c.env.planet = null;                        // close on the dreadnought: no tiny planet behind it
 });
 shot(100, 110, 'B4 standoff', (c) => {
   const { t, u } = c;
@@ -1883,7 +1884,7 @@ export function findShot(t) {
 
 // wide establishing shots: the camera is lifted to look down on the action at an oblique angle, and a big planet
 // fills part of the background behind the subject (lit side toward the camera)
-const WIDE_SHOTS = new Set(['A4 fleet assembles', 'B3 DREADNOUGHT REVEAL', 'B4 standoff', 'S9c wide battle', 'S18a shockwave',
+const WIDE_SHOTS = new Set(['A4 fleet assembles', 'B4 standoff', 'S9c wide battle', 'S18a shockwave',
   'S20 enemy flees', 'X the enemy arrives (wide)']);
 function wideTreatment(c) {
   const cam = c.cam, T = cam.target;

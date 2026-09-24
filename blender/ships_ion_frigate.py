@@ -23,7 +23,9 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 import lib
 from lib import MB, reg, rng, lerp, annulus
-from shipkit import Hull, armor, cuts, obox, plate
+from shipkit import Hull, armor, cuts, obox, plate, lamp_fixture, window_bay, beacon
+
+LAMP_BODY, WIN_FRAME = 'hull2', 'greeble'     # non-emissive fixture bodies (housings / window bezels)
 
 ASSETS = os.path.join(os.path.dirname(HERE), 'assets')
 
@@ -149,7 +151,8 @@ def glacis(mb, H):
     for sg in (1, -1):   # recoil dampers from the collar into the front face
         for z in (BZ + 1.2, BZ - 1.2):
             mb.cyl((sg * 1.35, Y(s + 0.3), z), (sg * 1.1, Y(s + 1.6), z * 0.3 + BZ * 0.7), 0.16, 0.13, 'trim', seg=8)
-        mb.sphere((sg * (w / 2 - 0.8), Y(s + 0.4), cz + h / 2 - 1.0), 0.18, 'blue_light', seg=8, rings=4)
+        beacon(mb, Vector((sg * (w / 2 - 0.8), Y(s + 0.35), cz + h / 2 - 1.0)), Vector((0, -1, 0)), 0.15, 'blue_light',
+               LAMP_BODY, 'trim')
 
 
 def strongback(mb, R):
@@ -207,7 +210,8 @@ def cap_module(mb, s0, s1, sg, SB):
     z0, z1 = -3.35, -1.35
     blk(mb, s0, s1, x0, x1, z0, z1, 'hull2', ins=0.12)
     blk(mb, s0 + 0.35, s1 - 0.35, x1 - sg * 0.05, x1 + sg * 0.12, z0 + 0.35, z1 - 0.4, 'plate')   # side door
-    blk(mb, s0 + 0.5, s0 + 0.9, x1 + sg * 0.1, x1 + sg * 0.16, z1 - 0.7, z1 - 0.5, 'amber')
+    lamp_fixture(mb, Vector((x1 + sg * 0.12, Y(s0 + 0.7), z1 - 0.6)), Vector((sg, 0, 0)), (0.2, 0.4, 0.08), 'amber',
+                 LAMP_BODY, lift=0.04)
     xm = (x0 + x1) / 2
     L = s1 - s0
     for i, du in enumerate((-0.3, 0.3)):
@@ -309,6 +313,10 @@ class LF:
     def box(self, mb, u, v, w, su, sv, sw, mat):
         obox(mb, self.p(u, v, w + sw / 2), self.n, (su, sv, sw), mat, lift=0.0, fwd=self.t)
 
+    def lamp(self, mb, u, v, w, su, sv, sw, mat):
+        """Housed lamp fixture in place of an emissive box (same footprint, bottom at height w)."""
+        lamp_fixture(mb, self.p(u, v, w + sw / 2), self.n, (su, sv, sw), mat, LAMP_BODY, fwd=self.t, lift=0.0)
+
     def cyl(self, mb, a, b, r0, r1=None, mat='trim', seg=8, caps=True):
         mb.cyl(self.p(*a), self.p(*b), r0, r0 if r1 is None else r1, mat, seg=seg, caps=caps)
 
@@ -399,7 +407,7 @@ def sensor_array(mb, F, W, L, nu, nv):
         for j in range(nv):
             F.box(mb, -W / 2 + cu * (i + 0.5), -L / 2 + cv * (j + 0.5), 0.14, cu - 0.12, cv - 0.12, 0.09, 'plate')
     for e in (-1, 1):
-        F.box(mb, e * (W / 2 - 0.18), L / 2 - 0.18, 0.14, 0.2, 0.2, 0.12, 'blue_light')
+        F.lamp(mb, e * (W / 2 - 0.18), L / 2 - 0.18, 0.14, 0.2, 0.2, 0.12, 'blue_light')
 
 
 def radiator_bank(mb, F, W, L, pitch=0.36, fh=0.75):
@@ -430,7 +438,7 @@ def rcs_quad(mb, F, sz=1.0):
         a = (du * sz / 2, dv * sz / 2, w)
         b = (du * (sz / 2 + 0.45 * sz), dv * (sz / 2 + 0.45 * sz), w)
         F.cyl(mb, a, b, 0.12 * sz, 0.26 * sz, 'exhaust', seg=6)
-    F.box(mb, 0, 0, 0.75 * sz, 0.22, 0.22, 0.1, 'amber')
+    F.lamp(mb, 0, 0, 0.75 * sz, 0.22, 0.22, 0.1, 'amber')
 
 
 def hatch(mb, F, W, L, light=True):
@@ -440,7 +448,7 @@ def hatch(mb, F, W, L, light=True):
         F.box(mb, 0, e * (L / 2 - 0.07), 0.07, W - 0.28, 0.14, 0.1, 'trim')
     F.box(mb, 0, -L / 2 + 0.3, 0.07, W - 0.5, 0.18, 0.15, 'greeble')
     if light:
-        F.box(mb, W / 2 - 0.22, L / 2 - 0.22, 0.17, 0.14, 0.14, 0.08, 'amber')
+        F.lamp(mb, W / 2 - 0.22, L / 2 - 0.22, 0.17, 0.14, 0.14, 0.08, 'amber')
 
 
 def docking_port(mb, F, r=0.9):
@@ -452,7 +460,7 @@ def docking_port(mb, F, r=0.9):
         F.box(mb, math.cos(a) * (r + 0.42), math.sin(a) * (r + 0.42), 0.18, 0.32, 0.32, 0.36, 'greeble')
     for a in (-1, 1):
         for b in (-1, 1):
-            F.box(mb, a * 1.12 * r, b * 1.12 * r, 0.18, 0.16, 0.16, 0.08, 'amber')
+            F.lamp(mb, a * 1.12 * r, b * 1.12 * r, 0.18, 0.16, 0.16, 0.08, 'amber')
 
 
 def capacitor_bank(mb, F, nu, nv, pitch=0.8, r=0.28, h=0.75):
@@ -477,7 +485,7 @@ def vent_louvre(mb, F, W, L, pitch=0.32):
 def sensor_dome(mb, F, r):
     F.cyl(mb, (0, 0, -F.sink), (0, 0, 0.2), r * 1.2, r * 1.15, 'trim', seg=14)
     F.cyl(mb, (0, 0, 0.2), (0, 0, 0.2 + r * 0.45), r, r * 0.55, 'glass', seg=14)
-    F.box(mb, r * 0.95, 0.0, 0.2, 0.14, 0.14, 0.08, 'amber')
+    F.lamp(mb, r * 0.95, 0.0, 0.2, 0.14, 0.14, 0.08, 'amber')
 
 
 def conduit(mb, pts, n, npipes=3, r=0.13, gap=0.34, clamp_every=2.0):
@@ -585,8 +593,8 @@ def command_block(mb, H, R):
         z = zt + 2.2 + 1.1 * f
         s = lerp(-20.0, -21.0, f) + 0.05
         for x in [-1.6 + i * 0.8 for i in range(5)]:
-            obox(mb, Vector((x, Y(s), z)), Vector((0, -1, 1.0 / 1.0)).normalized(), (0.22, 0.55, 0.06), 'window',
-                 lift=0.0, fwd=Vector((1, 0, 0)))
+            window_bay(mb, Vector((x, Y(s), z)), Vector((0, -1, 1.0)).normalized(), (0.22, 0.55, 0.06), 'window',
+                       WIN_FRAME, lift=0.018, fwd=Vector((1, 0, 0)))
     for k in range(2):
         f = 0.3 + 0.36 * k
         z = zt - 0.3 + 2.5 * f
@@ -595,18 +603,18 @@ def command_block(mb, H, R):
             x = -3.2 + i * 0.8
             if R.random() < 0.15:
                 continue
-            obox(mb, Vector((x, Y(s), z)), Vector((0, -1, 1.1)).normalized(), (0.2, 0.5, 0.06), 'window', lift=0.0,
-                 fwd=Vector((1, 0, 0)))
+            window_bay(mb, Vector((x, Y(s), z)), Vector((0, -1, 1.1)).normalized(), (0.2, 0.5, 0.06), 'window',
+                       WIN_FRAME, lift=0.018, fwd=Vector((1, 0, 0)))
     for sg in (1, -1):
         for z in (zt + 0.5, zt + 1.35):
             s = sA + 1.5
             while s < sF - 2.0:
                 if R.random() > 0.2:
                     xw = sg * (4.0 - 0.7 * (z - zt + 0.3) / 2.5) + sg * 0.03
-                    obox(mb, Vector((xw, Y(s), z)), Vector((sg, 0, 0.28)).normalized(), (0.2, 0.7, 0.06), 'window',
-                         lift=0.0)
+                    window_bay(mb, Vector((xw, Y(s), z)), Vector((sg, 0, 0.28)).normalized(), (0.2, 0.7, 0.06),
+                               'window', WIN_FRAME, lift=0.018)
                 s += 1.2
-        mb.sphere((sg * 3.3, Y(sA + 0.9), zt + 2.3), 0.13, 'amber', seg=6, rings=3)
+        beacon(mb, Vector((sg * 3.3, Y(sA + 0.9), zt + 2.3)), Vector((0, 0, 1)), 0.11, 'amber', LAMP_BODY, 'trim')
 
 
 def zone_command(mb, H, R, S):
@@ -636,9 +644,9 @@ def zone_command(mb, H, R, S):
                     ds = [h.dot(n) for h in hits] if all(hits) else None
                     if ds and max(ds) - min(ds) < 0.2:          # on one plate (a sub-plate step is bridged)
                         c = hits[1] + n * (max(ds) - hits[1].dot(n))
-                        obox(mb, c, n, (0.55, 1.05, 0.08), 'greeble', lift=0.0)
-                        if R.random() > 0.12:
-                            obox(mb, c + n * 0.03, n, (0.28, 0.8, 0.08), 'window', lift=0.0)
+                        lit = R.random() > 0.12
+                        window_bay(mb, c, n, (0.55, 1.05, 0.08), 'window', WIN_FRAME, lift=0.03, lit=lit,
+                                   border=0.135)
                 s += 1.5
     # airlock (upper belt) + docking collar (lower belt) per flank
     for sg, F in pair(lambda sg: S.hull(H, -21.0, sidep(sg, 0, 4, 0.52), 1.6, 1.2, 'airlock')):
@@ -697,10 +705,10 @@ def edge_lights(mb, H, S, R):
                 pos, n = H.pt(s, p, 0.0)
                 h = S.cast(pos + n * 3.0, -n, 6.0)
                 if h and (h - pos).dot(n) < T + 0.1:
-                    obox(mb, h, n, (0.18, 0.4, 0.08), 'amber', lift=0.0)
+                    lamp_fixture(mb, h, n, (0.18, 0.4, 0.08), 'amber', LAMP_BODY, lift=0.032)
                 s += pitch
     for sg in (1, -1):
-        mb.sphere((sg * 1.45, Y(26.6), -2.1), 0.14, 'blue_light', seg=8, rings=4)
+        beacon(mb, Vector((sg * 1.45, Y(26.6), -2.1)), Vector((sg, 0, 0)), 0.12, 'blue_light', LAMP_BODY, 'trim')
 
 
 # ================================================================================================ engines
@@ -755,9 +763,11 @@ def engine_block(mb, H, R):
             mb.cyl(b0, Vector((x, ys + 1.0, z)) + n * 1.9, 0.09, 0.07, 'trim', seg=6)
     # stern lights: blue beacons on the upper corners, amber rows on the frame
     for sg in (1, -1):
-        mb.sphere((sg * (w / 2 - 0.5), ys + 0.35, cz + h / 2 - 0.6), 0.16, 'blue_light', seg=8, rings=4)
+        beacon(mb, Vector((sg * (w / 2 - 0.5), ys + 0.6, cz + h / 2 - 0.6)), Vector((0, 1, 0)), 0.14, 'blue_light',
+               LAMP_BODY, 'trim')
         for k in range(4):
-            mb.box((sg * (0.9 + k * 1.1), ys + 0.65, cz + h / 2 - 0.55), (0.35, 0.1, 0.14), 'amber')
+            lamp_fixture(mb, Vector((sg * (0.9 + k * 1.1), ys + 0.6, cz + h / 2 - 0.55)), Vector((0, 1, 0)),
+                         (0.14, 0.35, 0.1), 'amber', LAMP_BODY, fwd=Vector((1, 0, 0)), lift=0.05)
 
 
 # ================================================================================================ build

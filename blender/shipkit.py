@@ -406,13 +406,17 @@ def window_bay(mb, pos, n, size, mat='window', frame_mat=None, fwd=Vector((0, -1
     pl = (li - (k - 1) * m) / k
     pa = (ai - (rows - 1) * m) / rows
     zm = zp + (h - zp) * 0.7
-    for i in range(k - 1):          # mullions
+    for i in range(k - 1):          # mullions: bevelled ridges across the opening (ends hidden in the reveal)
         cy = -li / 2 + pl + m / 2 + i * (pl + m)
-        mb.loft([_ring(L, _rect(ai, m, 0, cy), zp), _ring(L, _rect(ai, m * 0.7, 0, cy), zm)], frame_mat, cap0=False)
+        prof = [(cy - m / 2, zp), (cy - m * 0.35, zm), (cy + m * 0.35, zm), (cy + m / 2, zp)]
+        mb.loft([[_w(L, x, y, z) for y, z in prof] for x in (-ai / 2, ai / 2)], frame_mat, cap0=False, cap1=False,
+                closed=False)
     for j in range(rows - 1):       # transoms (a touch lower than the mullions: no coplanar tops)
         cx = -ai / 2 + pa + m / 2 + j * (pa + m)
         zt = zp + (zm - zp) * 0.85
-        mb.loft([_ring(L, _rect(m, li, cx, 0), zp), _ring(L, _rect(m * 0.7, li, cx, 0), zt)], frame_mat, cap0=False)
+        prof = [(cx - m / 2, zp), (cx - m * 0.35, zt), (cx + m * 0.35, zt), (cx + m / 2, zp)]
+        mb.loft([[_w(L, x, y, z) for x, z in prof] for y in (li / 2, -li / 2)], frame_mat, cap0=False, cap1=False,
+                closed=False)
     for i in range(k):
         cy = -li / 2 + pl / 2 + i * (pl + m)
         for j in range(rows):
@@ -427,8 +431,7 @@ def window_bay(mb, pos, n, size, mat='window', frame_mat=None, fwd=Vector((0, -1
             if r > 1.0 - blind_prob:    # half-drawn blind: dark slab over part of the pane, just above the glass
                 fr = 0.3 + 0.4 * _hash(ctr, 1)
                 bx0 = cx + pa / 2 - pa * fr / 2
-                mb.loft([_ring(L, _rect(pa * fr, pl, bx0, cy), zp), _ring(L, _rect(pa * fr, pl, bx0, cy),
-                                                                           zp + (h - zp) * 0.18)], dark_mat)
+                _face(mb, _ring(L, _rect(pa * fr, pl * 0.96, bx0, cy), zp + (h - zp) * 0.12), dark_mat)
 
 
 def light_panel(mb, pos, n, size, mat, frame_mat=None, fwd=Vector((0, -1, 0)), lift=None, grid=(1, 3), depth=0.5):

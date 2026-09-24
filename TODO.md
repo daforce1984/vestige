@@ -205,3 +205,6 @@
 - [x] 143. Dive: continuous burst acceleration (the old curve jumped back at 244.5 — the "teleport"), boost spike at 241.2; S16a camera pulled in.
 - [x] 144. Parries: bigger full-arm swats with the shoulders turning into each one.
 - [x] 145. Berserk first strike is a true clasped double-fist hammer: both fists solved with FK to meet above/in front (gap ≈ fist width), no per-hit jitter on it.
+- [x] 146. RONIN holds the katana two-handed (samurai grip): left arm FK-solved onto the hilt below the right fist, aligned with the blade (two starts incl. mirrored right arm, joint-limited); blade/contacts unchanged.
+- [x] 147. RONIN #1 no longer fires on the approach (bolts, laser audio, vambrace parries removed).
+- [x] 148. Dreadnought reveal close-up: no planet in the background (B3 dropped from the wide-shot treatment).

@@ -23,11 +23,14 @@ SHOTS = {
     'mothership': [
         ('wall', (63, -48, 12), 34, 70, 12),               # starboard hangar-wall window strips + door lights
         ('spine', (18, -40, 64), 26, 55, 22),              # spine window bands, deck-edge lamps
-        ('bridge', (0, 60, 72), 40, -25, 14),              # command block window bands
+        ('bridge', (0, 64, 68), 50, -20, 38),              # command block window bands
         ('stern', (0, 291, 4), 60, 160, 10),               # hangar slot luminaires, strip lights, beacons
         ('launch', (-72, -57, -8), 36, -115, 28),          # launch-deck chevrons
         ('strake', (76, -30, 56), 26, 115, 30),            # strake edge lamps, underside window bays
-        ('flank', (62, -190, 20), 36, 60, 10),             # forward crew-deck window bands
+        ('flank', (50, -190, 5), 40, 75, 8),               # forward crew-deck window bands
+        ('beacon', (64, 291, 40), 12, 140, 25),            # stern corner beacon
+        ('deck', (30, -190, 60), 30, 40, 45),              # VLS / PD marker lamps, deck-edge lamps
+        ('trench', (30, -40, 56), 22, 30, 35),             # service-trench chevrons
         ('tip', (133, 225, 18), 30, 75, 12),               # sponson tip window grid + beacon
     ],
     'ion_frigate': [

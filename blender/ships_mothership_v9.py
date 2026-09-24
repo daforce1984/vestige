@@ -92,12 +92,15 @@ def blk(mb, s0, s1, x0, x1, z0, z1, mat, ins=0.0, ins_s=None, bevel=0.0):
 LAMP_BODY, WIN_FRAME = 'hull2', 'greeble'       # non-emissive fixture bodies (housings / window bezels)
 
 
-def fixture(mb, pos, n, size, mat, fwd=Vector((0, -1, 0)), lift=0.0):
-    """Emissive fixture in place of an emissive box: `window` -> recessed window bay, lights -> housed lamp."""
+def fixture(mb, pos, n, size, mat, fwd=Vector((0, -1, 0)), lift=None):
+    """Emissive fixture in place of an emissive box centred on a surface point: `window` -> recessed window bay,
+    lights -> housed lamp.  Default lift raises the footprint so the housing / pane plane clears the surface
+    (the old boxes were half sunk; a sunk housing or pane would be hidden by the plate)."""
+    h = size[2]
     if mat == 'window':
-        window_bay(mb, pos, n, size, 'window', WIN_FRAME, fwd=fwd, lift=lift)
+        window_bay(mb, pos, n, size, 'window', WIN_FRAME, fwd=fwd, lift=0.3 * h if lift is None else lift)
     else:
-        lamp_fixture(mb, pos, n, size, mat, LAMP_BODY, fwd=fwd, lift=lift)
+        lamp_fixture(mb, pos, n, size, mat, LAMP_BODY, fwd=fwd, lift=0.4 * h if lift is None else lift)
 
 
 def light_row(mb, p0, p1, n, pitch, size, mat, R=None, dropout=0.0, kind=None):
@@ -114,7 +117,7 @@ def light_row(mb, p0, p1, n, pitch, size, mat, R=None, dropout=0.0, kind=None):
         if R and R.random() < dropout:
             continue
         if kind == 'chevron':      # direction markers pointing along p0 -> p1
-            chevron_light(mb, p0 + f * (L * i / k), n, size, mat, LAMP_BODY, fwd=f, lift=0.0)
+            chevron_light(mb, p0 + f * (L * i / k), n, size, mat, LAMP_BODY, fwd=f, lift=0.4 * size[2])
         else:
             fixture(mb, p0 + f * (L * i / k), n, size, mat, fwd=f)
 
@@ -1016,7 +1019,7 @@ def window_band(mb, S, H, side, s0, s1, p, R, dropout=0.15):
                 continue
             c, n = hs[1]
             lit = R.random() >= dropout
-            window_bay(mb, c, n, (2.0, ln + 0.6, 0.3), 'window', WIN_FRAME, lift=0.0, lit=lit, border=0.5)
+            window_bay(mb, c, n, (2.0, ln + 0.6, 0.3), 'window', WIN_FRAME, lift=0.12, lit=lit, border=0.5)
 
 
 def cast_rows(mb, S, R):
