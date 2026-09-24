@@ -1928,10 +1928,10 @@ shot(358, 393.5, 'S23 title', (c) => {
   c.post.exposure = 0.75;
   c.post.fade = 1 - smooth(391.5, 393.3, t);
   const rise = smooth(358.5, 362, t);
-  c.R.glow(madd(pos, V.norm([0, 0, 0], V.lerp([0, 0, 0], S, PLANET, 0.06)), 1000), 70, [1.2 * rise, 0.5 * rise, 0.1 * rise], 0.8);
+  // (no extra atmosphere glow sprite: it read as a fake disc of light round the sun, and lingered at the frame edge)
   c.post.flare = { pos: madd(pos, S, 1000), intensity: 1.4 * rise };
   c.post.streak = 0;
-  c.post.godray = { pos: madd(pos, S, 1000), intensity: 0.22 * rise, decay: 0.965 };
+  // (no god rays here: marched over bloom while the camera swings they left a hard-edged ghost disc round the sun)
   c.env.shadowCenter = motherPoint([0, 0, 0], 358, [0, 0, 0]); c.env.shadowRadius = 600;
 });
 

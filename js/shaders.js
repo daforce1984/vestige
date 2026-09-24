@@ -1464,12 +1464,12 @@ fn h12(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(12.9898, 78.233))) * 437
     let sp = P.flare.xy;
     let d = (uv - sp) * asp2;
     let r = length(d);
-    let onS = smoothstep(-0.12, 0.02, min(sp.x, sp.y)) * smoothstep(-0.12, 0.02, min(1.0 - sp.x, 1.0 - sp.y));   // fades as the sun leaves the frame
+    let onS = smoothstep(0.0, 0.1, min(sp.x, sp.y)) * smoothstep(0.0, 0.1, min(1.0 - sp.x, 1.0 - sp.y));   // fully gone by the time the sun reaches the frame edge (no stray ghosts)
     let I = P.flare.z * onS;
     let ang = atan2(d.y, d.x);
     let rays = pow(abs(sin(ang * 6.0 + 0.4)), 40.0) * 0.6 + pow(abs(sin(ang * 11.0 + 1.3)), 70.0) * 0.4;
     var fl = vec3f(1.0, 0.92, 0.8) * exp(-r * 38.0) * 3.0                       // hot core
-           + vec3f(1.0, 0.62, 0.3) * exp(-r * 7.0) * 0.55                        // warm glare (round)
+           + vec3f(1.0, 0.7, 0.42) * (exp(-r * r * 60.0) * 0.28 + exp(-r * 5.0) * 0.06)   // warm glare: soft gaussian + faint wide tail (no hard-edged disc)
            + vec3f(1.0, 0.75, 0.5) * rays * exp(-r * 9.0) * 0.35;               // starburst (short, subtle)
     let axis = vec2f(0.5) - sp;
     for (var k = 0; k < 5; k++) {
