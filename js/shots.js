@@ -1977,18 +1977,41 @@ function drawImplosion(R, t, c) {
   }
 }
 
+const _astHidden = {};
+function astOnly(R, name) {
+  if (_astHidden[name]) return _astHidden[name];
+  const h = {}; for (const p of R.models.asteroids.parts) if (p.name !== name && p.name !== '__root') h[p.name] = 1;
+  return (_astHidden[name] = h);
+}
 function drawDebrisField(R, t) {
   const base = addv(WELL, [40, 60, -1150]);
   const m = M.new();
-  for (let i = 0; i < 26; i++) {
+  // procedural asteroids (tools/make_asteroids.py; shaded with texSet -1): power-law sizes, slow tumbles
+  for (let i = 0; i < 34; i++) {
     const d = randDir([0, 0, 0], i * 7.7);
-    const p = madd(base, d, 40 + hash(i * 3.3) * 260);
+    const r = 3 + 26 * Math.pow(hash(i + 4), 2.2);
+    const p = madd(base, d, 60 + r * 1.3 + hash(i * 3.3) * 200);          // keep clear of Sigma and the close cameras
     p[2] += (t - 280) * (hash(i) - 0.5) * 2;
-    const e = R.add('debris', matEuler(m, p, t * 0.05 * (hash(i + 1) - 0.5), t * 0.04 * (hash(i + 2) - 0.5) + i, i * 0.7, 1 + hash(i + 4) * 2.5));
+    const e = R.add('asteroids', matEuler(m, p, t * 0.05 * (hash(i + 1) - 0.5) + i * 1.3, t * 0.04 * (hash(i + 2) - 0.5) + i, i * 0.7, r));
     if (!e) continue;
-    const names = ['rock0', 'rock1', 'rock2', 'rock3', 'hull0', 'hull1', 'hull2', 'hull3'];
-    e.hidden = debrisOnly(R, names[i % names.length]);
-    e.damage = i % 8 >= 4 ? 0.3 : 0;
+    e.hidden = astOnly(R, 'ast' + (i % 6));
+    e.texSet = -1; e.seed = i * 3.7;
+  }
+  // a few large ones placed where the drift / return cameras look (behind Sigma, down his line home)
+  [[-70, 25, -230, 26, 0], [110, -40, -330, 38, 3], [-170, 70, -470, 55, 1], [60, 90, -150, 12, 4], [-40, -60, -120, 9, 5]].forEach(([x, y, z, r, k], j) => {
+    const p = addv(base, [x, y, z - (t - 280) * 0.6]);
+    const e = R.add('asteroids', matEuler(m, p, t * 0.02 * (j % 2 ? 1 : -1) + j, t * 0.015 + j * 2.1, j * 0.9, r));
+    if (e) { e.hidden = astOnly(R, 'ast' + k); e.texSet = -1; e.seed = 50 + j; }
+  });
+  // torn hull plates from the battle
+  for (let i = 0; i < 8; i++) {
+    const d = randDir([0, 0, 0], i * 5.3 + 100);
+    const p = madd(base, d, 40 + hash(i * 4.1 + 9) * 240);
+    p[2] += (t - 280) * (hash(i + 20) - 0.5) * 2;
+    const e = R.add('debris', matEuler(m, p, t * 0.05 * (hash(i + 21) - 0.5), t * 0.04 * (hash(i + 22) - 0.5) + i, i * 0.7, 1 + hash(i + 24) * 2.5));
+    if (!e) continue;
+    e.hidden = debrisOnly(R, 'hull' + (i % 4));
+    e.damage = 0.3;
     e.seed = i;
   }
 }

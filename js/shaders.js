@@ -476,6 +476,29 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let ta = select(tA2, tA1, texSet == 1); let tm = select(tM2, tM1, texSet == 1);
     base = pow(ta.rgb, vec3f(2.2)); texAO = tm.r; rough = tm.g; metal = tm.b;
   }
+  // procedural asteroid (texSet = -1, tools/make_asteroids.py geometry): triplanar-free 3D regolith colour + bump.
+  // Model space is ~unit radius, so every frequency scales with the rock.
+  if (texSet < 0) {
+    let q = i.lp;
+    let big = fbm(q * 2.2 + inst.p1.w, 4);
+    let mid = fbm(q * 7.0 + 3.1 + inst.p1.w, 3);
+    base = mix(vec3f(0.034, 0.032, 0.03), vec3f(0.1, 0.09, 0.08), smoothstep(0.3, 0.72, big));   // dark basalt .. dusty regolith (albedo ~0.05–0.12)
+    base *= mix(0.8, 1.12, mid);
+    base = mix(base, base * vec3f(1.15, 0.95, 0.8), smoothstep(0.55, 0.8, fbm(q * 3.5 + 9.0, 3)) * 0.5);   // iron-stained patches
+    base += vec3f(0.025) * smoothstep(0.85, 0.92, vnoise(q * 70.0 + inst.p1.w));                         // mineral grains
+    rough = 0.93; metal = 0.0;
+    // bump: height field gradient by central differences (fine pits and grit that the mesh cannot hold)
+    let e = 0.004;
+    let hq = fbm(q * 9.0 + 1.7, 3) * 0.6 + vnoise(q * 40.0) * 0.4;
+    let gx = (fbm((q + vec3f(e, 0.0, 0.0)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(e, 0.0, 0.0)) * 40.0) * 0.4 - hq) / e;
+    let gy = (fbm((q + vec3f(0.0, e, 0.0)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(0.0, e, 0.0)) * 40.0) * 0.4 - hq) / e;
+    let gz = (fbm((q + vec3f(0.0, 0.0, e)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(0.0, 0.0, e)) * 40.0) * 0.4 - hq) / e;
+    var gw = (inst.m * vec4f(gx, gy, gz, 0.0)).xyz;
+    gw = gw / max(length(inst.m[0].xyz), 1e-3);
+    gw = gw - n * dot(gw, n);
+    n = normalize(n - gw * 0.022);
+    texAO = mix(0.55, 1.0, smoothstep(0.2, 0.6, hq));   // pits hold shadow
+  }
   // battle wear (mechs): chipped paint on edges, grime in crevices + streaks, scorch marks
   let wear = select(inst.tint.w, 0.0, texSet > 0);
   if (wear > 0.0 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01) {
@@ -551,17 +574,18 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // environment reflection with a brushed-metal streak (anisotropic look along the hull's long axis)
   let Rv = reflect(-V, n);
   let brushed = 0.75 + 0.5 * vnoise(vec3f(i.lp.x * 0.6, i.lp.y * 0.6, i.lp.z * 0.02) + inst.p1.w);
-  let reflK = fres * (1.0 - rough * 0.8) * brushed * mix(0.2, 0.85, metal);
+  let rockK = select(1.0, 0.12, texSet < 0);                        // dusty rock: almost no sheen
+  let reflK = fres * (1.0 - rough * 0.8) * brushed * mix(0.2, 0.85, metal) * rockK;
   var envC = envRefl(Rv, rough);
   if (F.interior.w > 0.5) { envC = envInterior(i.wp, Rv, rough); }
   col += envC * reflK * ao * mix(0.35, 1.0, sh);
   // rim (nebula backlight) for silhouettes
   let rim = pow(1.0 - max(dot(n, V), 0.0), 2.5);
-  col += F.rimCol.rgb * rim * F.rimCol.w * ao * (0.5 + 0.5 * base);
+  col += F.rimCol.rgb * rim * F.rimCol.w * ao * (0.5 + 0.5 * base) * mix(0.3, 1.0, rockK);
   // cinematic fill from slightly above the camera: keeps the dark side of hulls readable
   let fillDir = normalize(V + vec3f(0.0, 0.35, 0.0));
   let fl = clamp((dot(n, fillDir) + F.fill.w) / (1.0 + F.fill.w), 0.0, 1.0);
-  col += F.fill.rgb * fl * (diffC + F0 * 0.3) * ao;
+  col += F.fill.rgb * fl * (diffC + F0 * 0.3) * ao * mix(0.55, 1.0, rockK);
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;
   if (inst.shade.y > 0.0) {

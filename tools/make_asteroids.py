@@ -1,0 +1,152 @@
+"""Procedural asteroids -> assets/asteroids.glb (nodes ast0..ast5, unit radius ~1, centred at the origin).
+
+Each rock: a level-5 icosphere (20 480 tris) displaced along its normal by
+  * an ellipsoid / lumpy base: domain-warped low-frequency fBm (the overall potato shape),
+  * ridged multifractal mid-frequency relief (fault ridges and gullies),
+  * a power-law population of impact craters: bowl + raised rim + faint ejecta blanket, overlapping (newer on older),
+  * 0-2 fracture planes (flat broken faces, as if split off a larger body), softly blended,
+  * fine high-frequency fBm grit.
+Smooth area-weighted vertex normals; the fragment shader (texSet = -1) adds triplanar regolith colour and bump detail.
+usage: uv run --with numpy tools/make_asteroids.py"""
+import json, struct, pathlib
+import numpy as np
+
+N_ROCKS, LEVEL = 6, 5
+
+
+# ------------------------------------------------------------------ icosphere
+def icosphere(level):
+    t = (1 + 5 ** 0.5) / 2
+    v = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
+         [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]]
+    f = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+         [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]]
+    v = [np.array(p, float) / np.linalg.norm(p) for p in v]
+    for _ in range(level):
+        cache, nf = {}, []
+        def mid(a, b):
+            k = (a, b) if a < b else (b, a)
+            if k not in cache:
+                m = v[a] + v[b]; v.append(m / np.linalg.norm(m)); cache[k] = len(v) - 1
+            return cache[k]
+        for a, b, c in f:
+            ab, bc, ca = mid(a, b), mid(b, c), mid(c, a)
+            nf += [[a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]]
+        f = nf
+    return np.array(v), np.array(f, dtype=np.int64)
+
+
+# ------------------------------------------------------------------ noise (vectorised gradient noise)
+class Noise:
+    def __init__(self, seed):
+        r = np.random.default_rng(seed)
+        self.perm = np.concatenate([r.permutation(256)] * 2)
+        g = r.normal(size=(256, 3)); self.grad = g / np.linalg.norm(g, axis=1, keepdims=True)
+
+    def __call__(self, p):                       # p: (n,3) -> (n,) in ~[-1,1]
+        pi = np.floor(p).astype(np.int64); pf = p - pi
+        w = pf * pf * pf * (pf * (pf * 6 - 15) + 10)
+        out = 0
+        P = self.perm
+        for dx in (0, 1):
+            for dy in (0, 1):
+                for dz in (0, 1):
+                    h = P[P[P[(pi[:, 0] + dx) & 255] + ((pi[:, 1] + dy) & 255)] + ((pi[:, 2] + dz) & 255)]
+                    d = pf - np.array([dx, dy, dz])
+                    val = np.sum(self.grad[h] * d, axis=1)
+                    wx = w[:, 0] if dx else 1 - w[:, 0]; wy = w[:, 1] if dy else 1 - w[:, 1]; wz = w[:, 2] if dz else 1 - w[:, 2]
+                    out = out + val * wx * wy * wz
+        return out * 1.6
+
+    def fbm(self, p, oct, lac=2.0, gain=0.5):
+        s, a, f = 0, 1.0, 1.0
+        for _ in range(oct):
+            s = s + a * self(p * f); f *= lac; a *= gain
+        return s
+
+    def ridged(self, p, oct):
+        s, a, f, prev = 0, 0.5, 1.0, 1.0
+        for _ in range(oct):
+            n = 1 - np.abs(self(p * f)); n = n * n * prev
+            s = s + a * n; prev = n; f *= 2.1; a *= 0.5
+        return s
+
+
+# ------------------------------------------------------------------ one rock
+def rock(seed):
+    rng = np.random.default_rng(seed * 7919 + 13)
+    nz = Noise(seed)
+    V, F = icosphere(LEVEL)
+    n = V.copy()                                          # unit directions
+    # potato: warped low-frequency lumps on a random ellipsoid
+    warp = np.stack([nz.fbm(n * 1.1 + o, 3) for o in (11.3, 27.9, 43.1)], axis=1) * 0.35
+    h = 0.30 * nz.fbm(n * 0.9 + warp + 5.0, 4)
+    h += 0.11 * (nz.ridged(n * 2.3 + 17.0, 5) - 0.35)     # fault ridges / gullies
+    h -= 0.045 * np.abs(nz.fbm(n * 5.5 + 31.0, 3))         # creases: sharp V-shaped cracks between blocks
+    h += 0.03 * np.floor(nz.fbm(n * 3.0 + 51.0, 2) * 4) / 4   # terraced / stepped rock (blocky, not melted)
+    # craters: power-law sizes, random centres; later (smaller) ones overprint older ones
+    nc = int(rng.integers(14, 26))
+    for k in range(nc):
+        c = rng.normal(size=3); c /= np.linalg.norm(c)
+        ang = 0.07 + 0.5 * rng.random() ** 2.6            # angular radius (rad): many small, few big
+        depth = ang * (0.28 + 0.12 * rng.random())
+        d = np.arccos(np.clip(n @ c, -1, 1)) / ang        # 0 at the centre, 1 at the rim
+        d = d * (1 + 0.08 * nz(n * 9 + k * 3.7))          # irregular rim
+        bowl = np.where(d < 1, (d * d - 1) * depth, 0)
+        rim = depth * 0.35 * np.exp(-((d - 1) / 0.22) ** 2)
+        ejecta = depth * 0.06 * np.exp(-np.maximum(d - 1, 0) * 2.5) * (d > 1)
+        h += bowl + rim + ejecta
+    h += 0.018 * nz.fbm(n * 11.0 + 3.3, 3)                # grit
+    scale = np.array([1.0, 0.72 + 0.25 * rng.random(), 0.6 + 0.3 * rng.random()])
+    P = n * (1 + h)[:, None] * scale
+    # fracture planes: flat broken faces blended in softly (smooth-min against the plane)
+    for _ in range(int(rng.integers(0, 3))):
+        pn = rng.normal(size=3); pn /= np.linalg.norm(pn)
+        pd = (0.45 + 0.3 * rng.random()) * float(np.max(P @ pn))
+        s = P @ pn
+        k = 0.08
+        over = s - pd
+        cut = np.where(over > -k, (over + k) ** 2 / (4 * k), 0)   # C1 soft clamp
+        cut = np.where(over > k, over, cut)
+        P = P - pn * cut[:, None]
+        P += pn * (0.012 * nz(P * 14 + 7))[:, None] * (cut > 0)[:, None]   # rough fracture face
+    P -= (P.max(0) + P.min(0)) / 2
+    P /= np.max(np.linalg.norm(P, axis=1))               # unit radius
+    # smooth normals (area weighted)
+    fn = np.cross(P[F[:, 1]] - P[F[:, 0]], P[F[:, 2]] - P[F[:, 0]])
+    N = np.zeros_like(P)
+    for j in range(3): np.add.at(N, F[:, j], fn)
+    N /= np.linalg.norm(N, axis=1, keepdims=True)
+    return P.astype(np.float32), N.astype(np.float32), F.astype(np.uint32)
+
+
+# ------------------------------------------------------------------ GLB
+def main():
+    bin_ = bytearray(); views, accs, meshes, nodes = [], [], [], []
+    def add(arr, typ, comp, target, mm=False):
+        while len(bin_) % 4: bin_.append(0)
+        off = len(bin_); b = arr.tobytes(); bin_.extend(b)
+        views.append({'buffer': 0, 'byteOffset': off, 'byteLength': len(b), 'target': target})
+        a = {'bufferView': len(views) - 1, 'componentType': comp, 'count': int(arr.shape[0] if typ != 'SCALAR' else arr.size), 'type': typ}
+        if mm: a['min'] = arr.min(0).tolist(); a['max'] = arr.max(0).tolist()
+        accs.append(a); return len(accs) - 1
+    for i in range(N_ROCKS):
+        P, N, F = rock(i + 1)
+        prim = {'attributes': {'POSITION': add(P, 'VEC3', 5126, 34962, True), 'NORMAL': add(N, 'VEC3', 5126, 34962)},
+                'indices': add(F.reshape(-1), 'SCALAR', 5125, 34963), 'material': 0}
+        meshes.append({'primitives': [prim]})
+        nodes.append({'name': 'ast%d' % i, 'mesh': i, 'translation': [0, 0, 0]})
+        print('ast%d' % i, len(P), 'verts', len(F), 'tris')
+    while len(bin_) % 4: bin_.append(0)
+    gl = {'asset': {'version': '2.0', 'generator': 'make_asteroids.py'}, 'scene': 0, 'scenes': [{'nodes': list(range(N_ROCKS))}],
+          'nodes': nodes, 'meshes': meshes,
+          'materials': [{'name': 'asteroid', 'pbrMetallicRoughness': {'baseColorFactor': [0.2, 0.185, 0.17, 1], 'metallicFactor': 0.0, 'roughnessFactor': 0.95}}],
+          'accessors': accs, 'bufferViews': views, 'buffers': [{'byteLength': len(bin_)}]}
+    js = json.dumps(gl).encode(); js += b' ' * ((4 - len(js) % 4) % 4)
+    out = struct.pack('<III', 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(bin_)) + struct.pack('<II', len(js), 0x4E4F534A) + js + struct.pack('<II', len(bin_), 0x004E4942) + bytes(bin_)
+    p = pathlib.Path(__file__).resolve().parent.parent / 'assets' / 'asteroids.glb'
+    p.write_bytes(out); print(p, len(out), 'bytes')
+
+
+if __name__ == '__main__':
+    main()

@@ -147,3 +147,7 @@
 - [x] 103. Duel weight: 1-frame contact bites with long eased releases instead of 2–4 frame freezes; hits carry 30 %
       follow-through; hips counter-rotate the chest twist, legs brace with swing speed, head stabilises (weightShift);
       contact residuals unchanged.
+- [x] 104. Procedural asteroids (`tools/make_asteroids.py` → `assets/asteroids.glb`, 6 rocks × 20k tris): warped fBm
+      potato shape, ridged fault relief, creases, terraces, power-law craters with rims/ejecta, soft fracture planes;
+      shader mode texSet = -1: dark regolith albedo, iron stains, grains, finite-difference bump, pit AO, no sheen.
+      Debris field: 34 rocks + 5 hero rocks placed in the drift/return camera views; old low-poly rocks retired.
