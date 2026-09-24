@@ -626,20 +626,20 @@ function ionShotCues() {
 // hyperspace in/out: one 'Atomic Impact' per warp, landing on the visual snap (world.js warpSchedule). Events within 0.25 s are
 // merged; big ships are deep and loud, line ships lighter and farther.
 function warpCues() {
-  // events within 1.2 s share one cue (a fleet arriving together is ONE deep warp, not a clatter of repeats);
-  // line ships never get a cue of their own — they only add weight to their group. The enemy wave (80–84) is one hit.
+  // EVERY warp gets its own warp_out2, landing on its visual snap; only ships snapping in the same instant (< 0.15 s)
+  // share one (weighted by the largest). Small line ships are lighter, farther and panned; capital ships deep and
+  // loud with ducking. The enemy's arrival wave (80–84) stays one single hit (no clatter).
   const ev = warpSchedule().filter((e) => !(e.t > 80 && e.t < 84.8 && e.size < 3)), out = [];
   out.push([81.6, 'warp_out2', { gain: 2.2, rate: 0.9, prio: 10, duck: 2, duckDb: -9, norand: true }]);   // the whole enemy line arrives
   for (let i = 0; i < ev.length;) {
     let j = i, size = 0, n = 0;
-    while (j < ev.length && ev[j].t - ev[i].t < 1.2) { size = Math.max(size, ev[j].size); n++; j++; }
+    while (j < ev.length && ev[j].t - ev[i].t < 0.15) { size = Math.max(size, ev[j].size); n++; j++; }
+    const t = ev[i].t;
     i = j;
-    if (size < 2) continue;
-    const t = ev[j - 1 >= 0 ? i - n : 0].t;
-    // loud and up front: the warp must read clearly over the bed (it used to be pitched down, far and masked)
-    const g = size === 3 ? 2.2 : 1.6;
-    out.push([t, 'warp_out2', { gain: Math.min(2.4, g + 0.08 * (n - 1)), rate: size === 3 ? 0.92 : 1.0,
-      pan: size === 3 ? 0 : Math.sin(t * 7.3) * 0.35, prio: 10, norand: true, duck: size === 3 ? 2.5 : 1.4, duckDb: size === 3 ? -9 : -6 }]);
+    const g = size === 3 ? 2.2 : size === 2 ? 1.6 : 1.05;
+    const pan = size === 3 ? 0 : Math.sin(t * 7.3) * (size === 2 ? 0.35 : 0.6);
+    out.push([t, 'warp_out2', { gain: Math.min(2.4, g + 0.1 * (n - 1)), rate: size === 3 ? 0.92 : size === 2 ? 1.0 : 1.08 + 0.06 * Math.sin(t * 3.1),
+      far: size === 1 ? 0.18 : 0, pan, prio: size === 1 ? 8 : 10, norand: true, duck: size === 3 ? 2.5 : size === 2 ? 1.4 : 0.6, duckDb: size === 3 ? -9 : size === 2 ? -6 : -3 }]);
   }
   return out;
 }

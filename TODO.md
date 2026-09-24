@@ -160,3 +160,4 @@
       laminated cut face, ragged inner edge) sharing the exact hole boundary B(θ) with the melt shader; shader mode
       texSet −2: glowing runs, slag crust plates with molten cracks, plate seams; scaled with the growing hole, crushed
       and warped with the hull.
+- [x] 107. Every warp gets its own warp_out2 on its visual snap (only simultaneous < 0.15 s share); small ships lighter/panned — the enemy's fleeing line ships at 313.0 / 315.2 were silent (1.2 s clustering).
