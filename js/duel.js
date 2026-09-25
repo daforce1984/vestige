@@ -120,12 +120,15 @@ L.shield = P({ torso: [22, 10, 0], head: [25, 0, 0], arm_L_upper: [-95, -35, 0],
 L.lookUp = P({ torso: [-18, 8, 0], head: [-45, 10, 0], arm_L_upper: [-40, 0, 20], arm_L_lower: [-60, 0, 0], arm_R_upper: [-70, 0, -15], arm_R_lower: [-40, 0, 0], leg_L_upper: [-25, 0, 8], leg_L_lower: [40, 0, 0], leg_R_upper: [10, 0, -8], leg_R_lower: [50, 0, 0], foot_L: [20, 0, 0], foot_R: [30, 0, 0], _body: [-18, 0, 0] });
 L.boost = W(L.flight, { head: [-40, 0, 0], _body: [-10, 0, 0] });
 // saber (left hand)
+// ready guard (standoffs): squared up to the opponent, mace angled forward-up at him (~48° over the horizontal, head in
+// front of the face — solved with the duel FK; the old guard held it straight up like a torch), elbow soft, the arm
+// cannon raised in front as a shield, legs split front/back instead of tucked symmetrically
 L.guard = P({
-  pelvis: [0, -22, 0], torso: [12, -12, 0], head: [6, 12, 0],
-  arm_L_upper: [-62, -22, 6], arm_L_lower: [-48, 0, 0], hand_L: [72, 0, 0],
-  arm_R_upper: [-30, 10, -20], arm_R_lower: [-80, 0, 0],
-  leg_L_upper: [-38, 0, 8], leg_L_lower: [48, 0, 0], foot_L: [20, 0, 0],
-  leg_R_upper: [22, 0, -8], leg_R_lower: [62, 0, 0], foot_R: [35, 0, 0],
+  pelvis: [0, -10, 0], torso: [14, -6, 0], head: [2, 6, 0],
+  arm_L_upper: [-23, -13, -29], arm_L_lower: [-54, 0, 0], hand_L: [19, 5, 0],
+  arm_R_upper: [-52, 18, -16], arm_R_lower: [-92, 0, 0],
+  leg_L_upper: [-30, 0, 9], leg_L_lower: [32, 0, 0], foot_L: [14, 0, 0],
+  leg_R_upper: [14, 0, -6], leg_R_lower: [52, 0, 0], foot_R: [30, 0, 0], _body: [6, 0, 0],
 });
 L.ignite = W(L.guard, { arm_L_upper: [-70, -30, 0], arm_L_lower: [-60, 0, 0], hand_L: [60, 0, 0], head: [-15, 5, 0] });
 L.highBlock = W(L.guard, { torso: [-5, -5, 0], head: [-30, 0, 0], arm_L_upper: [-150, -35, -10], arm_L_lower: [-45, 0, 0], hand_L: [40, 80, 0], arm_R_upper: [-140, 20, 10], arm_R_lower: [-50, 0, 0], leg_L_upper: [-50, 0, 10], leg_L_lower: [75, 0, 0], leg_R_upper: [0, 0, -8], leg_R_lower: [85, 0, 0], _body: [-10, 0, 0] });
