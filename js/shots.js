@@ -1107,19 +1107,7 @@ shot(0, 14, 'C0 cold open', (c) => {
   camLook(c, pos, V.madd([0, 0, 0], pos, dir, 200), lerp(34, 50, w), lerp(0.02, -0.06, w));
   if (t < 8.25) handheld(c, 0.04); else { shake(c, 0.5 + 0.5 * Math.exp(-(t - 8.6) * 2), 12); handheld(c, 0.5); }
   if (t > 8.2) drawColdOpenAction(R, t, pos, fightTgt);
-  else if (t > 3.5) {                                   // the battle is already out there: far beams and flashes in the sky we look at
-    const k0 = smooth(3.5, 7.5, t);
-    const cr = V.norm([0, 0, 0], V.cross([0, 0, 0], dir, [0, 1, 0])), cu = V.cross([0, 0, 0], cr, dir);
-    const far = (u, v, d) => V.add([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], pos, dir, d), cr, u * d * 0.5), V.scale([0, 0, 0], cu, v * d * 0.28));
-    for (let j = 0; j < 10; j++) {
-      const tf = 3.6 + j * 0.45 + hash(j + 60) * 0.3, D = 6000 + 3000 * hash(j + 61);
-      const a = far((hash(j + 62) - 0.5) * 2.2, (hash(j + 63) - 0.5) * 1.6, D), b = far((hash(j + 64) - 0.5) * 2.2, (hash(j + 65) - 0.5) * 1.6, D * 1.1);
-      bolt(R, t, tf, tf + 1.1, a, b, D * 0.25, D * 0.0012, j % 2 ? [2.4 * k0, 0.7 * k0, 0.25 * k0] : [0.5 * k0, 1.1 * k0, 2.6 * k0], 1);
-      const fp = far((hash(j + 67) - 0.5) * 2, (hash(j + 68) - 0.5) * 1.4, D);
-      const lf = t - tf - 0.3;
-      if (lf > 0 && lf < 0.8) { const e = k0 * Math.exp(-lf * 5); R.glow(fp, D * 0.012, [6 * e, 3.5 * e, 1.6 * e], 0.2); }
-    }
-  }
+  // (before the whip the sky stays still and peaceful: nothing of the battle shows)
   for (const b of CO_BOOM) if (t > b[0] && t < b[0] + 0.6) shake(c, 1.4 * Math.exp(-(t - b[0]) * 5), 16);
   c.post.fade = smooth(0.3, 3.5, t);
   c.post.lensA = { enable: 0 };

@@ -251,8 +251,6 @@ export const SAMPLE_CUES = [
     ? [c[0], c[1], { ...c[2], at: c[1] === 'beam_blast1' ? 2.15 : 1.7, dur: 0.9, fadeOut: 0.3 }] : c))),
   [9.5,   'flyby_fast', { at: 2.0, dur: 3, gain: 1.1, pan0: -0.9, pan1: 0.9, prio: 9, norand: true }],   // close fly-by, peak 10.3
   [11.5,  'metal_groan', { at: 2.8, dur: 2.2, gain: 0.8, pan: -0.4, prio: 7 }],
-  // the battle is already out there before the whip: far, low thumps under the calm (4–8.2)
-  ...[4.3, 5.1, 5.8, 6.4, 7.0, 7.5, 7.9].map((t, i) => [t, '@boom', { bus: 'sfx', f: 34 + (i % 3) * 5, vel: 0.08 + 0.03 * i, dur: 1.4, verb: 0.5 }]),
   // the combat itself, from the same schedule as the picture (world.js CO_*): every shot, every hit, every kill
   ...CO_KILLS.flatMap((kl, i) => {
     const pan = [0.3, -0.2, 0.4, -0.4, 0.1][i], fighter = kl.shooter[0] === 'f';
