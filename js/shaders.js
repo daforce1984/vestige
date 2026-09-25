@@ -226,9 +226,7 @@ fn skyColor(d0: vec3f) -> vec3f {
   col += stars * F.bg.y;
   // sun
   let sd = max(dot(d, F.sunDir.xyz), 0.0);
-  col += F.sunCol.rgb * (pow(sd, 300.0) * 1.2 + pow(sd, 20.0) * 0.08) * F.misc.y;
-  let sd2 = max(dot(d, F.rimCol.xyz), 0.0) * F.rimCol.w;                          // the second sun
-  col += F.fill.rgb * (pow(sd2, 300.0) * 1.2 + pow(sd2, 20.0) * 0.08) * F.fill.w;
+  // (no painted halo round the suns any more: the disc itself is HDR and the bloom pass does what glow there is)
   // soft slate-blue space haze (brighter toward the sun and the planet), like a painted concept backdrop
   let hz = 0.55 + 0.45 * (pow(sd, 3.0) * 0.6 + pow(max(dot(d, normalize(F.planet.xyz + vec3f(1e-5))), 0.0), 4.0) * 0.5) + d.y * 0.15;
   col += F.sky.rgb * F.sky.w * hz;
