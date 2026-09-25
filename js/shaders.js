@@ -407,6 +407,34 @@ fn seg7w(p: vec2f, d: i32, w: f32) -> f32 {           // 7-segment digit, p in [
   if ((m & 64u) != 0u && hx && abs(p.y - 0.9) < w * 0.5) { on = 1.0; }
   return on;
 }
+// procedural crater field on a unit sphere (3D cell noise), 4 octaves (cells 1/14 … 1/260 of the radius), ~10× finer
+// than the moon mesh. ONE evaluation returns the analytic height gradient (for the bump), rim and ray brightness;
+// each octave only visits the 2×2×2 cells nearest the point (craters sit inside their cell).
+struct MC { g: vec3f, rim: f32, ray: f32 };
+fn moonCraters(q: vec3f, seed: f32) -> MC {
+  var o: MC; o.g = vec3f(0.0); o.rim = 0.0; o.ray = 0.0;
+  var sc = 14.0; var amp = 1.0;
+  for (var oc = 0; oc < 4; oc++) {
+    let p = q * sc; let fl = floor(p); let off = step(vec3f(0.5), p - fl) - 1.0;
+    for (var k = 0; k < 8; k++) {
+      let c = fl + off + vec3f(f32(k & 1), f32((k >> 1) & 1), f32((k >> 2) & 1));
+      let r3 = hash33(c + seed + f32(oc) * 17.0);
+      if (r3.z > 0.55) { continue; }
+      let ctr = c + 0.3 + r3 * 0.4;
+      let rad = 0.22 + 0.25 * r3.y;
+      let dv = (p - ctr) / rad; let d = length(dv);
+      if (d < 1.5 && d > 1e-4) {
+        // height h(d) = (d²−1)·0.6 inside + 0.25·exp(−((d−1)/0.18)²); dh/dd, chain to p (× sc/rad per unit q)
+        var dh = select(0.0, 1.2 * d, d < 1.0) - 0.25 * 2.0 * (d - 1.0) / (0.18 * 0.18) * exp(-pow((d - 1.0) / 0.18, 2.0));
+        o.g += amp * dh * (dv / d) * (sc / rad) * 0.02;
+        o.rim += amp * exp(-pow((d - 1.0) / 0.12, 2.0));
+        if (oc == 0 && r3.x > 0.8) { o.ray += smoothstep(1.0, 1.4, d) * pow(abs(sin(atan2(dv.y, dv.x) * 9.0)), 6.0); }
+      }
+    }
+    sc *= 2.35; amp *= 0.55;
+  }
+  return o;
+}
 fn boxd(p: vec2f, c: vec2f, h: vec2f) -> f32 { let d = abs(p - c) - h; return length(max(d, vec2f(0.0))) + min(max(d.x, d.y), 0.0); }
 fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
   var o: HD; o.paint = vec3f(0.0); o.col = vec3f(0.0); o.mixk = 0.0; o.rough = 0.0; o.metal = -1.0; o.tilt = vec2f(0.0); o.ao = 1.0;
@@ -633,6 +661,18 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     n = normalize(n - gw * 0.022 * (1.0 - 0.8 * moonK));
     texAO = mix(mix(0.55, 1.0, smoothstep(0.2, 0.6, hq)), 1.0, moonK * 0.85);   // pits hold shadow (barely, on the moon)
     base = mix(base, base * 2.3 + vec3f(0.02), moonK);
+    if (moonK > 0.5) {
+      // procedural crater field (4 octaves) — bump from its gradient, bright rims, a few ray systems, dark maria
+      let qs = normalize(q);
+      let c0 = moonCraters(qs, 5.0);
+      var cg = (inst.m * vec4f(c0.g, 0.0)).xyz / max(length(inst.m[0].xyz), 1e-3);
+      cg = cg - n * dot(cg, n);
+      n = normalize(n - cg * 0.18);
+      let mare = smoothstep(0.42, 0.62, fbm(qs * 1.6 + 11.0, 4));
+      base *= mix(1.0, 0.55, mare);                                    // dark basaltic maria
+      base *= 1.0 + 0.35 * clamp(c0.rim, 0.0, 1.5) + 0.6 * clamp(c0.ray, 0.0, 1.0);   // bright fresh rims and ray ejecta
+      base *= 0.92 + 0.16 * vnoise(qs * 900.0);                        // fine regolith grain
+    }
   }
   // battle wear (mechs): chipped paint on edges, grime in crevices + streaks, scorch marks
   let wear = select(inst.tint.w, 0.0, texSet > 0);

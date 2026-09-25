@@ -238,3 +238,7 @@
 - [x] 176. Grip orientation verified (Sigma: the haft runs through the closed fist, index side toward the mace head; RONIN: both fists on the hilt, axes aligned, roll matched — added a same-roll term to the grip cost).
 - [x] 177. Flagship decals: few and huge, sized to their plate and kept inside it with a 0.9 m margin (3-digit hull numbers 62 % of plate height, plate-filling emblem, full-width hazard band); small text/vents/hatches/chevrons and the course-spanning registration numerals removed.
 - [x] 178. Flagship decals: bold stroke font (seg7w), hand-placed on the flat side walls and ~5× bigger — hull number "07" 40 m tall, a 60 m fleet emblem, a long hazard band — fully inside the wall band; side-wall mapping flipped so they read correctly on both flanks.
+- [x] 179. Rounded plate edges on every ship (shipkit plate()/armor(): 2-segment round on long edges, weighted normals), flagship side walls one continuous plate, wound rim regenerated.
+- [x] 180. Distance LOD (blender/make_lods.py → <name>_lod.glb, 9 ships/fighters, 12–45 %): swapped in R.add beyond 5.5 × ship length — battle scenes back to ~21–24 fps (were 12).
+- [x] 181. Decals 90 % size, applied as an overlay tint (the armour's metalness/roughness/seams/bump stay underneath).
+- [x] 182. Moon: procedural crater field in the shader (4 octaves, cells 1/14…1/260 of the radius, analytic bump gradient, bright rims, ray systems, maria, fine grain) — ~10× the mesh detail at 24 fps.
