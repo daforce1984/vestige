@@ -24,7 +24,7 @@ const _cm = new Float32Array(16), _cq = [0, 0, 0, 1];
 
 /** a spark PARTICLE: a tight hot point with a little bloom (never a streak/line). size = sprite radius (the bright
  *  core is ~¼ of it) */
-export function spark(R, p, size, col) { R.glow(p, size, col, 0.35); }
+export function spark(R, p, size, col) { R.glow(p, size * 0.45, col, 0.15); }   // fine points: small core, little halo
 export function explosion(R, t, t0, pos, size, seed, kind = 'ship', lightR = 16) {   // lightR: light radius in sizes (keep small for blasts ON a hull)
   // homeland/fx.js explosion(): light first (white HDR core layers), a soft wash, three wavefronts,
   // three offset cauliflower fireballs, burning hull fragments. Almost no smoke (vacuum).

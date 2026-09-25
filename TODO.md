@@ -274,3 +274,4 @@
 - [x] 212. Screen distortion off in scene 45 only (the dive: post.distort 0, no shock-ring ripples there); everywhere else it stays.
 - [x] 213. All sparks are PARTICLES (fx.spark: tight hot glow points) — duel/mace/lance/bolt-burst/core/hull sparkers; the dive's speed-streak lines are dust motes now.
 - [x] 214. The upper sun is the strong key (2.5, 2.12, 1.62); the lower blue-white sun is a weak cool light (0.3, 0.38, 0.6).
+- [x] 215. Spark particles finer: sprite radius ×0.45, halo 0.35 → 0.15.
