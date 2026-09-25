@@ -350,7 +350,7 @@ export class Renderer {
       };
       // ship engines burn BRIGHT: nozzle-face emission ×5 (HDR, so the bloom pass makes them glow); mechs keep theirs
       if (!/^(gundam|enemy_ms|mech_hand|mace)$/.test(s.name)) for (const mt of g.materials) {
-        if (/engine|thrust|nozzle|exhaust|heat/i.test(mt.name) && mt.emissive[0] + mt.emissive[1] + mt.emissive[2] > 0.01) mt.emissive = mt.emissive.map((v) => v * 5);
+        if (/engine|thrust|nozzle|exhaust|heat/i.test(mt.name) && mt.emissive[0] + mt.emissive[1] + mt.emissive[2] > 0.01) mt.emissive = mt.emissive.map((v) => v * 2.5);
       }
       // PBR remap for hull paints: darker albedo, some metalness, tighter roughness (ships read too bright/flat before)
       for (const mt of g.materials) {

@@ -45,9 +45,10 @@ export function explosion(R, t, t0, pos, size, seed, kind = 'ship', lightR = 16)
   glowL(size * 0.9, 0.35, 1.5, [1, 0.8, 0.55], 0.3, 0.1);
   // EVERY blast has a blinding centre that blooms: an HDR white core (way over 1 -> the bloom pass spreads it) that
   // stays white-hot while the fireball burns and cools through yellow/orange, inside a wide soft glow halo
-  { const kc = Math.exp(-lt * 2.4), kh = Math.exp(-lt * 1.6);
-    R.glow(pos, size * (0.55 + 0.25 * lt), [14 * kc, 12 * kc * (0.75 + 0.25 * kc), 9 * kc * (0.45 + 0.55 * kc)], 0.5);
-    R.glow(pos, size * (1.5 + 0.6 * lt), [1.6 * kh, 0.95 * kh, 0.45 * kh], 0.95); }
+  { const kc = Math.exp(-lt * 1.8), kh = Math.exp(-lt * 1.3), w = sat(kc * 1.6);   // w: stays pure white while hot
+    R.glow(pos, size * (0.6 + 0.3 * lt), [40 * kc, 40 * kc * lerp(0.7, 1, w), 40 * kc * lerp(0.4, 1, w)], 0.7);   // blown-out white centre
+    R.glow(pos, size * (1.1 + 0.4 * lt), [6 * kc, 5.2 * kc, 4.2 * kc], 0.9);
+    R.glow(pos, size * (2.2 + 0.8 * lt), [2.6 * kh, 1.6 * kh, 0.8 * kh], 1.0); }                                     // strong wide glow
   
   R.light(pos, size * lightR, [1, 0.7, 0.4], 45 * Math.exp(-lt * 5) + 4 * Math.max(0, 1 - lt / END));
   // wavefronts (refractive ripples)
@@ -156,9 +157,9 @@ const _nh = [0, 0, 0];
 function nozzleHeart(R, p, r, col, k, dir) {
   const rr = Math.max(r, 0.9);                                // small craft still show a real glowing point
   if (dir) p = V.madd(_nh, p, dir, r * 0.7);                  // just outside the nozzle face, so the hull doesn't hide it
-  const w = (c) => (c * 0.55 + 0.45) * 12 * k;
-  R.glow(p, rr * 1.6, [w(col[0]), w(col[1]), w(col[2])], 0.7);
-  R.glow(p, rr * 5, [col[0] * 1.1 * k, col[1] * 1.1 * k, col[2] * 1.1 * k], 0.95);
+  const w = (c) => (c * 0.55 + 0.45) * 4.5 * k;
+  R.glow(p, rr * 1.2, [w(col[0]), w(col[1]), w(col[2])], 0.6);
+  R.glow(p, rr * 3, [col[0] * 0.45 * k, col[1] * 0.45 * k, col[2] * 0.45 * k], 0.9);
 }
 export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail = 1, opts = null) {
   // past states are expensive (full choreography evaluations): quantise tau to 1/48 s and share them between emitters
@@ -171,6 +172,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
   const pts = model.emitPoints.engine;
   if (!pts || !pts.length) return;
   if ((entry.stretch || 0) > 0.01) return;                   // mid-warp: the hull is stretched, no fire ahead of the ship
+  if ((entry.hidden && entry.hidden.__all) || entry.revealDir) return;   // not here yet / still coming through the rift: no engine light in empty space
   const isShip = name !== 'gundam' && name !== 'enemy_ms';
   if (isShip && !entry.forceThrottle) {                      // ships: throttle follows the real speed (off when stopped)
     throttle *= shipSpeedK(R, name, entry, model);

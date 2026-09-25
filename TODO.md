@@ -277,3 +277,7 @@
 - [x] 215. Spark particles finer: sprite radius ×0.45, halo 0.35 → 0.15.
 - [x] 216. Every explosion (fx.explosion + the swatted-bolt burst) has a blinding HDR white core that blooms and stays white-hot while the fireball burns, cooling through yellow/orange, inside a wide soft glow halo.
 - [x] 217. Every ship engine burns bright and glows: nozzle-face emission ×5 (HDR → bloom) on all ship models, and each nozzle gets an HDR white-hot heart + a wide glow, just outside the nozzle face (min size for small craft), also when idle (no longer faded end-on).
+- [x] 218. Baseline light like scene 12: sky ambient 1 → 1.9 everywhere (the duel's own 1.4 override dropped), lower sun back to (0.45, 0.56, 0.85); ship engine glow toned down (heart 12 → 4.5, halo smaller, nozzle emission ×2.5).
+- [x] 219. Scene 88: no engine glow / wound sparks / fires / drips before the flagship is there — engine glows skip hidden or still-revealing entries (and run after the jump code), wound fx gated on the reveal (_woundVis, reset per frame).
+- [x] 220. Scene 88 → 89 cut: no lighting jump — S23 exposure, sun disc and anamorphic streak start at F2's values and ease to their own over 359–366.5.
+- [x] 221. Explosion centres blow out to pure white (HDR ×40) with a strong wide glow (fx.explosion + the bolt burst).

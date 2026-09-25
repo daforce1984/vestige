@@ -43,10 +43,10 @@ function spaceEnv(t) {
   return {
     // lighting after the concept-art reference: warm key, cool soft skylight from above, warm bounce from below,
     // slate-blue space haze instead of pure black, gentle contrast
-    time: t, sunDir: SUN, sunCol: [2.5, 2.12, 1.62], ambUp: [0.2, 0.25, 0.34], ambDown: [0.16, 0.11, 0.07], ambient: 1,   // sunCol: the upper sun is the strong key
+    time: t, sunDir: SUN, sunCol: [2.5, 2.12, 1.62], ambUp: [0.2, 0.25, 0.34], ambDown: [0.16, 0.11, 0.07], ambient: 1.9,   // sunCol: the upper sun is the strong key
     nebula: 0, stars: 0.8, sunDisc: 1,
     // a binary system: the second, blue-white sun on the far side lights what the first leaves dark (none at Earth)
-    sun2Dir: t < EARTH_T ? SUN2 : null, sun2Col: [0.3, 0.38, 0.6],   // the lower, blue-white sun: much weaker
+    sun2Dir: t < EARTH_T ? SUN2 : null, sun2Col: [0.45, 0.56, 0.85],   // the lower, blue-white sun: weaker than the upper one
     sky: [0.010, 0.011, 0.013, 0.6],   // near-neutral: no blue gas in the backdrop
     planet: null,                                    // no moon (only Earth at the end)
     shadows: true, shadowCenter: [0, 0, 0], shadowRadius: 400,
@@ -1399,7 +1399,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   c.env.shadowCenter = k.focus; c.env.shadowRadius = k.shadowRadius;
   c.post.shakeBlur = k.blur;                                   // (no whole-screen flash on duel contacts: it read as flicker)
   if (k.name.startsWith('D12')) c.post.distort = 0;           // scene 45 (the dive): no screen distortion
-  c.env.ambient = 1.4;             // (the strong fill + rim were for the mechs, which no longer take either — on the
+                                   // (the strong fill + rim were for the mechs, which no longer take either — on the
   c.post.lensA = { enable: 0 };   // distant ships they only washed the hulls out white)   the well is far away: no background lensing (it smeared the planet into grey)
   if (k.slowmo) { c.post.saturation = 0.75; c.post.streak = 0.45; c.post.gradeHighlights = [1.2, 1.0, 0.85]; }
   { // bullet time: the picture drains a little and the edges fall away while time crawls
@@ -2000,13 +2000,13 @@ shot(358, 393.5, 'S23 title', (c) => {
   camLook(c, pos, madd(pos, dir, 1000), lerp(q.fov, 34, k0), lerp(0.04, 0.12, k0) - k2 * 0.08);
   c.world = t < 369;                                          // the fleet stays until the camera has risen well past it (no pop)
   c.env.planet = { dir: PLANET, radius: PL_R, col: [0.3, 0.5, 1.0], earth: true };
-  c.env.stars = 0.6 + k2 * 0.3; c.env.sunDisc = 0;
-  c.post.exposure = 0.75;
+  c.env.stars = 0.6 + k2 * 0.3; c.env.sunDisc = 1 - smooth(359, 362, t);   // continuous with F2 at the cut, fades as we turn away
+  c.post.exposure = lerp(0.9, 0.75, smooth(362, 366.5, t));             // (a hard 0.9 -> 0.75 at 358 read as a lighting jump)
   c.post.fade = 1 - smooth(391.5, 393.3, t);
   const rise = smooth(358.5, 362, t);
   // (no extra atmosphere glow sprite: it read as a fake disc of light round the sun, and lingered at the frame edge)
   c.post.flare = { pos: madd(pos, S, 1000), intensity: 1.4 * rise };
-  c.post.streak = 0;
+  c.post.streak = lerp(0.22, 0, smooth(362, 366.5, t));             // continuous with F2's default at the cut
   // (no god rays here: marched over bloom while the camera swings they left a hard-edged ghost disc round the sun)
   c.env.shadowCenter = motherPoint([0, 0, 0], 358, [0, 0, 0]); c.env.shadowRadius = 600;
 });
@@ -2155,8 +2155,9 @@ function drawDodgeBolt(R, t) {
   const lb = t - TB;                                                      // the burst
   if (lb >= 0 && lb < 1.6) {
     const f = Math.exp(-lb * 9);
-    R.glow(E, 3 + 8 * easeOut(sat(lb / 0.06)), [16 * f, 13 * f, 9 * f], 0.6);                           // white-hot, blooming core
-    R.glow(E, 10 + 10 * lb, [1.4 * Math.exp(-lb * 3), 0.8 * Math.exp(-lb * 3), 0.35 * Math.exp(-lb * 3)], 0.95);   // wide glow
+    R.glow(E, 3 + 8 * easeOut(sat(lb / 0.06)), [40 * f, 40 * f, 38 * f], 0.7);                          // blown-out white core
+    R.glow(E, 8 + 10 * lb, [5 * f, 4.4 * f, 3.6 * f], 0.9);
+    R.glow(E, 14 + 14 * lb, [2.4 * Math.exp(-lb * 2.5), 1.4 * Math.exp(-lb * 2.5), 0.6 * Math.exp(-lb * 2.5)], 1.0);   // strong wide glow
     R.glow(E, 5 + 12 * easeOut(sat(lb / 0.3)), [2.2 * Math.exp(-lb * 4), 0.8 * Math.exp(-lb * 4), 0.3 * Math.exp(-lb * 4)], 0.6);   // orange fireball
     R.light(E, 120, [1, 0.6, 0.3], 18 * Math.exp(-lb * 6));
     if (lb < 0.35) R.ripple(E, 4 + 34 * easeOut(lb / 0.35), [0.4, 0.4, 0.4], (1 - lb / 0.35) * 1.5);

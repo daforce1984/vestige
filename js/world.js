@@ -576,6 +576,7 @@ export function drawWorld(R, t, opts = {}) {
   const me = t > 17 ? R.add('mothership', motherMatrix(tmpM, t)) : null;
   GUN.motherModel = R.models.mothership;
   if (me) {
+    me._woundVis = 1;                                              // (pooled entry: reset every frame)
     const dmg = t > LANCE_FIRE + 1 ? lerp(0.25, 0.62, sat((t - LANCE_FIRE - 1) / 8)) : 0;
     me.damage = dmg;
     me.seed = 3.3;
@@ -594,7 +595,6 @@ export function drawWorld(R, t, opts = {}) {
       me.matOverride = { window: { base: [0.2, 0.05, 0.05], metal: 0, rough: 0.5, emissive: [3 * pulse + 0.3, 0.15, 0.1] } };
     }
     me.forceThrottle = t > 28 && t < 41;                        // under way during the belly pass (the camera rides along)
-    engineGlows(R, 'mothership', me, [0.35, 0.55, 1.1], 0.6, t > 232 && t < 292 ? 1 : 0.7, 1.6);
     // ARRIVAL (Dune-style): the window unfolds at 17.5, the ship slides out slowly 19–29
     if (t < MOTHER_ARRIVE + MOTHER_EMERGE + 1.5) {
       const L = LM, fwd = [0, 0, 1], sz = modelSize(R, 'mothership');
@@ -617,22 +617,25 @@ export function drawWorld(R, t, opts = {}) {
       const base = motherMatrix(M.new(), t);
       const p0 = [base[12], base[13], base[14]];
       let st = null, winC = null, winA = 0;
+      // the wound (mid-ship) is only there once that part of the hull is: gate its fx on the reveal
       if (t < 348.0) {
         const h = hyperOut(t, 345.6, p0, fwd, L, 1);
-        if (h.gone) me.hidden = allParts(R, 'mothership'); else st = h;
+        if (h.gone) { me.hidden = allParts(R, 'mothership'); me._woundVis = 0; } else { st = h; me._woundVis = 1 - smooth(0.36, 0.5, h.u); }
         winC = h.W; winA = h.alpha;
       } else {
         const h = hyperIn(t, 348.0, p0, fwd, L, 1);
         st = h.u < 1 ? h : null; winC = h.W; winA = h.alpha;
+        me._woundVis = h.u < 1 ? smooth(0.46, 0.6, h.u) : 1;
       }
       if (st) { me.m.set(base); me.m[12] = st.pos[0]; me.m[13] = st.pos[1]; me.m[14] = st.pos[2]; me.revealDir = st.dir; me.revealZ = st.revealZ; me.revealWidth = 3; me.tint = [0, 0, 0]; me.stretch = t < 348 ? stretchOut(st.u) : stretchIn(st.u); me.stretchOut = t < 348; }
       if (winA > 0 && winC) hyperWindow(R, winC, fwd, sz[0] * 0.62 + 30, sz[1] * 0.75 + 30, HYPER_BLUE, winA);
     }
     // the wound: the hangar bay behind the melted wall, molten drips, and the bay's contents sucked out into space
-    if (t > LANCE_FIRE) drawWound(R, t, me);
+    engineGlows(R, 'mothership', me, [0.35, 0.55, 1.1], 0.6, t > 232 && t < 292 ? 1 : 0.7, 1.6);   // (after the jump code: it hides/reveals the hull)
+    if (t > LANCE_FIRE && (me._woundVis ?? 1) > 0.02) drawWound(R, t, me);
     drawDock(R, t, me);                                          // bay doors + mouth frame always; the rig and fields inside
     // hull fires after lance
-    if (t > LANCE_FIRE + 1) {
+    if (t > LANCE_FIRE + 1 && (me._woundVis ?? 1) > 0.02) {
       const n = 14;
       for (let i = 0; i < n; i++) {
         const a = hash(i * 3.7) * 6.283, rr = WOUND_R * (1.05 + 0.5 * hash(i * 5.1));
