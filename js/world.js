@@ -372,10 +372,11 @@ function drawDock(R, t, me) {
   const amb = 0.55 + 0.45 * Math.max(0, Math.sin(t * 3.2));
   const ov = { dock_light: { base: [0.3, 0.7, 1], metal: 0, rough: 0.3, emissive: [0.5 * seam * 2.2, 1.0 * seam * 2.2, 1.6 * seam * 2.2] },
     amber: { base: [1, 0.5, 0.1], metal: 0, rough: 0.4, emissive: [1.6 * amb, 0.7 * amb, 0.14 * amb] } };
-  for (const [zc, dir] of [[39.5, -1], [74.5, 1]]) {
-    const zz = zc + dir * 35 * open;
-    M.fromTRS(_dt, [-3.2 * easeInOut(sat(open * 6)), 0, zz], [0, 0, 0, 1], 1);   // leaves step out onto their rails, then slide clear
-    if (dir > 0) { _dt[8] = -_dt[8]; _dt[9] = -_dt[9]; _dt[10] = -_dt[10]; }          // mirror: leading edge toward the seam
+  for (const [zc, dir] of [[40, -1], [74, 1]]) {
+    const zz = zc + dir * 34 * open;                             // slides into its pocket housing beside the bay
+    // the fore leaf is the same leaf turned 180° about the X axis through its centre (y 7): leading edge toward the
+    // seam, outer face still outward (a mirror would flip the winding and cull the outer face)
+    if (dir > 0) M.fromTRS(_dt, [0, 14, zz], [1, 0, 0, 0], 1); else M.fromTRS(_dt, [0, 0, zz], [0, 0, 0, 1], 1);
     M.mul(_dm, mm, _dt);
     const d = R.add('dock_rig', _dm);
     if (d) { d.hidden = { frame: 1, clampL: 1, clampR: 1, mouth: 1 }; d.stretch = me.stretch || 0; d.stretchAnchor = motherAnchor(R, me) - zz; d.seed = 7.9; d.matOverride = ov; }

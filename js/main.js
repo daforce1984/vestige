@@ -18,7 +18,7 @@ const MODELS = [
   { name: 'gravity_well', detail: 2.5, keep: ['ring', 'core', 'pylons'] },
   { name: 'hangar', detail: 0, metalize: true },
   { name: 'mace', detail: 0 },
-  { name: 'dock_rig', detail: 0.5, keep: ['frame', 'clampL', 'clampR', 'door'] },
+  { name: 'dock_rig', detail: 0.5, keep: ['frame', 'clampL', 'clampR', 'door', 'mouth'], hullDetail: true },
   { name: 'mech_hand', detail: 0, keep: ['palm', 'f0_1', 'f0_2', 'f0_3', 'f1_1', 'f1_2', 'f1_3', 'f2_1', 'f2_2', 'f2_3', 'f3_1', 'f3_2', 'f3_3', 'thumbR_1', 'thumbR_2', 'thumbL_1', 'thumbL_2'] },
   { name: 'mother_bay', detail: 0, sortAxis: [1, 0, 0], prepass: true },
   { name: 'bay_props', detail: 0.3, keep: ['crate0', 'crate1', 'container', 'barrel', 'tank', 'panel0', 'panel1', 'rib', 'cable', 'toolcart', 'seat', 'person0', 'person1', 'person2', 'person3'] },
