@@ -1398,6 +1398,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   shake(c, k.shake, k.shakeFreq); handheld(c, k.handheld);
   c.env.shadowCenter = k.focus; c.env.shadowRadius = k.shadowRadius;
   c.post.shakeBlur = k.blur;                                   // (no whole-screen flash on duel contacts: it read as flicker)
+  if (k.name.startsWith('D12')) c.post.distort = 0;           // scene 45 (the dive): no screen distortion
   c.env.ambient = 1.4;             // (the strong fill + rim were for the mechs, which no longer take either — on the
   c.post.lensA = { enable: 0 };   // distant ships they only washed the hulls out white)   the well is far away: no background lensing (it smeared the planet into grey)
   if (k.slowmo) { c.post.saturation = 0.75; c.post.streak = 0.45; c.post.gradeHighlights = [1.2, 1.0, 0.85]; }
@@ -1426,7 +1427,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
         spark(R, p0, 0.6, [0.6, 0.65, 0.8]);                        // dust motes whipping past (no streak lines)
       }
       const slot = Math.floor((t - 182.6) / 0.16), age = (t - 182.6) - slot * 0.16;
-      R.ripple(madd(e, dv, 4), 6 + age * 40, [0.2, 0.2, 0.2], (1 - age / 0.16) * 0.9);
+      if (t >= 183.6) R.ripple(madd(e, dv, 4), 6 + age * 40, [0.2, 0.2, 0.2], (1 - age / 0.16) * 0.9);   // (none in scene 45)
     }
   }
   for (const bi of [1, 2]) {

@@ -271,6 +271,6 @@
 - [x] 209. Rim light removed in every scene (renderer forces its strength to 0); the duel shot's extra fill/rim (meant for the mechs) dropped — they had washed the distant enemy ships out white.
 - [x] 210. Lighting: no camera fill anywhere (shots' env.fill is ignored) and no rim light; instead a BINARY SUN — a second, blue-white sun (SUN2, ≈125° from the first) lights the far sides with the same GGX model (no shadow map), glints in reflections, and both suns are drawn big in the sky (radius 0.011 / 0.008 rad). Off at Earth (t ≥ EARTH_T).
 - [x] 211. RONIN #2's dive (180.6–184.25, scenes 43–46): one clean plunge — no hover, jitter, squash, weight-shift or inertia lean; aims at the strike point (Sigma at 184.5), not at his every wobble.
-- [x] 212. No screen-space distortion anywhere (post distort forced 0; refraction ripples no longer drawn — they left grey circles).
+- [x] 212. Screen distortion off in scene 45 only (the dive: post.distort 0, no shock-ring ripples there); everywhere else it stays.
 - [x] 213. All sparks are PARTICLES (fx.spark: tight hot glow points) — duel/mace/lance/bolt-burst/core/hull sparkers; the dive's speed-streak lines are dust motes now.
 - [x] 214. The upper sun is the strong key (2.5, 2.12, 1.62); the lower blue-white sun is a weak cool light (0.3, 0.38, 0.6).
