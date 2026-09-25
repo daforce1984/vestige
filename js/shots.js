@@ -2155,7 +2155,8 @@ function drawDodgeBolt(R, t) {
   const lb = t - TB;                                                      // the burst
   if (lb >= 0 && lb < 1.6) {
     const f = Math.exp(-lb * 9);
-    R.glow(E, 3 + 8 * easeOut(sat(lb / 0.06)), [6 * f, 4.2 * f, 2.6 * f], 0.35);                        // white-hot core
+    R.glow(E, 3 + 8 * easeOut(sat(lb / 0.06)), [16 * f, 13 * f, 9 * f], 0.6);                           // white-hot, blooming core
+    R.glow(E, 10 + 10 * lb, [1.4 * Math.exp(-lb * 3), 0.8 * Math.exp(-lb * 3), 0.35 * Math.exp(-lb * 3)], 0.95);   // wide glow
     R.glow(E, 5 + 12 * easeOut(sat(lb / 0.3)), [2.2 * Math.exp(-lb * 4), 0.8 * Math.exp(-lb * 4), 0.3 * Math.exp(-lb * 4)], 0.6);   // orange fireball
     R.light(E, 120, [1, 0.6, 0.3], 18 * Math.exp(-lb * 6));
     if (lb < 0.35) R.ripple(E, 4 + 34 * easeOut(lb / 0.35), [0.4, 0.4, 0.4], (1 - lb / 0.35) * 1.5);

@@ -275,3 +275,4 @@
 - [x] 213. All sparks are PARTICLES (fx.spark: tight hot glow points) — duel/mace/lance/bolt-burst/core/hull sparkers; the dive's speed-streak lines are dust motes now.
 - [x] 214. The upper sun is the strong key (2.5, 2.12, 1.62); the lower blue-white sun is a weak cool light (0.3, 0.38, 0.6).
 - [x] 215. Spark particles finer: sprite radius ×0.45, halo 0.35 → 0.15.
+- [x] 216. Every explosion (fx.explosion + the swatted-bolt burst) has a blinding HDR white core that blooms and stays white-hot while the fireball burns, cooling through yellow/orange, inside a wide soft glow halo.

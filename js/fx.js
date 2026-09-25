@@ -43,6 +43,11 @@ export function explosion(R, t, t0, pos, size, seed, kind = 'ship', lightR = 16)
   glowL(size * 1.2, 0.14, 1.2, warm, 0.6);
   glowL(size * 0.45, 0.22, 1.15, [1, 1, 1], 1.8, 0.1);      // white-hot core
   glowL(size * 0.9, 0.35, 1.5, [1, 0.8, 0.55], 0.3, 0.1);
+  // EVERY blast has a blinding centre that blooms: an HDR white core (way over 1 -> the bloom pass spreads it) that
+  // stays white-hot while the fireball burns and cools through yellow/orange, inside a wide soft glow halo
+  { const kc = Math.exp(-lt * 2.4), kh = Math.exp(-lt * 1.6);
+    R.glow(pos, size * (0.55 + 0.25 * lt), [14 * kc, 12 * kc * (0.75 + 0.25 * kc), 9 * kc * (0.45 + 0.55 * kc)], 0.5);
+    R.glow(pos, size * (1.5 + 0.6 * lt), [1.6 * kh, 0.95 * kh, 0.45 * kh], 0.95); }
   
   R.light(pos, size * lightR, [1, 0.7, 0.4], 45 * Math.exp(-lt * 5) + 4 * Math.max(0, 1 - lt / END));
   // wavefronts (refractive ripples)
