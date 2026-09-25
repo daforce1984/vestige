@@ -276,3 +276,4 @@
 - [x] 214. The upper sun is the strong key (2.5, 2.12, 1.62); the lower blue-white sun is a weak cool light (0.3, 0.38, 0.6).
 - [x] 215. Spark particles finer: sprite radius ×0.45, halo 0.35 → 0.15.
 - [x] 216. Every explosion (fx.explosion + the swatted-bolt burst) has a blinding HDR white core that blooms and stays white-hot while the fireball burns, cooling through yellow/orange, inside a wide soft glow halo.
+- [x] 217. Every ship engine burns bright and glows: nozzle-face emission ×5 (HDR → bloom) on all ship models, and each nozzle gets an HDR white-hot heart + a wide glow, just outside the nozzle face (min size for small craft), also when idle (no longer faded end-on).

@@ -348,7 +348,10 @@ export class Renderer {
         name: s.name, detail: s.detail ?? 1, hullClass: s.hullDetail ? { hull: 1, plate: 2, hull2: 3, greeble: 4, trim: 5 } : null, parts: g.parts, materials: g.materials, empties: g.empties, bounds: g.bounds,
         baseVertex: vo / 8, baseIndex: io, entries: [], partIndex: {}, draws: [], prepass: !!s.prepass,
       };
-      // engine nozzle faces are drawn as glow sprites too; keep the surface emission modest so they don't bloom into disks
+      // ship engines burn BRIGHT: nozzle-face emission ×5 (HDR, so the bloom pass makes them glow); mechs keep theirs
+      if (!/^(gundam|enemy_ms|mech_hand|mace)$/.test(s.name)) for (const mt of g.materials) {
+        if (/engine|thrust|nozzle|exhaust|heat/i.test(mt.name) && mt.emissive[0] + mt.emissive[1] + mt.emissive[2] > 0.01) mt.emissive = mt.emissive.map((v) => v * 5);
+      }
       // PBR remap for hull paints: darker albedo, some metalness, tighter roughness (ships read too bright/flat before)
       for (const mt of g.materials) {
         const em = mt.emissive[0] + mt.emissive[1] + mt.emissive[2];

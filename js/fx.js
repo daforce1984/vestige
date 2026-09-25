@@ -151,6 +151,15 @@ const _pn = [0, 0, 0], _pa = [0, 0, 0], _prev = [0, 0, 0];
  * traced as gas emitted from where the nozzle WAS, flying straight back from where it pointed, so the plume bends
  * smoothly along the flight path when the craft turns. opts.particles adds drifting sparks/embers.
  */
+// the heart of a ship's nozzle: an HDR white-tinted core (the bloom pass spreads it) inside a wide soft glow
+const _nh = [0, 0, 0];
+function nozzleHeart(R, p, r, col, k, dir) {
+  const rr = Math.max(r, 0.9);                                // small craft still show a real glowing point
+  if (dir) p = V.madd(_nh, p, dir, r * 0.7);                  // just outside the nozzle face, so the hull doesn't hide it
+  const w = (c) => (c * 0.55 + 0.45) * 12 * k;
+  R.glow(p, rr * 1.6, [w(col[0]), w(col[1]), w(col[2])], 0.7);
+  R.glow(p, rr * 5, [col[0] * 1.1 * k, col[1] * 1.1 * k, col[2] * 1.1 * k], 0.95);
+}
 export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail = 1, opts = null) {
   // past states are expensive (full choreography evaluations): quantise tau to 1/48 s and share them between emitters
   if (opts && opts.past) {
@@ -172,8 +181,9 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
         const pm = R.partWorld(name, entry, model.parts[ep.part].name);
         M.transformPoint(tmp, pm, ep.pos);
         const r = Math.max(ep.r, 0.3) * scale;
-        const pk = 0.16 + 0.08 * Math.sin(time * 1.6 + i * 0.9 + (entry.seed || 0));   // ~0.25 Hz breathing, per-nozzle phase
-        R.glow(tmp, r * 1.15, [col[0] * pk, col[1] * pk, col[2] * pk], 0.25);
+        const pk = 0.8 + 0.12 * Math.sin(time * 1.6 + i * 0.9 + (entry.seed || 0));    // idle but still burning bright, slow breathing
+        M.transformDir(tmp2, pm, [0, 0, -1]); V.norm(tmp2, tmp2);
+        nozzleHeart(R, tmp, r, col, pk, tmp2);
       }
       return;
     }
@@ -195,6 +205,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       endOn = 0.25 + 0.75 * Math.min(1, (1 - Math.abs((vx * tmp2[0] + vy * tmp2[1] + vz * tmp2[2]) / vl)) * 3); }
     const k = throttle * flick * endOn;
     const c = [col[0] * k, col[1] * k, col[2] * k];
+    if (isShip) nozzleHeart(R, tmp, r, col, Math.max(0.7, throttle) * flick, tmp2);   // every ship nozzle: white-hot heart + bloom (not faded end-on)
     if (opts && opts.past) {
       // curved plume: 8 samples of gas emitted over the last `span` seconds
       const N = isShip ? 0 : 8, span = opts.span ?? 0.12;       // ships: a single smooth cone (segments showed beads)
