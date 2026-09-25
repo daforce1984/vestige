@@ -486,6 +486,54 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, side: f32) -> HD {
     let wear = (1.0 - smoothstep(seamW + 0.02, seamW + 0.09, de)) * 0.5 * aa;   // uniform edge highlight (no noise inside a plate)
     o.col = mix(o.col, vec3f(2.2), wear * 0.6); o.rough -= wear * 0.2;
   }
+  // --- side walls: THREE big armour plates per flank (+ the stern block), split where the hull's faces break —
+  // aft taper | midships | bow taper — with a deep chamfered joint, bolt rows along it, an inset frame groove, two belt
+  // grooves, a few access hatches, and a faint natural weathering (large soft tone drift, streaks, grime low down)
+  if (vertical) {
+    let z = -uv.x * side;
+    let b0 = -200.0; let b1 = -50.0; let b2 = 125.0;
+    var nb = b0;
+    if (abs(z - b1) < abs(z - nb)) { nb = b1; }
+    if (abs(z - b2) < abs(z - nb)) { nb = b2; }
+    let dz = abs(z - nb);
+    let pid = select(select(select(3.0, 2.0, z < b2), 1.0, z < b1), 0.0, z < b0);
+    let away = sign(z - nb) * (-side);                                  // +u points away from the joint
+    let jw = 0.16;
+    let joint = (1.0 - smoothstep(jw, jw + pw * 1.5 + 0.02, dz));
+    let cham = (1.0 - smoothstep(jw, jw + 0.45, dz)) * (1.0 - joint);
+    o.tilt += vec2f(away * cham * 0.6, 0.0);
+    o.ao *= 1.0 - joint * 0.85;
+    o.col *= (1.0 - joint * 0.5) * (1.0 + cham * 0.25);
+    if (aa2 > 0.0 && dz < 1.2) {                                       // bolt rows 0.75 m either side of each joint
+      let fy = fract(uv.y / 1.15) - 0.5;
+      let rv = length(vec2f(fy * 1.15, dz - 0.75));
+      let bolt = (1.0 - smoothstep(0.07, 0.1, rv)) * aa2;
+      o.tilt += normalize(vec2f(away * (dz - 0.75), fy) + 1e-4) * bolt * 0.5;
+      o.col *= 1.0 + bolt * 0.3;
+    }
+    let gw = 0.05 + pw * 1.2;
+    var groove = 1.0 - smoothstep(gw, gw + 0.02, abs(dz - 2.4));      // inset frame, 2.4 m in from the joint
+    groove = max(groove, 1.0 - smoothstep(gw, gw + 0.02, abs(uv.y + 9.0)));   // belt grooves
+    groove = max(groove, 1.0 - smoothstep(gw, gw + 0.02, abs(uv.y - 41.0)));
+    // access hatches (2 per plate): a thin recessed outline with a small grip plate
+    for (var hk = 0; hk < 2; hk++) {
+      let hz = select(select(select(-235.0, 20.0, pid == 2.0), select(-95.0, -160.0, hk == 1), pid == 1.0), select(150.0, 245.0, hk == 1), pid == 3.0);
+      let hy = select(33.0, -4.0, hk == 1);
+      let hp = vec2f(z - hz, uv.y - hy);
+      let hd = abs(hp) - vec2f(2.4, 1.7);
+      let ol = max(hd.x, hd.y);
+      groove = max(groove, (1.0 - smoothstep(gw * 0.8, gw * 0.8 + 0.02, abs(ol))) * step(0.5, f32(pid != 2.0)));
+      let grip = step(abs(hp.x - 1.6), 0.35) * step(abs(hp.y), 0.18) * step(0.5, f32(pid != 2.0));
+      o.col *= 1.0 + grip * 0.25;
+    }
+    groove *= aa;
+    o.ao *= 1.0 - groove * 0.45; o.col *= 1.0 - groove * 0.25;
+    // weathering: large, faint tone drift + vertical streaks + a little grime low on the wall (±4 %: no patchwork)
+    let drift = vnoise(vec3f(uv.x * 0.012, uv.y * 0.03, seed + pid * 3.1)) - 0.5;
+    let streak = vnoise(vec3f(uv.x * 0.35, uv.y * 0.012, seed + 7.0 + pid)) - 0.5;
+    o.col *= 1.0 + drift * 0.07 + streak * 0.05 * aa;
+    o.col *= mix(0.93, 1.0, smoothstep(-22.0, 6.0, uv.y));
+  }
   // --- decals: FEW and GIANT (5× the plate-sized ones): painted across the plating on a 150 × 56 m grid, bold stroke
   // font, each fully inside its grid cell (a margin all round), so none is ever clipped
   var paint = vec3f(0.0); var pa = 0.0;
@@ -493,9 +541,9 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, side: f32) -> HD {
   // (u reads left→right on each flank). Band y −4…+40 is clean between z −250 and +150; the bays (z −40…120) are avoided.
   if (vertical && cls != 4.0 && cls != 5.0) {
     let z = -uv.x * side;
-    // hull number "07" — 34 m tall, centred on z = −115, y = 17
+    // hull number "07" — 34 m tall, centred on the AFT plate (z −200…−50): z = −125, y = 17
     let dh = 34.0; let dw = dh * (1.3 / 1.85);
-    let uc = -(-115.0) * side;                                         // u of the number's centre on this flank
+    let uc = -(-125.0) * side;                                         // u of the number's centre on this flank
     let pn = vec2f(uv.x - (uc - dw), uv.y - (17.0 - dh * 0.5)) / (dh / 1.85);
     if (pn.x > 0.0 && pn.x < 2.6 && pn.y > 0.0 && pn.y < 1.85) {
       let k = floor(pn.x / 1.3); let px = vec2f(pn.x - k * 1.3, pn.y);
@@ -503,13 +551,13 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, side: f32) -> HD {
       paint = vec3f(0.6, 0.61, 0.63); pa = max(pa, dg);
     }
     // fleet emblem, 17 m radius
-    let v = (uv - vec2f(178.0 * side, 17.0)) / 17.0; let r = length(v);   // (z −178: clear of the stern edge)
+    let v = (uv - vec2f(-215.0 * side, 17.0)) / 17.0; let r = length(v);   // centred on the BOW plate (z 125…310): z = 215
     let ring = step(abs(r - 0.88), 0.09);
     let tv = max(abs(v.x) * 0.87 + v.y * 0.5, -v.y);
     let tri = step(tv, 0.56) * step(0.3, tv);
     if (max(ring, tri) > 0.0) { paint = vec3f(0.6, 0.61, 0.63); pa = 1.0; }
     // hazard band low on the forward wall (z 130…185, y −2…3)
-    if (uv.y > -2.0 && uv.y < 3.5 && z > 130.0 && z < 185.0) { let st = step(0.5, fract((uv.x + uv.y) / 7.0)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
+    if (uv.y > -2.0 && uv.y < 3.5 && z > 136.0 && z < 186.0) { let st = step(0.5, fract((uv.x + uv.y) / 7.0)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
   }
   if (pa > 0.0) {
     pa *= 0.9;
