@@ -1533,9 +1533,15 @@ shot(207, 212, 'S13b down the barrel', (c) => {
   const { t, u, R } = c;
   const em = GUN.dread ? dreadEmitter(R, t, GUN.dread) : dreadPos(t);
   const hit = motherPoint([0, 0, 0], t, LANCE_HIT);
-  // behind and above the fork, looking along the firing line: the mothership small and far, dead ahead
+  // over the lance's shoulder: high behind the emitter and a little to the side, looking straight at the mothership
+  // (the barrel runs up from the bottom of the frame toward it); the lens tightens so the target reads — ~35 % of the
+  // frame width — instead of a speck hidden behind the barrel
   const back = V.norm([0, 0, 0], V.sub([0, 0, 0], em, hit));
-  camLook(c, addv(madd(em, back, 70 - u * 20), [0, 26, 0]), lerpv(em, hit, 0.6), 34 - u * 8, 0);
+  const sideV = V.norm([0, 0, 0], V.cross([0, 0, 0], back, [0, 1, 0]));
+  const cp = addv(madd(madd(em, back, 62 - u * 12), sideV, 16), [0, 20, 0]);
+  const dist = V.dist(cp, hit), ang = 650 / dist / 0.35;                 // horizontal field for the ship at 35 %
+  const fovV = Math.min(34, Math.max(6, 2 * Math.atan(Math.tan(ang / 2) / (16 / 9)) / DEG)) * (1 - 0.12 * u);   // slow push
+  camLook(c, cp, lerpv(cp, hit, 0.98), fovV, 0);
   handheld(c, 0.08);
   shake(c, 0.1 + u * 0.3, 6);
   c.post.lensB = { enable: 1, pos: em, thetaE: 0.08 + 0.05 * u, horizon: 0, swirl: 0, glow: 0 };
