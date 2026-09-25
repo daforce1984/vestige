@@ -965,7 +965,7 @@ function drawDogfight(R, t, tmpM) {
         const li = lt - TT, tp = fighterPos([0, 0, 0], k, t);         // rides on the target as it flies on
         const off = randDir([0, 0, 0], sh.seed * 1.7); V.madd(tp, tp, off, 1.6);
         const kf = Math.exp(-li * 9);
-        R.glow(tp, 2.5 + 3 * kf, [(col[0] * 0.4 + 2.5) * kf, (col[1] * 0.4 + 2) * kf, (col[2] * 0.4 + 1.5) * kf], 0.6);   // impact flash
+        R.glow(tp, 1.2 + 1.5 * kf, [(col[0] * 0.4 + 2.5) * 4 * kf, (col[1] * 0.4 + 2) * 4 * kf, (col[2] * 0.4 + 1.5) * 4 * kf], 0.2);   // impact flash (HDR: blooms)
         R.glow(tp, 1.2, [1.6 * (1 - li / 0.7), 0.5 * (1 - li / 0.7), 0.1 * (1 - li / 0.7)], 0.3);                        // glowing scorch
         if (li < 0.1) R.light(tp, 40, [1, 0.7, 0.5], 6 * (1 - li / 0.1));
         for (let i = 0; i < 12; i++) {                                // spark particles off the hull

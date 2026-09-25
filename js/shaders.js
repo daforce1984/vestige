@@ -1388,6 +1388,25 @@ export const BLOOM = POST_COMMON + /* wgsl */ `
         textureSampleLevel(src, smp, uv + ts * vec2f(0, -2), 0.0).rgb + textureSampleLevel(src, smp, uv + ts * vec2f(0, 2), 0.0).rgb) * 0.0625;
   return vec4f(min(c, vec3f(4000.0)), 1.0);
 }
+// first downsample: the same filter + a soft-knee THRESHOLD — only what is really bright (HDR > ~1) blooms
+@fragment fn downPre(i: VO) -> @location(0) vec4f {
+  let ts = 1.0 / vec2f(textureDimensions(src));
+  let uv = i.uv;
+  var c = textureSampleLevel(src, smp, uv, 0.0).rgb * 0.125;
+  c += (textureSampleLevel(src, smp, uv + ts * vec2f(-1, -1), 0.0).rgb + textureSampleLevel(src, smp, uv + ts * vec2f(1, -1), 0.0).rgb +
+        textureSampleLevel(src, smp, uv + ts * vec2f(-1, 1), 0.0).rgb + textureSampleLevel(src, smp, uv + ts * vec2f(1, 1), 0.0).rgb) * 0.125;
+  c += (textureSampleLevel(src, smp, uv + ts * vec2f(-2, -2), 0.0).rgb + textureSampleLevel(src, smp, uv + ts * vec2f(2, -2), 0.0).rgb +
+        textureSampleLevel(src, smp, uv + ts * vec2f(-2, 2), 0.0).rgb + textureSampleLevel(src, smp, uv + ts * vec2f(2, 2), 0.0).rgb) * 0.03125;
+  c += (textureSampleLevel(src, smp, uv + ts * vec2f(-2, 0), 0.0).rgb + textureSampleLevel(src, smp, uv + ts * vec2f(2, 0), 0.0).rgb +
+        textureSampleLevel(src, smp, uv + ts * vec2f(0, -2), 0.0).rgb + textureSampleLevel(src, smp, uv + ts * vec2f(0, 2), 0.0).rgb) * 0.0625;
+  c = min(c, vec3f(4000.0));
+  let l = max(c.r, max(c.g, c.b));
+  let T = 1.0; let knee = 0.6;
+  var soft = clamp(l - T + knee, 0.0, 2.0 * knee);
+  soft = soft * soft / (4.0 * knee + 1e-4);
+  c *= max(soft, l - T) / max(l, 1e-4);
+  return vec4f(c, 1.0);
+}
 @fragment fn up(i: VO) -> @location(0) vec4f {
   let ts = 1.0 / vec2f(textureDimensions(src));
   let uv = i.uv;

@@ -185,6 +185,11 @@ export class Renderer {
       vertex: { module: bloomMod, entryPoint: 'vs' },
       fragment: { module: bloomMod, entryPoint: 'down', targets: [{ format: HDR }] },
     });
+    this.downPrePipe = dev.createRenderPipeline({
+      layout: 'auto', label: 'bloomDownPre',
+      vertex: { module: bloomMod, entryPoint: 'vs' },
+      fragment: { module: bloomMod, entryPoint: 'downPre', targets: [{ format: HDR }] },
+    });
     this.upPipe = dev.createRenderPipeline({
       layout: 'auto', label: 'bloomUp',
       vertex: { module: bloomMod, entryPoint: 'vs' },
@@ -437,6 +442,7 @@ export class Renderer {
       entries: [{ binding: 1, resource: this.linSmp }, { binding: 2, resource: src }],
     });
     this.downBG = [bl(this.downPipe, V_.scene2), ...V_.bloom.slice(0, -1).map((v) => bl(this.downPipe, v))];
+    this.downPreBG = bl(this.downPrePipe, V_.scene2);
     this.upBG = V_.bloom.map((v) => bl(this.upPipe, v));
     this.accum = tex(HDR, [w, h], RA | TB);
     this.views.accum = this.accum.createView();
@@ -499,7 +505,7 @@ export class Renderer {
     d[o + 8] = c[0]; d[o + 9] = c[1]; d[o + 10] = c[2]; d[o + 11] = c[3] || 0;
     d[o + 12] = col[0]; d[o + 13] = col[1]; d[o + 14] = col[2]; d[o + 15] = alpha;
   }
-  glow(p, radius, col, halo = 0.6) { this.sprite(0, p, [radius, 0, halo, 0], Z4, col, 0); }
+  glow(p, radius, col, halo = 0.6) { this.sprite(0, p, [radius, 0, halo * 0.35, 0], Z4, col, 0); }   // halo mostly left to the bloom pass
   fire(p, radius, age, seed, col = ONE, opacity = 1) { this.sprite(1, p, [radius, seed * 3.1, age, seed], Z4, col, opacity); }
   /** procedural volumetric fireball (ray-marched noise ball, emission only). age 0..1 */
   fireball(p, radius, age, seed, col = ONE, intensity = 1) { this.sprite(14, p, [radius, seed * 3.1, age, seed], Z4, col, intensity); }
@@ -777,7 +783,7 @@ export class Renderer {
       p.setPipeline(pipe); p.setBindGroup(0, bg); p.draw(3); p.end();
     };
     fs(V_.scene2, this.lensPipe, this.lensBG);
-    for (let i = 0; i < BLOOM_LEVELS; i++) fs(V_.bloom[i], this.downPipe, this.downBG[i]);
+    for (let i = 0; i < BLOOM_LEVELS; i++) fs(V_.bloom[i], i === 0 ? this.downPrePipe : this.downPipe, i === 0 ? this.downPreBG : this.downBG[i]);   // level 0: thresholded
     for (let i = BLOOM_LEVELS - 1; i > 0; i--) fs(V_.bloom[i - 1], this.upPipe, this.upBG[i], true);
     if (of <= 1) fs(this.ctx.getCurrentTexture().createView(), this.finalPipe, this.finalBG);
     else {

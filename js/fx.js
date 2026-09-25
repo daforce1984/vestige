@@ -38,17 +38,13 @@ export function explosion(R, t, t0, pos, size, seed, kind = 'ship', lightR = 16)
     R.glow(pos, sz * (1 + (grow - 1) * (lt / life)), [col[0] * mul * k, col[1] * mul * k, col[2] * mul * k], halo);
   };
   const warm = [1, 0.82, 0.63];
-  glowL(size * 2.2, 0.35, 1.6, warm, 0.03, 0.5);          // wash
   glowL(size * 0.8, 0.22, 1.3, [1, 1, 1], 0.8);           // flash (spread over ~5 frames: no single-frame pop)
-  glowL(size * 1.2, 0.14, 1.2, warm, 0.6);
   glowL(size * 0.45, 0.22, 1.15, [1, 1, 1], 1.8, 0.1);      // white-hot core
   glowL(size * 0.9, 0.35, 1.5, [1, 0.8, 0.55], 0.3, 0.1);
   // EVERY blast has a blinding centre that blooms: an HDR white core (way over 1 -> the bloom pass spreads it) that
   // stays white-hot while the fireball burns and cools through yellow/orange, inside a wide soft glow halo
   { const kc = Math.exp(-lt * 1.8), kh = Math.exp(-lt * 1.3), w = sat(kc * 1.6);   // w: stays pure white while hot
-    R.glow(pos, size * (0.6 + 0.3 * lt), [40 * kc, 40 * kc * lerp(0.7, 1, w), 40 * kc * lerp(0.4, 1, w)], 0.7);   // blown-out white centre
-    R.glow(pos, size * (1.1 + 0.4 * lt), [6 * kc, 5.2 * kc, 4.2 * kc], 0.9);
-    R.glow(pos, size * (2.2 + 0.8 * lt), [2.6 * kh, 1.6 * kh, 0.8 * kh], 1.0); }                                     // strong wide glow
+    R.glow(pos, size * (0.45 + 0.25 * lt), [60 * kc, 60 * kc * lerp(0.7, 1, w), 60 * kc * lerp(0.4, 1, w)], 0.2); }   // blown-out white centre (the BLOOM pass makes the glow)
   
   R.light(pos, size * lightR, [1, 0.7, 0.4], 45 * Math.exp(-lt * 5) + 4 * Math.max(0, 1 - lt / END));
   // wavefronts (refractive ripples)
@@ -156,9 +152,8 @@ const _nh = [0, 0, 0];
 function nozzleHeart(R, p, r, col, k, dir) {
   const rr = Math.max(r, 0.9);                                // small craft still show a real glowing point
   if (dir) p = V.madd(_nh, p, dir, r * 0.7);                  // just outside the nozzle face, so the hull doesn't hide it
-  const w = (c) => (c * 0.55 + 0.45) * 4.5 * k;
-  R.glow(p, rr * 1.2, [w(col[0]), w(col[1]), w(col[2])], 0.6);
-  R.glow(p, rr * 3, [col[0] * 0.45 * k, col[1] * 0.45 * k, col[2] * 0.45 * k], 0.9);
+  const w = (c) => (c * 0.55 + 0.45) * 7 * k;
+  R.glow(p, rr * 1.0, [w(col[0]), w(col[1]), w(col[2])], 0.15);          // bright HDR core: the bloom pass makes its glow
 }
 export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail = 1, opts = null) {
   // past states are expensive (full choreography evaluations): quantise tau to 1/48 s and share them between emitters
@@ -225,8 +220,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
         R.beam(_prev, _pn, r * (0.2 + 1.45 * Math.pow(f, 1.3)), [c[0] * kb, c[1] * kb, c[2] * kb], 0.9, 6, 0.6, 0.5);
         V.copy(_prev, _pn);
       }
-      if (isShip) R.glow(tmp, r * 2.4, [c[0] * 1.1, c[1] * 1.1, c[2] * 1.1], 0.35);   // bright additive glow round the thick base
-      else R.glow(tmp, r * 1.2, [c[0] * 0.6, c[1] * 0.6, c[2] * 0.6], 0.15);
+      if (!isShip) R.glow(tmp, r * 1.2, [c[0] * 0.6, c[1] * 0.6, c[2] * 0.6], 0.15);
       if (isShip) crossPlume(R, tmp, tmp2, r, len * 1.3, c);
       else { R.flame(tmp, V.scale(tmp3, tmp2, len * 0.45), r * 1.7, c, 1.4, i * 3.1, 1); crossPlume(R, tmp, tmp2, r * 0.8, len * 0.8, c); }
       if (opts.particles) {
@@ -251,7 +245,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       }
       continue;
     }
-    if (isShip) { crossPlume(R, tmp, tmp2, r, len, c); R.glow(tmp, r * 2.2, [c[0] * 1.0, c[1] * 1.0, c[2] * 1.0], 0.35); continue; }   // one smooth cone + a glow AT the nozzle only (no bead mid-plume)
+    if (isShip) { crossPlume(R, tmp, tmp2, r, len, c); continue; }   // (glow: the bloom pass)   // one smooth cone + a glow AT the nozzle only (no bead mid-plume)
     V.scale(tmp3, tmp2, len);
     R.flame(tmp, tmp3, r * 1.7, c, 1.4, i * 3.1, 1);
     crossPlume(R, tmp, tmp2, r * 0.8, len * 1.1, c);                  // the same cone plume as the ships (hot, additive base)

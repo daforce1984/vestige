@@ -54,7 +54,7 @@ function spaceEnv(t) {
 }
 function basePost() {
   return {
-    exposure: 0.9, bloom: 0.022, ca: 0.0006, grain: 0.008, fade: 1, flash: 0, letterbox: 1, vignette: 0.8,
+    exposure: 0.9, bloom: 0.3, ca: 0.0006, grain: 0.008, fade: 1, flash: 0, letterbox: 1, vignette: 0.8,
     distort: 1, streak: 0.22, saturation: 0.9, contrast: 1.08, gradeShadows: [0.92, 0.98, 1.06], gradeHighlights: [1.08, 1.0, 0.9],
     shakeBlur: 0, lensA: null, lensB: null, godray: null,
   };
@@ -1373,7 +1373,7 @@ shot(153, 156, 'S11b eyes ignite', (c) => {
   const { t, u } = c;
   c.world = false; c.hangar = 'launch';
   c.post.streak = 0.5 + 1.6 * (t > 153.5 ? Math.exp(-(t - 153.5) * 1.5) : 0);   // anamorphic flare off the visor
-  c.post.bloom = 0.08 + 0.1 * (t > 153.5 ? Math.exp(-(t - 153.5) * 2) : 0);
+  c.post.bloom = 0.3 + 0.3 * (t > 153.5 ? Math.exp(-(t - 153.5) * 2) : 0);
   camLook(c, addv(HANGAR, [2.5 - u * 1, 16.4, 11 - u * 1.5]), addv(HANGAR, [0, 16.2, 0]), 30);
   handheld(c, 0.15);
   hangarEnv(c, 'launch');
@@ -2173,9 +2173,7 @@ function drawDodgeBolt(R, t) {
   const lb = t - TB;                                                      // the burst
   if (lb >= 0 && lb < 1.6) {
     const f = Math.exp(-lb * 9);
-    R.glow(E, 3 + 8 * easeOut(sat(lb / 0.06)), [40 * f, 40 * f, 38 * f], 0.7);                          // blown-out white core
-    R.glow(E, 8 + 10 * lb, [5 * f, 4.4 * f, 3.6 * f], 0.9);
-    R.glow(E, 14 + 14 * lb, [2.4 * Math.exp(-lb * 2.5), 1.4 * Math.exp(-lb * 2.5), 0.6 * Math.exp(-lb * 2.5)], 1.0);   // strong wide glow
+    R.glow(E, 2.5 + 5 * easeOut(sat(lb / 0.06)), [60 * f, 60 * f, 56 * f], 0.2);                        // blown-out white core (bloom = the glow)
     R.glow(E, 5 + 12 * easeOut(sat(lb / 0.3)), [2.2 * Math.exp(-lb * 4), 0.8 * Math.exp(-lb * 4), 0.3 * Math.exp(-lb * 4)], 0.6);   // orange fireball
     R.light(E, 120, [1, 0.6, 0.3], 18 * Math.exp(-lb * 6));
     if (lb < 0.35) R.ripple(E, 4 + 34 * easeOut(lb / 0.35), [0.4, 0.4, 0.4], (1 - lb / 0.35) * 1.5);
