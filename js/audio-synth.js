@@ -1547,18 +1547,19 @@ function shieldHit(E, t, p) {
   sweep(sh.frequency, t, 1300, t + 1.2, 420); sweep(sb.frequency, t, 1300, t + 1.2, 420);
   sh.connect(sb); sb.connect(sgn); sgn.connect(v.out); perc(sgn.gain, t + 0.02, vel * 0.05, 0.5, 0.01);
 }
-// small-craft laser: a tight pitch-dropping zap with a bit of body and a click — each shot a little different
+// small-craft cannon: a HEAVY energy round, not a toy zap — a low pitch-dropping punch, a distorted crack at the
+// muzzle, a short dark 'thoom' body and a roomy tail. f0 (1300–1900 from the callers) only varies the pitch a little.
 function blaster(E, t, p) {
-  const vel = p.vel ?? 0.5, f0 = p.f0 ?? 1700, end = t + 0.3;
-  const v = new Voice(E, 'sfx', { verb: 0.22, pan: p.pan ?? 0 });
-  const o = v.osc('sawtooth', f0, t, end), lp = v.f('lowpass', 6000, 1.4), g = v.g(0);
-  sweep(o.frequency, t, f0, t + 0.13, f0 * 0.2); sweep(lp.frequency, t, 6500, t + 0.14, 600);
-  o.connect(lp); lp.connect(g); g.connect(v.out); perc(g.gain, t, vel * 0.3, 0.055, 0.0008);
-  const s = v.osc('sine', f0 * 0.45, t, end), sg = v.g(0);
-  sweep(s.frequency, t, f0 * 0.45, t + 0.16, 80);
-  s.connect(sg); sg.connect(v.out); perc(sg.gain, t, vel * 0.45, 0.07, 0.0008);
-  const n = v.noise('white', t, t + 0.04), nb = v.f('bandpass', 4000, 1.3), ng = v.g(0);
-  n.connect(nb); nb.connect(ng); ng.connect(v.out); perc(ng.gain, t, vel * 0.22, 0.012, 0.0004);
+  const vel = p.vel ?? 0.5, v0 = (p.f0 ?? 1600) / 1600, end = t + 0.6;
+  const v = new Voice(E, 'sfx', { verb: 0.42, pan: p.pan ?? 0, gain: 0.7 });
+  const k = v.osc('sine', 150 * v0, t, end), kg = v.g(0);                      // punch
+  sweep(k.frequency, t, 150 * v0, t + 0.12, 44);
+  k.connect(kg); kg.connect(v.out); perc(kg.gain, t, vel * 0.9, 0.09, 0.002);
+  const n = v.noise('white', t, t + 0.12), nb = v.f('bandpass', 1400 * v0, 0.9), ws = v.ws('soft'), ng = v.g(0);   // crack
+  n.connect(nb); nb.connect(ws); ws.connect(ng); ng.connect(v.out); perc(ng.gain, t, vel * 0.5, 0.025, 0.0005);
+  const o = v.osc('sawtooth', 330 * v0, t, end), lp = v.f('lowpass', 1600, 0.9), og = v.g(0);   // dark body
+  sweep(o.frequency, t, 330 * v0, t + 0.2, 85); sweep(lp.frequency, t, 1800, t + 0.22, 260);
+  o.connect(lp); lp.connect(og); og.connect(v.out); perc(og.gain, t + 0.004, vel * 0.22, 0.11, 0.003);
 }
 // Rising shield-strain whine between impacts (cut at the end)
 function shieldStrain(E, t, p) {
