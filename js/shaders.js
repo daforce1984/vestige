@@ -784,7 +784,9 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // cinematic fill from slightly above the camera: keeps the dark side of hulls readable
   let fillDir = normalize(V + vec3f(0.0, 0.35, 0.0));
   let fl = clamp((dot(n, fillDir) + F.fill.w) / (1.0 + F.fill.w), 0.0, 1.0);
-  col += F.fill.rgb * fl * (diffC + F0 * 0.3) * ao * mix(0.55, 1.0, rockK);
+  // the camera-side fill read as a lamp carried by the flagship: its armour only ever gets the base level (as in S23)
+  let fillC = select(F.fill.rgb, F.fill.rgb * min(1.0, 0.17 / max(max(F.fill.r, F.fill.g), max(F.fill.b, 1e-4))), hullFlag);
+  col += fillC * fl * (diffC + F0 * 0.3) * ao * mix(0.55, 1.0, rockK);
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;
   if (inst.shade.y > 0.0) {

@@ -246,3 +246,5 @@
 - [x] 184. Flagship decals moved onto clear wall so none are cut or smeared ("07" z −115, emblem z −178, hazard band z 130..185)
 - [x] 185. Sigma chest reactor ring glows (heartbeat pulse, red when berserk)
 - [x] 186. Hangar doors/frame fitted onto the bay's armoured box face (were floating 4–7 m off it); leaves slide sideways into pocket housings on the hull; door/frame use the hull's own shading (hullDetail gunmetal) so the lighting matches; fore leaf rotated (not mirrored) so its outer face isn't culled.
+- [x] 187. Flagship "self light": the camera-side fill is capped to the base level on the flagship's armour (as in S23), so F2 no longer looks lamp-lit and the cut into S23 no longer strips it.
+- [x] 188. Lance hit: deflected beam flies on 60 km (out of frame); whole-ship white wash removed (entry flash, 880 m chain-blast lights → local, lingering fire light scaled with it, hit light 900→170 m, S14b exposure 1.25→0.9, gravity-well light 1.2→0.55).

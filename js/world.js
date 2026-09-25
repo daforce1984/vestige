@@ -593,7 +593,6 @@ export function drawWorld(R, t, opts = {}) {
       const pulse = 0.5 + 0.5 * Math.sin(t * 6);
       me.matOverride = { window: { base: [0.2, 0.05, 0.05], metal: 0, rough: 0.5, emissive: [3 * pulse + 0.3, 0.15, 0.1] } };
     }
-    if (t > LANCE_FIRE + 1 && t < LANCE_FIRE + 3) me.flash = Math.exp(-(t - LANCE_FIRE - 1) * 3) * 2;
     me.forceThrottle = t > 28 && t < 41;                        // under way during the belly pass (the camera rides along)
     engineGlows(R, 'mothership', me, [0.35, 0.55, 1.1], 0.6, t > 232 && t < 292 ? 1 : 0.7, 1.6);
     // ARRIVAL (Dune-style): the window unfolds at 17.5, the ship slides out slowly 19–29
@@ -890,7 +889,7 @@ function drawWell(R, t, tmpM) {
     e.damage = sat((t - 272.5) / 4);
     e.flash = Math.max(0, 1 - (t - 272.8) * 2) * 2;
   }
-  R.light(WELL, 1200, [0.9, 0.8, 0.75], 1.2 * on);
+  R.light(WELL, 1200, [0.9, 0.8, 0.75], 0.55 * on);          // (1.2 washed the whole flagship when it sat near the well)
 }
 
 // ---------------- dogfight

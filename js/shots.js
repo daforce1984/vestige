@@ -1436,7 +1436,7 @@ shot(218, 226, 'S14b tinnitus', (c) => {
   const hit = motherPoint([0, 0, 0], t, LANCE_HIT);
   camLook(c, motherPoint([0, 0, 0], t, [LANCE_HIT[0] + 260 - u * 40, LANCE_HIT[1] + 70 - u * 15, LANCE_HIT[2] - 230 + u * 40]), hit, 40, 0.12 - u * 0.08);
   handheld(c, 1.0);
-  c.post.saturation = 0.35 + u * 0.4; c.post.shakeBlur = 0.002 * (1 - u); c.post.exposure = 1.25 - u * 0.2;
+  c.post.saturation = 0.35 + u * 0.4; c.post.shakeBlur = 0.002 * (1 - u); c.post.exposure = 0.9;   // (1.25 washed the hull white)
   c.post.ca = 0.4 * (0.006 * (1 - u) + 0.002);
   c.env.shadowCenter = hit; c.env.shadowRadius = 260;
   c.env.shadows = false;                 // perf: the huge interior would double in the shadow pass
@@ -2154,12 +2154,12 @@ function drawLanceAndCannon(R, t, c) {
     }
     if (reach >= 1) {
       R.glow(hit, 60 * k, [2.5 * k, 1.4 * k, 3 * k], 0.5);
-      R.light(hit, 900, [1, 0.5, 1.2], 30 * k);
+      R.light(hit, 170, [1, 0.5, 1.2], 6 * k);                   // lights the wound only (900 m washed the whole flagship white)
       // glancing blow: the deflected beam carries on off the hull at the mirrored angle, spraying molten sparks
       const n = V.norm([0, 0, 0], V.sub([0, 0, 0], motherPoint([0, 0, 0], t, [LANCE_HIT[0] + 10, LANCE_HIT[1], LANCE_HIT[2]]), motherPoint([0, 0, 0], t, LANCE_HIT)));
       const dn = V.dot(dir, n), rdir = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], dir, n, -2 * dn), n, 0.25));
       const kr = k * Math.min(1, (lt - 0.9) / 0.15);
-      const rEnd = madd(hit, rdir, 2600 * Math.min(1, (lt - 0.9) / 0.5));
+      const rEnd = madd(hit, rdir, 60000 * Math.min(1, (lt - 0.9) / 0.6));   // flies on out to the end of space
       R.beam(hit, rEnd, 3.2 * kr, [LANCE_COL[0] * 0.8 * kr, LANCE_COL[1] * 0.8 * kr, LANCE_COL[2] * 0.8 * kr], 1.1, 30, 3, 1.2);
       R.beam(hit, rEnd, 10 * kr, [LANCE_COL[0] * 0.03 * kr, LANCE_COL[1] * 0.03 * kr, LANCE_COL[2] * 0.03 * kr], 1, 2, 3, 0.6);
       for (let i = 0; i < 40; i++) {
@@ -2171,7 +2171,7 @@ function drawLanceAndCannon(R, t, c) {
   }
   // mothership hit explosions chain
   const chain = [[216.9, [64, 30, 70], 55], [218.2, [62, -15, 0], 38], [219.4, [60, 34, -10], 40], [221, [58, -20, 95], 36], [223, [62, 40, 60], 30]];   // secondary blasts along the scorched flank
-  for (const [t0, lp, sz] of chain) explosion(R, t, t0, motherPoint([0, 0, 0], t0, lp), sz, t0 * 3, 'ship');
+  for (const [t0, lp, sz] of chain) explosion(R, t, t0, motherPoint([0, 0, 0], t0, lp), sz, t0 * 3, 'ship', 3.5);   // light the flank locally, not the whole ship
   // main cannon
   if (t > MAIN_CHARGE && t < MAIN_FIRE + 5) {
     const mc = mainCannon(R, t);

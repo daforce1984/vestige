@@ -22,7 +22,7 @@ function chunkHidden(R, keep) {
 }
 const _cm = new Float32Array(16), _cq = [0, 0, 0, 1];
 
-export function explosion(R, t, t0, pos, size, seed, kind = 'ship') {
+export function explosion(R, t, t0, pos, size, seed, kind = 'ship', lightR = 16) {   // lightR: light radius in sizes (keep small for blasts ON a hull)
   // homeland/fx.js explosion(): light first (white HDR core layers), a soft wash, three wavefronts,
   // three offset cauliflower fireballs, burning hull fragments. Almost no smoke (vacuum).
   const TS = kind === 'huge' ? 3.2 : kind === 'small' ? 1.0 : 1.8;   // film time-stretch
@@ -41,7 +41,7 @@ export function explosion(R, t, t0, pos, size, seed, kind = 'ship') {
   glowL(size * 0.45, 0.22, 1.15, [1, 1, 1], 1.8, 0.1);      // white-hot core
   glowL(size * 0.9, 0.35, 1.5, [1, 0.8, 0.55], 0.3, 0.1);
   
-  R.light(pos, size * 16, [1, 0.7, 0.4], 45 * Math.exp(-lt * 5) + 4 * Math.max(0, 1 - lt / END));
+  R.light(pos, size * lightR, [1, 0.7, 0.4], 45 * Math.exp(-lt * 5) + 4 * Math.max(0, 1 - lt / END));
   // wavefronts (refractive ripples)
   for (const [rr, life, del, c] of [[7.5, 0.34, 0.015, [1, 1, 1]], [12, 0.7, 0.06, warm], [17, 1.15, 0.16, [1, 0.54, 0.25]]]) {
     const a = (lt - del) / life;
@@ -95,7 +95,7 @@ export function explosion(R, t, t0, pos, size, seed, kind = 'ship') {
     R.glow(tmp2, size * 0.015 + 0.25, [2.6 * k, 1.2 * k, 0.3 * k], 0.2);
   }
   // flickering fire light while it burns
-  R.light(pos, size * 10, [1, 0.55, 0.25], 6 * Math.max(0, 1 - lt / END) * (0.75 + 0.25 * Math.sin(lt * 23)));
+  R.light(pos, size * 10 * (lightR / 16), [1, 0.55, 0.25], 6 * Math.max(0, 1 - lt / END) * (0.75 + 0.25 * Math.sin(lt * 23)));
   // tumbling hull chunks
   if (false && kind !== 'small' && R.models.debris) {   // (removed: stock debris pieces that weren't part of the exploding model)
     const nc = kind === 'huge' ? 10 : 5;
