@@ -132,12 +132,12 @@ L.guard = P({
 });
 // idle / at-the-ready (before the fight is on): relaxed, the mace hanging from a loose arm by his side, head up and
 // watching (arm angles FK-solved so the mace really hangs head-down)
-L.idle = P({
-  pelvis: [0, -6, 0], torso: [6, -4, 0], head: [4, 6, 0],
+L.idle = P({   // HEAVY: sunk low, chest forward over the hips, head down and glaring, the free arm hanging like a weight
+  pelvis: [0, -6, 0], torso: [16, -4, 0], head: [10, 6, 0],
   arm_L_upper: [13, 23, -8], arm_L_lower: [-19, 0, 0], hand_L: [112, 10, 0],
-  arm_R_upper: [-18, 6, -14], arm_R_lower: [-38, 0, 0], hand_R: [8, 0, 0],
-  leg_L_upper: [-20, 0, 7], leg_L_lower: [26, 0, 0], foot_L: [12, 0, 0],
-  leg_R_upper: [10, 0, -6], leg_R_lower: [34, 0, 0], foot_R: [22, 0, 0], _body: [3, 0, 0],
+  arm_R_upper: [-8, 6, -16], arm_R_lower: [-30, 0, 0], hand_R: [8, 0, 0],
+  leg_L_upper: [-34, 0, 8], leg_L_lower: [50, 0, 0], foot_L: [16, 0, 0],
+  leg_R_upper: [4, 0, -6], leg_R_lower: [54, 0, 0], foot_R: [26, 0, 0], _body: [8, 0, 0],
 });
 L.ignite = W(L.guard, { arm_L_upper: [-70, -30, 0], arm_L_lower: [-60, 0, 0], hand_L: [60, 0, 0], head: [-15, 5, 0] });
 L.highBlock = W(L.guard, { torso: [-5, -5, 0], head: [-30, 0, 0], arm_L_upper: [-150, -35, -10], arm_L_lower: [-45, 0, 0], hand_L: [40, 80, 0], arm_R_upper: [-140, 20, 10], arm_R_lower: [-50, 0, 0], leg_L_upper: [-50, 0, 10], leg_L_lower: [75, 0, 0], leg_R_upper: [0, 0, -8], leg_R_lower: [85, 0, 0], _body: [-10, 0, 0] });
@@ -274,6 +274,15 @@ R.ready = W(mirror(P({
   leg_L_upper: [-42, 0, 8], leg_L_lower: [64, 0, 0], foot_L: [18, 0, 0],
   leg_R_upper: [26, 0, -8], leg_R_lower: [40, 0, 0], foot_R: [40, 0, 0], _body: [12, 0, 0],
 })), { arm_R_upper: [-20, 4, 38], arm_R_lower: [-27, 0, 0], hand_R: [16, 0, 0] });
+// TAUNT (RONIN #1's entrance): katana swung up to rest on its shoulder, the free hand held out to Sigma palm-up,
+// beckoning — chest back, head cocked. (hero convention: weapon arm = L, free arm = R; mirrored for RONIN)
+R.taunt = mirror(P({
+  pelvis: [0, 12, 0], torso: [-8, 16, 0], head: [-10, -12, 14],
+  arm_L_upper: [-62, -24, 58], arm_L_lower: [-128, 0, 0], hand_L: [38, 0, 0],
+  arm_R_upper: [-72, 12, -12], arm_R_lower: [-16, 0, 0], hand_R: [-25, 0, 0],
+  leg_L_upper: [-16, 0, 8], leg_L_lower: [22, 0, 0], foot_L: [12, 0, 0],
+  leg_R_upper: [12, 0, -6], leg_R_lower: [36, 0, 0], foot_R: [24, 0, 0], _body: [-5, 0, 0],
+}));
 export const POSE_LIB = { hero: L, ronin: R };
 // The hero swings a mace, not a sword: a club is held in a fist grip (haft roughly ⟂ forearm), so the wrist flex that
 // let the saber "continue the forearm" (+90°) is compressed into a natural cocked wrist (soft knee at 20°, 90° → ~41°).
@@ -698,7 +707,8 @@ const e1Pos = posTrack([
   [180.2, F1(38, -4, 8), 'out'],
 ]);
 const e1Pose = poseTrack([
-  [170, R.ready], [176.45, R.ready, 'io'],                     // 170–176.45: two-handed, ready to charge, floating
+  [170, R.ready], [172.3, R.ready, 'io'], [172.75, R.taunt, 'io'], [173.6, R.taunt], [174.25, R.ready, 'io'],   // the taunt, then back to two hands
+  [176.45, R.ready, 'io'],                                     // 170–176.45: two-handed, ready to charge, floating
   [176.95, W(R.foreWind, { torso: [30, -40, 0], _body: [30, 0, 0] }), 'io'], [177.35, R.foreWind, 'out'],
   [177.6, R.foreMid, 'in'], [177.72, R.foreEnd, 'out'], [177.88, R.foreEnd], [178.0, R.backMid, 'in'], [178.08, R.backMid],
   [178.2, R.doubled, 'in'], [178.45, R.doubled, 'out'], [178.55, R.hitTorso, 'in'], [179.0, R.tumble, 'out'],
@@ -953,12 +963,12 @@ function duelHero_(t) {
   }
   micro(t, _pose, 1.3, (1 - idleK) * (tw < 177 ? lerp(1, 0.35, ROUGH(tw)) : 1));
   if (idleK > 0) {
-    _pose[PIDX.torso] += Math.sin(t * 1.6) * 0.02 * idleK; _pose[PIDX.head] += Math.sin(t * 1.6 - 0.6) * 0.015 * idleK;   // breathing
-    _pose[PIDX.arm_L_upper] += Math.sin(t * 1.6 - 1.2) * 0.03 * idleK;                                                     // the hanging mace lags the float
+    _pose[PIDX.torso] += Math.sin(t * 1.05) * 0.03 * idleK; _pose[PIDX.head] += Math.sin(t * 1.05 - 0.6) * 0.02 * idleK;   // slow, heavy breaths
+    _pose[PIDX.arm_L_upper] += Math.sin(t * 1.05 - 1.2) * 0.025 * idleK;                                                   // the hanging mace lags them
   }
   s._idle = idleK;
   s.anchor = s.pos.slice();                                   // (the idle camera follows this, so the float shows on screen)
-  if (idleK > 0) s.pos = add(s.pos, [Math.sin(t * 0.9) * 0.12 * idleK, Math.sin(t * 1.3 + 0.4) * 0.45 * idleK, Math.sin(t * 0.7 + 1) * 0.12 * idleK]);
+  if (idleK > 0) s.pos = add(s.pos, [Math.sin(t * 0.6) * 0.06 * idleK, Math.sin(t * 0.75 + 0.4) * 0.22 * idleK, Math.sin(t * 0.5 + 1) * 0.06 * idleK]);   // a slow, heavy float
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   _pose[PIDX.hand_L] = maceWrist(_pose[PIDX.hand_L]);
   // facing
@@ -1030,8 +1040,11 @@ const EV_T = () => EV.filter((e) => e[1] !== 'shake').map((e) => e[0]);
 const LOCK_VARS = [['arm_L_upper', 0], ['arm_L_upper', 1], ['arm_L_upper', 2], ['arm_L_lower', 0], ['hand_L', 0], ['hand_L', 1], ['hand_L', 2]];
 function gripLock(s) {
   if (SOLVING || !s || !s.vis || !(s.saber > 0.5)) return s;
+  const gw = s._grip ?? 1;
+  if (gw <= 0.001) return s;                                  // hand off the hilt (taunt)
   const pose = s.pose;
   for (const [p] of LOCK_VARS) pose[p] = (pose[p] || [0, 0, 0]).slice();
+  const free = gw < 1 ? Object.fromEntries(LOCK_VARS.map(([p]) => [p, pose[p].slice()])) : null;
   const cost = () => gripErr(duelFK(s, 'enemy_ms'));
   let best = cost();
   for (let step = 0.6; step > 0.002; step *= 0.6) {
@@ -1047,6 +1060,7 @@ function gripLock(s) {
       if (!imp) break;
     }
   }
+  if (free) for (const p in free) for (let c = 0; c < 3; c++) pose[p][c] = lerp(free[p][c], pose[p][c], gw);   // eases onto / off the hilt
   const fk = duelFK(s, 'enemy_ms');
   s.twoHandErr = V.dist(M.transformPoint([0, 0, 0], fk.hand_L, GRIP_L), M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R));
   return s;
@@ -1131,6 +1145,11 @@ function duelEnemy1_(t) {
       ['leg_L_upper', 2, 0.02, 0.7, 2.5], ['leg_R_upper', 2, 0.02, 0.8, 0.9]];
     for (const [p, c, a, w, ph] of F) _pose[PIDX[p] + c] += Math.sin(t * w + ph) * a * e1K;
   }
+  // the beckon: the held-out free hand curls up twice ("come on"), the forearm following a little
+  const bk = smooth(172.8, 172.95, tw) * (1 - smooth(173.45, 173.6, tw));
+  if (bk > 0) { const c = Math.pow(Math.max(0, Math.sin((tw - 172.85) * Math.PI * 2 * 1.45)), 2);
+    _pose[PIDX.hand_L] += 0.75 * c * bk; _pose[PIDX.arm_L_lower] += 0.22 * c * bk; }
+  s._grip = 1 - smooth(172.35, 172.6, tw) * (1 - smooth(173.7, 174.2, tw));   // left hand off the hilt for the taunt
   s._idle = e1K;
   s.anchor = s.pos.slice();
   if (e1K > 0) s.pos = add(s.pos, [Math.sin(t * 0.8 + 2) * 0.12 * e1K, Math.sin(t * 1.1 + 1.3) * 0.4 * e1K, Math.sin(t * 0.6) * 0.12 * e1K]);
@@ -1425,7 +1444,7 @@ function gripBake(who, t, parts, wBlade) {
   return Math.sqrt(gripErr(fkAt(who, t)));
 }
 const ARMS_BOTH = ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R'], ARM_L = ['arm_L_upper', 'arm_L_lower', 'hand_L'];
-const GRIP_ON = { e1: (t) => t >= 170 && t <= 179.9, e2: (t) => t >= 181.5 && t <= 192.6 };
+const GRIP_ON = { e1: (t) => t >= 170 && t <= 179.9 && !(t > 172.4 && t < 174.2), e2: (t) => t >= 181.5 && t <= 192.6 };
 export const GRIP_REPORT = [];
 for (const who of ['e1', 'e2']) for (const k of TRACKS[who].pose.keys) if (GRIP_ON[who](k[0])) GRIP_REPORT.push([who, k[0], +gripBake(who, k[0], [...ARMS_BOTH, 'torso'], 0.04).toFixed(2)]);
 export const SOLVE_REPORT = SOLVE.map((ev) => {

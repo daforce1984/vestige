@@ -577,7 +577,7 @@ function duelCues() {
     const val = (i, k) => (S[i].on && S[i].s[k] != null ? S[i].s[k] : 0);
     // saber edges + hum (swing-speed modulated)
     let lit = null;
-    for (let i = 1; i < (name === 'hero' ? 0 : S.length); i++) {
+    for (let i = 1; i < 0; i++) {   // (no saber sounds at all: Sigma swings a mace and the RONINs steel katanas — the ignite/hum read as a lightsaber)
       const a = val(i - 1, 'saber'), b = val(i, 'saber'), t = S[i].t;
       if (a < 0.5 && b >= 0.5) {
         lit = t;
