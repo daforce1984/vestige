@@ -71,7 +71,7 @@ export function explosion(R, t, t0, pos, size, seed, kind = 'ship', lightR = 16)
     V.madd(tmp2, pos, tmp, off + size * 0.35 * a);
     const base = secondary ? 0.45 + hash(s0 + 2) * 0.4 : (i === 0 ? 1.25 : 0.7 + hash(s0 + 2) * 0.4);
     const sz = size * base * 0.55 * (0.45 + 1.25 * easeOut(Math.min(1, a * 1.8)));
-    R.fire(tmp2, sz, a, hash(s0 + 3) * 50 + i, [1, 1, 1], secondary ? 0.8 : (i === 0 ? 1.0 : 0.85));
+    R.fireball(tmp2, sz * 1.15, a, hash(s0 + 3) * 50 + i, [1, 1, 1], secondary ? 0.8 : (i === 0 ? 1.0 : 0.85));   // procedural volumetric
     if (secondary && a < 0.15) R.glow(tmp2, sz * 0.8, [1.6 * (1 - a / 0.15), 1.1 * (1 - a / 0.15), 0.6 * (1 - a / 0.15)], 0.3);
   }
   // burning debris: arcing chunks trailing fire then smoke
@@ -87,8 +87,7 @@ export function explosion(R, t, t0, pos, size, seed, kind = 'ship', lightR = 16)
       if (tt < 0) break;
       V.madd(tmp2, pos, tmp, sp * tt);
       const fk = 1 - k / 7;
-      if (k < 3) R.fire(tmp2, size * 0.09 * fk * (1 - lt / life) + 0.4, 0.25 + k * 0.15, s0 + k, [1, 1, 1], 0.9 * fk);
-      else R.smoke(tmp2, size * 0.1 * (1 + k * 0.3), 0.3 + k * 0.08, s0 + k, [0.05, 0.045, 0.04], 0.5 * fk * (1 - lt / life));
+      if (k < 4) R.fireball(tmp2, size * 0.1 * fk * (1 - lt / life) + 0.5, Math.min(0.95, 0.3 + k * 0.15 + lt / life * 0.4), s0 + k, [1, 1, 1], 0.9 * fk);   // burning trail (no dark smoke)
     }
   }
   // embers: slow, long-lived glowing specks drifting out

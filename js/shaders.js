@@ -843,6 +843,15 @@ export const DEPTH_RESOLVE = /* wgsl */ `
 // ---------------------------------------------------------------- sprites / beams / effects
 export const SPRITE = COMMON + /* wgsl */ `
 struct Spr { a: vec4f, b: vec4f, c: vec4f, d: vec4f };
+// black-body-ish fire ramp: temperature 0 (dark red) .. 1+ (white)
+fn fireRamp(k: f32) -> vec3f {
+  let x = clamp(k, 0.0, 1.2);
+  if (x > 0.85) { return vec3f(1.0, 0.97, 0.9) * (1.0 + (x - 0.85) * 3.0); }
+  if (x > 0.62) { let q = (x - 0.62) / 0.23; return vec3f(1.0, 0.78 + q * 0.19, 0.3 + q * 0.6); }
+  if (x > 0.38) { let q = (x - 0.38) / 0.24; return vec3f(1.0, 0.42 + q * 0.36, 0.06 + q * 0.24); }
+  if (x > 0.16) { let q = (x - 0.16) / 0.22; return vec3f(0.62 + q * 0.38, 0.12 + q * 0.3, 0.02 + q * 0.04); }
+  let q = x / 0.16; return vec3f(0.18 + q * 0.44, 0.03 + q * 0.09, 0.01 + q * 0.01);
+}
 @group(0) @binding(1) var<storage, read> S: array<Spr>;
 @group(0) @binding(2) var depthTex: texture_depth_2d;
 
@@ -986,8 +995,7 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
       col = ramp * pow(kk, 1.6) * tint * s.d.a * fade * 1.7;
       // soot fringe: dark smoky edge that occludes what's behind (premultiplied), grows as it cools
       let soot = smoothstep(0.08, 0.35, dens) * (1.0 - smoothstep(0.35, 0.7, kk)) * smoothstep(0.1, 0.6, age);
-      alpha = soot * 0.75 * s.d.a;
-      col += vec3f(0.035, 0.028, 0.022) * alpha;
+      alpha = 0.0 * soot;                             // (the dark soot fringe outlined every blast in black: gone)
       // embers: tiny bright specks scattered in the cloud
       let ec = floor(p * 38.0);
       let eh = hash31(vec3f(ec, seed));
@@ -1002,6 +1010,36 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     }
     let sf = softFade(i.pos, i.vz, s.b.x * 0.6);
     col *= sf; alpha *= sf;
+  } else if (shape == 14) {
+    // PROCEDURAL VOLUMETRIC FIREBALL: rays marched through a domain-warped noise ball, emission only (additive —
+    // no dark rims). Hot white core + hot turbulent pockets cooling through yellow/orange/red toward the surface;
+    // with age the ball swells, hollows out and cools. age = b.z (0..1), seed = b.w
+    let age = s.b.z; let seed = s.b.w;
+    let r2 = dot(i.uv, i.uv);
+    if (r2 > 1.0) { discard; }
+    let zmax = sqrt(1.0 - r2);
+    let NS = 9;
+    let dz = 2.0 * zmax / f32(NS);
+    var acc = vec3f(0.0); var tr = 1.0;
+    for (var k = 0; k < NS; k++) {
+      let z = -zmax + (f32(k) + 0.5) * dz;
+      let pp = vec3f(i.uv, z);
+      let rp = length(pp);
+      let q = pp * 2.1 + vec3f(seed * 7.1, seed * 3.3, seed * 5.7 - age * 1.6);
+      let wv = vec3f(vnoise(q * 0.9 + 11.0), vnoise(q * 0.9 + 23.0), vnoise(q * 0.9 + 37.0)) - 0.5;
+      let n = fbm(q + wv * 1.4, 3);
+      let surf = 0.5 + 0.5 * n;                                            // the noisy, lumpy surface
+      var d = smoothstep(surf, surf - 0.28, rp);
+      d *= 1.0 - smoothstep(0.35, 0.95, age) * smoothstep(0.55, 0.05, rp) * 0.85;   // hollows as it burns out
+      let temp = ((1.0 - rp) * 1.25 + (n - 0.45) * 1.1) * (1.0 - age * 0.8);
+      let e = d * dz;
+      acc += fireRamp(temp) * max(temp, 0.05) * e * tr * 3.2;
+      tr *= exp(-d * dz * 1.6);
+    }
+    col = acc * tint * s.d.a * pow(max(1.0 - age, 0.0), 0.7);
+    alpha = 0.0;
+    dist = normalize(i.uv + 1e-5) * (1.0 - tr) * (1.0 - age) * 0.006;
+    col *= softFade(i.pos, i.vz, s.b.x * 0.6);
   } else if (shape == 7) {
     // exhaust flame: along/across falloff, turbulence growing toward the tail, white-hot core near the nozzle
     let tt = i.uv.y; let cc = abs(i.uv.x);

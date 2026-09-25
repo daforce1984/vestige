@@ -501,6 +501,8 @@ export class Renderer {
   }
   glow(p, radius, col, halo = 0.6) { this.sprite(0, p, [radius, 0, halo, 0], Z4, col, 0); }
   fire(p, radius, age, seed, col = ONE, opacity = 1) { this.sprite(1, p, [radius, seed * 3.1, age, seed], Z4, col, opacity); }
+  /** procedural volumetric fireball (ray-marched noise ball, emission only). age 0..1 */
+  fireball(p, radius, age, seed, col = ONE, intensity = 1) { this.sprite(14, p, [radius, seed * 3.1, age, seed], Z4, col, intensity); }
   smoke(p, radius, age, seed, col, opacity = 1) { this.sprite(2, p, [radius, seed * 3.1, age, seed], Z4, col, opacity); }
   beam(p0, p1, radius, col, intensity = 1, sharp = 20, distort = 0, flow = 1) { this.sprite(3, p0, [p1[0], p1[1], p1[2], 0], [radius, sharp, distort, flow], col, intensity); }
   arc(p0, p1, halfWidth, col, intensity = 1, seed = 0, rate = 9) { this.sprite(12, p0, [p1[0], p1[1], p1[2], 0], [halfWidth, seed, rate, 0], col, intensity); }   // arc discharge (shader lightning)
