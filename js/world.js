@@ -512,6 +512,20 @@ export const DOG_SHOTS = (() => {
   }
   return out;
 })();
+// COLD OPEN (film 0–14) combat schedule, shared by picture and sound. Every kill is a real hit: a 6-shot burst ending
+// on the kill (the first 3 go wide and fly on, the last 3 land). shooter: fighter index ('f'), a dreadnought turret
+// ('turret') or the Hiigaran line behind the camera ('fleet'). Hull hits: heavy slugs landing on the dreadnought.
+export const CO_FLY = [   // [t0 (film), side offset, height, speed, enemy?, dir sign]
+  [8.3, -14, 6, 55, 1, 1], [8.45, -10, 9, 55, 0, 1], [9.4, 18, -8, 48, 1, -1], [9.55, 22, -4, 48, 0, -1],
+  [10.6, -6, 12, 62, 0, 1], [11.3, 12, -3, 45, 1, 1], [11.45, 9, 1, 45, 0, 1], [12.3, -20, -10, 52, 1, -1],
+];
+export const CO_BOOM = [[9.05, 1], [10.35, 4], [11.25, 2], [12.2, 6], [13.1, 7]];
+export const CO_KILLS = CO_BOOM.map(([td, k], i) => {
+  const shooter = [['f', 0], ['turret', 0], ['f', 3], ['f', 5], ['fleet', 0]][i];
+  return { td, k, shooter, shots: Array.from({ length: 6 }, (_, j) => ({ tf: td - 0.12 - (5 - j) * 0.11, hit: j >= 3, j })) };
+});
+export const CO_HULL_HITS = [8.75, 9.6, 10.15, 11.0, 11.8, 12.55, 13.35].map((t, i) => ({ t, i }));   // slugs land at t
+export const CO_TURRET = Array.from({ length: 10 }, (_, i) => 8.5 + i * 0.52 + hash(i + 40) * 0.2);
 // the bandits' 24 shots in the strike chase (shots.js 'S10a', picture + sound): each burst walks onto the next wingman
 // (wingman k dies at STRIKE_DIE[k]); shots landing in his last 0.8 s and every third shot HIT, the rest go wide
 const STRIKE_DIE = [null, 139.7, 137.9, 136.1];

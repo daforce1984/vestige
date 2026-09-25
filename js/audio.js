@@ -17,7 +17,7 @@ import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
 import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, bulletReal } from './duel.js';
-import { DOG_SHOTS, STRIKE_SHOTS } from './world.js';   // pure data/functions (no DOM/GPU)
+import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, TEAR_S0, TEAR_S1, TEAR_F1, FILM_DURATION, STORY_DURATION } from './timemap.js';
 // The Score clock is FILM time. Every table below (CUES, SAMPLE_CUES, SECTIONS, AUTOMATION, ION_SHOTS, DUEL_EVENTS,
@@ -249,13 +249,28 @@ export const SAMPLE_CUES = [
   // cold-open volleys: no rising blast lead-in (it would leak into the peaceful 0–8.3), blast peak only
   ...[8.65, 10.0, 11.5, 12.9].flatMap((t, i) => volley(t, 0, 1.4, i).map((c) => (c[1].startsWith('beam_blast')
     ? [c[0], c[1], { ...c[2], at: c[1] === 'beam_blast1' ? 2.15 : 1.7, dur: 0.9, fadeOut: 0.3 }] : c))),
-  [9.4,   'hl_big_explosion', { rate: 0.85, gain: 1.3, pan: 0.3, prio: 9, duck: 1.5, norand: true }],
-  [9.45,  'expl_debris', { gain: 0.6, pan: 0.35, prio: 7 }],
-  [9.4,   'debris_impact', { at: 1.0, dur: 3, gain: 0.7, pan: 0.3, prio: 7 }],
   [9.5,   'flyby_fast', { at: 2.0, dur: 3, gain: 1.1, pan0: -0.9, pan1: 0.9, prio: 9, norand: true }],   // close fly-by, peak 10.3
-  [11.2,  'hl_explosion', { rate: 0.9, gain: 1.2, pan: -0.4, prio: 9, norand: true }],
   [11.5,  'metal_groan', { at: 2.8, dur: 2.2, gain: 0.8, pan: -0.4, prio: 7 }],
-  [12.4,  'expl_distant_huge', { gain: 0.6, far: 0.4, pan: 0.6, prio: 6 }],
+  // the battle is already out there before the whip: far, low thumps under the calm (4–8.2)
+  ...[4.3, 5.1, 5.8, 6.4, 7.0, 7.5, 7.9].map((t, i) => [t, '@boom', { bus: 'sfx', f: 34 + (i % 3) * 5, vel: 0.08 + 0.03 * i, dur: 1.4, verb: 0.5 }]),
+  // the combat itself, from the same schedule as the picture (world.js CO_*): every shot, every hit, every kill
+  ...CO_KILLS.flatMap((kl, i) => {
+    const pan = [0.3, -0.2, 0.4, -0.4, 0.1][i], fighter = kl.shooter[0] === 'f';
+    return [
+      ...kl.shots.flatMap((sh) => [
+        fighter ? [sh.tf, '@blaster', { vel: 0.6, f0: 1300 + 90 * sh.j, pan }] : [sh.tf, 'heavy_beam', { rate: 1.05, dur: 0.7, fadeOut: 0.3, gain: 0.5, pan, prio: 6, norand: true }],
+        ...(sh.hit ? [[sh.tf + (fighter ? 0.12 : 0.25), '@sparkBurst', { vel: 0.5, pan }]] : []),
+      ]),
+      [kl.td, 'hl_explosion', { rate: 1.12, gain: 1.05, pan, prio: 9, norand: true }],
+      [kl.td + 0.03, 'expl_debris', { rate: 1.1, gain: 0.5, pan, prio: 7, norand: true }],
+    ];
+  }),
+  ...CO_HULL_HITS.flatMap((h) => [
+    [h.t, 'hit_heavy', { rate: 0.8, gain: 0.8, pan: 0.2, far: 0.2, prio: 8, norand: true }],
+    [h.t + 0.05, 'expl_metal', { rate: 1.2, dur: 1.6, fadeOut: 0.6, gain: 0.55, pan: 0.2, far: 0.25, prio: 7, norand: true }],
+    [h.t, '@boom', { bus: 'sfx', f: 40, vel: 0.4, dur: 1.2, verb: 0.3 }],
+  ]),
+  ...CO_TURRET.map((t, i) => [t, 'heavy_beam', { rate: 0.95, dur: 0.8, fadeOut: 0.4, gain: 0.35, far: 0.3, pan: 0.5 - (i % 3) * 0.3, prio: 5, norand: true }]),
   [14.0,  'rumble_dark', { loop: true, dur: 2.2, gain: 0.35, fadeIn: 0.4, fadeOut: 0.6, prio: 8, norand: true }],   // near-silence 14–16
   [63.5,  'space_amb', { loop: true, dur: 308.3, gain: 0.5, fadeIn: 8, fadeOut: 4, prio: 9 }],
   // RED ALERT (gravity core): heavy — deep hull horns (braam slowed right down), a muffled low siren inside the hull

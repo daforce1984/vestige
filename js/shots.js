@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel, ionCharge, EARTH_T, STRIKE_SHOTS,
+  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel, ionCharge, EARTH_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -981,10 +981,22 @@ function shot(t0, t1, name, fn) { SHOTS.push({ t0, t1, name, fn }); }
 const CO_T0 = 139.4;                              // world time shown during the cold open (film 0 -> world 139.4)
 const CO_CAM = [170, 105, -860];
 // cold-open close action: fighters knife past the lens, bolts cross, a strike craft dies next to us, debris everywhere
-const CO_FLY = [   // [t0 (film), side offset, height, speed, enemy?, dir sign]
-  [8.3, -14, 6, 55, 1, 1], [8.45, -10, 9, 55, 0, 1], [9.4, 18, -8, 48, 1, -1], [9.55, 22, -4, 48, 0, -1],
-  [10.6, -6, 12, 62, 0, 1], [11.3, 12, -3, 45, 1, 1], [11.45, 9, 1, 45, 0, 1], [12.3, -20, -10, 52, 1, -1],
-];
+// a weapon impact: brief HDR flash + a cone of spark particles thrown back off the struck surface + a little light
+function coImpact(R, t, t0, p, back, size) {
+  const lt = t - t0;
+  if (lt < 0 || lt > 0.7) return;
+  const kf = Math.exp(-lt * 10);
+  R.glow(p, (1.5 + 1.5 * kf) * size, [12 * kf, 8 * kf, 4.5 * kf], 0.2);
+  if (lt < 0.12) R.light(p, 60 * size, [1, 0.7, 0.45], 8 * (1 - lt / 0.12));
+  const sd0 = V.norm([0, 0, 0], V.cross([0, 0, 0], back, [0, 1, 0])), up0 = V.cross([0, 0, 0], sd0, back);
+  for (let i = 0; i < 18; i++) {
+    const a = hash(t0 * 7 + i) * 6.283, sp = Math.pow(hash(t0 * 3 + i), 0.7) * 1.1;
+    const d = V.norm([0, 0, 0], V.add([0, 0, 0], back, V.add([0, 0, 0], V.scale([0, 0, 0], sd0, Math.cos(a) * sp), V.scale([0, 0, 0], up0, Math.sin(a) * sp))));
+    const life = 0.2 + hash(t0 + i * 1.3) * 0.45; if (lt > life) continue;
+    const u = lt / life, b = (1.5 + 6 * Math.exp(-lt * 6)) * (1 - u) * (1 - u);
+    spark(R, V.madd([0, 0, 0], p, d, (3 + 16 * hash(i + t0)) * size * (1 - (1 - u) * (1 - u))), (0.35 + 0.8 * (1 - u)) * size, [b, b * 0.65, b * 0.3]);
+  }
+}
 function coFighter(t, k, cam, fwd, side) {
   const [t0, off, h, sp, , sg] = CO_FLY[k];
   const lt = t - t0;
@@ -993,7 +1005,6 @@ function coFighter(t, k, cam, fwd, side) {
   const lat = off + sg * 8 * Math.sin(lt * 1.6) + sg * lt * 6;
   return addv(madd(madd(cam, fwd, along), side, lat), [0, h + 6 * Math.sin(lt * 2.1 + k), 0]);
 }
-const CO_BOOM = [[9.05, 1], [10.35, 4], [11.25, 2], [12.2, 6], [13.1, 7]];
 function drawColdOpenAction(R, t, cam, tgt) {
   const fwd = V.norm([0, 0, 0], V.sub([0, 0, 0], tgt, cam));
   const side = V.norm([0, 0, 0], V.cross([0, 0, 0], fwd, [0, 1, 0]));
@@ -1018,12 +1029,49 @@ function drawColdOpenAction(R, t, cam, tgt) {
       }
     }
   }
-  // crossing capital-ship bolts close overhead (short heavy ion slugs)
-  for (let j = 0; j < 7; j++) {
-    const tf = 8.5 + j * 0.7 + hash(j) * 0.3;
-    const a = addv(madd(madd(cam, fwd, -200), side, -300 + hash(j + 2) * 120), [0, 30 + hash(j + 4) * 60, 0]);
-    const b = addv(madd(madd(cam, fwd, 700), side, 250 - hash(j + 5) * 200), [0, -20 + hash(j + 6) * 50, 0]);
-    bolt(R, t, tf, tf + 0.9, j % 2 ? b : a, j % 2 ? a : b, 90, 1.6, j % 2 ? [3.2, 1.0, 0.3] : [0.7, 1.5, 3.4], 1.2);
+  // crossing capital-ship slugs close overhead: a WALL of fire both ways (16), some whipping right past the lens
+  for (let j = 0; j < 16; j++) {
+    const tf = 8.35 + j * 0.34 + hash(j) * 0.25;
+    const a = addv(madd(madd(cam, fwd, -200), side, -300 + hash(j + 2) * 160), [0, 10 + hash(j + 4) * 80, 0]);
+    const b = addv(madd(madd(cam, fwd, 700), side, 250 - hash(j + 5) * 260), [0, -30 + hash(j + 6) * 70, 0]);
+    bolt(R, t, tf, tf + 0.8, j % 2 ? b : a, j % 2 ? a : b, 90, 1.6, j % 2 ? [3.2, 1.0, 0.3] : [0.7, 1.5, 3.4], 1.2);
+  }
+  // the dreadnought's turrets answer: red slugs from its hull out toward our line (they fly on past)
+  for (const tf of CO_TURRET) {
+    const k = Math.floor(tf * 7);
+    const from = addv(madd(madd(tgt, side, -140 + hash(k) * 280), fwd, -20), [0, 10 + hash(k + 1) * 30, 0]);
+    const dir = V.norm([0, 0, 0], addv(madd(madd([0, 0, 0], fwd, -1), side, (hash(k + 2) - 0.5) * 1.2), [0, 0.15 + hash(k + 3) * 0.3, 0]));
+    bolt(R, t, tf, tf + 1.6, from, madd(from, dir, 2400), 60, 1.2, [3.4, 0.8, 0.3], 1.2);
+  }
+  // heavy slugs from our line LAND on the dreadnought: flash, a spray of sparks off the armour, a small blast
+  for (const h of CO_HULL_HITS) {
+    const hp = addv(madd(madd(tgt, side, -150 + hash(h.i + 20) * 300), fwd, -30), [0, -10 + hash(h.i + 21) * 40, 0]);
+    const from = addv(madd(madd(cam, fwd, -300), side, -260 + hash(h.i + 22) * 120), [0, 40, 0]);
+    bolt(R, t, h.t - 0.45, h.t, from, hp, 90, 1.8, [0.7, 1.5, 3.4], 1.3);
+    coImpact(R, t, h.t, hp, V.norm([0, 0, 0], V.sub([0, 0, 0], from, hp)), 1.6);
+    explosion(R, t, h.t + 0.05, hp, 12 + 6 * hash(h.i + 23), 950 + h.i, 'small', 3.5);
+  }
+  // every fighter kill is a real hit: the burst closes in, the last three land (sparks), then it blows
+  for (const kl of CO_KILLS) {
+    const vic = (tt) => coFighter(tt, kl.k, cam, fwd, side);
+    for (const sh of kl.shots) {
+      if (t < sh.tf || t > sh.tf + 3) continue;
+      const [kind, si] = kl.shooter;
+      const from = kind === 'f' ? coFighter(sh.tf, si, cam, fwd, side)
+        : kind === 'turret' ? addv(madd(tgt, side, -40 + 30 * sh.j), [0, 25, 0])
+        : addv(madd(madd(cam, fwd, -150), side, -120), [0, 30, 0]);
+      const col = kind === 'f' && !CO_FLY[si][4] ? [0.8, 1.6, 3.2] : kind === 'fleet' ? [0.7, 1.5, 3.4] : [3.2, 0.9, 0.35];
+      const TT = kind === 'f' ? 0.12 : 0.25;
+      if (sh.hit) {
+        const to = vic(sh.tf + TT);
+        bolt(R, t, sh.tf, sh.tf + TT, from, to, 14, 0.4, col, 1.2);
+        coImpact(R, t, sh.tf + TT, V.madd([0, 0, 0], vic(Math.min(t, kl.td)), randDir([0, 0, 0], sh.j * 5.1 + kl.k), 1.2), V.norm([0, 0, 0], V.sub([0, 0, 0], from, to)), 0.8);
+      } else {
+        const aim = addv(vic(sh.tf + TT), [(hash(sh.j + kl.k) - 0.5) * 18, (hash(sh.j + kl.k + 3) - 0.5) * 12, 0]);
+        const d = V.norm([0, 0, 0], V.sub([0, 0, 0], aim, from)), sp = V.dist(aim, from) / TT;
+        bolt(R, t, sh.tf, sh.tf + 3000 / sp, from, madd(from, d, 3000), 14, 0.4, col, 1.2);
+      }
+    }
   }
   // close debris drifting across the lens
   for (let i = 0; i < 16; i++) {
@@ -1032,12 +1080,12 @@ function drawColdOpenAction(R, t, cam, tgt) {
     const de = R.add('debris', _dbM);
     if (de) { de.hidden = debrisOnly(R, 'hull' + (i % 4)); de.damage = 0.4 + 0.3 * hash(i + 6); }
   }
-  // burning wreck fire + distant flak bursts beyond the frigate
+  // flak bursting along the enemy line (small, real blasts)
   for (let i = 0; i < 10; i++) {
     const tb = 8.4 + i * 0.55;
-    if (t < tb || t > tb + 0.6) continue;
+    if (t < tb || t > tb + 2) continue;
     const p = addv(madd(madd(tgt, fwd, -60 - hash(i) * 200), side, -220 + hash(i + 1) * 440), [0, -60 + hash(i + 2) * 140, 0]);
-    hitFlash(R, t, tb, p, 7, [1, 0.6, 0.3]);
+    explosion(R, t, tb, p, 4 + 3 * hash(i + 3), 970 + i, 'small', 3);
   }
 }
 shot(0, 14, 'C0 cold open', (c) => {
@@ -1059,6 +1107,19 @@ shot(0, 14, 'C0 cold open', (c) => {
   camLook(c, pos, V.madd([0, 0, 0], pos, dir, 200), lerp(34, 50, w), lerp(0.02, -0.06, w));
   if (t < 8.25) handheld(c, 0.04); else { shake(c, 0.5 + 0.5 * Math.exp(-(t - 8.6) * 2), 12); handheld(c, 0.5); }
   if (t > 8.2) drawColdOpenAction(R, t, pos, fightTgt);
+  else if (t > 3.5) {                                   // the battle is already out there: far beams and flashes in the sky we look at
+    const k0 = smooth(3.5, 7.5, t);
+    const cr = V.norm([0, 0, 0], V.cross([0, 0, 0], dir, [0, 1, 0])), cu = V.cross([0, 0, 0], cr, dir);
+    const far = (u, v, d) => V.add([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], pos, dir, d), cr, u * d * 0.5), V.scale([0, 0, 0], cu, v * d * 0.28));
+    for (let j = 0; j < 10; j++) {
+      const tf = 3.6 + j * 0.45 + hash(j + 60) * 0.3, D = 6000 + 3000 * hash(j + 61);
+      const a = far((hash(j + 62) - 0.5) * 2.2, (hash(j + 63) - 0.5) * 1.6, D), b = far((hash(j + 64) - 0.5) * 2.2, (hash(j + 65) - 0.5) * 1.6, D * 1.1);
+      bolt(R, t, tf, tf + 1.1, a, b, D * 0.25, D * 0.0012, j % 2 ? [2.4 * k0, 0.7 * k0, 0.25 * k0] : [0.5 * k0, 1.1 * k0, 2.6 * k0], 1);
+      const fp = far((hash(j + 67) - 0.5) * 2, (hash(j + 68) - 0.5) * 1.4, D);
+      const lf = t - tf - 0.3;
+      if (lf > 0 && lf < 0.8) { const e = k0 * Math.exp(-lf * 5); R.glow(fp, D * 0.012, [6 * e, 3.5 * e, 1.6 * e], 0.2); }
+    }
+  }
   for (const b of CO_BOOM) if (t > b[0] && t < b[0] + 0.6) shake(c, 1.4 * Math.exp(-(t - b[0]) * 5), 16);
   c.post.fade = smooth(0.3, 3.5, t);
   c.post.lensA = { enable: 0 };
