@@ -2133,16 +2133,11 @@ function drawDodgeBolt(R, t) {
   const a = madd(hit, dir, -1300 * 0.62);
   bolt(R, t, T - 0.62, T, a, hit, 70, 2.2, [3.4, 0.7, 0.4], 1.8);
   if (t < T) { const hp = V.lerp([0, 0, 0], a, hit, (t - (T - 0.62)) / 0.62); R.glow(hp, 16, [2.2, 0.5, 0.25], 0.5); R.light(hp, 90, [1, 0.3, 0.15], 4); return; }
-  // swatted: batted off to his right, it tumbles ~25 m and BURSTS — a white flash, a shock ring and a spray of burning
-  // fragments in every direction
+  // swatted: the bolt comes apart ON the back of his hand — it bursts right there, a white flash, a shock ring and a
+  // spray of sparks every way (a little more of them thrown along the swat)
   // (dodgeRight() points to his LEFT — +X is the model's left — so his right is −r)
   const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], r, -1.0), [0, 0.25, 0]), V.scale([0, 0, 0], fwd, 0.15)));
-  const TB = T + 0.11, E = madd(hit, out, 22), lt = t - T;
-  if (t < TB) {
-    const p = V.lerp([0, 0, 0], hit, E, (t - T) / (TB - T));
-    bolt(R, t, T, TB, hit, E, 26, 2.0, [3.4, 0.8, 0.45], 1.8);
-    R.glow(p, 12, [3, 0.8, 0.4], 0.5);
-  }
+  const TB = T, E = madd(hit, out, 1.2), lt = t - T;
   const k = Math.exp(-lt * 7);                                            // the swat itself on the vambrace
   R.glow(hit, 4 + 5 * easeOut(sat(lt / 0.08)), [3.5 * k, 1.6 * k, 0.8 * k], 0.45);
   R.light(hit, 60, [1, 0.55, 0.3], 8 * k);
@@ -2161,7 +2156,7 @@ function drawDodgeBolt(R, t) {
     R.light(E, 120, [1, 0.6, 0.3], 18 * Math.exp(-lb * 6));
     if (lb < 0.35) R.ripple(E, 4 + 34 * easeOut(lb / 0.35), [0.4, 0.4, 0.4], (1 - lb / 0.35) * 1.5);
     for (let i = 0; i < 150; i++) {                                       // sparks: thin burning streaks flung every way,
-      const sd = randDir([0, 0, 0], i * 2.37 + 71);                        // white-hot (blooming) at first, then cooling
+      const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 2.37 + 71), out, 0.45));   // white-hot (blooming) at first, then cooling
       const life = 0.3 + hash(i + 31) * 1.0; if (lb > life) continue;     // orange -> dull red, thinning and fading out
       const u = lb / life, sp = 30 + 80 * hash(i + 5);
       const dist = sp * life * 0.55 * (1 - (1 - u) * (1 - u));             // drag: fast out, slowing
