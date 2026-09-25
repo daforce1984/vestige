@@ -241,8 +241,8 @@ export class Renderer {
       this.celIB = dev.createBuffer({ size: idx.length * 4, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
       dev.queue.writeBuffer(this.celIB, 0, new Uint32Array(idx));
       this.celCount = idx.length;
-      this.celData = new Float32Array(16);
-      this.celBuf = dev.createBuffer({ size: 64, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      this.celData = new Float32Array(24);                    // planet + two suns
+      this.celBuf = dev.createBuffer({ size: 96, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
       this.skyPipe = dev.createRenderPipeline({
         layout: 'auto', label: 'skySphere',
         vertex: { module: bgMod, entryPoint: 'vsSphere', buffers: [{ arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }] }] },
@@ -654,9 +654,10 @@ export class Renderer {
     f[88] = view[0]; f[89] = view[4]; f[90] = view[8]; f[91] = 0;
     f[92] = view[1]; f[93] = view[5]; f[94] = view[9]; f[95] = 0;
     const rc = env.rim || [0.3, 0.4, 0.8, 0.5];
-    f[96] = rc[0]; f[97] = rc[1]; f[98] = rc[2]; f[99] = 0;   // no rim light anywhere (it read as a glowing outline on every hull)
-    const fc = env.fill || [0, 0, 0, 0];
-    f[100] = fc[0]; f[101] = fc[1]; f[102] = fc[2]; f[103] = fc[3];
+    // (no rim light and no camera fill anywhere any more) — those two slots now carry the SECOND SUN
+    const s2 = env.sun2Dir, s2c = env.sun2Col;
+    if (s2 && s2c) { f[96] = s2[0]; f[97] = s2[1]; f[98] = s2[2]; f[99] = 1; f[100] = s2c[0]; f[101] = s2c[1]; f[102] = s2c[2]; f[103] = env.sun2Disc ?? env.sunDisc ?? 1; }
+    else { f[99] = 0; f[100] = f[101] = f[102] = f[103] = 0; }
     // lenses: angles relative to the camera (background-only lensing in the sky shader)
     const putLens = (o, L) => {
       for (let k = 0; k < 8; k++) f[o + k] = 0;
@@ -679,8 +680,13 @@ export class Renderer {
     }
     if ((env.sunDisc ?? 0) > 0.01) {
       const D = 300000, o = this.celN++ * 8;
-      cd[o] = cam.pos[0] + sd[0] * D; cd[o + 1] = cam.pos[1] + sd[1] * D; cd[o + 2] = cam.pos[2] + sd[2] * D; cd[o + 3] = D * 0.0045;
+      cd[o] = cam.pos[0] + sd[0] * D; cd[o + 1] = cam.pos[1] + sd[1] * D; cd[o + 2] = cam.pos[2] + sd[2] * D; cd[o + 3] = D * 0.011;   // a big sun
       cd[o + 4] = 3; cd[o + 5] = 0; cd[o + 6] = 0; cd[o + 7] = 0;
+    }
+    if (env.sun2Dir && env.sun2Col && (env.sun2Disc ?? env.sunDisc ?? 1) > 0.01) {   // the second sun, a little smaller
+      const D = 300000, o = this.celN++ * 8, s2 = env.sun2Dir;
+      cd[o] = cam.pos[0] + s2[0] * D; cd[o + 1] = cam.pos[1] + s2[1] * D; cd[o + 2] = cam.pos[2] + s2[2] * D; cd[o + 3] = D * 0.008;
+      cd[o + 4] = 4; cd[o + 5] = 0; cd[o + 6] = 0; cd[o + 7] = 0;
     }
     if (this.celN) dev.queue.writeBuffer(this.celBuf, 0, cd, 0, this.celN * 8);
     this.nearFar[0] = near; this.nearFar[1] = far;

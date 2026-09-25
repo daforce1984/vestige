@@ -269,3 +269,4 @@
 - [x] 207. "⚔ 메카 전투씬만 보기" now starts at 165.9 — from the bolt Sigma swats away on the way in.
 - [x] 208. Scene 36 (D05) camera locked (axis fixed at the cut, un-floated anchor, no shake) and moved round to RONIN's side so the katana reads full length.
 - [x] 209. Rim light removed in every scene (renderer forces its strength to 0); the duel shot's extra fill/rim (meant for the mechs) dropped — they had washed the distant enemy ships out white.
+- [x] 210. Lighting: no camera fill anywhere (shots' env.fill is ignored) and no rim light; instead a BINARY SUN — a second, blue-white sun (SUN2, ≈125° from the first) lights the far sides with the same GGX model (no shadow map), glints in reflections, and both suns are drawn big in the sky (radius 0.011 / 0.008 rad). Off at Earth (t ≥ EARTH_T).

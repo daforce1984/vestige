@@ -20,8 +20,8 @@ struct Frame {
   planetCol: vec4f,   // rgb, w = ring
   camRight: vec4f,
   camUp: vec4f,
-  rimCol: vec4f,      // rim light color, w = strength
-  fill: vec4f,        // camera-side cinematic fill light rgb, w = wrap
+  rimCol: vec4f,      // SECOND SUN: xyz toward it, w = enable (the old rim-light slot)
+  fill: vec4f,        // second sun colour rgb, w = its disc/glow intensity in the sky (the old fill slot)
   lensA: vec4f,       // xyz direction camera->lens, w Einstein angle (rad)
   lensA2: vec4f,      // horizon angle, swirl, glow, enable
   lensB: vec4f,
@@ -61,6 +61,8 @@ fn envRefl(r: vec3f, rough: f32) -> vec3f {
   var c = mix(F.ambDown.rgb * 1.6, F.ambUp.rgb * 1.2, r.y * 0.5 + 0.5);
   let sd = max(dot(r, F.sunDir.xyz), 0.0);
   c += F.sunCol.rgb * (pow(sd, mix(40.0, 2400.0, 1.0 - rough)) * mix(1.5, 22.0, 1.0 - rough) + pow(sd, 6.0) * 0.12);
+  let sd2 = max(dot(r, F.rimCol.xyz), 0.0) * F.rimCol.w;
+  c += F.fill.rgb * (pow(sd2, mix(40.0, 2400.0, 1.0 - rough)) * mix(1.5, 22.0, 1.0 - rough) + pow(sd2, 6.0) * 0.12);
   if (F.planet.w > 0.0) {
     let pd = dot(r, F.planet.xyz);
     let edge = cos(F.planet.w);
@@ -225,6 +227,8 @@ fn skyColor(d0: vec3f) -> vec3f {
   // sun
   let sd = max(dot(d, F.sunDir.xyz), 0.0);
   col += F.sunCol.rgb * (pow(sd, 300.0) * 1.2 + pow(sd, 20.0) * 0.08) * F.misc.y;
+  let sd2 = max(dot(d, F.rimCol.xyz), 0.0) * F.rimCol.w;                          // the second sun
+  col += F.fill.rgb * (pow(sd2, 300.0) * 1.2 + pow(sd2, 20.0) * 0.08) * F.fill.w;
   // soft slate-blue space haze (brighter toward the sun and the planet), like a painted concept backdrop
   let hz = 0.55 + 0.45 * (pow(sd, 3.0) * 0.6 + pow(max(dot(d, normalize(F.planet.xyz + vec3f(1e-5))), 0.0), 4.0) * 0.5) + d.y * 0.15;
   col += F.sky.rgb * F.sky.w * hz;
@@ -778,15 +782,19 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   var envC = envRefl(Rv, rough);
   if (F.interior.w > 0.5) { envC = envInterior(i.wp, Rv, rough); }
   col += envC * reflK * ao * mix(0.35, 1.0, sh);
-  // rim (nebula backlight) for silhouettes
-  let rim = pow(1.0 - max(dot(n, V), 0.0), 2.5);
-  col += F.rimCol.rgb * rim * F.rimCol.w * ao * (0.5 + 0.5 * base) * mix(0.3, 1.0, rockK) * select(1.0, 0.3, texSet > 0) * max(inst.shade.w, 0.0);   // shade.w = per-entry rim scale; < 0: no rim AND no camera fill (mechs)
-  // cinematic fill from slightly above the camera: keeps the dark side of hulls readable
-  let fillDir = normalize(V + vec3f(0.0, 0.35, 0.0));
-  let fl = clamp((dot(n, fillDir) + F.fill.w) / (1.0 + F.fill.w), 0.0, 1.0);
-  // the camera-side fill read as a lamp carried by the flagship: its armour only ever gets the base level (as in S23)
-  let fillC = select(F.fill.rgb, F.fill.rgb * min(1.0, 0.17 / max(max(F.fill.r, F.fill.g), max(F.fill.b, 1e-4))), hullFlag);
-  col += fillC * fl * (diffC + F0 * 0.3) * ao * mix(0.55, 1.0, rockK) * select(1.0, 0.0, inst.shade.w < 0.0);
+  // the SECOND SUN (a real star in the sky, no rim / fill tricks any more): same GGX light, no shadow map of its own
+  if (F.rimCol.w > 0.5) {
+    let L2 = F.rimCol.xyz;
+    let H2 = normalize(L2 + V);
+    let ndl2 = max(dot(n, L2), 0.0);
+    let nh2 = max(dot(n, H2), 0.0);
+    let dd2 = nh2 * nh2 * (a2 - 1.0) + 1.0;
+    let D2 = a2 / (3.14159 * dd2 * dd2);
+    let G2 = (ndl2 / (ndl2 * (1.0 - kq) + kq)) * (ndv / (ndv * (1.0 - kq) + kq));
+    let Fh2 = F0 + (1.0 - F0) * pow(1.0 - max(dot(H2, V), 0.0), 5.0);
+    let spec2 = D2 * G2 * Fh2 / max(4.0 * ndl2 * ndv, 1e-3);
+    col += F.fill.rgb * ndl2 * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0))) * mix(0.6, 1.0, ao * texAO);
+  }
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;
   if (inst.shade.y > 0.0) {
@@ -1583,6 +1591,9 @@ fn craters(n: vec3f, scale: f32, seed: f32) -> vec2f {
   var col = vec3f(0.0);
   if (kind == 3) {
     return vec4f(F.sunCol.rgb * 30.0 * (0.8 + 0.2 * limb), 1.0);
+  }
+  if (kind == 4) {                                                   // the second sun
+    return vec4f(F.fill.rgb * 30.0 * (0.8 + 0.2 * limb), 1.0);
   }
   let term = smoothstep(-0.06, 0.18, ndl);
   let rimAtm = pow(1.0 - max(dot(n, V), 0.0), 4.0);

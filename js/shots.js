@@ -19,6 +19,7 @@ const SABER_ORANGE = [2.4, 0.9, 0.25];
 
 // ------------------------------------------------------------------ environment presets
 const SUN = V.norm([0, 0, 0], [-0.8, 0.5, 0.25]);
+const SUN2 = V.norm([0, 0, 0], [0.75, 0.12, -0.6]);        // the second sun (≈125° from the first)
 // Earth-like planet placed so the sun sits just past its limb seen from the fleet (sunrise shots)
 const PL_R = 0.62;
 const PLANET = (() => {
@@ -43,7 +44,9 @@ function spaceEnv(t) {
     // lighting after the concept-art reference: warm key, cool soft skylight from above, warm bounce from below,
     // slate-blue space haze instead of pure black, gentle contrast
     time: t, sunDir: SUN, sunCol: [1.9, 1.62, 1.25], ambUp: [0.2, 0.25, 0.34], ambDown: [0.16, 0.11, 0.07], ambient: 1,
-    rim: [0.55, 0.6, 0.7, 0.3], fill: [0.16, 0.16, 0.17, 0.4], nebula: 0, stars: 0.8, sunDisc: 1,
+    nebula: 0, stars: 0.8, sunDisc: 1,
+    // a binary system: the second, blue-white sun on the far side lights what the first leaves dark (none at Earth)
+    sun2Dir: t < EARTH_T ? SUN2 : null, sun2Col: [0.62, 0.78, 1.2],
     sky: [0.010, 0.011, 0.013, 0.6],   // near-neutral: no blue gas in the backdrop
     planet: null,                                    // no moon (only Earth at the end)
     shadows: true, shadowCenter: [0, 0, 0], shadowRadius: 400,
