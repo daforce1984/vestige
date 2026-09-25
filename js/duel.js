@@ -945,8 +945,34 @@ export function duelEnemy1(t) {
 const TH_VARS = [['arm_L_upper', 0], ['arm_L_upper', 1], ['arm_L_upper', 2], ['arm_L_lower', 0], ['hand_L', 0], ['hand_L', 1], ['hand_L', 2],
   ['arm_R_upper', 0], ['arm_R_upper', 1], ['arm_R_upper', 2], ['arm_R_lower', 0], ['hand_R', 0], ['hand_R', 1]];
 const EV_T = () => EV.filter((e) => e[1] !== 'shake').map((e) => e[0]);
+// per-frame GRIP LOCK on top of the baked keys: a small, local left-arm-only descent from the baked pose closes the
+// last gap so the left fist sits exactly on the hilt (starting from the smooth baked pose keeps it continuous)
+const LOCK_VARS = [['arm_L_upper', 0], ['arm_L_upper', 1], ['arm_L_upper', 2], ['arm_L_lower', 0], ['hand_L', 0], ['hand_L', 1], ['hand_L', 2]];
+function gripLock(s) {
+  if (SOLVING || !s || !s.vis || !(s.saber > 0.5)) return s;
+  const pose = s.pose;
+  for (const [p] of LOCK_VARS) pose[p] = (pose[p] || [0, 0, 0]).slice();
+  const cost = () => gripErr(duelFK(s, 'enemy_ms'));
+  let best = cost();
+  for (let step = 0.6; step > 0.002; step *= 0.6) {
+    for (let it = 0; it < 6; it++) {
+      let imp = false;
+      for (const [p, k] of LOCK_VARS) {
+        const L = [-3.3, 3.3];                              // (the wrist/elbow limits made the hilt unreachable)
+        for (const sg of [1, -1]) {
+          const v0 = pose[p][k]; pose[p][k] = clamp(v0 + sg * step, L[0], L[1]);
+          const c = cost(); if (c < best - 1e-7) { best = c; imp = true; break; } pose[p][k] = v0;
+        }
+      }
+      if (!imp) break;
+    }
+  }
+  const fk = duelFK(s, 'enemy_ms');
+  s.twoHandErr = V.dist(M.transformPoint([0, 0, 0], fk.hand_L, GRIP_L), M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R));
+  return s;
+}
 function twoHand(s) {
-  return s;   // (grip is baked into the pose keys — see gripBake; per-frame IK popped between solutions)
+  return gripLock(s);
   if (SOLVING || !s || !s.vis || !(s.saber > 0.5)) return s;
   // SAMURAI GRIP: both fists on the hilt. The katana is modelled into RONIN's right fist (hand_R mesh): hilt axis in
   // hand_R space from the pommel (−0.2, −2.0, −2.0) up through the fist, direction ≈ (−0.02, 0.31, 0.95). The left fist
@@ -1292,7 +1318,7 @@ function gripBake(who, t, parts, wBlade) {
 const ARMS_BOTH = ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R'], ARM_L = ['arm_L_upper', 'arm_L_lower', 'hand_L'];
 const GRIP_ON = { e1: (t) => t >= 177.05 && t <= 179.9, e2: (t) => t >= 181.5 && t <= 192.6 };
 export const GRIP_REPORT = [];
-for (const who of ['e1', 'e2']) for (const k of TRACKS[who].pose.keys) if (GRIP_ON[who](k[0])) GRIP_REPORT.push([who, k[0], +gripBake(who, k[0], ARMS_BOTH, 0.35).toFixed(2)]);
+for (const who of ['e1', 'e2']) for (const k of TRACKS[who].pose.keys) if (GRIP_ON[who](k[0])) GRIP_REPORT.push([who, k[0], +gripBake(who, k[0], [...ARMS_BOTH, 'torso'], 0.04).toFixed(2)]);
 export const SOLVE_REPORT = SOLVE.map((ev) => {
   const residual = solveContact(ev);
   for (const tc of ev.copyTo || []) {   // hold the solved aim steady from the end of the raise to the shot

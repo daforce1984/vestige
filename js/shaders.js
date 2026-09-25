@@ -421,7 +421,7 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
   var q = vec2f(xo - cell.x * W, uv.y - ry * H);
   var sz = vec2f(W, H);
   let hc = hash31(vec3f(cell, seed + 1.0));
-  if (hc > 0.62) {                                                   // split into 2 x 2 sub-plates
+  if (hc > 2.0) {                                                    // (no 2×2 sub-plate split: it read as patchwork)
     let sx = step(W * 0.5, q.x); let sy = step(H * 0.5, q.y);
     sz = sz * 0.5; q = q - vec2f(sx, sy) * sz; cell = cell * 2.0 + vec2f(sx, sy) + 100.0;
   }
@@ -431,8 +431,8 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
   // big courses (24 x 12 m) shift the tone a little, plates vary within them: the hull reads as assembled armour
   let bc = floor(uv / vec2f(24.0, 12.0));
   let bh = hash31(vec3f(bc, seed + 21.0));
-  o.col = vec3f((0.78 + 0.44 * h) * (0.88 + 0.24 * bh)); o.mixk = 0.0;
-  o.rough = (h2 - 0.5) * 0.36;
+  o.col = vec3f(1.0); o.mixk = 0.0;                                   // one tone for every plate
+  o.rough = 0.0;
   // recessed seam + bevelled raised edge (normal tilts away from the seam)
   let seamW = 0.045;
   let seam = (1.0 - smoothstep(seamW, seamW + pw * 1.5 + 0.01, de)) * mix(0.55, 1.0, aa);
@@ -631,7 +631,9 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     }
   }
   // cinematic hull detail (flagship: shade.z = material class 1 hull, 2 plate, 3 hull2, 4 greeble, 5 trim)
-  let hullOn = inst.shade.z > 0.5 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01 && pwLP < 1.5;   // beyond ~1.5 m/pixel the plating is sub-pixel: skip it
+  let hullFlag = inst.shade.z > 0.5 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01;   // flagship armour (any distance)
+  let hullOn = hullFlag && pwLP < 1.5;   // beyond ~1.5 m/pixel the plating is sub-pixel: skip it
+  if (hullFlag) { base = vec3f(0.092, 0.098, 0.114) * select(1.0, 1.12, inst.shade.z > 4.5); rough = 0.46; metal = 0.75; }   // every armour class: ONE gunmetal   // hull / plate / hull2: ONE gunmetal (no patchwork of materials)
   if (hullOn) {
     let ln = normalize(i.ln); let a = abs(ln);
     var uvp: vec2f; var tU = vec3f(0.0, 0.0, 1.0); var tV = vec3f(0.0, 1.0, 0.0);
@@ -722,11 +724,11 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   let isEmissive = dot(inst.emis.rgb, vec3f(1.0)) > 0.01;
   var ao = 1.0;
   if (det > 0.0 && !isEmissive) {
-    if (!hullOn) { base *= (1.0 + pnl.y * 0.8) * (1.0 - pnl.x * 0.14); }   // (the flagship has its own plating)
+    if (!hullFlag) { base *= (1.0 + pnl.y * 0.8) * (1.0 - pnl.x * 0.14); }   // (the flagship has its own plating)
     let grime = fbm(i.lp / (det * 7.0) + inst.p1.w, select(4, 2, hullOn));
     let streaks = vnoise(vec3f(i.lp.x / (det * 1.5), i.lp.y / (det * 12.0), i.lp.z / (det * 1.5)));
-    if (!hullOn) { base *= mix(0.55, 1.08, smoothstep(0.25, 0.75, grime)) * mix(0.85, 1.0, streaks); }   // flagship: one tone per plate
-    if (!hullOn) { rough = clamp(rough + pnl.y * 0.8, 0.15, 1.0); ao = 1.0 - pnl.x * 0.12; }
+    if (!hullFlag) { base *= mix(0.55, 1.08, smoothstep(0.25, 0.75, grime)) * mix(0.85, 1.0, streaks); }   // flagship: one tone per plate
+    if (!hullFlag) { rough = clamp(rough + pnl.y * 0.8, 0.15, 1.0); ao = 1.0 - pnl.x * 0.12; }
   }
   // damage: scorch + glowing cracks
   var dmg = inst.p0.y;
@@ -768,7 +770,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   col += (diffC + F0 * 0.3) * amb * ao * texAO;
   // environment reflection with a brushed-metal streak (anisotropic look along the hull's long axis)
   let Rv = reflect(-V, n);
-  let brushed = 0.75 + 0.5 * vnoise(vec3f(i.lp.x * 0.6, i.lp.y * 0.6, i.lp.z * 0.02) + inst.p1.w);
+  let brushed = select(0.75 + 0.5 * vnoise(vec3f(i.lp.x * 0.6, i.lp.y * 0.6, i.lp.z * 0.02) + inst.p1.w), 1.0, inst.shade.z > 0.5);
   let rockK = select(1.0, 0.12, texSet == -1 || texSet == -3);                        // dusty rock: almost no sheen
   let reflK = fres * (1.0 - rough * 0.8) * brushed * mix(0.2, 0.85, metal) * rockK;
   var envC = envRefl(Rv, rough);

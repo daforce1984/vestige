@@ -233,3 +233,5 @@
 - [x] 171. Sigma model: 2 inverted faces re-wound and 150 broken vertex normals (pointing away from their faces) rebuilt from the faces (backup assets/v5_backup/gundam_pre_normalfix.glb). Sigma paint matte (roughness ≥ 0.72), chipped bare metal scuffed (≥ 0.5) and less metallic.
 - [x] 172. Flagship plating: one uniform tone per plate (no in-plate noise: grime, streaks, chip noise, edge-wear noise off); decals ~2× (hull numbers 3.2 m, text blocks, chevrons, hazard bands, emblem, 9 m registration numerals).
 - [x] 173. Scene 3: camera fixed at the close framing from the first frame (no push-in). Scene 4: the belly pass covers ~72 % of the hull (cuts before reaching the stern).
+- [x] 174. Grips: RONIN's grip bake now uses both arms + torso with a loose blade weight, plus a per-frame left-arm grip lock (median grip error 0.1 m); Sigma's closed fist round the mace haft unchanged.
+- [x] 175. Flagship side "patchwork" removed: every armour class uses one gunmetal (trim slightly lighter), no 2×2 sub-plate split, no per-plate tone/roughness variation, no brushed-noise sheen, no generic panel/grime layer — only seams, rivets, bevels and decals.
