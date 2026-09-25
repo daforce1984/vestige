@@ -282,3 +282,4 @@
 - [x] 220. Scene 88 → 89 cut: no lighting jump — S23 exposure, sun disc and anamorphic streak start at F2's values and ease to their own over 359–366.5.
 - [x] 221. Explosion centres blow out to pure white (HDR ×40) with a strong wide glow (fx.explosion + the bolt burst).
 - [x] 222. Explosions procedural: fireballs are ray-marched domain-warped noise balls (sprite shape 14, emission only — no dark rims), hot white core + turbulent pockets cooling to red, hollowing with age; burning debris trails the same (no dark smoke); the old fire sprite's black soot fringe removed everywhere.
+- [x] 223. Berserk shield blows re-voiced: shieldHit is a concussive pitch-dropping thoom + a flickering electric discharge + the field ringing (low detuned chord) + a glassy downward shimmer; the metal 'hit_heavy' layer → 'shockwave'; the strain whine is a soft sine swell (was a sawtooth).

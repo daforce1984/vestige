@@ -394,7 +394,7 @@ export const SAMPLE_CUES = [
   [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar
   [262.05,'servo',     { rate: 0.5, gain: 0.9, prio: 8, norand: true }],
   [262,   'braam',     { rate: 0.85, gain: 1, prio: 9, duck: 2, norand: true }],
-  ...[263.4, 265.0, 266.6].flatMap((t, i) => [[t, 'hit_heavy', { gain: 0.9 + 0.1 * i, rate: 1.05 - 0.07 * i, prio: 9, duck: 1.1, norand: true }]]),
+  ...[263.4, 265.0, 266.6].flatMap((t, i) => [[t, 'shockwave', { dur: 1.4, fadeOut: 0.6, gain: 0.55 + 0.1 * i, rate: 1.25 - 0.06 * i, prio: 9, duck: 1.1, norand: true }]]),   // (a metal hit didn't fit an energy barrier)
   [267.25,'metal_groan', { at: 2.9, dur: 0.8, rate: 1.25, gain: 0.8, fadeOut: 0.05, prio: 8, norand: true }],   // servo strain
   [267.3, 'servo',     { rate: 0.7, gain: 0.8, dur: 0.7, fadeOut: 0.05, prio: 8, norand: true }],
   [268,   'boom_cine', { gain: 1.1, prio: 9, duck: 2.5, norand: true }],               // SHATTER

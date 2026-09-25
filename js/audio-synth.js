@@ -1519,25 +1519,33 @@ function growl(E, t, p) {
 }
 // Energy-shield impact: fast FM crackle + crackle bed + sub knock
 function shieldHit(E, t, p) {
-  const vel = p.vel ?? 0.9, stop = t + 1.8;
-  const v = new Voice(E, 'sfx', { verb: 0.55, pan: p.pan ?? 0 });
-  const c = v.osc('sine', 1400, t, stop), m = v.osc('square', 173, t, stop), mg = v.g(1100);
-  sweep(m.frequency, t, 240, t + 0.8, 60);
-  sweep(mg.gain, t, 1500, t + 0.9, 80);
-  m.connect(mg); mg.connect(c.frequency);
-  const bp = v.f('bandpass', 2200, 0.9), cg = v.g(0);
-  c.connect(bp); bp.connect(cg); cg.connect(v.out);
-  perc(cg.gain, t, vel * 0.28, 0.22, 0.002);
-  const n = v.noise('crackle', t, stop), nh = v.f('highpass', 1800, 0.7), ng = v.g(0);
-  n.connect(nh); nh.connect(ng); ng.connect(v.out);
-  perc(ng.gain, t, vel * 0.8, 0.35, 0.002);
-  const w = v.noise('white', t, t + 0.4), wb = v.f('bandpass', 5000, 1.5), wg = v.g(0);
-  w.connect(wb); wb.connect(wg); wg.connect(v.out);
-  perc(wg.gain, t, vel * 0.35, 0.05, 0.001);
-  const s = v.osc('sine', 70, t, t + 1), sg = v.g(0);
-  sweep(s.frequency, t, 90, t + 0.3, 38);
-  s.connect(sg); sg.connect(v.out);
-  perc(sg.gain, t, vel * 0.7, 0.14);
+  // a fist on an ENERGY BARRIER: a huge concussive "thoom" (the field takes the blow), an electric discharge that
+  // crackles out across the surface, and the whole field ringing like a struck bell — low, beating, fading
+  const vel = p.vel ?? 0.9, stop = t + 2.6;
+  const v = new Voice(E, 'sfx', { verb: 0.6, pan: p.pan ?? 0, gain: 0.8 });
+  // 1. concussion: two pitch-dropping sines + a low noise thump
+  for (const [f0, f1, a, tc] of [[62, 30, 1.0, 0.45], [96, 44, 0.55, 0.3]]) {
+    const o = v.osc('sine', f0, t, stop), og = v.g(0);
+    sweep(o.frequency, t, f0, t + 0.5, f1);
+    o.connect(og); og.connect(v.out); perc(og.gain, t, vel * a, tc, 0.004);
+  }
+  const th = v.noise('white', t, t + 0.5), tl = v.f('lowpass', 700, 0.8), tg = v.g(0);
+  th.connect(tl); tl.connect(tg); tg.connect(v.out); perc(tg.gain, t, vel * 0.6, 0.09, 0.002);
+  // 2. discharge: bright crackle spreading across the field, flickering, with a short sizzle tail
+  const cr = v.noise('crackle', t, stop), cb = v.f('bandpass', 4200, 0.8), cg = v.g(0), fl = v.g(0.6);
+  cr.connect(cb); cb.connect(cg); cg.connect(fl); fl.connect(v.out);
+  sweep(cb.frequency, t, 5200, t + 0.9, 2400);
+  perc(cg.gain, t + 0.01, vel * 0.55, 0.4, 0.003);
+  const flk = v.osc('square', 34, t, stop), fk = v.g(0.35); flk.connect(fk); fk.connect(fl.gain);
+  // 3. the field rings: a low, slightly detuned chord (beats), swelling in and dying away
+  const rg = v.g(0), rl = v.f('lowpass', 900, 0.6);
+  rg.connect(rl); rl.connect(v.out);
+  for (const f of [110, 110 * 1.006, 164.8, 246.9, 329.6 * 0.997]) { const o = v.osc('sine', f, t, stop); o.connect(rg); }
+  rg.gain.setValueAtTime(0, t); rg.gain.linearRampToValueAtTime(vel * 0.09, t + 0.06); rg.gain.setTargetAtTime(0, t + 0.12, 0.55);
+  // a glassy shimmer sliding down under the ring
+  const sh = v.osc('triangle', 1300, t, stop), sb = v.f('bandpass', 1300, 4), sgn = v.g(0);
+  sweep(sh.frequency, t, 1300, t + 1.2, 420); sweep(sb.frequency, t, 1300, t + 1.2, 420);
+  sh.connect(sb); sb.connect(sgn); sgn.connect(v.out); perc(sgn.gain, t + 0.02, vel * 0.05, 0.5, 0.01);
 }
 // Rising shield-strain whine between impacts (cut at the end)
 function shieldStrain(E, t, p) {
@@ -1550,10 +1558,10 @@ function shieldStrain(E, t, p) {
   l.connect(lg); lg.connect(tg.gain);
   const bp = v.f('bandpass', 800, 3); bp.connect(g);
   const f0 = p.f0 ?? 420, f1 = p.f1 ?? 1700;
-  const o = v.osc('sawtooth', f0, t, end + 0.05), o2 = v.osc('sine', f0 * 2.01, t, end + 0.05), og = v.g(0.6);
+  const o = v.osc('sine', f0, t, end + 0.05), o2 = v.osc('sine', f0 * 2.01, t, end + 0.05), og = v.g(0.35);   // (a sawtooth whine read as cheap)
   sweep(o.frequency, t, f0, end, f1); sweep(o2.frequency, t, f0 * 2.01, end, f1 * 2.01); sweep(bp.frequency, t, f0 * 2, end, f1 * 2);
   o.connect(bp); o2.connect(og); og.connect(g);
-  riseCut(g.gain, t, end, vel * 0.3, 0.03);
+  riseCut(g.gain, t, end, vel * 0.16, 0.03);
 }
 // Shield SHATTER: bright glassy burst + pitch-down sweep + glass ring + crystalline shard tinkles
 function shatter(E, t, p) {
