@@ -654,7 +654,7 @@ export class Renderer {
     f[88] = view[0]; f[89] = view[4]; f[90] = view[8]; f[91] = 0;
     f[92] = view[1]; f[93] = view[5]; f[94] = view[9]; f[95] = 0;
     const rc = env.rim || [0.3, 0.4, 0.8, 0.5];
-    f[96] = rc[0]; f[97] = rc[1]; f[98] = rc[2]; f[99] = rc[3];
+    f[96] = rc[0]; f[97] = rc[1]; f[98] = rc[2]; f[99] = 0;   // no rim light anywhere (it read as a glowing outline on every hull)
     const fc = env.fill || [0, 0, 0, 0];
     f[100] = fc[0]; f[101] = fc[1]; f[102] = fc[2]; f[103] = fc[3];
     // lenses: angles relative to the camera (background-only lensing in the sky shader)

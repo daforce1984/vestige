@@ -267,3 +267,5 @@
 - [x] 205. The swatted bolt bursts ON the back of Sigma's hand at contact (no flight after the swat); sparks thrown every way, a little more along the swat; burst SFX moved to the contact.
 - [x] 206. RONIN #1 before the charge (170–176.45, scenes 32–35): two-handed ready stance — katana on the centre line pointed at Sigma (FK-solved right arm; left fist locked on the hilt, grip error ≈ 0.1), leaning in, sword-side leg forward/bent, the other trailing; zero-g float on every joint (torso, head, arm, hand, legs, feet on their own slow phases).
 - [x] 207. "⚔ 메카 전투씬만 보기" now starts at 165.9 — from the bolt Sigma swats away on the way in.
+- [x] 208. Scene 36 (D05) camera locked (axis fixed at the cut, un-floated anchor, no shake) and moved round to RONIN's side so the katana reads full length.
+- [x] 209. Rim light removed in every scene (renderer forces its strength to 0); the duel shot's extra fill/rim (meant for the mechs) dropped — they had washed the distant enemy ships out white.

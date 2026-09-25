@@ -1395,8 +1395,8 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   shake(c, k.shake, k.shakeFreq); handheld(c, k.handheld);
   c.env.shadowCenter = k.focus; c.env.shadowRadius = k.shadowRadius;
   c.post.shakeBlur = k.blur;                                   // (no whole-screen flash on duel contacts: it read as flicker)
-  c.env.fill = [0.42, 0.44, 0.52, 0.55]; c.env.rim = [0.6, 0.72, 1.0, 1.0]; c.env.ambient = 1.4;
-  c.post.lensA = { enable: 0 };   // the well is far away: no background lensing (it smeared the planet into grey)
+  c.env.ambient = 1.4;             // (the strong fill + rim were for the mechs, which no longer take either — on the
+  c.post.lensA = { enable: 0 };   // distant ships they only washed the hulls out white)   the well is far away: no background lensing (it smeared the planet into grey)
   if (k.slowmo) { c.post.saturation = 0.75; c.post.streak = 0.45; c.post.gradeHighlights = [1.2, 1.0, 0.85]; }
   { // bullet time: the picture drains a little and the edges fall away while time crawls
     const bs = sat((0.75 - bulletSpeed(storyT(FILM_NOW))) / 0.5);
