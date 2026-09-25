@@ -2126,7 +2126,7 @@ function drawDodgeBolt(R, t) {
   // contact point: the right vambrace (between forearm and hand) at T, from the solved FK of the parry pose
   const hs = duelHero(T);
   const fk = duelFK({ ...hs, saber: 1 }, 'gundam');
-  const hit = V.lerp([0, 0, 0], M.transformPoint([0, 0, 0], fk.arm_R_lower, [0, 0, 0]), M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]), 0.62);
+  const hit = V.lerp([0, 0, 0], M.transformPoint([0, 0, 0], fk.arm_R_lower, [0, 0, 0]), M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]), 0.9);   // back of the wrist / hand
   const fwd = V.norm([0, 0, 0], hs.fwd);
   const r = dodgeRight(T);
   const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], fwd, -0.9), V.scale([0, 0, 0], r, -0.35)));   // from ahead, a little right
@@ -2160,14 +2160,16 @@ function drawDodgeBolt(R, t) {
     R.glow(E, 5 + 12 * easeOut(sat(lb / 0.3)), [2.2 * Math.exp(-lb * 4), 0.8 * Math.exp(-lb * 4), 0.3 * Math.exp(-lb * 4)], 0.6);   // orange fireball
     R.light(E, 120, [1, 0.6, 0.3], 18 * Math.exp(-lb * 6));
     if (lb < 0.35) R.ripple(E, 4 + 34 * easeOut(lb / 0.35), [0.4, 0.4, 0.4], (1 - lb / 0.35) * 1.5);
-    for (let i = 0; i < 90; i++) {                                        // fragments in every direction, fast then dragging
-      const sd = randDir([0, 0, 0], i * 2.37 + 71);
-      const life = 0.35 + hash(i + 31) * 1.1; if (lb > life) continue;
-      const u = lb / life, sp = 25 + 70 * hash(i + 5);
-      const p = madd(E, sd, sp * life * easeOut(u) * 0.6), q = madd(p, sd, -(2 + 6 * (1 - u)));
-      const b = 5 * (1 - u) * (1 - u) * (hash(i + 17) > 0.8 ? 1.6 : 1);
-      R.beam(q, p, 0.1 + 0.08 * hash(i), [b, b * 0.55, b * 0.22], 1, 10);
-      if (i % 6 === 0) R.glow(p, 0.8 + 1.2 * (1 - u), [2.5 * (1 - u), 1.1 * (1 - u), 0.4 * (1 - u)], 0.5);
+    for (let i = 0; i < 150; i++) {                                       // sparks: thin burning streaks flung every way,
+      const sd = randDir([0, 0, 0], i * 2.37 + 71);                        // white-hot (blooming) at first, then cooling
+      const life = 0.3 + hash(i + 31) * 1.0; if (lb > life) continue;     // orange -> dull red, thinning and fading out
+      const u = lb / life, sp = 30 + 80 * hash(i + 5);
+      const dist = sp * life * 0.55 * (1 - (1 - u) * (1 - u));             // drag: fast out, slowing
+      const vel = sp * (1 - u);                                            // current speed -> streak length
+      const p = madd(E, sd, dist), q = madd(p, sd, -(0.6 + vel * 0.06));
+      const fade = (1 - u) * (1 - u), hot = Math.exp(-lb * 7);
+      const b = (1.2 + 9 * hot) * fade * (hash(i + 17) > 0.85 ? 1.5 : 1);
+      R.beam(q, p, 0.02 + 0.1 * (1 - u) * (0.5 + hash(i)), [b, b * (0.55 + 0.35 * hot), b * (0.15 + 0.5 * hot)], 1, 10);
     }
   }
 }
