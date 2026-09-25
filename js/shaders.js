@@ -436,7 +436,8 @@ fn moonCraters(q: vec3f, seed: f32) -> MC {
   return o;
 }
 fn boxd(p: vec2f, c: vec2f, h: vec2f) -> f32 { let d = abs(p - c) - h; return length(max(d, vec2f(0.0))) + min(max(d.x, d.y), 0.0); }
-fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
+fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, side: f32) -> HD {
+  let vertical = side != 0.0;
   var o: HD; o.paint = vec3f(0.0); o.col = vec3f(0.0); o.mixk = 0.0; o.rough = 0.0; o.metal = -1.0; o.tilt = vec2f(0.0); o.ao = 1.0;
   let aa = clamp(1.0 - pw * 4.0, 0.0, 1.0);                         // fine detail fades before it can alias
   let aa2 = clamp(1.0 - pw * 12.0, 0.0, 1.0);
@@ -486,27 +487,27 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
   // --- decals: FEW and GIANT (5× the plate-sized ones): painted across the plating on a 150 × 56 m grid, bold stroke
   // font, each fully inside its grid cell (a margin all round), so none is ever clipped
   var paint = vec3f(0.0); var pa = 0.0;
-  // placed by hand on the flat side walls (wall band y −31…+60): fully inside the wall, bold, 5× the old size
+  // placed by hand on the flat side walls, in clear wall (no window rows, bays or equipment): hull z = −u·side
+  // (u reads left→right on each flank). Band y −4…+40 is clean between z −250 and +150; the bays (z −40…120) are avoided.
   if (vertical && cls != 4.0 && cls != 5.0) {
-    let zz = abs(uv.x);
-    // hull number "07" — 40 m tall, centred on z = −60 (both flanks)
-    let dh = 36.0; let dw = dh * (1.3 / 1.85);                        // (90 %)
-    let lx = uv.x - (select(60.0, -60.0, uv.x < 0.0)) + dw;            // local x from the number's left edge
-    let pn = vec2f(lx, uv.y - (13.0 - dh * 0.5)) / (dh / 1.85);
+    let z = -uv.x * side;
+    // hull number "07" — 34 m tall, centred on z = −115, y = 17
+    let dh = 34.0; let dw = dh * (1.3 / 1.85);
+    let uc = -(-115.0) * side;                                         // u of the number's centre on this flank
+    let pn = vec2f(uv.x - (uc - dw), uv.y - (17.0 - dh * 0.5)) / (dh / 1.85);
     if (pn.x > 0.0 && pn.x < 2.6 && pn.y > 0.0 && pn.y < 1.85) {
       let k = floor(pn.x / 1.3); let px = vec2f(pn.x - k * 1.3, pn.y);
       let dg = select(seg7w(px, 7, 0.32), seg7w(px, 0, 0.32), k == 0.0);
       paint = vec3f(0.6, 0.61, 0.63); pa = max(pa, dg);
     }
-    // fleet emblem, 30 m radius, on the aft wall section (z ≈ −235)
-    let ec = vec2f(select(235.0, -235.0, uv.x < 0.0), 12.0);
-    let v = (uv - ec) / 27.0; let r = length(v);
+    // fleet emblem, 17 m radius
+    let v = (uv - vec2f(178.0 * side, 17.0)) / 17.0; let r = length(v);   // (z −178: clear of the stern edge)
     let ring = step(abs(r - 0.88), 0.09);
     let tv = max(abs(v.x) * 0.87 + v.y * 0.5, -v.y);
     let tri = step(tv, 0.56) * step(0.3, tv);
     if (max(ring, tri) > 0.0) { paint = vec3f(0.6, 0.61, 0.63); pa = 1.0; }
-    // a long hazard band low on the forward wall (z 100…170)
-    if (uv.y > -23.6 && uv.y < -17.3 && zz > 103.5 && zz < 166.5) { let st = step(0.5, fract((uv.x + uv.y) / 8.0)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
+    // hazard band low on the forward wall (z 130…185, y −2…3)
+    if (uv.y > -2.0 && uv.y < 3.5 && z > 130.0 && z < 185.0) { let st = step(0.5, fract((uv.x + uv.y) / 7.0)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
   }
   if (pa > 0.0) {
     pa *= 0.9;
@@ -628,7 +629,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     if (a.x > a.y && a.x > a.z) { uvp = vec2f(-i.lp.z * sign(ln.x), i.lp.y); tU = vec3f(0.0, 0.0, -sign(ln.x)); tV = vec3f(0.0, 1.0, 0.0); }
     else if (a.y > a.z) { uvp = i.lp.xz; tU = vec3f(1.0, 0.0, 0.0); tV = vec3f(0.0, 0.0, 1.0); }
     else { uvp = i.lp.xy; tU = vec3f(1.0, 0.0, 0.0); tV = vec3f(0.0, 1.0, 0.0); }
-    let hd = hullDetail(uvp, inst.shade.z, inst.p1.w, pwLP, a.x > 0.8);   // giant decals only on the flat side walls
+    let hd = hullDetail(uvp, inst.shade.z, inst.p1.w, pwLP, select(0.0, sign(ln.x), a.x > 0.8));   // giant decals only on the flat side walls
     base = base * hd.col;
     base = mix(base, base * (hd.paint / 0.1) * 0.9, hd.mixk * 0.9);   // overlay: tint the armour (keeps its material and value range)
     rough = clamp(rough + hd.rough, 0.12, 1.0);

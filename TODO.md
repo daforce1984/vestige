@@ -242,3 +242,6 @@
 - [x] 180. Distance LOD (blender/make_lods.py → <name>_lod.glb, 9 ships/fighters, 12–45 %): swapped in R.add beyond 5.5 × ship length — battle scenes back to ~21–24 fps (were 12).
 - [x] 181. Decals 90 % size, applied as an overlay tint (the armour's metalness/roughness/seams/bump stay underneath).
 - [x] 182. Moon: procedural crater field in the shader (4 octaves, cells 1/14…1/260 of the radius, analytic bump gradient, bright rims, ray systems, maria, fine grain) — ~10× the mesh detail at 24 fps.
+183. [x] Flagship hangar: armoured two-leaf doors (ribs, belts, teeth, hazard chevrons, seam lights) that open sideways during launch/recovery + lit bay mouth frame (tools/make_dock.py, world.js drawDock)
+184. [x] Flagship decals moved onto clear wall so none are cut or smeared ("07" z −115, emblem z −178, hazard band z 130..185)
+185. [x] Sigma chest reactor ring glows (heartbeat pulse, red when berserk)

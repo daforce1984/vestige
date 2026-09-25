@@ -590,7 +590,14 @@ export function drawGundam(R, t, s, opts = {}) {
   const eyeK = s.eye * (opts.eye ?? 1);
   const bz = s.berserk || 0;
   const ec = [lerp(0.5 * 2.5, 9, bz) * eyeK, lerp(2.2 * 2.5, 0.4, bz) * eyeK, lerp(1.2 * 2.5, 0.25, bz) * eyeK];
-  e.matOverride = { eye: { base: [0.2, 0.9, 0.5], metal: 0, rough: 0.3, emissive: ec } };
+  // chest reactor ring (torso 'core'): its own emissive plus a soft glow halo, slow heartbeat pulse; red when berserk
+  const coreK = (0.85 + 0.15 * Math.sin(t * 2.2)) * (s.fpv ? 0 : 1) * (s.damage > 0.5 ? 0.4 : 1);
+  const cc = [lerp(0.35, 3.5, bz) * 3.2 * coreK, lerp(0.85, 0.35, bz) * 3.2 * coreK, lerp(1.0, 0.2, bz) * 3.2 * coreK];
+  e.matOverride = { eye: { base: [0.2, 0.9, 0.5], metal: 0, rough: 0.3, emissive: ec }, core: { base: [0.3, 0.8, 1.0], metal: 0, rough: 0.3, emissive: cc } };
+  if (coreK > 0.02) {
+    const cp = M.transformPoint([0, 0, 0], R.partWorld('gundam', e, 'torso'), [0.03, 3.14, 2.7]);
+    R.glow(cp, 1.9, [cc[0] * 0.35, cc[1] * 0.35, cc[2] * 0.35], 0.45);
+  }
   // exhaust history never reaches back across a scene cut where his path jumps (340: the drift → the bay approach)
   const pastHero = opts.pastState || ((tau) => { const q = gundamState(t >= 340 && t - tau < 340 ? 340 : t - tau); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails

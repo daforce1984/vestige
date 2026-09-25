@@ -346,7 +346,7 @@ function drawDock(R, t, me) {
   const mm = me.m;
   const rig = R.add('dock_rig', mm);
   if (rig) {
-    rig.hidden = { door: 1 }; rig.stretch = me.stretch || 0; rig.stretchAnchor = motherAnchor(R, me); rig.seed = 7.7;
+    rig.hidden = { door: 1, mouth: 1 }; rig.stretch = me.stretch || 0; rig.stretchAnchor = motherAnchor(R, me); rig.seed = 7.7;
     const open = 1 - easeInOut(sat((t - 342.55) / 0.5));
     rig.pose = { clampL: [0, 0, -1.5 * open], clampR: [0, 0, -1.5 * open] };
     const blink = 0.6 + 0.4 * Math.sin(t * 9);
@@ -365,15 +365,32 @@ function drawDock(R, t, me) {
     const au = M.transformDir([0, 0, 0], mm, [0, 0, 35]), av = M.transformDir([0, 0, 0], mm, [0, 21.5, 0]);
     R.bayField(cw, au, av, t > 340.95 ? t - 340.95 : -1, [0.35, 0.7, 1.6], 0.8 * k);
   }
-  const shut = easeInOut(sat((t - 343.0) / 0.75));
+  // the bay doors: two armoured leaves that part to either side (launch 150–161.8, recovery 335.5–343.75),
+  // closed the rest of the film; seam lights run while they move, marker lamps pulse amber
+  const open = doorOpen(t), moving = Math.abs(doorOpen(t + 0.05) - open) > 1e-4;
+  const seam = moving ? 0.5 + 0.5 * Math.sin(t * 14) : open > 0.5 ? 0.25 : 0.6;
+  const amb = 0.55 + 0.45 * Math.max(0, Math.sin(t * 3.2));
+  const ov = { dock_light: { base: [0.3, 0.7, 1], metal: 0, rough: 0.3, emissive: [0.5 * seam * 2.2, 1.0 * seam * 2.2, 1.6 * seam * 2.2] },
+    amber: { base: [1, 0.5, 0.1], metal: 0, rough: 0.4, emissive: [1.6 * amb, 0.7 * amb, 0.14 * amb] } };
   for (const [zc, dir] of [[39.5, -1], [74.5, 1]]) {
-    M.fromTRS(_dt, [0, 0, zc + dir * 35 * (1 - shut)], [0, 0, 0, 1], 1);
+    const zz = zc + dir * 35 * open;
+    M.fromTRS(_dt, [-3.2 * easeInOut(sat(open * 6)), 0, zz], [0, 0, 0, 1], 1);   // leaves step out onto their rails, then slide clear
+    if (dir > 0) { _dt[8] = -_dt[8]; _dt[9] = -_dt[9]; _dt[10] = -_dt[10]; }          // mirror: leading edge toward the seam
     M.mul(_dm, mm, _dt);
     const d = R.add('dock_rig', _dm);
-    if (d) { d.hidden = { frame: 1, clampL: 1, clampR: 1 }; d.stretch = me.stretch || 0; d.stretchAnchor = motherAnchor(R, me) - (zc + dir * 35 * (1 - shut)); d.seed = 7.9; }
+    if (d) { d.hidden = { frame: 1, clampL: 1, clampR: 1, mouth: 1 }; d.stretch = me.stretch || 0; d.stretchAnchor = motherAnchor(R, me) - zz; d.seed = 7.9; d.matOverride = ov; }
   }
+  const mf = R.add('dock_rig', mm);                             // the mouth frame (fixed)
+  if (mf) { mf.hidden = { frame: 1, clampL: 1, clampR: 1, door: 1 }; mf.stretch = me.stretch || 0; mf.stretchAnchor = motherAnchor(R, me); mf.seed = 8.1;
+    const lamp = 0.8 + 0.2 * Math.sin(t * 2);
+    mf.matOverride = { dock_light: { base: [0.3, 0.7, 1], metal: 0, rough: 0.3, emissive: [0.45 * lamp * 2, 0.85 * lamp * 2, 1.4 * lamp * 2] }, amber: ov.amber }; }
 }
 
+// bay door opening 0 (shut) … 1 (fully parted)
+function doorOpen(t) {
+  const seg = (a0, a1, c0, c1) => (t < a0 || t > c1 ? 0 : t < a1 ? easeInOut((t - a0) / (a1 - a0)) : t < c0 ? 1 : 1 - easeInOut((t - c0) / (c1 - c0)));
+  return Math.max(seg(149.6, 151.0, 160.6, 161.8), seg(335.4, 336.9, 343.0, 343.75));
+}
 function motherAnchor(R, me) { const b = R.models.mothership.bounds; return me.stretchOut ? b.min[2] : b.max[2]; }
 const _rimT = M.new(), _rimM = M.new();
 function drawWound(R, t, me) {
@@ -613,7 +630,7 @@ export function drawWorld(R, t, opts = {}) {
     }
     // the wound: the hangar bay behind the melted wall, molten drips, and the bay's contents sucked out into space
     if (t > LANCE_FIRE) drawWound(R, t, me);
-    if (t > 335 || (t > 150 && t < 162)) drawDock(R, t, me);   // (also at the launch: the bay field)
+    drawDock(R, t, me);                                          // bay doors + mouth frame always; the rig and fields inside
     // hull fires after lance
     if (t > LANCE_FIRE + 1) {
       const n = 14;

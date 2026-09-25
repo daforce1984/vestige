@@ -71,13 +71,62 @@ for nm, z in (('clampL', 52.2), ('clampR', 61.8)):
     C.box('dock_light', -5.2, -4.0, -1.65, -1.55, -0.5, 0.5)
     clamps.append(node(nm, C, [-62.6, 11.5, z]))
 
-# ---- door leaf (35 m along Z × 44 m tall), outer face at x = -75
+# ---- door leaf (35 m along Z × 43 m tall), outer face at x = -75. Local +Z points toward the centre seam for the
+# leaf the engine places at z 74.5 (it mirrors the other with a scale of -1 on Z). Heavy armoured slab with a frame,
+# recessed panels between vertical ribs, two reinforcement belts, interlocking teeth + a hazard chevron band and a
+# row of seam lights on the leading edge, marker lamps along top and bottom.
 D = Mesh()
-D.box('dock_metal', -75.6, -74.4, -21.5, 21.5, -17.5, 17.5)
-for y in range(-18, 20, 6): D.box('dock_trim', -75.8, -75.6, y, y + 0.6, -17.0, 17.0)
-for z in (-17.0, 16.4): D.box('hazard', -75.9, -75.5, -21.0, 21.0, z, z + 0.6)
-D.box('amber', -75.9, -75.7, 20.5, 21.0, -16.0, 16.0)
+D.box('dock_metal', -75.4, -74.2, -21.5, 21.5, -17.5, 17.5)                     # slab
+D.box('dock_trim', -75.9, -75.4, -21.5, -20.3, -17.5, 17.5)                     # frame bottom
+D.box('dock_trim', -75.9, -75.4, 20.3, 21.5, -17.5, 17.5)                       # frame top
+D.box('dock_trim', -75.9, -75.4, -21.5, 21.5, -17.5, -16.4)                     # frame outer edge
+for z in (-10.5, -3.5, 3.5, 10.5):                                              # vertical ribs
+    D.box('dock_metal', -76.3, -75.4, -20.3, 20.3, z - 0.45, z + 0.45)
+for y in (-7.0, 7.0):                                                           # reinforcement belts
+    D.box('dock_trim', -76.5, -75.4, y - 0.9, y + 0.9, -16.4, 14.5)
+    for z in (-14.0, -7.0, 0.0, 7.0, 12.5):                                     # belt bolts
+        D.box('dock_metal', -76.7, -76.5, y - 0.35, y + 0.35, z - 0.35, z + 0.35)
+for k in range(8):                                                              # interlocking teeth on the leading edge
+    y0 = -20.0 + k * 5.2
+    D.box('dock_metal', -75.6, -74.0, y0, y0 + 2.4, 17.5, 18.6)
+for k in range(9):                                                              # hazard chevrons on the leading strip
+    y0 = -20.0 + k * 4.6
+    D.box('hazard', -76.0, -75.8, y0, y0 + 2.2, 14.6, 16.8)
+    D.box('dock_metal', -76.0, -75.85, y0 + 2.2, y0 + 4.6, 14.6, 16.8)
+for k in range(10):                                                             # seam lights down the leading edge
+    y0 = -19.0 + k * 4.2
+    D.box('dock_trim', -75.95, -75.6, y0 - 0.5, y0 + 0.5, 16.8, 17.4)
+    D.box('dock_light', -76.05, -75.95, y0 - 0.35, y0 + 0.35, 16.9, 17.3)
+for z in (-14.0, -6.0, 2.0, 10.0):                                              # marker lamps top and bottom
+    for y in (-20.9, 20.9):
+        D.box('dock_trim', -76.1, -75.9, y - 0.35, y + 0.35, z - 0.9, z + 0.9)
+        D.box('amber', -76.2, -76.1, y - 0.2, y + 0.2, z - 0.7, z + 0.7)
 door = node('door', D, [0, 4.5, 0])
+
+# ---- bay mouth frame (fixed): armoured jambs round the opening (y -17..26, z 22..92) with a bevelled inner lip,
+# lamp fixtures every 4.5 m along top and bottom, hazard lips, corner beacons
+Fm = Mesh()
+Fm.box('dock_metal', -77.8, -74.9, 26.0, 29.2, 18.5, 95.5)                      # header
+Fm.box('dock_metal', -77.8, -74.9, -20.2, -17.0, 18.5, 95.5)                    # sill
+Fm.box('dock_metal', -77.8, -74.9, -17.0, 26.0, 18.5, 21.8)                     # aft jamb
+Fm.box('dock_metal', -77.8, -74.9, -17.0, 26.0, 92.2, 95.5)                     # fore jamb
+Fm.box('dock_trim', -78.3, -77.8, 25.4, 26.2, 21.4, 92.6)                       # inner lip trims
+Fm.box('dock_trim', -78.3, -77.8, -17.2, -16.4, 21.4, 92.6)
+Fm.box('dock_trim', -78.3, -77.8, -16.4, 25.4, 21.4, 22.2)
+Fm.box('dock_trim', -78.3, -77.8, -16.4, 25.4, 91.8, 92.6)
+for k in range(16):                                                             # hazard on the sill lip
+    z0 = 22.5 + k * 4.35
+    Fm.box('hazard', -78.35, -77.9, -20.0, -18.6, z0, z0 + 2.1)
+for k in range(15):                                                             # lamp fixtures along header & sill
+    z0 = 24.5 + k * 4.5
+    for y in (27.6, -18.6):
+        Fm.box('dock_trim', -78.4, -77.8, y - 0.55, y + 0.55, z0 - 1.1, z0 + 1.1)
+        Fm.box('dock_light', -78.5, -78.4, y - 0.3, y + 0.3, z0 - 0.85, z0 + 0.85)
+for z in (20.1, 93.9):                                                          # corner beacons
+    for y in (27.8, -18.8):
+        Fm.box('dock_metal', -78.6, -77.8, y - 0.7, y + 0.7, z - 0.7, z + 0.7)
+        Fm.box('amber', -79.2, -78.6, y - 0.45, y + 0.45, z - 0.45, z + 0.45)
+mouth = node('mouth', Fm, [0, 0, 0])
 
 # ---- write GLB
 bin_ = bytearray(); views = []; accs = []
@@ -113,7 +162,7 @@ for n, b, me, r, e in MATS:
         s = max(e); m['emissiveFactor'] = [x / s for x in e]
         if s > 1: m['extensions'] = {'KHR_materials_emissive_strength': {'emissiveStrength': s}}
     mats.append(m)
-gl = {'asset': {'version': '2.0', 'generator': 'make_dock.py'}, 'scene': 0, 'scenes': [{'nodes': [frame] + clamps + [door]}], 'nodes': gl_nodes,
+gl = {'asset': {'version': '2.0', 'generator': 'make_dock.py'}, 'scene': 0, 'scenes': [{'nodes': [frame] + clamps + [door, mouth]}], 'nodes': gl_nodes,
       'meshes': gmeshes, 'materials': mats, 'extensionsUsed': ['KHR_materials_emissive_strength'],
       'accessors': accs, 'bufferViews': views, 'buffers': [{'byteLength': len(bin_)}]}
 js = json.dumps(gl).encode(); js += b' ' * ((4 - len(js) % 4) % 4)
