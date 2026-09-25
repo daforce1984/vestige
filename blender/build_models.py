@@ -13,7 +13,7 @@ ASSETS = os.path.join(os.path.dirname(HERE), 'assets')
 BUILDERS = {
     'mothership': ('ships_hiigaran_v5', 'mothership'),
     'ion_frigate': ('ships_ion_frigate', 'ion_frigate'),   # v10 redesign (ION_FRIGATE_DESIGN.md)
-    'assault_frigate': ('ships_hiigaran_v5', 'assault_frigate'),
+    'assault_frigate': ('ships_assault_frigate', 'assault_frigate'),   # v11 redesign (ASSAULT_FRIGATE_DESIGN.md); v5 builder kept in ships_hiigaran_v5
     # v6 fighter variants (fighters_ours.py / fighters_enemy.py; the v4 designs remain in small_craft.py)
     'interceptor': ('fighters_ours', 'interceptor_a'),
     'interceptor_b': ('fighters_ours', 'interceptor_b'),
