@@ -5,6 +5,8 @@
 import { BG, MESH, DEPTH_RESOLVE, SPRITE, LENS, BLOOM, FINAL, BLIT, CELESTIAL } from './shaders.js';
 import { M, V, Q } from './math.js';
 import { parseGLB } from './gltf.js';
+// mechs get no rim light and no camera-side fill light (they read as lit by the lens) — Sigma, the RONINs, the mace, the hands
+const NO_RIM = new Set(['gundam', 'enemy_ms', 'mace', 'mech_hand']);
 
 const MAX_INST = 16384;
 const INST_FLOATS = 60;
@@ -611,7 +613,7 @@ export class Renderer {
           const cr = e.crush;          // world-space crumple: [x, y, z, radius, amount, dirX, dirY, dirZ]
           if (cr) { I[o + 49] = cr[4]; I[o + 50] = cr[5]; I[o + 51] = cr[6]; I[o + 52] = cr[0]; I[o + 53] = cr[1]; I[o + 54] = cr[2]; I[o + 55] = cr[3]; }
           else { I[o + 49] = 0; }
-          I[o + 56] = e.shadeK ?? 1; I[o + 57] = e.soot || 0; I[o + 58] = model.hullClass ? (model.hullClass[d.matName] || 0) : 0; I[o + 59] = e.rimK ?? 1;
+          I[o + 56] = e.shadeK ?? 1; I[o + 57] = e.soot || 0; I[o + 58] = model.hullClass ? (model.hullClass[d.matName] || 0) : 0; I[o + 59] = NO_RIM.has(model.name) ? -1 : e.rimK ?? 1;   // -1: no rim, no camera fill
           n++;
         }
         if (n > first) draws.push(model.baseIndex + d.first, d.count, model.baseVertex, first, n - first, model.prepass ? 1 : 0);

@@ -251,3 +251,4 @@
 - [x] 189. Duel standoffs: Sigma's guard re-posed (FK-solved) — squared up, mace angled forward-up at the opponent instead of held straight up like a torch, arm cannon raised as a shield, legs split front/back.
 - [x] 190. Duel bullet time: speed ramps round the big blows (179.0, 184.5, 188.2, 192.4) — 0.18× at contact, fast catch-up after; the blow lands on its original time, duel SFX follow the ramp (bulletReal); picture drains/vignettes while time crawls.
 - [x] 191. Heavy blows leave marks: knee/kick on RONIN #1, shoulder charge on RONIN #2, RONIN #2's kick on Sigma dent the struck plating (crush); the kick (178.55) and the charge (188.2) tear a slab of chest armour off (part-clipped hole with hot edges + the slab tumbling away). Renderer: e.clipPart limits a clip box to one part.
+- [x] 192. Mechs (Sigma, RONINs, mace, articulated hands): no rim light and no camera-side fill — lit only by the sun, sky ambient and real lights.

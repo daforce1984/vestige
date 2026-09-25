@@ -780,13 +780,13 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   col += envC * reflK * ao * mix(0.35, 1.0, sh);
   // rim (nebula backlight) for silhouettes
   let rim = pow(1.0 - max(dot(n, V), 0.0), 2.5);
-  col += F.rimCol.rgb * rim * F.rimCol.w * ao * (0.5 + 0.5 * base) * mix(0.3, 1.0, rockK) * select(1.0, 0.3, texSet > 0) * inst.shade.w;   // mechs: subtle rim; shade.w = per-entry rim scale
+  col += F.rimCol.rgb * rim * F.rimCol.w * ao * (0.5 + 0.5 * base) * mix(0.3, 1.0, rockK) * select(1.0, 0.3, texSet > 0) * max(inst.shade.w, 0.0);   // shade.w = per-entry rim scale; < 0: no rim AND no camera fill (mechs)
   // cinematic fill from slightly above the camera: keeps the dark side of hulls readable
   let fillDir = normalize(V + vec3f(0.0, 0.35, 0.0));
   let fl = clamp((dot(n, fillDir) + F.fill.w) / (1.0 + F.fill.w), 0.0, 1.0);
   // the camera-side fill read as a lamp carried by the flagship: its armour only ever gets the base level (as in S23)
   let fillC = select(F.fill.rgb, F.fill.rgb * min(1.0, 0.17 / max(max(F.fill.r, F.fill.g), max(F.fill.b, 1e-4))), hullFlag);
-  col += fillC * fl * (diffC + F0 * 0.3) * ao * mix(0.55, 1.0, rockK);
+  col += fillC * fl * (diffC + F0 * 0.3) * ao * mix(0.55, 1.0, rockK) * select(1.0, 0.0, inst.shade.w < 0.0);
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;
   if (inst.shade.y > 0.0) {
