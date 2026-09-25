@@ -253,3 +253,4 @@
 - [x] 191. Heavy blows leave marks: knee/kick on RONIN #1, shoulder charge on RONIN #2, RONIN #2's kick on Sigma dent the struck plating (crush); the kick (178.55) and the charge (188.2) tear a slab of chest armour off (part-clipped hole with hot edges + the slab tumbling away). Renderer: e.clipPart limits a clip box to one part.
 - [x] 192. Mechs (Sigma, RONINs, mace, articulated hands): no rim light and no camera-side fill — lit only by the sun, sky ambient and real lights.
 - [x] 193. RONIN #2 kill: a 180° spinning strike — coil 70° away, whip round (back passing the enemy) accelerating into the contact at 192.4 (solved, residual 0.01), spin bleeds off in the follow-through; ends facing the dash line for the walk-away.
+- [x] 194. Start screen: '⚔ 메카 전투씬만 보기' button — plays the duel (169.8–195.2) with sound, then returns to the menu (▶ 재생 then starts from the top).

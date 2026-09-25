@@ -74,6 +74,7 @@ const canvas = $('#c');
 const R = new Renderer(canvas);
 if (qs.get('scale')) R.renderScale = parseFloat(qs.get('scale'));
 let score = null;
+let stopAt = null;                                        // film time to stop at ("mech battle only" button)
 let playing = false, frozen = null;
 let clockStart = 0, clockOffset = 0;   // fallback clock when audio is unavailable
 
@@ -197,6 +198,9 @@ function loop() {
     if (debug) hud.textContent = `t=${t.toFixed(2)} f=${fi}  ${findShot(storyT(t)).name}  fps=${fps.toFixed(1)} shutter=${shutter}  draws=${R.stats.draws} inst=${R.stats.inst} spr=${R.stats.sprites}`;
     $('#bar').style.width = `${(100 * t) / DURATION}%`;
   }
+  if (playing && stopAt !== null && tRaw >= stopAt) {         // "mech battle only": stop after the duel, back to the menu
+    stopAt = null; pause(); clockOffset = 0; $('#start').classList.remove('hidden');   // ▶ 재생 then plays the film from the top
+  }
   if (playing && tRaw >= DURATION + 1) { pause(); clockOffset = DURATION; $('#start').classList.remove('hidden'); $('#start .go').textContent = '↻ 다시 보기'; }
   if (!R.lost) requestAnimationFrame(loop);
 }
@@ -211,7 +215,7 @@ async function boot() {
     await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
     const tris = R.modelList.reduce((s, m) => s + m.tris, 0);
     status.textContent = `준비 완료 · ${R.modelList.length} models · ${(tris / 1000).toFixed(0)}k tris`;
-    $('#start .go').disabled = false;
+    $('#start .go').disabled = false; $('#duelBtn').disabled = false;
   } catch (e) {
     console.error(e);
     status.textContent = '오류: ' + e.message;
@@ -228,7 +232,7 @@ async function boot() {
   };
 }
 
-$('#start .go').addEventListener('click', async () => {
+async function startFilm(from, until = null) {
   $('#start').classList.add('hidden');
   if (!score) {
     try {
@@ -238,8 +242,14 @@ $('#start .go').addEventListener('click', async () => {
     } catch (e) { console.warn('audio unavailable:', e); score = null; }
   }
   frozen = null;
-  play(clockOffset >= DURATION ? 0 : clockOffset);
-});
+  stopAt = until;
+  if (playing) pause();
+  play(from);
+}
+$('#start .go').addEventListener('click', () => startFilm(clockOffset >= DURATION ? 0 : clockOffset));
+// the mech battle (scene 32, the Sigma vs RONIN duel) on its own: from just before the first exchange to the last blast
+const DUEL_FROM = 169.8, DUEL_UNTIL = 195.2;
+$('#duelBtn').addEventListener('click', () => startFilm(DUEL_FROM, DUEL_UNTIL));
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); if (playing) pause(); else play(now()); }
   else if (e.code === 'Escape') { if (playing) pause(); }

@@ -49,6 +49,7 @@
     font-family: 'Noto Sans KR', sans-serif; font-size: 17px; letter-spacing: .2em; cursor: pointer; border-radius: 2px; }
   #start .go:hover:not(:disabled) { background: rgba(127,178,255,.12); }
   #start .go:disabled { opacity: .4; cursor: wait; }
+  #start .btns { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
   #status { font-size: 13px; color: var(--dim); letter-spacing: .05em; min-height: 1.2em; }
   #start .keys { font-size: 12px; color: #5d6577; letter-spacing: .05em; }
   #progress { position: fixed; left: 0; right: 0; bottom: 0; height: 6px; cursor: pointer; opacity: 0; transition: opacity .3s; }
@@ -76,7 +77,7 @@
 <div id="start">
   <h1>VESTIGE</h1>
   <div class="sub">6:22</div>
-  <button class="go" disabled>▶ 재생</button>
+  <div class="btns"><button class="go" disabled>▶ 재생</button><button class="go" id="duelBtn" disabled>⚔ 메카 전투씬만 보기</button></div>
   <div id="status">WebGPU 초기화…</div>
   <div class="keys">24fps · Space 일시정지 · ←/→ 5초 이동 · F 전체화면 · H UI 숨김 · 사운드를 켜 주세요</div>
 </div>
