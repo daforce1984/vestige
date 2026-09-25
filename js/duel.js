@@ -635,7 +635,7 @@ const heroPos = posTrack([
 const heroPose = poseTrack([
   [169.3, L.flight], [170.4, L.guard, 'io'], [172.4, L.guard],               // closing in behind the mace through the laser fire
   [172.7, W(L.guard, { torso: [20, 25, 0], arm_L_upper: [-60, -40, 20] }), 'out'],
-  [173.4, L.idle, 'io'], [174.2, W(L.idle, { head: [-6, -10, 0], torso: [8, 5, 0], pelvis: [0, 0, 0] }), 'io'], [174.85, L.idle, 'io'],   // at the ready: mace hanging, watching RONIN
+  [173.4, L.idle, 'io'], [174.85, L.idle, 'io'],   // at the ready: mace hanging, watching RONIN (held still: only the idle float below)
   [175.2, L.guard], [175.5, W(L.guard, { torso: [25, -20, 0], _body: [15, 0, 0] }), 'out'], [176.2, L.guard, 'io'],
   [177.35, L.guard], [177.47, L.guard],
   [177.62, L.sway, 'out'], [177.9, L.forearmBlock, 'io'], [178.0, W(L.forearmBlock, { arm_R_upper: [-68, -35, -35] }), 'in'],
@@ -792,7 +792,7 @@ function inertiaLean(s, fwdBase) {
   const acc = scl(sub(v1, v0), 1 / (2 * h));
   const f = nrm([fwdBase[0], 0, fwdBase[2]]), r = [f[2], 0, -f[0]];
   let near = 1; for (const ti of IMPACTS) near = Math.min(near, smooth(0.05, 0.3, Math.abs(t - ti)));
-  const k = near;
+  const k = near * (1 - (s._idle || 0));
   return [clamp((acc[0] * f[0] + acc[2] * f[2]) * 0.0022, -0.32, 0.32) * k, clamp(-(acc[0] * r[0] + acc[2] * r[2]) * 0.0018, -0.3, 0.3) * k];
 }
 function finish(s, arr, fwdBase) {
@@ -926,15 +926,23 @@ function duelHero_(t) {
   s.pos = heroRawPos(tw);
   const co = collisionOffset('hero', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => heroRawPos(warp(x)), t); s._pf = (x) => heroRawPos(warp(x)); s._t = t;
-  springPose(heroPose, tw, _pose); heroImp(tw, _pose); volleyParry(tw, _pose); if (tw >= 170) { heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper'); }
-  // idle (173.4–175.1): a slow breathing sway and the hanging mace swinging a little like a pendulum, instead of jitter
+  springPose(heroPose, tw, _pose); heroImp(tw, _pose); volleyParry(tw, _pose);
+  // IDLE (173.4–175.1, scene 35): the body is held still — no squash / weight-shift / jitter / inertia lean / turning
+  // after RONIN; only a slow float (below: the whole machine drifts up and down a little) and breathing
   const idleK = smooth(173.2, 173.6, tw) * (1 - smooth(174.85, 175.15, tw));
-  micro(t, _pose, 1.3, 1 - 0.7 * idleK);
-  if (idleK > 0) {
-    _pose[PIDX.torso] += Math.sin(t * 1.9) * 0.035 * idleK; _pose[PIDX.head] += Math.sin(t * 1.9 - 0.6) * 0.03 * idleK;
-    _pose[PIDX.arm_L_upper] += Math.sin(t * 1.5 + 0.8) * 0.07 * idleK; _pose[PIDX.arm_L_upper + 2] += Math.sin(t * 1.1) * 0.03 * idleK;
-    _pose[PIDX._body + 2] += Math.sin(t * 1.2) * 0.025 * idleK;
+  if (tw >= 170) {
+    const pre = idleK > 0 ? Float64Array.from(_pose) : null;
+    heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper');
+    if (pre) for (let i = 0; i < _pose.length; i++) _pose[i] = lerp(_pose[i], pre[i], idleK);
   }
+  micro(t, _pose, 1.3, 1 - idleK);
+  if (idleK > 0) {
+    _pose[PIDX.torso] += Math.sin(t * 1.6) * 0.02 * idleK; _pose[PIDX.head] += Math.sin(t * 1.6 - 0.6) * 0.015 * idleK;   // breathing
+    _pose[PIDX.arm_L_upper] += Math.sin(t * 1.6 - 1.2) * 0.03 * idleK;                                                     // the hanging mace lags the float
+  }
+  s._idle = idleK;
+  s.anchor = s.pos.slice();                                   // (the idle camera follows this, so the float shows on screen)
+  if (idleK > 0) s.pos = add(s.pos, [Math.sin(t * 0.9) * 0.12 * idleK, Math.sin(t * 1.3 + 0.4) * 0.45 * idleK, Math.sin(t * 0.7 + 1) * 0.12 * idleK]);
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   _pose[PIDX.hand_L] = maceWrist(_pose[PIDX.hand_L]);
   // facing
@@ -950,6 +958,7 @@ function duelHero_(t) {
     parryPose(tw, _pose);
   } else if (tw < 180.25) {
     f = flat(sub(e1RawPos(tw), s.pos));
+    if (idleK > 0) f = nrm(lrp(f, flat(sub(e1RawPos(173.6), heroRawPos(173.6))), idleK));   // idle: keeps its heading
   } else {
     const toE1 = flat(sub(e1RawPos(180.2), s.pos));
     const toE2 = flat(sub(e2RawPos(tw), s.pos), tw < 184 ? 0.6 : 0.35);
@@ -1453,7 +1462,7 @@ export const DUEL_CAMS = [
   { t0: 170.0, t1: 171.6, name: 'D01 wide establish', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, -48 + u * 6)), add(scl(sd, 24), [0, 14, 0])), target: lrp(h, e, 0.45), fov: 50, handheld: 0.4 }; } },
   { t0: 171.6, t1: 172.6, name: 'D02 OTS hero fires', fn: (t) => ({ ...ots(hp(t), e1p(t), { right: 1, back: 34, lift: 9, fov: 40, side: 13 }), handheld: 0.6 }) },
   { t0: 172.6, t1: 173.6, name: 'D03 E1 boost in', fn: (t, u) => { const e = e1p(t); const h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(sd, 34)), add(scl(d, 22), [0, 6 - u * 3, 0])), target: up(e, 2), fov: 42, handheld: 0.7 }; } },   // whole RONIN in frame
-  { t0: 173.6, t1: 175.0, name: 'D04 low hero angle', fn: (t, u) => { const h = hp(t), d = nrm(sub(e1p(173.6), hp(173.6))); const sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 24)), add(scl(sd, -12), [0, -12, 0])), target: up(h, 6), fov: 50, roll: 0.12, handheld: 0, baseShake: 0 }; } },   // locked: fixed orientation (from the cut's first frame), only carried along with Sigma's drift — no swing as RONIN moves
+  { t0: 173.6, t1: 175.0, name: 'D04 low hero angle', fn: (t, u) => { const h = duelHero(t).anchor, d = nrm(sub(e1p(173.6), hp(173.6))); const sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 24)), add(scl(sd, -12), [0, -12, 0])), target: up(h, 6), fov: 50, roll: 0.12, handheld: 0, baseShake: 0 }; } },   // locked: fixed orientation (from the cut's first frame), only carried along with Sigma's drift — no swing as RONIN moves
   { t0: 175.0, t1: 176.4, name: 'D05 E1 medium', fn: (t, u) => { const e = e1p(t), h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(d, 42 - u * 5)), add(scl(sd, -16), [0, 7, 0])), target: up(e, 2.5), fov: 38, handheld: 0.6 }; } },   // whole body in frame (aimed 9 m up it cut him in half)
   { t0: 176.4, t1: 177.5, name: 'D06 profile — the charge', fn: (t, u) => { const c = two(hp(t), e1p(t), { side: 1, dist: 0.9, lift: 5, fov: 44, bias: 0.55 }); return { ...c, handheld: 0.3 }; } },
   // ---- melee with E1
