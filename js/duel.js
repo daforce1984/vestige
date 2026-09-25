@@ -932,7 +932,11 @@ function duelHero_(t) {
     const toE1 = flat(sub(e1RawPos(180.2), s.pos));
     const toE2 = flat(sub(e2RawPos(tw), s.pos), tw < 184 ? 0.6 : 0.35);
     f = nrm(lrp(toE1, toE2, smooth(180.95, 181.3, tw)));
-    if (tw > 191.55) f = nrm(lrp(f, [0, -0.08, -1], smooth(191.55, 192.1, tw)));   // pass-cut: faces its dash line, cuts to its left
+    // the killing blow is a 180° SPINNING strike: from facing RONIN #2 he coils the other way (70°), then whips round
+    // with his back passing the enemy, accelerating all the way into the contact — the mace arm, out to his left,
+    // meets the torso at the fastest point of the spin (facing the dash line, as before) — and the spin bleeds off
+    // in the follow-through
+    if (tw > 191.3) f = yawRot(flat(sub(e2RawPos(Math.min(tw, 192.4)), s.pos), 0.35), spinYaw(tw) * DEG);
   }
   s.saber = heroSaber(tw);
   s.boost = heroBoost(tw);
@@ -954,6 +958,13 @@ function duelHero_(t) {
 }
 
 const _c_duelEnemy1 = new Map();
+function spinYaw(t) {       // degrees, relative to facing RONIN #2 (270 = facing the dash line, mace arm on the enemy)
+  if (t < 191.3) return 0;
+  if (t < 191.85) return 70 * easeInOut((t - 191.3) / 0.55);                      // coil
+  if (t < 192.4) { const u = (t - 191.85) / 0.55; return 70 + 200 * u * u; }       // whip round, fastest at contact
+  if (t < 193.1) { const u = (t - 192.4) / 0.7; return 270 + 35 * (1 - (1 - u) * (1 - u)); }   // follow-through
+  return 305 - 5 * easeInOut(sat((t - 193.1) / 0.8));
+}
 export function duelEnemy1(t) {
   if (!STATE_CACHE) return duelEnemy1_(t);
   let r = _c_duelEnemy1.get(t);
