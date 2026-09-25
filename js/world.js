@@ -497,6 +497,29 @@ for (let k = 0; k < 14; k++) {
     hiigChases: k % 3 !== 1, die: [138, 141.6, 145, 148.6, 152, 157, 163, 171, 178, 189][k] ?? 999,
   });
 }
+// the dogfight's laser shots (shared by the picture and the sound): bursts of 5, every 3.3 s per pair. The last shot
+// of a burst HITS now and then (always in the second before the kill); everything else misses and flies on into space
+export const DOG_SHOTS = (() => {
+  const out = [];
+  for (let k = 0; k < 14; k++) {
+    const launch = 116 + k * 0.35, die = [138, 141.6, 145, 148.6, 152, 157, 163, 171, 178, 189][k] ?? 999;
+    for (let burst = 0; burst * 1.1 < 250; burst += 3) for (let s = 0; s < 5; s++) {
+      const tf = burst * 1.1 + s * 0.07 + hash(k * 17 + burst) * 0.3;
+      if (tf > die || tf < launch || tf > 248) continue;
+      const hit = tf > die - 1.2 || (s === 4 && hash(k * 31 + burst * 7) < 0.45);
+      out.push({ k, tf, s, hit, seed: k * 97 + burst * 5 + s });
+    }
+  }
+  return out;
+})();
+// the bandits' 24 shots in the strike chase (shots.js 'S10a', picture + sound): each burst walks onto the next wingman
+// (wingman k dies at STRIKE_DIE[k]); shots landing in his last 0.8 s and every third shot HIT, the rest go wide
+const STRIKE_DIE = [null, 139.7, 137.9, 136.1];
+export const STRIKE_SHOTS = Array.from({ length: 24 }, (_, n) => {
+  const tf = 134.3 + n * 0.26, tgtK = tf < 136.1 ? 3 : tf < 137.9 ? 2 : tf < 139.7 ? 1 : 0;
+  const die = STRIKE_DIE[tgtK];
+  return { n, tf, tgtK, hit: tgtK !== 0 && (n % 3 === 0 || (die !== null && tf + 0.2 > die - 0.8 && tf + 0.2 < die)) };
+});
 export function fighterPos(out, k, t) {
   const p = PAIRS[k];
   const a = p.w * t + p.ph;
@@ -926,17 +949,38 @@ function drawDogfight(R, t, tmpM) {
     const ce = R.add(chaserName, mat(tmpM, b, v, [0, 1, 0], Math.sin(t * 1.1 + k + 1) * 0.5));
     engineGlows(R, chaserName, ce, hiChase ? HIIG_ENGINE : ENEMY_ENGINE, 0.6, 1, 2.5, { past: dogPast(k, 0.9, t) });
     GUN.pairs[k] = { target: [...a], chaser: [...b], alive };
-    // tracer bursts
-    const col = hiChase ? [0.5, 1.1, 3.0] : [3.0, 0.55, 0.35];
-    for (let burst = Math.floor((t - 1.2) / 3.3) * 3; burst <= Math.floor(t / 3.3) * 3; burst += 3) {   // sparse
-      for (let s = 0; s < 5; s++) {
-        const tf = burst * 1.1 + s * 0.07 + hash(k * 17 + burst) * 0.3;
-        if (tf > p.die || tf < launch) continue;
-        const from = fighterPos([0, 0, 0], k, tf - 0.9);
-        const to = fighterPos([0, 0, 0], k, tf + 0.25);
-        to[0] += (hash(tf * 3) - 0.5) * 8; to[1] += (hash(tf * 5) - 0.5) * 8;
-        bolt(R, t, tf, tf + 0.3, from, to, 10, 0.35, [col[0] * fade, col[1] * fade, col[2] * fade], 1.3);
+  }
+  // laser shots: a HIT strikes the target's hull (flash + sparks + a scorch glow riding on it); a MISS keeps going
+  for (const sh of DOG_SHOTS) {
+    if (sh.tf > t || sh.tf < t - 12) continue;
+    const k = sh.k, p = PAIRS[k], lt = t - sh.tf;
+    const col = p.hiigChases ? [0.5, 1.1, 3.0] : [3.0, 0.55, 0.35], c = [col[0] * fade, col[1] * fade, col[2] * fade];
+    const from = fighterPos([0, 0, 0], k, sh.tf - 0.9);
+    if (sh.hit) {
+      const TT = 0.22;                                               // flight time to the target
+      if (lt < TT) {
+        const to = fighterPos([0, 0, 0], k, sh.tf + TT);
+        bolt(R, t, sh.tf, sh.tf + TT, from, to, 10, 0.35, c, 1.3);
+      } else if (lt < TT + 0.7) {
+        const li = lt - TT, tp = fighterPos([0, 0, 0], k, t);         // rides on the target as it flies on
+        const off = randDir([0, 0, 0], sh.seed * 1.7); V.madd(tp, tp, off, 1.6);
+        const kf = Math.exp(-li * 9);
+        R.glow(tp, 2.5 + 3 * kf, [(col[0] * 0.4 + 2.5) * kf, (col[1] * 0.4 + 2) * kf, (col[2] * 0.4 + 1.5) * kf], 0.6);   // impact flash
+        R.glow(tp, 1.2, [1.6 * (1 - li / 0.7), 0.5 * (1 - li / 0.7), 0.1 * (1 - li / 0.7)], 0.3);                        // glowing scorch
+        if (li < 0.1) R.light(tp, 40, [1, 0.7, 0.5], 6 * (1 - li / 0.1));
+        for (let i = 0; i < 12; i++) {                                // spark particles off the hull
+          const life = 0.18 + hash(sh.seed + i) * 0.3; if (li > life) continue;
+          const u = li / life, d = randDir([0, 0, 0], sh.seed * 3.1 + i * 2.3);
+          const b = 4 * (1 - u) * (1 - u);
+          spark(R, V.madd([0, 0, 0], tp, d, (2 + 10 * hash(sh.seed + i + 5)) * easeOut(u)), 0.5 + 0.4 * (1 - u), [b, b * 0.7, b * 0.35]);
+        }
       }
+    } else {
+      const aim = fighterPos([0, 0, 0], k, sh.tf + 0.25);
+      aim[0] += (hash(sh.tf * 3) - 0.5) * 22; aim[1] += (hash(sh.tf * 5) - 0.5) * 22;   // wide of the mark
+      const dir = V.norm([0, 0, 0], V.sub([0, 0, 0], aim, from)), sp = V.dist(aim, from) / 0.25;
+      const FAR = 4000, dur = FAR / sp;                              // same speed, on out into space
+      bolt(R, t, sh.tf, sh.tf + dur, from, V.madd([0, 0, 0], from, dir, FAR), 10, 0.35, c, 1.3);
     }
   }
 }

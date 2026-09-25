@@ -16,7 +16,8 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, bulletReal } from './duel.js';   // pure data/functions (no DOM/GPU)
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, bulletReal } from './duel.js';
+import { DOG_SHOTS, STRIKE_SHOTS } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, TEAR_S0, TEAR_S1, TEAR_F1, FILM_DURATION, STORY_DURATION } from './timemap.js';
 // The Score clock is FILM time. Every table below (CUES, SAMPLE_CUES, SECTIONS, AUTOMATION, ION_SHOTS, DUEL_EVENTS,
@@ -333,7 +334,22 @@ export const SAMPLE_CUES = [
     [t, 'hl_explosion', { rate: 1.12, gain: 1.05, pan, prio: 9, duck: 0.8, norand: true }],
     [t + 0.03, 'expl_debris', { rate: 1.1, gain: 0.55, pan, prio: 7, norand: true }],
   ]),
-  ...Array.from({ length: 24 }, (_, n) => [134.3 + n * 0.26, 'laser_shot', { gain: 0.35, rate: 1.25, far: 0.25, pan: [-0.3, 0.1, 0.4][n % 3], prio: 5 }]),   // the bandits' guns
+  // the dogfight's lasers (world.js DOG_SHOTS — the very shots on screen): synthesized zaps, the near pairs louder;
+  // hits get a small crackle on the target
+  // the bandits' guns (shots.js STRIKE_SHOTS — same schedule as the picture)
+  ...STRIKE_SHOTS.flatMap((d) => {
+    const pan = [-0.3, 0.1, 0.4][d.n % 3];
+    const out = [[d.tf, '@blaster', { vel: 0.55, f0: 1500 + 400 * ((d.n * 0.37) % 1), pan }]];
+    if (d.hit) out.push([d.tf + 0.2, '@sparkBurst', { vel: 0.45, pan: pan * 0.5 }]);
+    return out;
+  }),
+  ...DOG_SHOTS.filter((d) => d.tf > 141 && d.tf < 150 && d.k < 6).flatMap((d) => {
+    const h = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
+    const pan = (h(d.k * 3.7) - 0.5) * 1.2, near = d.k < 3 ? 1 : 0.55;
+    const out = [[d.tf, '@blaster', { vel: 0.5 * near, f0: 1400 + 700 * h(d.seed), pan }]];
+    if (d.hit) out.push([d.tf + 0.22, '@sparkBurst', { vel: 0.35 * near, pan }]);
+    return out;
+  }),
   // fighter kills (small)
   ...[138, 141.6, 145, 148.6, 152, 157, 163, 171, 178, 189].map((t, i) => [t, 'hl_explosion', { rate: 1.22, gain: 0.75, far: 0.3 + 0.1 * (i % 3), pan: 'rnd', prio: 5 }]),
   ...[138, 145, 152, 163, 178].map((t, i) => [t + 0.04, 'expl_debris', { rate: 1.15, gain: 0.3, far: 0.4, pan: 'rnd', prio: 3 }]),

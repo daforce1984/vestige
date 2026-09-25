@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel, ionCharge, EARTH_T,
+  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel, ionCharge, EARTH_T, STRIKE_SHOTS,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -1275,6 +1275,7 @@ function strafeRun(t) { return [-520 + (t - 134) * 150, 40 + Math.sin(t * 1.3) *
 // [side, up, back] in the leader's frame, death time (null = the leader survives)
 const STRIKE = [[0, 0, 0, null], [-15, -2, 11, 139.7], [17, 1, 13, 137.9], [32, -3, 25, 136.1]];
 const BANDITS = [[-6, 5, 70], [14, 9, 84], [30, 2, 96]];
+// (their 24 shots: world.js STRIKE_SHOTS, shared with the sound)
 function strikePos(t, off) {
   const a = strafeRun(t), v = V.norm([0, 0, 0], V.sub([0, 0, 0], strafeRun(t + 0.05), a));
   const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], v, [0, 1, 0])), up = V.cross([0, 0, 0], sd, v);
@@ -1305,15 +1306,32 @@ shot(134, 141, 'S10a dogfight chase', (c) => {
     const past = (tau) => { const q = strikePos(t - tau, b); return { m: mat(new Float32Array(16), q.p, q.v, [0, 1, 0], 0) }; };
     if (ef) engineGlows(R, fighterModel(true, k), ef, ENEMY_ENGINE, 0.6, 1, 3, { past });
   });
-  for (let n = 0; n < 24; n++) {
-    const tf = 134.3 + n * 0.26;
-    const tgtK = tf < 136.1 ? 3 : tf < 137.9 ? 2 : tf < 139.7 ? 1 : 0;          // each burst on the next victim
-    const shooter = BANDITS[n % 3];
-    const from = strikePos(tf, shooter).p;
-    const tp = strikePos(tf + 0.2, STRIKE[tgtK]).p;
-    const miss = tgtK === 0 ? 9 : (n % 3 === 0 ? 1 : 5);
-    const to = V.add([0, 0, 0], tp, [(hash(n) - 0.5) * miss * 2, (hash(n + 1) - 0.5) * miss * 1.4, 0]);
-    bolt(R, t, tf, tf + 0.2, from, to, 12, 0.2, [3, 1.2, 0.4], 1);
+  // their shots: a HIT strikes the wingman (flash + sparks riding on his hull); a MISS flies on out into space
+  for (const sh of STRIKE_SHOTS) {
+    const { tf, tgtK, hit, n } = sh, lt = t - tf;
+    if (lt < 0 || lt > 12) continue;
+    const from = strikePos(tf, BANDITS[n % 3]).p;
+    if (hit) {
+      const vict = STRIKE[tgtK];
+      if (lt < 0.2) { bolt(R, t, tf, tf + 0.2, from, strikePos(tf + 0.2, vict).p, 12, 0.2, [3, 1.2, 0.4], 1); continue; }
+      const li = lt - 0.2;
+      if (li > 0.6 || (vict[3] && t > vict[3])) continue;
+      const tp = V.madd([0, 0, 0], strikePos(t, vict).p, randDir([0, 0, 0], n * 3.7), 1.3);
+      const kf = Math.exp(-li * 9);
+      R.glow(tp, 2 + 2.5 * kf, [4 * kf, 2.6 * kf, 1.4 * kf], 0.6);
+      R.glow(tp, 1, [1.5 * (1 - li / 0.6), 0.45 * (1 - li / 0.6), 0.1 * (1 - li / 0.6)], 0.3);
+      if (li < 0.1) R.light(tp, 30, [1, 0.7, 0.5], 5 * (1 - li / 0.1));
+      for (let i = 0; i < 12; i++) {
+        const life = 0.16 + hash(n * 7 + i) * 0.3; if (li > life) continue;
+        const u = li / life, d = randDir([0, 0, 0], n * 5.3 + i * 2.1), b = 4 * (1 - u) * (1 - u);
+        spark(R, madd(tp, d, (1.5 + 8 * hash(n + i * 3)) * easeOut(u)), 0.45 + 0.35 * (1 - u), [b, b * 0.7, b * 0.35]);
+      }
+    } else {
+      const tp = strikePos(tf + 0.2, STRIKE[tgtK]).p;
+      const to = V.add([0, 0, 0], tp, [(hash(n) - 0.5) * 16, (hash(n + 1) - 0.5) * 11, 0]);   // wide
+      const dir = V.norm([0, 0, 0], V.sub([0, 0, 0], to, from)), sp = V.dist(to, from) / 0.2, FAR = 4000;
+      bolt(R, t, tf, tf + FAR / sp, from, madd(from, dir, FAR), 12, 0.2, [3, 1.2, 0.4], 1);
+    }
   }
   const v = lead.v;
   const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], v, [0, 1, 0]));
