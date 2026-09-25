@@ -7,3 +7,4 @@ assets/src/
 assets/sfx_src/
 blender/previews/
 *.blend1
+render/
