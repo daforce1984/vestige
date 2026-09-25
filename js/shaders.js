@@ -413,9 +413,9 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
   let aa = clamp(1.0 - pw * 4.0, 0.0, 1.0);                         // fine detail fades before it can alias
   let aa2 = clamp(1.0 - pw * 12.0, 0.0, 1.0);
   // --- plate courses: rows 4.5 m, staggered, plate widths vary per row
-  let H = 9.0;                                                        // large plates (was 4.5)
+  let H = select(9.0, 1.0e6, vertical);                               // side walls: ONE plate (no seam grid)
   let ry = floor(uv.y / H);
-  let W = 16.0 + 12.0 * hash31(vec3f(ry, seed, 3.0));
+  let W = select(16.0 + 12.0 * hash31(vec3f(ry, seed, 3.0)), 1.0e6, vertical);
   let xo = uv.x + hash31(vec3f(ry, seed, 7.0)) * W;
   var cell = vec2f(floor(xo / W), ry);
   var q = vec2f(xo - cell.x * W, uv.y - ry * H);
