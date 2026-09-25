@@ -230,3 +230,6 @@
 - [x] 168. Scene 60→61: Sigma's exhaust history no longer reaches back across the 340 cut (his path jumps there), which drew a long light streak sweeping across the frame.
 - [x] 169. Bug: the hero's leftover beam-saber hilt had 'engine'-coloured faces, so 24 tiny thruster plumes fired from the hand/weapon; excluded from the engine emitters and the hilt part hidden (only the 3 backpack thrusters remain).
 - [x] 170. Recovery bay: the field's pass-through ripple starts as a ring (it began as a bright filled dot that read as a light ball by Sigma's hand); visor glow smaller; dock lamp dimmer; mech plumes fade when seen end-on.
+- [x] 171. Sigma model: 2 inverted faces re-wound and 150 broken vertex normals (pointing away from their faces) rebuilt from the faces (backup assets/v5_backup/gundam_pre_normalfix.glb). Sigma paint matte (roughness ≥ 0.72), chipped bare metal scuffed (≥ 0.5) and less metallic.
+- [x] 172. Flagship plating: one uniform tone per plate (no in-plate noise: grime, streaks, chip noise, edge-wear noise off); decals ~2× (hull numbers 3.2 m, text blocks, chevrons, hazard bands, emblem, 9 m registration numerals).
+- [x] 173. Scene 3: camera fixed at the close framing from the first frame (no push-in). Scene 4: the belly pass covers ~72 % of the hull (cuts before reaching the stern).

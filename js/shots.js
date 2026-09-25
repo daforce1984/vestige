@@ -1026,7 +1026,7 @@ shot(16, 30, 'A2 THE ARRIVAL', (c) => {
   // a slow push past the escorts (scale) that finally tilts up under the prow
   const b = R.models.mothership.bounds;
   const len = b.max[2] - b.min[2];
-  const k = easeInOut(sat((t - 19.5) / 10.5));
+  const k = 1;                                                        // fixed at the close framing from the first frame (no push-in)
   const pos = [lerp(-len * 0.95, -len * 0.42, k), lerp(-len * 0.2, -len * 0.12, k), lerp(len * 1.15, len * 0.62, k)];
   const tgt = [0, lerp(-len * 0.02, len * 0.05, k), lerp(-len * 0.15, len * 0.1, k)];
   camLook(c, pos, tgt, lerp(38, 48, k), 0.05 - 0.03 * k);
@@ -1041,7 +1041,7 @@ shot(30, 40, 'A3 belly pass', (c) => {
   // the flagship is ALREADY under way: the camera hangs just below the keel and the hull streams past overhead —
   // plates, hatches and lights rush by fast, yet the ship takes the whole ten seconds to go by (it is that long)
   const L = b.max[2] - b.min[2];
-  const z = lerp(b.max[2] + 25, b.min[2] - 20, (t - 30) / 10);          // constant speed from the first frame
+  const z = lerp(b.max[2] + 25, b.max[2] - L * 0.72, (t - 30) / 10);   // constant speed; the shot cuts before the stern arrives
   const y = b.min[1] - 5;                                              // skimming just under the keel
   const pos = motherPoint([0, 0, 0], t, [-18, y, z]);
   const look = motherPoint([0, 0, 0], t, [-8, y + 26, z - 70]);       // up and aft: the hull rushes at us overhead
