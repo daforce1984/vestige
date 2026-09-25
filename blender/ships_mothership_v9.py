@@ -125,6 +125,8 @@ def light_row(mb, p0, p1, n, pitch, size, mat, R=None, dropout=0.0, kind=None):
 # ------------------------------------------------------------------------------------------ structural grid
 FR0, BAYL, FRAME = -44.0, 24.0, 6.0          # bulkheads every 24 m from the bay bulkhead s=-44, frames every 6 m
 WALL_T, CHAM_T, KEEL_T = 1.2, 1.1, 1.0
+WALL_GAP, WALL_MAT = 0.2, 'plate'       # flat side walls: one plate per wall face (end gap m, material)
+PLATE_ROUND_MAX = 0.1                   # rounded plate edges: fillet size cap (m) for all mothership armour
 SPINE = [(293, 238, 9, 6), (238, 170, 13, 10), (170, 126, 17, 14), (126, 90, 17, 14), (90, -20, 19, 17),
          (-20, -60, 22, 20), (-130, -200, 24, 19), (-200, -274, 20, 13)]
 STRAKE = [(176, 50, 50, 54), (126, 64, 51.5, 58), (40, 78, 51.5, 59), (-46, 94, 51.5, 59.5), (-120, 108, 44, 55),
@@ -238,12 +240,17 @@ def main_hull(mb, H, R):
     for e in (5, 7):
         armor(mb, H, sc, [e + 0.02, e + 0.5, e + 0.98], DN_MAT, R, thick=CHAM_T, gap_s=0.9, gap_p=gp(H, 0, e),
               sub_prob=0.15, sub_mat='hull')
-    # walls: three belts; starboard skips the hangar wall, port skips the launch bay; aft is inside the sponsons
-    wall_mat = lambda i, j, R: ('plate', 'hull2', 'plate')[j] if R.random() < 0.78 else 'hull'
+    # walls: ONE continuous armour plate per flat wall face (no plate grid), small 0.15 m chamfer + 0.1 m rounded
+    # outer edge; starboard skips the hangar wall, port skips the launch bay; aft is inside the sponsons.
+    # R is advanced exactly as the old 3-belt plate grid did (throwaway build) so the armour, structure and site
+    # choices generated after this keep their random stream.
+    old_mat = lambda i, j, R: ('plate', 'hull2', 'plate')[j] if R.random() < 0.78 else 'hull'
     for e, spans in ((0, ((124.5, 293.0),)), (4, ((-45.0, 5.5), (104.5, 293.0)))):
         for a, b in spans:
-            armor(mb, H, cuts(a, b, R, 22, 40), [e + 0.02, e + 0.34, e + 0.66, e + 0.98], wall_mat, R,
-                  thick=WALL_T, gap_s=0.9, gap_p=gp(H, 0, e), sub_prob=0.22, sub_mat='hull2')
+            armor(MB(), H, cuts(a, b, R, 22, 40), [e + 0.02, e + 0.34, e + 0.66, e + 0.98], old_mat, R,
+                  thick=WALL_T, gap_s=0.9, gap_p=gp(H, 0, e), sub_prob=0.22, sub_mat='hull2')    # RNG sync only
+            plate(mb, H, a + WALL_GAP / 2, b - WALL_GAP / 2, e + 0.012, e + 0.988, WALL_MAT, thick=WALL_T, ch=0.15,
+                  rnd=0.1)
     # keel: armour belts either side of a structural keel spine (one block per bulkhead bay)
     armor(mb, H, cuts(-282, 300, R, 24, 44), [6.02, 6.21, 6.41], DN_MAT, R, thick=KEEL_T, gap_s=0.9,
           gap_p=gp(H, 0, 6), sub_prob=0.15, sub_mat='hull')
@@ -1337,6 +1344,7 @@ def mothership(probe=False):
     R = rng(909)
     H = Hull(STATIONS, PROF)
     mb = MB()
+    mb.plate_round_max = PLATE_ROUND_MAX
     # structure + armour
     main_hull(mb, H, R)
     deck(mb, H, R)

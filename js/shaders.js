@@ -462,7 +462,7 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
   if (vertical && cls != 4.0 && cls != 5.0) {
     let zz = abs(uv.x);
     // hull number "07" — 40 m tall, centred on z = −60 (both flanks)
-    let dh = 40.0; let dw = dh * (1.3 / 1.85);
+    let dh = 36.0; let dw = dh * (1.3 / 1.85);                        // (90 %)
     let lx = uv.x - (select(60.0, -60.0, uv.x < 0.0)) + dw;            // local x from the number's left edge
     let pn = vec2f(lx, uv.y - (13.0 - dh * 0.5)) / (dh / 1.85);
     if (pn.x > 0.0 && pn.x < 2.6 && pn.y > 0.0 && pn.y < 1.85) {
@@ -472,19 +472,19 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
     }
     // fleet emblem, 30 m radius, on the aft wall section (z ≈ −235)
     let ec = vec2f(select(235.0, -235.0, uv.x < 0.0), 12.0);
-    let v = (uv - ec) / 30.0; let r = length(v);
+    let v = (uv - ec) / 27.0; let r = length(v);
     let ring = step(abs(r - 0.88), 0.09);
     let tv = max(abs(v.x) * 0.87 + v.y * 0.5, -v.y);
     let tri = step(tv, 0.56) * step(0.3, tv);
     if (max(ring, tri) > 0.0) { paint = vec3f(0.6, 0.61, 0.63); pa = 1.0; }
     // a long hazard band low on the forward wall (z 100…170)
-    if (uv.y > -24.0 && uv.y < -17.0 && zz > 100.0 && zz < 170.0) { let st = step(0.5, fract((uv.x + uv.y) / 8.0)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
+    if (uv.y > -23.6 && uv.y < -17.3 && zz > 103.5 && zz < 166.5) { let st = step(0.5, fract((uv.x + uv.y) / 8.0)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
   }
   if (pa > 0.0) {
     pa *= 0.9;
   }
   o.mixk = pa;
-  if (pa > 0.0) { o.metal = 0.15; o.rough += 0.1; }
+  // overlay: the decal only recolours — the armour's own metalness, roughness, seams and bump stay underneath
   o.paint = paint * (0.75 + 0.25 * h2);
   return o;
 }
@@ -601,7 +601,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     else if (a.y > a.z) { uvp = i.lp.xz; tU = vec3f(1.0, 0.0, 0.0); tV = vec3f(0.0, 0.0, 1.0); }
     else { uvp = i.lp.xy; tU = vec3f(1.0, 0.0, 0.0); tV = vec3f(0.0, 1.0, 0.0); }
     let hd = hullDetail(uvp, inst.shade.z, inst.p1.w, pwLP, a.x > 0.8);   // giant decals only on the flat side walls
-    base = mix(base * hd.col, hd.paint, hd.mixk);
+    base = base * hd.col;
+    base = mix(base, base * (hd.paint / 0.1) * 0.9, hd.mixk * 0.9);   // overlay: tint the armour (keeps its material and value range)
     rough = clamp(rough + hd.rough, 0.12, 1.0);
     if (hd.metal >= 0.0) { metal = mix(metal, hd.metal, hd.mixk); }
     texAO *= hd.ao;

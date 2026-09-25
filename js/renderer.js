@@ -466,6 +466,13 @@ export class Renderer {
 
   /** add a model instance. Returns an entry whose fields can be tweaked (flash, damage, reveal*, pose...) */
   add(name, matrix) {
+    // LOD: dense fleets / far ships / shatter chunks use the decimated copy (<name>_lod) beyond LOD_DIST × its length
+    const lod = this.models[name + '_lod'];
+    if (lod && this.camPos) {
+      const full = this.models[name], L = full ? full.bounds.max[2] - full.bounds.min[2] : 60;
+      const dx = matrix[12] - this.camPos[0], dy = matrix[13] - this.camPos[1], dz = matrix[14] - this.camPos[2];
+      if (dx * dx + dy * dy + dz * dz > (L * 5.5) * (L * 5.5)) name = name + '_lod';
+    }
     const model = this.models[name];
     if (!model) return null;
     const e = this._entryPool[this._entryUsed++] || newEntry();

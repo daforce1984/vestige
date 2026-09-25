@@ -136,21 +136,18 @@ class Hull:
 
 
 # ------------------------------------------------------------------ armor plates
-# Rounded plate edges: every plate's outer edges get a 2-segment circular fillet (p sides) / a cubic roll-off (s ends)
-# whose tangent length is PLATE_ROUND x thickness (clamped by the plate's own size, and by `mb.plate_round_max` metres
-# when a ship sets it).  The fillets are smooth-shaded while the flat faces stay flat: the bevel edges are marked
-# smooth and a Weighted Normal (face area) modifier limited to the plate vertices hands every fillet vertex the normal
-# of its big neighbouring face, so the shading rolls over the edge without bending the plate tops.
+# Rounded plate edges: every plate's outer edges get a 2-segment circular fillet (long p sides; 1 segment below
+# PLATE_ROUND_SEG2_MIN) / a cut-back corner pair (s ends: end-wall top + chamfer top) whose tangent length is
+# PLATE_ROUND x thickness (clamped by the plate's own size, and by `mb.plate_round_max` metres when a ship sets it).
+# The fillets are smooth-shaded while the flat faces stay flat: the bevel edges are marked smooth and a Weighted
+# Normal (face area) modifier limited to the plate vertices hands every fillet vertex the normal of its big
+# neighbouring face, so the shading rolls over the edge without bending the plate tops.
 # The build keeps the *un-rounded* plate until MB.to_object() (so ray-cast placement during the build sees exactly
 # the old plates) and swaps in the rounded one there.  PLATE_ROUND = 0 disables it.
 PLATE_ROUND = 0.4
+PLATE_ROUND_SEG2_MIN = 0.05       # fillets smaller than this (m) get one smooth-shaded segment instead of two
 PLATE_ROUND_SKIP = ('engine', 'muzzle', 'window')    # emissive markers the engine clusters: never touched
 _RND_SMOOTH_MAX = 70.0                                 # fillet edges up to this dihedral are shaded smooth
-
-
-def _bez(P, u):
-    a, b, c, d = (1 - u) ** 3, 3 * u * (1 - u) ** 2, 3 * u * u * (1 - u), u ** 3
-    return (a * P[0][0] + b * P[1][0] + c * P[2][0] + d * P[3][0], a * P[0][1] + b * P[1][1] + c * P[2][1] + d * P[3][1])
 
 
 def _round_rings(hull, s0, s1, p0, p1, off, thick, ch, mids, d):
@@ -167,17 +164,19 @@ def _round_rings(hull, s0, s1, p0, p1, off, thick, ch, mids, d):
     if math.floor(p1) > p0 and math.floor(p1) != p1:
         room = min(room, (p1 - math.floor(p1)) * hull.edge_len(sm, math.floor(p1)) - ch)
     dp = min(d, 0.6 * room)
-    # s ends: cubic whose control polygon is the original end profile (wall top -> chamfer corner) -> lies inside it
+    # s ends: the end wall -> chamfer slope -> top profile keeps its shape; both corners are cut back by their
+    # tangent length (one segment each, shaded smooth -> reads as a rounded edge)
     slope_s = math.hypot(ch, thick - hw)
-    dW = min(d, 0.6 * (hw + 0.05))
+    dW = min(d, 0.6 * (hw + 0.05), 0.45 * slope_s)
     dT = min(d, 0.45 * slope_s, 0.8 * (L / 2 - ch))
     if dp < 0.004 or dT < 0.004 or dW < 0.004 or L < 2 * (ch + dT) + 1e-3:
         return None
-    P = [(0.0, hw - dW), (0.0, hw), (ch, thick), (ch + dT, thick)]
-    prof = [P[0], _bez(P, 0.5), P[3]]                  # 2 segments: (distance from the end, thickness)
+    ux, uy = ch / slope_s, (thick - hw) / slope_s
+    prof = [(0.0, hw - dW), (ux * dW, hw + uy * dW), (ch - ux * dT, thick - uy * dT), (ch + dT, thick)]
     ss = [(s0 + a, h) for a, h in prof]
     ss += [(s, thick) for s in mids if s0 + ch + dT + 1e-3 < s < s1 - ch - dT - 1e-3]
     ss += [(s1 - a, h) for a, h in prof[::-1]]
+    seg2 = dp >= PLATE_ROUND_SEG2_MIN
     rings = []
     for s, tr in ss:
         # p sides: 2-segment circular fillet of the slope (0,-0.05)->(ch,tr) / top corner, tangent length dd
@@ -196,10 +195,16 @@ def _round_rings(hull, s0, s1, p0, p1, off, thick, ch, mids, d):
         inn = hull.sample(s, p0, p1, off - 0.05)
         top = hull.sample(s, p0, p1, off + tr, trim0=B[0], trim1=B[0])
         ra = hull.sample(s, p0, p1, off + A[1], trim0=A[0], trim1=A[0])
-        rm = hull.sample(s, p0, p1, off + M[1], trim0=M[0], trim1=M[0])
-        rings.append(inn + [ra[-1], rm[-1]] + top[::-1] + [rm[0], ra[0]])
+        if seg2:
+            rm = hull.sample(s, p0, p1, off + M[1], trim0=M[0], trim1=M[0])
+            rings.append(inn + [ra[-1], rm[-1]] + top[::-1] + [rm[0], ra[0]])
+        else:
+            rings.append(inn + [ra[-1]] + top[::-1] + [ra[0]])
     n, T = len(inner), len(top)
-    cols = [n, n + 1, n + 2, n + 1 + T, n + 2 + T, n + 3 + T]       # A, M, B (p1 side), B, M, A (p0 side)
+    if seg2:
+        cols = [n, n + 1, n + 2, n + 1 + T, n + 2 + T, n + 3 + T]   # A, M, B (p1 side), B, M, A (p0 side)
+    else:
+        cols = [n, n + 1, n + T, n + 1 + T]                         # A, B (p1 side), B, A (p0 side)
     return rings, cols
 
 
@@ -218,7 +223,7 @@ def _rounding_pass(mb):
         for i in range(K - 1):
             for j in cols:
                 cand.append(bm.edges.get((vr[i][j], vr[i + 1][j])))
-        for i in list(range(0, 3)) + list(range(K - 3, K)):
+        for i in list(range(0, 4)) + list(range(K - 4, K)):
             for j in range(m):
                 cand.append(bm.edges.get((vr[i][j], vr[i][(j + 1) % m])))
         for e in cand:
