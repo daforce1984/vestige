@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2 } from './duel.js';   // pure data/functions (no DOM/GPU)
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, bulletReal } from './duel.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, TEAR_S0, TEAR_S1, TEAR_F1, FILM_DURATION, STORY_DURATION } from './timemap.js';
 // The Score clock is FILM time. Every table below (CUES, SAMPLE_CUES, SECTIONS, AUTOMATION, ION_SHOTS, DUEL_EVENTS,
@@ -615,6 +615,7 @@ function duelCues() {
   out.push([156.9, 'hit_heavy', { rate: 0.7, lp: 1200, gain: G * 0.5, prio: 7, norand: true }]);
   out.push([157.3, 'servo', { rate: 0.6, gain: G * 0.6, prio: 7, norand: true }]);
   out.push([157.35, '@steam', { dur: 1.2, vel: 0.5 }]);
+  for (const c of out) c[0] = bulletReal(c[0]);               // follow the picture through the bullet-time ramps
   return out;
 }
 

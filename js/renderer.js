@@ -480,7 +480,7 @@ export class Renderer {
     e.flash = 0; e.damage = 0; e.revealDir = 0; e.revealZ = 0; e.revealWidth = 1; e.emissive = 1; e.seed = model.entries.length * 7.13;
     e.tint[0] = 0.4; e.tint[1] = 0.7; e.tint[2] = 1.0;
     e.pose = null; e.hidden = null; e.matOverride = null;
-    e.dmgR = 0; e.clip = null; e.clipHeat = 1; e.clipInv = false; e.stretch = 0; e.stretchOut = false; e.stretchAnchor = undefined; e.wear = 0; e.texSet = 0; e.crush = null; e.melt = null; e.shadeK = 1; e.soot = 0; e.hideMats = null; e.rimK = 1;
+    e.dmgR = 0; e.clip = null; e.clipHeat = 1; e.clipInv = false; e.stretch = 0; e.stretchOut = false; e.stretchAnchor = undefined; e.wear = 0; e.texSet = 0; e.crush = null; e.melt = null; e.shadeK = 1; e.soot = 0; e.hideMats = null; e.rimK = 1; e.clipPart = null;
     model.entries.push(e);
     return e;
   }
@@ -602,7 +602,7 @@ export class Renderer {
           I[o + 28] = e.revealDir; I[o + 29] = e.revealWidth; I[o + 30] = e.emissive; I[o + 31] = e.seed;
           I[o + 32] = e.tint[0]; I[o + 33] = e.tint[1]; I[o + 34] = e.tint[2]; I[o + 35] = e.wear || 0;
           I[o + 36] = e.dmgC[0]; I[o + 37] = e.dmgC[1]; I[o + 38] = e.dmgC[2]; I[o + 39] = e.dmgR;
-          const cl = e.clip;
+          const cl = e.clip && (!e.clipPart || model.parts[d.part].name === e.clipPart) ? e.clip : null;   // clipPart: only that part (part-local box)
           const ml = e.melt;           // [cx, cy, cz, radius, depth, heat] (model-local)
           if (ml) { I[o + 40] = ml[0]; I[o + 41] = ml[1]; I[o + 42] = ml[2]; I[o + 43] = 2; I[o + 44] = ml[3]; I[o + 45] = ml[4]; I[o + 46] = 0; I[o + 47] = ml[5]; }
           else if (cl) { I[o + 40] = cl[0]; I[o + 41] = cl[1]; I[o + 42] = cl[2]; I[o + 43] = e.clipInv ? -1 : 1; I[o + 44] = cl[3]; I[o + 45] = cl[4]; I[o + 46] = cl[5]; I[o + 47] = e.clipHeat ?? 1; }

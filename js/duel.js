@@ -322,6 +322,24 @@ const isImpact = (t) => IMPACTS.some((x) => Math.abs(x - t) < 1e-6);
 const isClashT = (t) => EV.some((e) => e[1] === 'clash' && Math.abs(e[0] - t) < 1e-6) || Math.abs(t - 189.08) < 1e-6;
 // fast whiff strikes also bypass the spring lag (crisp, exact), but keep their follow-through tangents
 const CRISP = [...IMPACTS, 177.6, 186.85, 187.2];
+// BULLET TIME round the big blows: a speed ramp on the whole picture (world, fx, duel) — it runs a touch fast into the
+// blow, drops to ~0.18× from just before contact to just after, then ramps fast to catch up. story(t) = t − off(t) with
+// off(x) = K·x·exp(−x²/w²): off(ts) = 0 (the blow lands exactly on its time, so audio stays in sync), off → 0 at both
+// ends, speed = 1 − off′ stays in [0.18, 1.37] (never stops, never reverses).
+export const BULLET = [[179.0, 0.9], [184.5, 0.85], [188.2, 0.7], [192.4, 1.0]];
+const BT_K = 0.82;
+export function bulletTime(t) {
+  let o = 0;
+  for (const [ts, w] of BULLET) { const x = t - ts; if (Math.abs(x) < 3.2 * w) o += BT_K * x * Math.exp(-(x * x) / (w * w)); }
+  return t - o;
+}
+/** inverse of bulletTime: the real (picture) time at which story time s is shown — for sound cues */
+export function bulletReal(s) {
+  let lo = s - 1.5, hi = s + 1.5;
+  for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (bulletTime(m) < s) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+export function bulletSpeed(t) { const h = 1 / 96; return (bulletTime(t + h) - bulletTime(t - h)) / (2 * h); }
 // Hit-stop: freeze d, then an eased release (Hermite offset, speed ramps 0 → >1 → 1) so anchors keep their times.
 export function warp(t) {
   let off = 0;

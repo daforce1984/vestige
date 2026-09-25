@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, bulletTime, bulletSpeed, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -526,6 +526,64 @@ for (const ev of DUEL_EVENTS.filter((e) => e.cut)) {
   BLOWS[idx] = { ev, p: M.transformPoint([0, 0, 0], inv, ev.pos), d: V.norm([0, 0, 0], M.transformDir([0, 0, 0], inv, d)) };
 }
 const E2_BLOW = BLOWS[2] && BLOWS[2].ev;
+// heavy blows leave a mark: the struck plating dents (crush) and on the hardest ones a slab of chest armour is ripped
+// off — the hole keeps a hot torn edge, the slab tumbles away along the blow. Contact points are the solved duel events,
+// kept in torso-local coordinates so the damage rides with the part.
+const HEAVY = [
+  { t: 178.2, who: 1, r: 5, k: 0.5 },                  // knee to RONIN #1's gut
+  { t: 178.55, who: 1, r: 6, k: 0.6, tear: 2.1 },      // push kick: chest plate torn off
+  { t: 188.2, who: 2, r: 6, k: 0.65, tear: 2.3 },      // shoulder charge into RONIN #2: chest plate torn off
+  { t: 189.45, who: 0, r: 5, k: 0.45 },                // RONIN #2's kick caves in Sigma's chest plate
+];
+for (const h of HEAVY) {
+  const ev = DUEL_EVENTS.find((e) => Math.abs(e.t - h.t) < 1e-6);
+  if (!ev || !ev.pos) { h.off = true; continue; }
+  const st = h.who === 0 ? duelHero(ev.t) : h.who === 1 ? duelEnemy1(ev.t) : duelEnemy2(ev.t);
+  const att = h.who === 0 ? duelEnemy2(ev.t) : duelHero(ev.t);
+  h.model = h.who === 0 ? 'gundam' : 'enemy_ms';
+  const T = duelFK({ ...st, saber: 1 }, h.model).torso, inv = M.invert(M.new(), T);
+  h.dw = V.norm([0, 0, 0], V.sub([0, 0, 0], st.pos, att.pos));           // blow direction (attacker → victim)
+  h.p = M.transformPoint([0, 0, 0], inv, ev.pos);
+  h.d = V.norm([0, 0, 0], M.transformDir([0, 0, 0], inv, h.dw));
+  h.w = ev.pos; h.ev = ev;
+  h.m = msMatrix(new Float32Array(16), st); h.pose = JSON.parse(JSON.stringify(st.pose));
+}
+const _hvM = new Float32Array(16), _hvM2 = new Float32Array(16), _hvQ = [0, 0, 0, 1];
+function heavyDamage(R, t, e, who) {
+  if (t > 200) return;
+  let dent = null;
+  for (const h of HEAVY) {
+    if (h.off || h.who !== who || t < h.t) continue;
+    const lt = t - h.t;
+    const tm = R.partWorld(h.model, e, 'torso');
+    const d = V.norm([0, 0, 0], M.transformDir([0, 0, 0], tm, h.d));
+    const cc = madd(M.transformPoint([0, 0, 0], tm, h.p), d, 1.2);
+    const k = h.k * easeOut(sat(lt / 0.08)) + 0.06 * Math.sin(Math.min(lt, 0.35) * 45) * Math.exp(-lt * 9);   // bites in, rings, stays
+    dent = [cc[0], cc[1], cc[2], h.r * Math.sign(d[2] || 1e-6), k, d[0], d[1]];
+    if (h.tear) {
+      const b = h.tear, c = V.madd([0, 0, 0], h.p, h.d, 0.4);        // the slab: a box round the contact, just under the skin
+      const box = [c[0] - b, c[1] - b, c[2] - b, c[0] + b, c[1] + b, c[2] + b];
+      e.clip = box; e.clipInv = true; e.clipPart = 'torso'; e.clipHeat = Math.max(0.25, 1.1 - lt / 3);
+      // the torn slab: the victim's own torso at the moment of impact, clipped to the box, thrown along the blow
+      const W = h.w, dist = 16 * lt * (1 - Math.min(0.5, lt * 0.08)) + 3 * easeOut(sat(lt / 0.1));
+      Q.fromEuler(_hvQ, lt * 2.3, lt * 1.1, lt * 1.7);
+      M.fromTRS(_hvM, [W[0] + h.dw[0] * dist, W[1] + h.dw[1] * dist + lt * 2, W[2] + h.dw[2] * dist], _hvQ, 1);
+      M.fromTRS(_hvM2, [-W[0], -W[1], -W[2]], [0, 0, 0, 1], 1);
+      M.mul(_hvM, _hvM, _hvM2); M.mul(_hvM, _hvM, h.m);
+      const ch = R.add(h.model, _hvM);
+      if (ch) {
+        ch.pose = h.pose; ch.clip = box; ch.clipInv = false; ch.clipPart = 'torso'; ch.clipHeat = Math.max(0.2, 1.2 - lt / 2);
+        ch.hidden = {}; for (const pt of R.models[h.model].parts) if (pt.name !== 'torso') ch.hidden[pt.name] = 1;
+        ch.seed = e.seed + 5; ch.wear = 1; ch.texSet = e.texSet; ch.damage = 0.3; ch.emissive = 0;
+      }
+      if (lt < 1.5) {                                            // sparks and a puff of burning coolant from the wound
+        const hp = M.transformPoint([0, 0, 0], tm, h.p);
+        R.fire(hp, 1.2 + 2.5 * easeOut(lt / 1.5), lt, h.t * 7, [1, 1, 1], 0.8 * (1 - lt / 1.5));
+      }
+    }
+  }
+  if (dent && !e.crush) e.crush = dent;
+}
 
 // first person: armoured hands with real fingers clawing into the shield (the model's fists are solid blocks)
 const CURL = -1;                                          // pose rx sign that bends a finger toward the palm (+Z)
@@ -643,6 +701,7 @@ export function drawGundam(R, t, s, opts = {}) {
     GUN.saber = [a, madd(a, dir, 12.9 * sc)];
     if (!s.fpv && k > 0.5) gripHand(R, e, 'L', 0);   // a real closed fist round the haft (replaces the open model hand)
   } else GUN.saber = null;
+  if (t >= 170 && t < 200 && !s.fpv) heavyDamage(R, t, e, 0);
   GUN.gundam = e;
   return e;
 }
@@ -678,6 +737,7 @@ function drawEnemyMS(R, t, s, idx) {
     e.crush = [cc[0], cc[1], cc[2], 10 * Math.sign(d[2] || 1e-6), k, d[0], d[1]];
     e.damage = Math.max(e.damage || 0, 0.35 * sat(lt / 0.3));
   }
+  heavyDamage(R, t, e, idx);
   const eye = emitWorld(R, 'enemy_ms', e, 'eye');
   if (eye) R.glow(eye, 1.6, [3.5, 0.3, 1.2], 0.6);
   // (no extra beam blade: RONIN already carries its own katana)
@@ -1338,6 +1398,10 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   c.env.fill = [0.42, 0.44, 0.52, 0.55]; c.env.rim = [0.6, 0.72, 1.0, 1.0]; c.env.ambient = 1.4;
   c.post.lensA = { enable: 0 };   // the well is far away: no background lensing (it smeared the planet into grey)
   if (k.slowmo) { c.post.saturation = 0.75; c.post.streak = 0.45; c.post.gradeHighlights = [1.2, 1.0, 0.85]; }
+  { // bullet time: the picture drains a little and the edges fall away while time crawls
+    const bs = sat((0.75 - bulletSpeed(storyT(FILM_NOW))) / 0.5);
+    if (bs > 0) { c.post.saturation = lerp(c.post.saturation ?? 0.9, 0.62, bs); c.post.vignette = lerp(c.post.vignette ?? 0.8, 1.25, bs); c.post.contrast = lerp(c.post.contrast ?? 1.08, 1.16, bs); c.post.streak = Math.max(c.post.streak ?? 0, 0.4 * bs); }
+  }
   // ---- the second RONIN from above (180.9–184.4): sensor spike → a silhouette against the light → the dive
   {
     const t = c.t, R = c.R;
@@ -2001,7 +2065,7 @@ function moonFor(R, s, film) {
 }
 export function frame(R, film) {
   FILM_NOW = film;
-  const t = storyT(film);
+  const t = bulletTime(storyT(film));                     // bullet time round the duel's big blows (identity elsewhere)
   const s = findShot(t);
   ctx.R = R; ctx.t = t; ctx.lt = t - s.t0; ctx.u = sat((t - s.t0) / (s.t1 - s.t0));
   ctx.env = spaceEnv(t); ctx.post = basePost();
