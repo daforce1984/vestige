@@ -391,11 +391,11 @@ fn panel(lp: vec3f, ln: vec3f, s: f32, seed: f32) -> vec3f {
 // text blocks, vent grilles, access hatches, chevrons, the fleet emblem — weathered (chipped paint, grime streaks,
 // worn bare-metal edges). Returns colour/rough/metal edits + a tangent-plane normal tilt.
 struct HD { col: vec3f, mixk: f32, rough: f32, metal: f32, tilt: vec2f, ao: f32, paint: vec3f };
-fn seg7(p: vec2f, d: i32) -> f32 {           // 7-segment digit, p in [0,1]x[0,1.8]; returns 1 inside a lit segment
+fn seg7(p: vec2f, d: i32) -> f32 { return seg7w(p, d, 0.16); }
+fn seg7w(p: vec2f, d: i32, w: f32) -> f32 {           // 7-segment digit, p in [0,1]x[0,1.8]; returns 1 inside a lit segment
   // segment bits: a b c d e f g (top, top-right, bottom-right, bottom, bottom-left, top-left, middle)
   var bits = array<u32, 10>(0x3Fu, 0x06u, 0x5Bu, 0x4Fu, 0x66u, 0x6Du, 0x7Du, 0x07u, 0x7Fu, 0x6Fu);
   let m = bits[u32(clamp(d, 0, 9))];
-  let w = 0.16;
   var on = 0.0;
   let hx = abs(p.x - 0.5) < 0.42; let vx0 = abs(p.x - 0.08) < w * 0.5; let vx1 = abs(p.x - 0.92) < w * 0.5;
   if ((m & 1u) != 0u && hx && abs(p.y - 1.72) < w * 0.5) { on = 1.0; }
@@ -455,27 +455,30 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
     let wear = (1.0 - smoothstep(seamW + 0.02, seamW + 0.09, de)) * 0.5 * aa;   // uniform edge highlight (no noise inside a plate)
     o.col = mix(o.col, vec3f(2.2), wear * 0.6); o.rough -= wear * 0.2;
   }
-  // --- decals: FEW and HUGE, each sized to its plate and kept fully inside it (never cut by a seam)
+  // --- decals: FEW and GIANT (5× the plate-sized ones): painted across the plating on a 150 × 56 m grid, bold stroke
+  // font, each fully inside its grid cell (a margin all round), so none is ever clipped
   var paint = vec3f(0.0); var pa = 0.0;
-  let mg = 0.9;                                                       // margin from the plate edges (m)
-  if (h < 0.07 && cls != 4.0 && cls != 5.0 && sz.x > 10.0) {        // hull number: 3 digits, 55 % of the plate height
-    let dh = sz.y * 0.62; let dw = dh * (1.3 / 1.85);
-    let p0 = (q - vec2f(sz.x * 0.5 - dw * 1.5, sz.y * 0.5 - dh * 0.5)) / (dh / 1.85);
-    var dg = 0.0;
-    if (p0.y > 0.0 && p0.y < 1.85 && p0.x > 0.0 && p0.x < 3.9) {
-      let n0 = i32(hash31(vec3f(cell, 11.0)) * 10.0); let n1 = i32(hash31(vec3f(cell, 12.0)) * 10.0); let n2 = i32(hash31(vec3f(cell, 13.0)) * 10.0);
-      let k = floor(p0.x / 1.3); let px = vec2f(p0.x - k * 1.3, p0.y);
-      if (k == 0.0) { dg = seg7(px, n0); } else if (k == 1.0) { dg = seg7(px, n1); } else { dg = seg7(px, n2); }
+  // placed by hand on the flat side walls (wall band y −31…+60): fully inside the wall, bold, 5× the old size
+  if (vertical && cls != 4.0 && cls != 5.0) {
+    let zz = abs(uv.x);
+    // hull number "07" — 40 m tall, centred on z = −60 (both flanks)
+    let dh = 40.0; let dw = dh * (1.3 / 1.85);
+    let lx = uv.x - (select(60.0, -60.0, uv.x < 0.0)) + dw;            // local x from the number's left edge
+    let pn = vec2f(lx, uv.y - (13.0 - dh * 0.5)) / (dh / 1.85);
+    if (pn.x > 0.0 && pn.x < 2.6 && pn.y > 0.0 && pn.y < 1.85) {
+      let k = floor(pn.x / 1.3); let px = vec2f(pn.x - k * 1.3, pn.y);
+      let dg = select(seg7w(px, 7, 0.32), seg7w(px, 0, 0.32), k == 0.0);
+      paint = vec3f(0.6, 0.61, 0.63); pa = max(pa, dg);
     }
-    paint = vec3f(0.55, 0.56, 0.58); pa = dg;
-  } else if (h < 0.1 && cls != 4.0 && cls != 5.0 && sz.x > 10.0) {              // fleet emblem filling the plate (ring + inner triangle)
-    let v = q - sz * 0.5; let R0 = min(sz.x, sz.y) * 0.5 - mg;
-    let r = length(v) / R0;
-    let ring = step(abs(r - 0.9), 0.07);
-    let tri = step(max(abs(v.x / R0) * 0.87 + v.y / R0 * 0.5, -v.y / R0), 0.55) * step(0.36, max(abs(v.x / R0) * 0.87 + v.y / R0 * 0.5, -v.y / R0));
-    paint = vec3f(0.62, 0.64, 0.66); pa = max(ring, tri);
-  } else if (h < 0.13 && cls != 4.0 && cls != 5.0) {               // hazard band across the whole plate, inside the margins
-    if (q.y > mg && q.y < mg + sz.y * 0.16 && q.x > mg && q.x < sz.x - mg) { let st = step(0.5, fract((q.x + q.y) / (sz.y * 0.2))); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
+    // fleet emblem, 30 m radius, on the aft wall section (z ≈ −235)
+    let ec = vec2f(select(235.0, -235.0, uv.x < 0.0), 12.0);
+    let v = (uv - ec) / 30.0; let r = length(v);
+    let ring = step(abs(r - 0.88), 0.09);
+    let tv = max(abs(v.x) * 0.87 + v.y * 0.5, -v.y);
+    let tri = step(tv, 0.56) * step(0.3, tv);
+    if (max(ring, tri) > 0.0) { paint = vec3f(0.6, 0.61, 0.63); pa = 1.0; }
+    // a long hazard band low on the forward wall (z 100…170)
+    if (uv.y > -24.0 && uv.y < -17.0 && zz > 100.0 && zz < 170.0) { let st = step(0.5, fract((uv.x + uv.y) / 8.0)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
   }
   if (pa > 0.0) {
     pa *= 0.9;
@@ -594,10 +597,10 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   if (hullOn) {
     let ln = normalize(i.ln); let a = abs(ln);
     var uvp: vec2f; var tU = vec3f(0.0, 0.0, 1.0); var tV = vec3f(0.0, 1.0, 0.0);
-    if (a.x > a.y && a.x > a.z) { uvp = i.lp.zy; tU = vec3f(0.0, 0.0, 1.0); tV = vec3f(0.0, 1.0, 0.0); }
+    if (a.x > a.y && a.x > a.z) { uvp = vec2f(-i.lp.z * sign(ln.x), i.lp.y); tU = vec3f(0.0, 0.0, -sign(ln.x)); tV = vec3f(0.0, 1.0, 0.0); }
     else if (a.y > a.z) { uvp = i.lp.xz; tU = vec3f(1.0, 0.0, 0.0); tV = vec3f(0.0, 0.0, 1.0); }
     else { uvp = i.lp.xy; tU = vec3f(1.0, 0.0, 0.0); tV = vec3f(0.0, 1.0, 0.0); }
-    let hd = hullDetail(uvp, inst.shade.z, inst.p1.w, pwLP, a.y < 0.6);
+    let hd = hullDetail(uvp, inst.shade.z, inst.p1.w, pwLP, a.x > 0.8);   // giant decals only on the flat side walls
     base = mix(base * hd.col, hd.paint, hd.mixk);
     rough = clamp(rough + hd.rough, 0.12, 1.0);
     if (hd.metal >= 0.0) { metal = mix(metal, hd.metal, hd.mixk); }

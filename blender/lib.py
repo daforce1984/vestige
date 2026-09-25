@@ -276,6 +276,7 @@ class MB:
         if cap1 and len(vr[-1]) > 2:
             fs.append(bm.faces.new(vr[-1]))
         self._fin(fs, mat, bevel)
+        return vr
 
     def nozzle(self, p, d, r, mat_body, mat_glow, length=None, flare=1.15, recess=0.35, seg=20):
         """Engine bell at point p pointing along direction d (exhaust side)."""
@@ -314,6 +315,10 @@ class MB:
 
     # output -----------------------------------------------------------
     def to_object(self, name, pivot=(0, 0, 0), smooth_angle=35.0):
+        """Hooks: callables in self.pre_out (fn(mb), run on the bmesh first -- e.g. shipkit's plate-edge rounding)
+        and self.post_out (fn(mb, obj), run on the finished object after the sharp-edge pass)."""
+        for fn in getattr(self, 'pre_out', ()):
+            fn(self)
         bm = self.bm
         bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
         for f, v0, v1 in getattr(self, '_keep', ()):
@@ -332,7 +337,10 @@ class MB:
         me.update()
         obj = bpy.data.objects.new(name, me)
         obj.location = pivot
-        return link(obj)
+        link(obj)
+        for fn in getattr(self, 'post_out', ()):
+            fn(self, obj)
+        return obj
 
 
 def join_into(objs, name):

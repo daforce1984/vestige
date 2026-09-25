@@ -136,16 +136,135 @@ class Hull:
 
 
 # ------------------------------------------------------------------ armor plates
-def plate(mb, hull, s0, s1, p0, p1, mat, off=0.0, thick=0.8, ch=None, step=None):
-    """One armor plate following the hull surface, chamfered on all four sides."""
+# Rounded plate edges: every plate's outer edges get a 2-segment circular fillet (p sides) / a cubic roll-off (s ends)
+# whose tangent length is PLATE_ROUND x thickness (clamped by the plate's own size, and by `mb.plate_round_max` metres
+# when a ship sets it).  The fillets are smooth-shaded while the flat faces stay flat: the bevel edges are marked
+# smooth and a Weighted Normal (face area) modifier limited to the plate vertices hands every fillet vertex the normal
+# of its big neighbouring face, so the shading rolls over the edge without bending the plate tops.
+# The build keeps the *un-rounded* plate until MB.to_object() (so ray-cast placement during the build sees exactly
+# the old plates) and swaps in the rounded one there.  PLATE_ROUND = 0 disables it.
+PLATE_ROUND = 0.4
+PLATE_ROUND_SKIP = ('engine', 'muzzle', 'window')    # emissive markers the engine clusters: never touched
+_RND_SMOOTH_MAX = 70.0                                 # fillet edges up to this dihedral are shaded smooth
+
+
+def _bez(P, u):
+    a, b, c, d = (1 - u) ** 3, 3 * u * (1 - u) ** 2, 3 * u * u * (1 - u), u ** 3
+    return (a * P[0][0] + b * P[1][0] + c * P[2][0] + d * P[3][0], a * P[0][1] + b * P[1][1] + c * P[2][1] + d * P[3][1])
+
+
+def _round_rings(hull, s0, s1, p0, p1, off, thick, ch, mids, d):
+    """Rounded plate: list of rings (equal length) + column indices of the fillet columns, or None if too small."""
+    L = s1 - s0
+    hw = thick * 0.35                                   # end-wall height of the original plate
+    sm = (s0 + s1) / 2
+    # plate width at mid-station (along the inner row) and room to the first / last hull vertex crossed
+    inner = hull.sample(sm, p0, p1, off - 0.05)
+    W = sum((b - a).length for a, b in zip(inner, inner[1:]))
+    room = W / 2 - ch
+    if math.ceil(p0) < p1:
+        room = min(room, (math.ceil(p0) - p0) * hull.edge_len(sm, math.floor(p0)) - ch)
+    if math.floor(p1) > p0 and math.floor(p1) != p1:
+        room = min(room, (p1 - math.floor(p1)) * hull.edge_len(sm, math.floor(p1)) - ch)
+    dp = min(d, 0.6 * room)
+    # s ends: cubic whose control polygon is the original end profile (wall top -> chamfer corner) -> lies inside it
+    slope_s = math.hypot(ch, thick - hw)
+    dW = min(d, 0.6 * (hw + 0.05))
+    dT = min(d, 0.45 * slope_s, 0.8 * (L / 2 - ch))
+    if dp < 0.004 or dT < 0.004 or dW < 0.004 or L < 2 * (ch + dT) + 1e-3:
+        return None
+    P = [(0.0, hw - dW), (0.0, hw), (ch, thick), (ch + dT, thick)]
+    prof = [P[0], _bez(P, 0.5), P[3]]                  # 2 segments: (distance from the end, thickness)
+    ss = [(s0 + a, h) for a, h in prof]
+    ss += [(s, thick) for s in mids if s0 + ch + dT + 1e-3 < s < s1 - ch - dT - 1e-3]
+    ss += [(s1 - a, h) for a, h in prof[::-1]]
+    rings = []
+    for s, tr in ss:
+        # p sides: 2-segment circular fillet of the slope (0,-0.05)->(ch,tr) / top corner, tangent length dd
+        sx, sy = ch, tr + 0.05
+        Ls = math.hypot(sx, sy)
+        dd = min(dp, 0.45 * Ls)
+        ux, uy = sx / Ls, sy / Ls
+        phi = math.atan2(sy, sx)                     # deflection slope -> top
+        r = dd / math.tan(phi / 2)
+        e = r / math.cos(phi / 2) - r
+        bx, by = 1.0 - ux, -uy
+        bl = math.hypot(bx, by)
+        A = (ch - ux * dd, tr - uy * dd)
+        M = (ch + bx / bl * e, tr + by / bl * e)
+        B = (ch + dd, tr)
+        inn = hull.sample(s, p0, p1, off - 0.05)
+        top = hull.sample(s, p0, p1, off + tr, trim0=B[0], trim1=B[0])
+        ra = hull.sample(s, p0, p1, off + A[1], trim0=A[0], trim1=A[0])
+        rm = hull.sample(s, p0, p1, off + M[1], trim0=M[0], trim1=M[0])
+        rings.append(inn + [ra[-1], rm[-1]] + top[::-1] + [rm[0], ra[0]])
+    n, T = len(inner), len(top)
+    cols = [n, n + 1, n + 2, n + 1 + T, n + 2 + T, n + 3 + T]       # A, M, B (p1 side), B, M, A (p0 side)
+    return rings, cols
+
+
+def _rounding_pass(mb):
+    """MB.pre_out hook: swap every recorded plate for its rounded version; tag fillet edges + plate vertices."""
+    bm = mb.bm
+    recs = [r for r in mb._rnd_plates if all(v.is_valid for v in r[0])]
+    bmesh.ops.delete(bm, geom=[v for r in recs for v in r[0]], context='VERTS')
+    smooth, sharp, verts = [], [], []
+    for _, rings, cols, mat in recs:
+        vr = mb.loft(rings, mat)
+        K, m = len(vr), len(vr[0])
+        bmesh.ops.recalc_face_normals(bm, faces=list({f for r in vr for v in r for f in v.link_faces}))
+        verts += [v for r in vr for v in r]
+        cand = []
+        for i in range(K - 1):
+            for j in cols:
+                cand.append(bm.edges.get((vr[i][j], vr[i + 1][j])))
+        for i in list(range(0, 3)) + list(range(K - 3, K)):
+            for j in range(m):
+                cand.append(bm.edges.get((vr[i][j], vr[i][(j + 1) % m])))
+        for e in cand:
+            if e is None:
+                continue
+            (smooth if e.calc_face_angle(math.pi) < _RND_SMOOTH_MAX * math.pi / 180 else sharp).append(e)
+    bm.verts.index_update()
+    bm.edges.index_update()
+    mb._rnd_tags = ([e.index for e in smooth], [e.index for e in sharp], [v.index for v in verts])
+
+
+def _rounding_post(mb, obj):
+    """MB.post_out hook: fillet edges smooth (after the angle-based sharp pass), weighted normals on the plates."""
+    smooth, sharp, verts = mb._rnd_tags
+    if not verts:
+        return
+    me = obj.data
+    att = me.attributes.get('sharp_edge') or me.attributes.new('sharp_edge', 'BOOLEAN', 'EDGE')
+    flags = [False] * len(me.edges)
+    att.data.foreach_get('value', flags)
+    for i in smooth:
+        flags[i] = False
+    for i in sharp:
+        flags[i] = True
+    att.data.foreach_set('value', flags)
+    me.update()
+    vg = obj.vertex_groups.new(name='plate_round')
+    vg.add(verts, 1.0, 'REPLACE')
+    wn = obj.modifiers.new('plate_round_normals', 'WEIGHTED_NORMAL')
+    wn.mode = 'FACE_AREA'
+    wn.weight = 100
+    wn.keep_sharp = True
+    wn.vertex_group = vg.name
+
+
+def plate(mb, hull, s0, s1, p0, p1, mat, off=0.0, thick=0.8, ch=None, step=None, rnd=None):
+    """One armor plate following the hull surface, chamfered on all four sides, outer edges rounded (see above).
+    rnd: fillet tangent length in metres (default PLATE_ROUND * thick, capped by mb.plate_round_max; 0 = off)."""
     if s1 - s0 < 1e-3 or p1 - p0 < 1e-3:
         return
     ch = ch if ch is not None else min(thick * 1.2, (s1 - s0) * 0.2)
     step = step or max(4.0, (s1 - s0) / 3)
     ss = [s0, s0 + ch]
     nmid = max(0, int((s1 - s0 - 2 * ch) / step))
-    for k in range(1, nmid + 1):
-        ss.append(lerp(s0 + ch, s1 - ch, k / (nmid + 1)))
+    mids = [lerp(s0 + ch, s1 - ch, k / (nmid + 1)) for k in range(1, nmid + 1)]
+    ss += mids
     ss += [s1 - ch, s1]
     rings = []
     for k, s in enumerate(ss):
@@ -154,12 +273,29 @@ def plate(mb, hull, s0, s1, p0, p1, mat, off=0.0, thick=0.8, ch=None, step=None)
         inner = hull.sample(s, p0, p1, off - 0.05)
         outer = hull.sample(s, p0, p1, off + t, trim0=ch, trim1=ch)
         rings.append(inner + outer[::-1])
-    mb.loft(rings, mat)
+    vr = mb.loft(rings, mat)
+    d = PLATE_ROUND * thick if rnd is None else rnd
+    cap = getattr(mb, 'plate_round_max', None)
+    if cap is not None:
+        d = min(d, cap)
+    if d <= 0 or mat in PLATE_ROUND_SKIP:
+        return
+    if type(hull).at is Hull.at and type(hull).poly is Hull.poly and not hull.smooth:
+        # piecewise-linear hull: the plate only needs rings where the hull itself has them (station breaks)
+        mids = [st[0] for st in hull.st if s0 + ch < st[0] < s1 - ch]
+    rr = _round_rings(hull, s0, s1, p0, p1, off, thick, ch, mids, d)
+    if rr is None:
+        return
+    if not hasattr(mb, '_rnd_plates'):
+        mb._rnd_plates = []
+        mb.pre_out = list(getattr(mb, 'pre_out', ())) + [_rounding_pass]
+        mb.post_out = list(getattr(mb, 'post_out', ())) + [_rounding_post]
+    mb._rnd_plates.append(([v for r in vr for v in r], rr[0], rr[1], mat))
 
 
 def armor(mb, hull, s_cuts, p_cuts, mats, R, off=0.0, thick=0.8, gap_s=0.6, gap_p=0.04, skip_prob=0.0,
-          skip=None, sub_prob=0.0, sub_mat=None, ch=None):
-    """Grid of plates. mats: callable(i_s, i_p, R) -> material or list."""
+          skip=None, sub_prob=0.0, sub_mat=None, ch=None, rnd=None):
+    """Grid of plates. mats: callable(i_s, i_p, R) -> material or list.  rnd: see plate()."""
     for i, (sa, sb) in enumerate(zip(s_cuts, s_cuts[1:])):
         for j, (pa, pb) in enumerate(zip(p_cuts, p_cuts[1:])):
             sm = (sa + sb) / 2
@@ -168,13 +304,15 @@ def armor(mb, hull, s_cuts, p_cuts, mats, R, off=0.0, thick=0.8, gap_s=0.6, gap_
             if skip_prob and R.random() < skip_prob:
                 continue
             m = mats(i, j, R) if callable(mats) else R.choice(mats)
-            plate(mb, hull, sa + gap_s / 2, sb - gap_s / 2, pa + gap_p, pb - gap_p, m, off=off, thick=thick, ch=ch)
+            plate(mb, hull, sa + gap_s / 2, sb - gap_s / 2, pa + gap_p, pb - gap_p, m, off=off, thick=thick, ch=ch,
+                  rnd=rnd)
             if sub_prob and R.random() < sub_prob:
                 L = sb - sa
                 a = R.uniform(sa + L * 0.15, sa + L * 0.4)
                 b = R.uniform(sa + L * 0.6, sb - L * 0.15)
                 pw = pb - pa
-                plate(mb, hull, a, b, pa + pw * 0.2, pb - pw * 0.2, sub_mat or m, off=off + thick, thick=thick * 0.6)
+                plate(mb, hull, a, b, pa + pw * 0.2, pb - pw * 0.2, sub_mat or m, off=off + thick, thick=thick * 0.6,
+                      rnd=None if rnd is None else rnd * 0.6)
 
 
 def cuts(a, b, R, lmin, lmax):
