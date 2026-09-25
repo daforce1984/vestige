@@ -235,3 +235,5 @@
 - [x] 173. Scene 3: camera fixed at the close framing from the first frame (no push-in). Scene 4: the belly pass covers ~72 % of the hull (cuts before reaching the stern).
 - [x] 174. Grips: RONIN's grip bake now uses both arms + torso with a loose blade weight, plus a per-frame left-arm grip lock (median grip error 0.1 m); Sigma's closed fist round the mace haft unchanged.
 - [x] 175. Flagship side "patchwork" removed: every armour class uses one gunmetal (trim slightly lighter), no 2×2 sub-plate split, no per-plate tone/roughness variation, no brushed-noise sheen, no generic panel/grime layer — only seams, rivets, bevels and decals.
+- [x] 176. Grip orientation verified (Sigma: the haft runs through the closed fist, index side toward the mace head; RONIN: both fists on the hilt, axes aligned, roll matched — added a same-roll term to the grip cost).
+- [x] 177. Flagship decals: few and huge, sized to their plate and kept inside it with a 0.9 m margin (3-digit hull numbers 62 % of plate height, plate-filling emblem, full-width hazard band); small text/vents/hatches/chevrons and the course-spanning registration numerals removed.

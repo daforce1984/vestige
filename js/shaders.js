@@ -455,70 +455,27 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
     let wear = (1.0 - smoothstep(seamW + 0.02, seamW + 0.09, de)) * 0.5 * aa;   // uniform edge highlight (no noise inside a plate)
     o.col = mix(o.col, vec3f(2.2), wear * 0.6); o.rough -= wear * 0.2;
   }
-  // --- decals (paint: dielectric, satin), chosen per plate & class
+  // --- decals: FEW and HUGE, each sized to its plate and kept fully inside it (never cut by a seam)
   var paint = vec3f(0.0); var pa = 0.0;
-  let big = sz.x > 6.5 && sz.y > 4.0;
-  if (h < 0.045 && cls != 4.0) {                                     // hazard band along the lower edge
-    if (q.y < 1.4 && q.y > 0.2) { let st = step(0.5, fract((q.x + q.y) / 1.2)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
-  } else if (h < 0.1 && big) {                                       // stencilled hull number
-    let n0 = i32(hash31(vec3f(cell, 11.0)) * 10.0); let n1 = i32(hash31(vec3f(cell, 12.0)) * 10.0); let n2 = i32(hash31(vec3f(cell, 13.0)) * 10.0);
-    let p0 = (q - vec2f(sz.x * 0.5 - 3.4, sz.y * 0.5 - 1.75)) / 1.75;
+  let mg = 0.9;                                                       // margin from the plate edges (m)
+  if (h < 0.07 && cls != 4.0 && cls != 5.0 && sz.x > 10.0) {        // hull number: 3 digits, 55 % of the plate height
+    let dh = sz.y * 0.62; let dw = dh * (1.3 / 1.85);
+    let p0 = (q - vec2f(sz.x * 0.5 - dw * 1.5, sz.y * 0.5 - dh * 0.5)) / (dh / 1.85);
     var dg = 0.0;
-    if (p0.y > 0.0 && p0.y < 1.85) {
+    if (p0.y > 0.0 && p0.y < 1.85 && p0.x > 0.0 && p0.x < 3.9) {
+      let n0 = i32(hash31(vec3f(cell, 11.0)) * 10.0); let n1 = i32(hash31(vec3f(cell, 12.0)) * 10.0); let n2 = i32(hash31(vec3f(cell, 13.0)) * 10.0);
       let k = floor(p0.x / 1.3); let px = vec2f(p0.x - k * 1.3, p0.y);
-      if (k == 0.0) { dg = seg7(px, n0); } else if (k == 1.0) { dg = seg7(px, n1); } else if (k == 2.0) { dg = seg7(px, n2); }
+      if (k == 0.0) { dg = seg7(px, n0); } else if (k == 1.0) { dg = seg7(px, n1); } else { dg = seg7(px, n2); }
     }
-    paint = vec3f(0.55, 0.56, 0.58); pa = dg * mix(0.5, 1.0, aa);
-  } else if (h < 0.2) {                                              // maintenance text block (fake type rows)
-    let t = q - vec2f(0.45, sz.y - 2.2);
-    if (t.x > 0.0 && t.x < 4.4 && t.y > 0.0 && t.y < 1.44) {
-      let row = floor(t.y / 0.3);
-      let inRow = step(fract(t.y / 0.3), 0.58);
-      let word = hash31(vec3f(floor(t.x / 0.18), row, h * 50.0));
-      let len = 0.6 + 0.4 * hash31(vec3f(row, h, 3.0));
-      paint = vec3f(0.5, 0.5, 0.48); pa = inRow * step(0.22, word) * step(t.x, 4.4 * len) * aa;
-      if (row == 4.0) { paint = vec3f(0.6, 0.42, 0.06); }                      // yellow header line
-    }
-  } else if (h < 0.27 && (cls == 2.0 || cls == 4.0 || cls == 3.0)) { // vent grille: dark slots with louvre tilt
-    let v = q - sz * 0.5;
-    if (abs(v.x) < 0.85 && abs(v.y) < 0.5) {
-      let sl = fract((v.y + 0.5) / 0.11);
-      let slot = step(0.35, sl);
-      o.col *= mix(1.0, 0.25, slot * aa); o.ao *= mix(1.0, 0.55, slot);
-      o.tilt += vec2f(0.0, (sl - 0.5) * 0.8 * aa);
-    }
-    let fr = abs(boxd(q, sz * 0.5, vec2f(0.9, 0.55)));
-    o.ao *= 1.0 - (1.0 - smoothstep(0.02, 0.05 + pw, fr)) * 0.6;
-  } else if (h < 0.32) {                                             // access hatch: seam outline, handle, yellow corners
-    let c = sz * 0.5;
-    let bd = boxd(q, c, vec2f(0.6, 0.8)) - 0.12;
-    o.ao *= 1.0 - (1.0 - smoothstep(0.015, 0.04 + pw, abs(bd))) * 0.7;
-    let hd = boxd(q, c + vec2f(0.0, 0.45), vec2f(0.22, 0.04));
-    o.col *= 1.0 + (1.0 - smoothstep(0.0, 0.02 + pw, hd)) * 0.6;
-    let corner = step(abs(bd + 0.1), 0.05) * step(0.5, abs(q.x - c.x)) * step(0.62, abs(q.y - c.y));
-    paint = vec3f(0.6, 0.42, 0.05); pa = corner;
-  } else if (h < 0.345 && cls != 4.0) {                              // direction chevrons >>>
-    let v = q - vec2f(0.6, sz.y * 0.5);
-    let k = fract(v.x / 1.1);
-    let chev = step(abs(k - 0.5 - abs(v.y) * 0.4), 0.09) * step(0.0, v.x) * step(v.x, 3.3) * step(abs(v.y), 0.6);
-    paint = vec3f(0.6, 0.6, 0.6); pa = chev * aa;
-  } else if (h < 0.36 && big && cls == 1.0) {                        // fleet emblem: ring, inner triangle (original design)
-    let v = q - sz * 0.5;
-    let r = length(v);
-    let ring = step(abs(r - 1.9), 0.18);
-    let tri = step(max(abs(v.x) * 0.87 + v.y * 0.5, -v.y) , 1.0) * step(0.62, max(abs(v.x) * 0.87 + v.y * 0.5, -v.y));
-    paint = vec3f(0.62, 0.64, 0.66); pa = max(ring, tri) * mix(0.6, 1.0, aa);
-  }
-  // large registration numerals on a few big flank courses (5 m tall, readable from a distance)
-  if (vertical && (cls == 1.0 || cls == 3.0) && bh < 0.07) {
-    let bq = uv - bc * vec2f(24.0, 12.0);
-    let p0 = (bq - vec2f(12.0 - 6.2, 6.0 - 4.4)) / 4.8;   // 9 m registration numerals
-    if (p0.y > 0.0 && p0.y < 1.85 && p0.x > 0.0 && p0.x < 2.6) {
-      let k = floor(p0.x / 1.3); let px = vec2f(p0.x - k * 1.3, p0.y);
-      let dA = i32(hash31(vec3f(bc, 31.0)) * 10.0); let dB = i32(hash31(vec3f(bc, 32.0)) * 10.0);
-      let dg = select(seg7(px, dB), seg7(px, dA), k == 0.0);
-      if (dg > 0.0) { paint = vec3f(0.5, 0.52, 0.55); pa = max(pa, dg); }
-    }
+    paint = vec3f(0.55, 0.56, 0.58); pa = dg;
+  } else if (h < 0.1 && cls != 4.0 && cls != 5.0 && sz.x > 10.0) {              // fleet emblem filling the plate (ring + inner triangle)
+    let v = q - sz * 0.5; let R0 = min(sz.x, sz.y) * 0.5 - mg;
+    let r = length(v) / R0;
+    let ring = step(abs(r - 0.9), 0.07);
+    let tri = step(max(abs(v.x / R0) * 0.87 + v.y / R0 * 0.5, -v.y / R0), 0.55) * step(0.36, max(abs(v.x / R0) * 0.87 + v.y / R0 * 0.5, -v.y / R0));
+    paint = vec3f(0.62, 0.64, 0.66); pa = max(ring, tri);
+  } else if (h < 0.13 && cls != 4.0 && cls != 5.0) {               // hazard band across the whole plate, inside the margins
+    if (q.y > mg && q.y < mg + sz.y * 0.16 && q.x > mg && q.x < sz.x - mg) { let st = step(0.5, fract((q.x + q.y) / (sz.y * 0.2))); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
   }
   if (pa > 0.0) {
     pa *= 0.9;

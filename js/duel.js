@@ -1292,7 +1292,10 @@ const GRIP_R = [-0.2, -1.88, -1.45], GRIP_DIR_R = [-0.02, 0.31, 0.95], GRIP_L = 
 function gripErr(fk) {
   const tgt = M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R), dir = nrm(M.transformDir([0, 0, 0], fk.hand_R, GRIP_DIR_R));
   const g = M.transformPoint([0, 0, 0], fk.hand_L, GRIP_L), hd = nrm(M.transformDir([0, 0, 0], fk.hand_L, GRIP_DIR_L));
-  return V.dist(g, tgt) ** 2 + 6 * (1 - V.dot(hd, dir));
+  // roll about the hilt: two fists stacked on one hilt face the same way (knuckles/fingers wrap the same side) —
+  // the mirrored hand_L's local −Y (fingers) must match hand_R's local −Y
+  const yl = nrm(M.transformDir([0, 0, 0], fk.hand_L, [0, -1, 0])), yr = nrm(M.transformDir([0, 0, 0], fk.hand_R, [0, -1, 0]));
+  return V.dist(g, tgt) ** 2 + 6 * (1 - V.dot(hd, dir)) + 3 * (1 - V.dot(yl, yr));
 }
 function gripBake(who, t, parts, wBlade) {
   const tr = TRACKS[who].pose, key = keyAt(tr, t);
