@@ -227,7 +227,9 @@ def mux():
     wav = os.path.join(OUT, 'audio.wav')
     if os.path.exists(wav):
         cmd += ['-i', wav, '-c:a', 'aac', '-b:a', '256k', '-shortest']
-    cmd += ['-c:v', 'copy', '-movflags', '+faststart', out]
+    # final encode: temporal denoise of the dark-sky dither + CRF 24 (35 Mbps -> ~6 Mbps, same look)
+    cmd += ['-vf', 'hqdn3d=4:3:14:12', '-c:v', 'libx264', '-preset', 'slow', '-crf', '24', '-threads', '6', '-pix_fmt', 'yuv420p',
+            '-profile:v', 'high', '-movflags', '+faststart', out]
     subprocess.check_call(cmd)
     print('wrote', out, os.path.getsize(out) // (1 << 20), 'MB')
 
