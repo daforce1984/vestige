@@ -2122,7 +2122,7 @@ export function frame(R, film) {
 // from far ahead-left, at ion-bolt speed; it reaches that point at DODGE.t and keeps going
 function drawDodgeBolt(R, t) {
   const T = DODGE.t;
-  if (t < T - 0.62 || t > T + 0.9) return;
+  if (t < T - 0.62 || t > T + 1.9) return;
   // contact point: the right vambrace (between forearm and hand) at T, from the solved FK of the parry pose
   const hs = duelHero(T);
   const fk = duelFK({ ...hs, saber: 1 }, 'gundam');
@@ -2133,19 +2133,42 @@ function drawDodgeBolt(R, t) {
   const a = madd(hit, dir, -1300 * 0.62);
   bolt(R, t, T - 0.62, T, a, hit, 70, 2.2, [3.4, 0.7, 0.4], 1.8);
   if (t < T) { const hp = V.lerp([0, 0, 0], a, hit, (t - (T - 0.62)) / 0.62); R.glow(hp, 16, [2.2, 0.5, 0.25], 0.5); R.light(hp, 90, [1, 0.3, 0.15], 4); return; }
-  // deflected: it glances off the armour and tears away to his right and up, weaker
-  const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], r, 0.85), [0, 0.45, 0]), V.scale([0, 0, 0], fwd, 0.25)));
-  bolt(R, t, T, T + 0.55, hit, madd(hit, out, 700), 55, 1.6, [2.6, 0.6, 0.35], 1.4);
-  const lt = t - T, k = Math.exp(-lt * 7);
-  R.glow(hit, 5 + 6 * easeOut(sat(lt / 0.08)), [3.5 * k, 1.6 * k, 0.8 * k], 0.45);
-  R.light(hit, 70, [1, 0.55, 0.3], 10 * k);
-  if (lt < 0.25) R.ripple(hit, 3 + 14 * easeOut(lt / 0.25), [0.3, 0.3, 0.3], (1 - lt / 0.25) * 1.2);
-  for (let i = 0; i < 26; i++) {                                          // spark fan off the vambrace
+  // swatted: batted off to his right, it tumbles ~25 m and BURSTS — a white flash, a shock ring and a spray of burning
+  // fragments in every direction
+  // (dodgeRight() points to his LEFT — +X is the model's left — so his right is −r)
+  const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], r, -1.0), [0, 0.25, 0]), V.scale([0, 0, 0], fwd, 0.15)));
+  const TB = T + 0.11, E = madd(hit, out, 22), lt = t - T;
+  if (t < TB) {
+    const p = V.lerp([0, 0, 0], hit, E, (t - T) / (TB - T));
+    bolt(R, t, T, TB, hit, E, 26, 2.0, [3.4, 0.8, 0.45], 1.8);
+    R.glow(p, 12, [3, 0.8, 0.4], 0.5);
+  }
+  const k = Math.exp(-lt * 7);                                            // the swat itself on the vambrace
+  R.glow(hit, 4 + 5 * easeOut(sat(lt / 0.08)), [3.5 * k, 1.6 * k, 0.8 * k], 0.45);
+  R.light(hit, 60, [1, 0.55, 0.3], 8 * k);
+  for (let i = 0; i < 18; i++) {                                          // spark fan off the vambrace, along the swat
     const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 4.1 + 3), out, 1.2));
-    const life = 0.25 + hash(i + 9) * 0.5; if (lt > life) continue;
-    const u = lt / life, p = madd(hit, sd, (4 + 22 * hash(i + 2)) * easeOut(u)), q = madd(p, sd, -(1.5 + 3 * (1 - u)));
-    const b = 4.5 * (1 - u) * (1 - u);
-    R.beam(q, p, 0.1, [b, b * 0.6, b * 0.3], 1, 10);
+    const life = 0.2 + hash(i + 9) * 0.35; if (lt > life) continue;
+    const u = lt / life, p = madd(hit, sd, (3 + 16 * hash(i + 2)) * easeOut(u)), q = madd(p, sd, -(1.2 + 2.5 * (1 - u)));
+    const b = 4 * (1 - u) * (1 - u);
+    R.beam(q, p, 0.09, [b, b * 0.6, b * 0.3], 1, 10);
+  }
+  const lb = t - TB;                                                      // the burst
+  if (lb >= 0 && lb < 1.6) {
+    const f = Math.exp(-lb * 9);
+    R.glow(E, 3 + 8 * easeOut(sat(lb / 0.06)), [6 * f, 4.2 * f, 2.6 * f], 0.35);                        // white-hot core
+    R.glow(E, 5 + 12 * easeOut(sat(lb / 0.3)), [2.2 * Math.exp(-lb * 4), 0.8 * Math.exp(-lb * 4), 0.3 * Math.exp(-lb * 4)], 0.6);   // orange fireball
+    R.light(E, 120, [1, 0.6, 0.3], 18 * Math.exp(-lb * 6));
+    if (lb < 0.35) R.ripple(E, 4 + 34 * easeOut(lb / 0.35), [0.4, 0.4, 0.4], (1 - lb / 0.35) * 1.5);
+    for (let i = 0; i < 90; i++) {                                        // fragments in every direction, fast then dragging
+      const sd = randDir([0, 0, 0], i * 2.37 + 71);
+      const life = 0.35 + hash(i + 31) * 1.1; if (lb > life) continue;
+      const u = lb / life, sp = 25 + 70 * hash(i + 5);
+      const p = madd(E, sd, sp * life * easeOut(u) * 0.6), q = madd(p, sd, -(2 + 6 * (1 - u)));
+      const b = 5 * (1 - u) * (1 - u) * (hash(i + 17) > 0.8 ? 1.6 : 1);
+      R.beam(q, p, 0.1 + 0.08 * hash(i), [b, b * 0.55, b * 0.22], 1, 10);
+      if (i % 6 === 0) R.glow(p, 0.8 + 1.2 * (1 - u), [2.5 * (1 - u), 1.1 * (1 - u), 0.4 * (1 - u)], 0.5);
+    }
   }
 }
 // ---------------- energy shield around the well core (261–268), shatter 268–271
@@ -2398,7 +2421,7 @@ cut(131.8, 134, 'X hull skim', (c) => {
 });
 cut(143.8, 145.4, 'X frigate dies close', (c) => { const td = lossCam(c, 2, 230, -0.9, 42); shake(c, td && c.t > td ? 1 : 0.3, 10); });
 cut(148.6, 150, 'X another loss', (c) => { const td = lossCam(c, 3, 260, 5.3, 38); shake(c, td && c.t > td ? 0.9 : 0.2, 9); });
-cut(166.8, 169, 'X carnage over the planet', (c) => {
+cut(167.35, 169, 'X carnage over the planet', (c) => {   // (from 166.8: now holds on Sigma until the swatted bolt has burst)
   const { t, u } = c;
   againstPlanet(c, [0, 0, -700], 1300 - u * 120, 60, 300, 40, 0.06, 0.05, true);
   handheld(c, 0.4); c.env.shadowRadius = 900; c.env.shadowCenter = [0, 0, -700];

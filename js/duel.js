@@ -778,6 +778,11 @@ function poseObj(arr) {   // also enforces the joint limits (snap overshoot / ad
   return o;
 }
 const flat = (d, k = 0.35) => nrm([d[0], d[1] * k, d[2]]);
+// rough heading: toward where the other machine is AROUND now (its offset averaged over ±0.5 s) — before the melee the
+// fighters size each other up and turn cleanly, instead of servoing onto every little hover wobble of the other
+const _RW = [[-0.5, 1], [-0.25, 2], [0, 3], [0.25, 2], [0.5, 1]];
+function roughDir(from, to, tw) { let d = [0, 0, 0]; for (const [o, w] of _RW) d = add(d, scl(sub(to(tw + o), from(tw + o)), w)); return flat(d); }
+const ROUGH = (tw) => 1 - smooth(176.6, 176.95, tw);          // 1 while sizing each other up, 0 from the charge on (exact contacts)
 function yawRot(f, a) { const c = Math.cos(a), s = Math.sin(a); return [f[0] * c + f[2] * s, f[1], -f[0] * s + f[2] * c]; }
 let STATE_CACHE = false;  // state memo per t — enabled only after the contact solver has finished (see end of module)
 let SOLVING = false;   // the contact solver skips velocity estimation
@@ -810,7 +815,7 @@ function heroRawPos(tw) {
   if (tw < 170) return gundamLaunchPath(tw);
   return add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), smooth(170, 171, tw)));
 }
-function e1RawPos(tw) { return add(springPos(e1Pos, tw), hover(tw, 7.1, lerp(1.2, 0.3, smooth(176.3, 176.9, tw)))); }
+function e1RawPos(tw) { return add(springPos(e1Pos, tw), hover(tw, 7.1, lerp(0.45, 0.3, smooth(176.3, 176.9, tw)))); }   // (1.2 m of hover read as wobble)
 function e2RawPos(tw) { return add(springPos(e2Pos, tw), hover(tw, 3.7, 0.3)); }
 const heroSquash = squashFrom(heroPos), e1Squash = squashFrom(e1Pos), e2Squash = squashFrom(e2Pos);
 const HIP = 0;   // pos is the hip (msMatrix puts model [0,9,0] at pos)
@@ -893,17 +898,20 @@ export function dodgeRight(tw) { const d = nrm(sub(gundamLaunchPath(tw + 0.05), 
 // forearm comes up across the chest (0.3 s before), takes the bolt on the armour at DODGE.t and sweeps it outward;
 // the body gives a little to the hit and the arm settles back with weight
 function parryPose(tw, out) {
+  // a full SWAT, left to right: the right forearm comes up and reaches right across to his left shoulder (wind-up),
+  // then whips all the way out to his right through the bolt, the chest turning with it; the arm settles back after
   const T = DODGE.t;
-  const up = smooth(T - 0.34, T - 0.06, tw), sweep = smooth(T - 0.02, T + 0.18, tw), back = smooth(T + 0.35, T + 1.0, tw);
+  const up = smooth(T - 0.4, T - 0.1, tw), sweep = smooth(T - 0.07, T + 0.16, tw), back = smooth(T + 0.45, T + 1.1, tw);
   const k = up * (1 - back), lt = tw - T;
   const kick = lt > 0 && lt < 0.8 ? Math.exp(-lt * 6) * Math.sin(lt * 18) : 0;                  // impact shudder
-  out[PIDX.arm_R_upper] += (-1.25 + 0.25 * sweep) * k - 0.12 * kick;
-  out[PIDX.arm_R_upper + 1] += (0.55 - 0.9 * sweep) * k;                                          // across the chest -> swept out
-  out[PIDX.arm_R_upper + 2] += (0.15 - 0.45 * sweep) * k;
-  out[PIDX.arm_R_lower] += -1.35 * k + 0.1 * kick;                                                // forearm up, armour facing out
+  out[PIDX.arm_R_upper] += (-1.3 + 0.45 * sweep) * k - 0.12 * kick;
+  out[PIDX.arm_R_upper + 1] += (0.95 - 2.05 * sweep) * k;                                         // far across the chest -> far out right
+  out[PIDX.arm_R_upper + 2] += (0.2 - 0.6 * sweep) * k;
+  out[PIDX.arm_R_lower] += (-1.45 + 0.75 * sweep) * k + 0.1 * kick;                               // folded for the wind, opening through the swat
   out[PIDX.hand_R] += -0.3 * k;
-  out[PIDX.torso + 1] += (-0.22 + 0.34 * sweep) * k;                                              // shoulder turns into it, then through
-  out[PIDX.torso] += 0.06 * kick; out[PIDX.head + 1] += -0.15 * k;
+  out[PIDX.torso + 1] += (-0.38 + 0.8 * sweep) * k;                                               // chest winds left, turns through to the right
+  out[PIDX.pelvis + 1] += (-0.12 + 0.25 * sweep) * k;
+  out[PIDX.torso] += 0.06 * kick; out[PIDX.head + 1] += (-0.2 + 0.1 * sweep) * k;
   out[PIDX._body + 2] += 0.05 * kick;
 }
 function dodgeOffset(tw) {
@@ -935,7 +943,7 @@ function duelHero_(t) {
     heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper');
     if (pre) for (let i = 0; i < _pose.length; i++) _pose[i] = lerp(_pose[i], pre[i], idleK);
   }
-  micro(t, _pose, 1.3, 1 - idleK);
+  micro(t, _pose, 1.3, (1 - idleK) * (tw < 177 ? lerp(1, 0.35, ROUGH(tw)) : 1));
   if (idleK > 0) {
     _pose[PIDX.torso] += Math.sin(t * 1.6) * 0.02 * idleK; _pose[PIDX.head] += Math.sin(t * 1.6 - 0.6) * 0.015 * idleK;   // breathing
     _pose[PIDX.arm_L_upper] += Math.sin(t * 1.6 - 1.2) * 0.03 * idleK;                                                     // the hanging mace lags the float
@@ -958,6 +966,7 @@ function duelHero_(t) {
     parryPose(tw, _pose);
   } else if (tw < 180.25) {
     f = flat(sub(e1RawPos(tw), s.pos));
+    if (ROUGH(tw) > 0) f = nrm(lrp(f, roughDir(heroRawPos, e1RawPos, tw), ROUGH(tw)));
     if (idleK > 0) f = nrm(lrp(f, flat(sub(e1RawPos(173.6), heroRawPos(173.6))), idleK));   // idle: keeps its heading
   } else {
     const toE1 = flat(sub(e1RawPos(180.2), s.pos));
@@ -1099,12 +1108,13 @@ function duelEnemy1_(t) {
   s.pos = e1RawPos(tw);
   const co = collisionOffset('e1', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => e1RawPos(warp(x)), t); s._pf = (x) => e1RawPos(warp(x)); s._t = t;
-  springPose(e1Pose, tw, _pose); e1Imp(tw, _pose); e1Squash(tw, _pose); weightShift(e1Pose, tw, _pose, 'arm_R_upper'); micro(t, _pose, 7.1, tw > 179 ? 0.3 : 1);
+  springPose(e1Pose, tw, _pose); e1Imp(tw, _pose); e1Squash(tw, _pose); weightShift(e1Pose, tw, _pose, 'arm_R_upper'); micro(t, _pose, 7.1, tw > 179 ? 0.3 : lerp(1, 0.35, ROUGH(tw)));
   if (tw > 179.0) ragdollArr(_pose, 179.0, tw, 1.2, 1);          // smashed: goes limp, limbs flail with the blow's momentum
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   let f;
   const h = heroRawPos(Math.min(tw, 179.0));
   f = flat(sub(h, s.pos));
+  if (ROUGH(tw) > 0) f = nrm(lrp(f, roughDir(e1RawPos, heroRawPos, tw), ROUGH(tw)));
   if (tw > 179.0) {                                   // dead: tumbling away
     const u = tw - 179.0;
     f = yawRot(f, u * 0.9);
@@ -1459,7 +1469,7 @@ function ots(from, to, { right = 1, back = 16, lift = 6, fov = 42, side = 7 } = 
 }
 export const DUEL_CAMS = [
   // ---- ranged exchange (AC 'Locked In' language: wide, mostly static frames; the quick-boosts happen inside the frame)
-  { t0: 170.0, t1: 171.6, name: 'D01 wide establish', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, -48 + u * 6)), add(scl(sd, 24), [0, 14, 0])), target: lrp(h, e, 0.45), fov: 50, handheld: 0.4 }; } },
+  { t0: 170.0, t1: 171.6, name: 'D01 wide establish', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(roughDir(hp, e1p, t)), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, -48 + u * 6)), add(scl(sd, 24), [0, 14, 0])), target: lrp(h, e, 0.45), fov: 50, handheld: 0.15, baseShake: 0.04 }; } },   // steady: rough axis, no servoing
   { t0: 171.6, t1: 172.6, name: 'D02 OTS hero fires', fn: (t) => ({ ...ots(hp(t), e1p(t), { right: 1, back: 34, lift: 9, fov: 40, side: 13 }), handheld: 0.6 }) },
   { t0: 172.6, t1: 173.6, name: 'D03 E1 boost in', fn: (t, u) => { const e = e1p(t); const h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(sd, 34)), add(scl(d, 22), [0, 6 - u * 3, 0])), target: up(e, 2), fov: 42, handheld: 0.7 }; } },   // whole RONIN in frame
   { t0: 173.6, t1: 175.0, name: 'D04 low hero angle', fn: (t, u) => { const h = duelHero(t).anchor, d = nrm(sub(e1p(173.6), hp(173.6))); const sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 24)), add(scl(sd, -12), [0, -12, 0])), target: up(h, 6), fov: 50, roll: 0.12, handheld: 0, baseShake: 0 }; } },   // locked: fixed orientation (from the cut's first frame), only carried along with Sigma's drift — no swing as RONIN moves
