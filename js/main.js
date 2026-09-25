@@ -1,7 +1,7 @@
 import { Renderer } from './renderer.js';
 import { frame, findShot, DURATION, SHOTS } from './shots.js';
 import { storyT, filmT } from './timemap.js';
-import { DUEL_CAMS, bulletTime } from './duel.js';
+import { DUEL_CAMS, bulletTime, bulletReal } from './duel.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
   'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
@@ -116,6 +116,17 @@ function showSceneTag() {
   const mm = Math.floor(ft / 60), ss = (ft % 60).toFixed(1).padStart(4, '0');
   sceneTag.innerHTML = `<b>SCENE ${i + 1}</b> / ${SCENE_ORDER.length}<span>${sc.name}</span><em>${mm}:${ss}  (story ${storyT(ft).toFixed(2)} s)</em>`;
   sceneTag.classList.add('on');
+}
+// ←/→: one scene (camera cut) at a time
+function stepScene(dir) {
+  const st = bulletTime(storyT(now()));
+  const starts = [...new Set(SCENE_ORDER.map((x) => x.t0))].sort((a, b) => a - b);
+  const cur = [...starts].reverse().find((x) => x <= st + 0.001) ?? starts[0];
+  const to = dir > 0 ? starts.find((x) => x > st + 0.001)
+    : st - cur > 0.3 ? cur : [...starts].reverse().find((x) => x < cur - 0.0005);   // ←: back to this cut's start, again → previous cut
+  if (to === undefined) return;
+  seek(filmT(bulletReal(to)) + 0.002);
+  showSceneTag();
 }
 function hideSceneTag() { sceneTag.classList.remove('on'); }
 function seek(t) {
@@ -261,8 +272,8 @@ $('#duelBtn').addEventListener('click', () => startFilm(DUEL_FROM, DUEL_UNTIL));
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); if (playing) pause(); else play(now()); }
   else if (e.code === 'Escape') { if (playing) pause(); }
-  else if (e.code === 'ArrowRight') seek(now() + 5);
-  else if (e.code === 'ArrowLeft') seek(now() - 5);
+  else if (e.code === 'ArrowRight') { if (e.shiftKey) seek(now() + 5); else stepScene(1); }
+  else if (e.code === 'ArrowLeft') { if (e.shiftKey) seek(now() - 5); else stepScene(-1); }
   else if (e.code === 'KeyF') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
   else if (e.code === 'KeyH') document.body.classList.toggle('nohud');
 });

@@ -130,6 +130,15 @@ L.guard = P({
   leg_L_upper: [-30, 0, 9], leg_L_lower: [32, 0, 0], foot_L: [14, 0, 0],
   leg_R_upper: [14, 0, -6], leg_R_lower: [52, 0, 0], foot_R: [30, 0, 0], _body: [6, 0, 0],
 });
+// idle / at-the-ready (before the fight is on): relaxed, the mace hanging from a loose arm by his side, head up and
+// watching (arm angles FK-solved so the mace really hangs head-down)
+L.idle = P({
+  pelvis: [0, -6, 0], torso: [6, -4, 0], head: [4, 6, 0],
+  arm_L_upper: [13, 23, -8], arm_L_lower: [-19, 0, 0], hand_L: [112, 10, 0],
+  arm_R_upper: [-18, 6, -14], arm_R_lower: [-38, 0, 0], hand_R: [8, 0, 0],
+  leg_L_upper: [-20, 0, 7], leg_L_lower: [26, 0, 0], foot_L: [12, 0, 0],
+  leg_R_upper: [10, 0, -6], leg_R_lower: [34, 0, 0], foot_R: [22, 0, 0], _body: [3, 0, 0],
+});
 L.ignite = W(L.guard, { arm_L_upper: [-70, -30, 0], arm_L_lower: [-60, 0, 0], hand_L: [60, 0, 0], head: [-15, 5, 0] });
 L.highBlock = W(L.guard, { torso: [-5, -5, 0], head: [-30, 0, 0], arm_L_upper: [-150, -35, -10], arm_L_lower: [-45, 0, 0], hand_L: [40, 80, 0], arm_R_upper: [-140, 20, 10], arm_R_lower: [-50, 0, 0], leg_L_upper: [-50, 0, 10], leg_L_lower: [75, 0, 0], leg_R_upper: [0, 0, -8], leg_R_lower: [85, 0, 0], _body: [-10, 0, 0] });
 L.highBlockHit = W(L.highBlock, { torso: [5, -5, 0], arm_L_upper: [-140, -35, -10], arm_L_lower: [-65, 0, 0], leg_L_upper: [-65, 0, 10], leg_L_lower: [100, 0, 0], leg_R_upper: [-15, 0, -8], leg_R_lower: [110, 0, 0] });
@@ -625,9 +634,8 @@ const heroPos = posTrack([
 ]);
 const heroPose = poseTrack([
   [169.3, L.flight], [170.4, L.guard, 'io'], [172.4, L.guard],               // closing in behind the mace through the laser fire
-  [172.7, W(L.guard, { torso: [20, 25, 0], arm_L_upper: [-60, -40, 20] }), 'out'], [173.4, L.guard, 'io'],
-  [173.95, W(L.guard, { torso: [6, 16, 0], head: [-14, -14, 0], arm_R_upper: [-72, 26, -22], arm_R_lower: [-88, 0, 0], leg_L_upper: [-42, 0, 9], leg_L_lower: [46, 0, 0] }), 'io'],   // tracks RONIN overhead, cannon arm up
-  [174.6, W(L.guard, { torso: [24, -12, 0], head: [8, 10, 0], arm_L_upper: [-8, -22, -38], arm_L_lower: [-72, 0, 0], leg_L_upper: [-58, 0, 9], leg_L_lower: [88, 0, 0], leg_R_upper: [-4, 0, -6], leg_R_lower: [92, 0, 0], _body: [12, 0, 0] }), 'io'],   // gathers: crouches, mace drawn back for the hop
+  [172.7, W(L.guard, { torso: [20, 25, 0], arm_L_upper: [-60, -40, 20] }), 'out'],
+  [173.4, L.idle, 'io'], [174.2, W(L.idle, { head: [-6, -10, 0], torso: [8, 5, 0], pelvis: [0, 0, 0] }), 'io'], [174.85, L.idle, 'io'],   // at the ready: mace hanging, watching RONIN
   [175.2, L.guard], [175.5, W(L.guard, { torso: [25, -20, 0], _body: [15, 0, 0] }), 'out'], [176.2, L.guard, 'io'],
   [177.35, L.guard], [177.47, L.guard],
   [177.62, L.sway, 'out'], [177.9, L.forearmBlock, 'io'], [178.0, W(L.forearmBlock, { arm_R_upper: [-68, -35, -35] }), 'in'],
@@ -918,7 +926,15 @@ function duelHero_(t) {
   s.pos = heroRawPos(tw);
   const co = collisionOffset('hero', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => heroRawPos(warp(x)), t); s._pf = (x) => heroRawPos(warp(x)); s._t = t;
-  springPose(heroPose, tw, _pose); heroImp(tw, _pose); volleyParry(tw, _pose); if (tw >= 170) { heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper'); } micro(t, _pose, 1.3);
+  springPose(heroPose, tw, _pose); heroImp(tw, _pose); volleyParry(tw, _pose); if (tw >= 170) { heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper'); }
+  // idle (173.4–175.1): a slow breathing sway and the hanging mace swinging a little like a pendulum, instead of jitter
+  const idleK = smooth(173.2, 173.6, tw) * (1 - smooth(174.85, 175.15, tw));
+  micro(t, _pose, 1.3, 1 - 0.7 * idleK);
+  if (idleK > 0) {
+    _pose[PIDX.torso] += Math.sin(t * 1.9) * 0.035 * idleK; _pose[PIDX.head] += Math.sin(t * 1.9 - 0.6) * 0.03 * idleK;
+    _pose[PIDX.arm_L_upper] += Math.sin(t * 1.5 + 0.8) * 0.07 * idleK; _pose[PIDX.arm_L_upper + 2] += Math.sin(t * 1.1) * 0.03 * idleK;
+    _pose[PIDX._body + 2] += Math.sin(t * 1.2) * 0.025 * idleK;
+  }
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   _pose[PIDX.hand_L] = maceWrist(_pose[PIDX.hand_L]);
   // facing
@@ -1437,7 +1453,7 @@ export const DUEL_CAMS = [
   { t0: 170.0, t1: 171.6, name: 'D01 wide establish', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, -48 + u * 6)), add(scl(sd, 24), [0, 14, 0])), target: lrp(h, e, 0.45), fov: 50, handheld: 0.4 }; } },
   { t0: 171.6, t1: 172.6, name: 'D02 OTS hero fires', fn: (t) => ({ ...ots(hp(t), e1p(t), { right: 1, back: 34, lift: 9, fov: 40, side: 13 }), handheld: 0.6 }) },
   { t0: 172.6, t1: 173.6, name: 'D03 E1 boost in', fn: (t, u) => { const e = e1p(t); const h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(sd, 34)), add(scl(d, 22), [0, 6 - u * 3, 0])), target: up(e, 2), fov: 42, handheld: 0.7 }; } },   // whole RONIN in frame
-  { t0: 173.6, t1: 175.0, name: 'D04 low hero angle', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 24)), add(scl(sd, -12), [0, -12, 0])), target: up(h, 6), fov: 50, roll: 0.12, handheld: 0.5 }; } },
+  { t0: 173.6, t1: 175.0, name: 'D04 low hero angle', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 24)), add(scl(sd, -12), [0, -12, 0])), target: up(h, 6), fov: 50, roll: 0.12, handheld: 0.2 }; } },
   { t0: 175.0, t1: 176.4, name: 'D05 E1 medium', fn: (t, u) => { const e = e1p(t), h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(d, 42 - u * 5)), add(scl(sd, -16), [0, 7, 0])), target: up(e, 2.5), fov: 38, handheld: 0.6 }; } },   // whole body in frame (aimed 9 m up it cut him in half)
   { t0: 176.4, t1: 177.5, name: 'D06 profile — the charge', fn: (t, u) => { const c = two(hp(t), e1p(t), { side: 1, dist: 0.9, lift: 5, fov: 44, bias: 0.55 }); return { ...c, handheld: 0.3 }; } },
   // ---- melee with E1

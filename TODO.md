@@ -256,3 +256,5 @@
 - [x] 194. Start screen: '⚔ 메카 전투씬만 보기' button — plays the duel (169.8–195.2) with sound, then returns to the menu (▶ 재생 then starts from the top).
 - [x] 195. Duel opening: RONIN #1's approach re-posed (upright swordsman on boosters, katana low/back, legs split — was a flat "flying superhero" with a levelled gun arm); D04 Sigma tracks it with the cannon arm up then crouches/draws the mace back for the hop (was a frozen guard just bobbing); D03/D05 cameras frame the whole RONIN (aimed 8–9 m above the hip they cut it in half).
 - [x] 196. Scene tag numbers every camera cut (the duel counts one scene per cut) → 89 scenes.
+- [x] 197. Scene 35 (D04): Sigma at the ready — idle pose with the mace hanging from a loose arm by his side (FK-solved), a slow breathing sway + the mace swinging a little like a pendulum (micro jitter cut 70 %), calmer camera; snaps to guard for the hop at 175.2.
+- [x] 198. ←/→ step one scene (camera cut) at a time (← first returns to the current cut's start); Shift+←/→ = ±5 s.
