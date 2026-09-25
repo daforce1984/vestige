@@ -1,6 +1,6 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
-import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow } from './fx.js';
+import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
 import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, bulletTime, bulletSpeed, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
@@ -43,10 +43,10 @@ function spaceEnv(t) {
   return {
     // lighting after the concept-art reference: warm key, cool soft skylight from above, warm bounce from below,
     // slate-blue space haze instead of pure black, gentle contrast
-    time: t, sunDir: SUN, sunCol: [1.9, 1.62, 1.25], ambUp: [0.2, 0.25, 0.34], ambDown: [0.16, 0.11, 0.07], ambient: 1,
+    time: t, sunDir: SUN, sunCol: [2.5, 2.12, 1.62], ambUp: [0.2, 0.25, 0.34], ambDown: [0.16, 0.11, 0.07], ambient: 1,   // sunCol: the upper sun is the strong key
     nebula: 0, stars: 0.8, sunDisc: 1,
     // a binary system: the second, blue-white sun on the far side lights what the first leaves dark (none at Earth)
-    sun2Dir: t < EARTH_T ? SUN2 : null, sun2Col: [0.62, 0.78, 1.2],
+    sun2Dir: t < EARTH_T ? SUN2 : null, sun2Col: [0.3, 0.38, 0.6],   // the lower, blue-white sun: much weaker
     sky: [0.010, 0.011, 0.013, 0.6],   // near-neutral: no blue gas in the backdrop
     planet: null,                                    // no moon (only Earth at the end)
     shadows: true, shadowCenter: [0, 0, 0], shadowRadius: 400,
@@ -826,7 +826,7 @@ function drawMSBattle(R, t) {
           const life = 0.18 + hash(k + q) * 0.2; if (lt > life) continue;
           const u2 = lt / life, p = madd(to, sd2, (2 + 9 * hash(q + k * 2)) * easeOut(u2)), q2 = madd(p, sd2, -1.2 * (1 - u2));
           const b = 3.5 * (1 - u2) * (1 - u2);
-          R.beam(q2, p, 0.06, [b, b * 0.6, b * 0.3], 1, 10);
+          spark(R, p, 0.7 + 0.5 * (1 - u2), [b, b * 0.6, b * 0.3]);
         }
       }
       const mf = Math.exp(-(t - tf) * 12); if (t - tf < 0.3) { R.glow(from, 2.2, [3 * mf, 1.6 * mf, 0.5 * mf], 0.6); R.light(from, 30, [1, 0.6, 0.3], 4 * mf); }
@@ -852,7 +852,7 @@ function drawMSBattle(R, t) {
         const p = madd(ev.pos, d, (8 + 22 * hash(i + ev.t * 3)) * st * easeOut(a));
         const q = madd(p, d, -3 * (1 - a));
         const b = (1 - a) * 4;
-        R.beam(q, p, 0.1, [b, b * 0.7, b * 0.4], 1, 10);
+        spark(R, p, 0.45 + 0.4 * (1 - a), [b, b * 0.7, b * 0.4]);
       }
       if (ev.type !== 'spark' && lt < 0.25) R.ripple(ev.pos, (6 + 10 * st) * (0.2 + easeOut(lt / 0.25)), [0.2, 0.2, 0.2], (1 - lt / 0.25) * 1.2);
     }
@@ -872,7 +872,7 @@ function drawMSBattle(R, t) {
         const life = 0.3 + hash(i + 40) * 0.9; if (ls > life) continue;
         const a = ls / life, p = madd(ev.pos, sd, (6 + 40 * hash(i + 7)) * easeOut(a)), q = madd(p, sd, -(2 + 4 * (1 - a)));
         const b = 5 * (1 - a) * (1 - a);
-        R.beam(q, p, 0.12, [b, b * 0.65, b * 0.3], 1, 10);
+        spark(R, p, 0.45 + 0.45 * (1 - a), [b, b * 0.65, b * 0.3]);
       }
       for (let i = 0; i < 0; i++) {                   // (no foreign plates: the victim's own mesh crumples / breaks up)
         const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 5.3 + 1), d, 1.4));
@@ -1423,7 +1423,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
         const o = V.norm([0, 0, 0], V.cross([0, 0, 0], dv, randDir([0, 0, 0], i * 2.9 + 1)));
         const ph = ((t * 4 + hash(i)) % 1);
         const p0 = madd(madd(e, o, 6 + 14 * hash(i + 2)), dv, 30 - ph * 60);
-        R.beam(p0, madd(p0, dv, -10 - 10 * hash(i + 3)), 0.06, [1.2, 1.3, 1.6], 1, 10);
+        spark(R, p0, 0.6, [0.6, 0.65, 0.8]);                        // dust motes whipping past (no streak lines)
       }
       const slot = Math.floor((t - 182.6) / 0.16), age = (t - 182.6) - slot * 0.16;
       R.ripple(madd(e, dv, 4), 6 + age * 40, [0.2, 0.2, 0.2], (1 - age / 0.16) * 0.9);
@@ -1684,7 +1684,7 @@ shot(266.95, 268.05, 'B2b POV tear', (c) => {
         const d = V.norm([0, 0, 0], V.add([0, 0, 0], randDir([0, 0, 0], k * 2.9 + Math.floor((film - 266.95) / per + hash(k + 5)) * 5.1 + hn.length), V.scale([0, 0, 0], f, -1.2)));
         const p = madd(hp, d, ph * (8 + 14 * hash(k + 9)));
         const b = (1 - ph) * (1.2 + strain * 1.8);
-        R.beam(madd(p, d, -1.6), p, 0.05, isHand ? [b * 0.7, b * 0.9, b * 1.3] : [b * 1.6, b * 0.9, b * 0.35], 1, 14);
+        spark(R, p, 0.7 + 0.5 * (1 - ph), isHand ? [b * 0.7, b * 0.9, b * 1.3] : [b * 1.6, b * 0.9, b * 0.35]);
       }
       // armour plates ripping off the forearms, and smoke/fire from overloaded joints
       if (!isHand && u > 0.25) {
@@ -1743,7 +1743,7 @@ shot(270, 275, 'B4 the rush', (c) => {
       const d = randDir([0, 0, 0], i * 3.1 + 7); if (d[2] > 0) d[2] = -d[2];
       const life = 0.4 + hash(i) * 0.8; if (lt > life) continue;
       const a = lt / life, p = madd(hp, d, (10 + 50 * hash(i + 2)) * easeOut(a)), q = madd(p, d, -6 * (1 - a));
-      R.beam(q, p, 0.2, [5 * (1 - a), 2.5 * (1 - a), 1 * (1 - a)], 1, 10);
+      spark(R, p, 0.7 + 0.6 * (1 - a), [5 * (1 - a), 2.5 * (1 - a), 1 * (1 - a)]);
     }
     for (let i = 0; i < 14; i++) {
       const d = randDir([0, 0, 0], i * 4.7 + 2); d[2] = -Math.abs(d[2]) - 0.5;
@@ -2149,7 +2149,7 @@ function drawDodgeBolt(R, t) {
     const life = 0.2 + hash(i + 9) * 0.35; if (lt > life) continue;
     const u = lt / life, p = madd(hit, sd, (3 + 16 * hash(i + 2)) * easeOut(u)), q = madd(p, sd, -(1.2 + 2.5 * (1 - u)));
     const b = 4 * (1 - u) * (1 - u);
-    R.beam(q, p, 0.09, [b, b * 0.6, b * 0.3], 1, 10);
+    spark(R, p, 0.8 + 0.6 * (1 - u), [b, b * 0.6, b * 0.3]);
   }
   const lb = t - TB;                                                      // the burst
   if (lb >= 0 && lb < 1.6) {
@@ -2167,7 +2167,7 @@ function drawDodgeBolt(R, t) {
       const p = madd(E, sd, dist), q = madd(p, sd, -(0.6 + vel * 0.06));
       const fade = (1 - u) * (1 - u), hot = Math.exp(-lb * 7);
       const b = (1.2 + 9 * hot) * fade * (hash(i + 17) > 0.85 ? 1.5 : 1);
-      R.beam(q, p, 0.02 + 0.1 * (1 - u) * (0.5 + hash(i)), [b, b * (0.55 + 0.35 * hot), b * (0.15 + 0.5 * hot)], 1, 10);
+      spark(R, p, 0.35 + 1.3 * (1 - u) * (0.5 + hash(i)), [b, b * (0.55 + 0.35 * hot), b * (0.15 + 0.5 * hot)]);   // shrinks as it cools
     }
   }
 }
@@ -2203,7 +2203,6 @@ function drawShield(R, t, c) {
       const p0 = madd(WELL, d, SHIELD_R), p1 = madd(p0, d, lt * (40 + 60 * hash(i)));
       const k = (1 - lt / 1.1);
       R.glow(p1, 2 + 3 * hash(i + 2), [0.9 * k, 1.8 * k, 4 * k], 0.5);
-      R.beam(madd(p1, d, -6 * k), p1, 0.25, [0.6 * k, 1.3 * k, 3 * k], 1, 10);
     }
     if (collapse < 0.4) R.light(tp, 400, [0.5, 0.8, 1.6], 40 * (1 - collapse / 0.4));
   }
@@ -2252,7 +2251,7 @@ function drawLanceAndCannon(R, t, c) {
       for (let i = 0; i < 40; i++) {
         const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.3 + Math.floor(t * 8)), rdir, 1.6), n, 0.6));
         const ph = ((t * 3 + hash(i)) % 1), p = madd(hit, sd, 10 + ph * 140), q = madd(p, sd, -12 * (1 - ph));
-        R.beam(q, p, 0.6, [5 * (1 - ph) * k, 2 * (1 - ph) * k, 0.6 * (1 - ph) * k], 1, 10);
+        spark(R, p, 3 + 3 * (1 - ph), [5 * (1 - ph) * k, 2 * (1 - ph) * k, 0.6 * (1 - ph) * k]);
       }
     }
   }

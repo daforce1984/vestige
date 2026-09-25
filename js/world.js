@@ -1,6 +1,6 @@
 // Persistent world state as pure functions of film time t (seconds). Seek-safe.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
-import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, breakOff, chargeInflow } from './fx.js';
+import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, breakOff, chargeInflow, spark } from './fx.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 export { explosion };
 
@@ -261,7 +261,7 @@ function drawWreckage(R, t, mm) {
     for (let k = 0; k < 8; k++) {
       const d = randDir([0, 0, 0], Math.floor(t * 12) * 1.3 + k * 2.1 + i * 9);
       const ph = ((t * 3 + hash(k + i)) % 1), a = V.madd([0, 0, 0], p0, d, ph * 6), b = V.madd([0, 0, 0], a, d, -1.5);
-      R.beam(b, a, 0.08, [4 * (1 - ph), 2.2 * (1 - ph), 0.6 * (1 - ph)], 1, 10);
+      spark(R, a, 0.8 + 0.6 * (1 - ph), [4 * (1 - ph), 2.2 * (1 - ph), 0.6 * (1 - ph)]);
     }
     R.glow(p0, 0.8, [3, 2, 0.8], 0.5);
   }

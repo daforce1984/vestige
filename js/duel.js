@@ -818,7 +818,10 @@ function heroRawPos(tw) {
   return add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), smooth(170, 171, tw)));
 }
 function e1RawPos(tw) { return add(springPos(e1Pos, tw), hover(tw, 7.1, lerp(0.45, 0.3, smooth(176.3, 176.9, tw)))); }   // (1.2 m of hover read as wobble)
-function e2RawPos(tw) { return add(springPos(e2Pos, tw), hover(tw, 3.7, 0.3)); }
+function e2RawPos(tw) { return add(springPos(e2Pos, tw), hover(tw, 3.7, 0.3 * (1 - E2_DIVE(tw)))); }
+// the dive from above (180.6–184.25, scenes 43–46): one clean committed plunge — no hover, jitter, squash, weight-shift,
+// inertia lean or re-aiming at Sigma's every wobble
+const E2_DIVE = (tw) => smooth(180.6, 180.9, tw) * (1 - smooth(183.9, 184.25, tw));
 const heroSquash = squashFrom(heroPos), e1Squash = squashFrom(e1Pos), e2Squash = squashFrom(e2Pos);
 const HIP = 0;   // pos is the hip (msMatrix puts model [0,9,0] at pos)
 
@@ -1167,11 +1170,18 @@ function duelEnemy2_(t) {
   s.pos = e2RawPos(tw);
   const co = collisionOffset('e2', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => e2RawPos(warp(x)), t); s._pf = (x) => e2RawPos(warp(x)); s._t = t;
-  springPose(e2Pose, tw, _pose); e2Imp(tw, _pose); e2Squash(tw, _pose); weightShift(e2Pose, tw, _pose, 'arm_R_upper'); micro(t, _pose, 3.7, tw > 192.4 ? 0.3 : 1);
+  springPose(e2Pose, tw, _pose); e2Imp(tw, _pose);
+  const dk = E2_DIVE(tw);
+  { const pre = dk > 0 ? Float64Array.from(_pose) : null;
+    e2Squash(tw, _pose); weightShift(e2Pose, tw, _pose, 'arm_R_upper');
+    if (pre) for (let i = 0; i < _pose.length; i++) _pose[i] = lerp(_pose[i], pre[i], dk); }
+  micro(t, _pose, 3.7, (tw > 192.4 ? 0.3 : 1) * (1 - dk));
+  s._idle = dk;
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   _pose[PIDX._body] += e2Flip(tw);
   const h = heroRawPos(Math.min(tw, 192.4));
   let f = flat(sub(h, s.pos), tw < 184.6 ? 0.8 : 0.35);
+  if (dk > 0) f = nrm(lrp(f, flat(sub(heroRawPos(184.5), s.pos), 0.8), dk));   // aims at where it will strike, not at the wobble
   if (tw > 192.4) {
     const u = tw - 192.4;
     f = yawRot(f, -u * 0.35);

@@ -506,7 +506,7 @@ export class Renderer {
   plume(nozzle, axis, halfW, col, intensity) { this.sprite(10, nozzle, axis, halfW, col, intensity); }
   flame(nozzle, axisLen, halfWidth, col, intensity, seed = 0, speed = 1) { this.sprite(7, nozzle, axisLen, [halfWidth, seed, speed, 0], col, intensity); }
   shield(p, radius, impactUV, flash, tear, hitAge, col, intensity, collapse = 0) { this.sprite(9, p, [radius, collapse, flash, 0], [impactUV[0], impactUV[1], tear, hitAge], col, intensity); }
-  ripple(p, radius, col, strength) { this.sprite(8, p, [radius, 0, 0, 0], Z4, col, strength); }
+  ripple(p, radius, col, strength) { }   // (a refraction ring: gone with the screen distortion — it only left a grey circle)
   haze(p, radius, strength, seed = 0) { this.sprite(6, p, [radius, seed, 0, seed], Z4, Z4, strength); }
   hyperWindow(center, axU, axV, col, intensity) { this.sprite(5, center, axU, axV, col, intensity); }
 
@@ -709,7 +709,7 @@ export class Renderer {
     }
     P[20] = post.exposure ?? 1; P[21] = post.bloom ?? 0.08; P[22] = post.ca ?? 0.002; P[23] = post.grain ?? 0.04;
     P[24] = post.fade ?? 1; P[25] = post.flash ?? 0; P[26] = post.letterbox ?? 1; P[27] = post.vignette ?? 0.9;
-    P[28] = post.distort ?? 1; P[29] = post.streak ?? 0.5; P[30] = env.time; P[31] = post.saturation ?? 1;
+    P[28] = 0; P[29] = post.streak ?? 0.5; P[30] = env.time; P[31] = post.saturation ?? 1;   // P[28]: no screen-space distortion anywhere (ripples, heat haze, beam wobble)
     const gs = post.gradeShadows || [0.92, 1.0, 1.1], gh = post.gradeHighlights || [1.08, 1.0, 0.92];
     P[32] = gs[0]; P[33] = gs[1]; P[34] = gs[2]; P[35] = post.contrast ?? 1.05;
     P[36] = gh[0]; P[37] = gh[1]; P[38] = gh[2]; P[39] = post.shakeBlur ?? 0;
