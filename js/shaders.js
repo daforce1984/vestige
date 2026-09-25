@@ -413,9 +413,9 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
   let aa = clamp(1.0 - pw * 4.0, 0.0, 1.0);                         // fine detail fades before it can alias
   let aa2 = clamp(1.0 - pw * 12.0, 0.0, 1.0);
   // --- plate courses: rows 4.5 m, staggered, plate widths vary per row
-  let H = 4.5;
+  let H = 9.0;                                                        // large plates (was 4.5)
   let ry = floor(uv.y / H);
-  let W = 6.0 + 6.0 * hash31(vec3f(ry, seed, 3.0));
+  let W = 16.0 + 12.0 * hash31(vec3f(ry, seed, 3.0));
   let xo = uv.x + hash31(vec3f(ry, seed, 7.0)) * W;
   var cell = vec2f(floor(xo / W), ry);
   var q = vec2f(xo - cell.x * W, uv.y - ry * H);
@@ -434,10 +434,10 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, vertical: bool) -> HD {
   o.col = vec3f(1.0); o.mixk = 0.0;                                   // one tone for every plate
   o.rough = 0.0;
   // recessed seam + bevelled raised edge (normal tilts away from the seam)
-  let seamW = 0.045;
+  let seamW = 0.025;                                                  // fine seams, only visible up close
   let seam = (1.0 - smoothstep(seamW, seamW + pw * 1.5 + 0.01, de)) * mix(0.55, 1.0, aa);
   let raised = step(0.35, h);
-  let bev = (1.0 - smoothstep(seamW, seamW + 0.16, de)) * raised * aa;
+  let bev = (1.0 - smoothstep(seamW, seamW + 0.07, de)) * raised * aa;
   var ed = vec2f(0.0);
   if (de == q.x) { ed = vec2f(-1.0, 0.0); } else if (de == sz.x - q.x) { ed = vec2f(1.0, 0.0); } else if (de == q.y) { ed = vec2f(0.0, -1.0); } else { ed = vec2f(0.0, 1.0); }
   o.tilt = -ed * bev * 0.55;
