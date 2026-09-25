@@ -258,3 +258,4 @@
 - [x] 196. Scene tag numbers every camera cut (the duel counts one scene per cut) → 89 scenes.
 - [x] 197. Scene 35 (D04): Sigma at the ready — idle pose with the mace hanging from a loose arm by his side (FK-solved), a slow breathing sway + the mace swinging a little like a pendulum (micro jitter cut 70 %), calmer camera; snaps to guard for the hop at 175.2.
 - [x] 198. ←/→ step one scene (camera cut) at a time (← first returns to the current cut's start); Shift+←/→ = ±5 s.
+- [x] 199. Scene 35 (D04) camera locked off: orientation fixed from the cut's first frame (it swung with RONIN's position), only carried with Sigma's drift; no handheld, no base shake (duel cams can now set baseShake).

@@ -1453,7 +1453,7 @@ export const DUEL_CAMS = [
   { t0: 170.0, t1: 171.6, name: 'D01 wide establish', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, -48 + u * 6)), add(scl(sd, 24), [0, 14, 0])), target: lrp(h, e, 0.45), fov: 50, handheld: 0.4 }; } },
   { t0: 171.6, t1: 172.6, name: 'D02 OTS hero fires', fn: (t) => ({ ...ots(hp(t), e1p(t), { right: 1, back: 34, lift: 9, fov: 40, side: 13 }), handheld: 0.6 }) },
   { t0: 172.6, t1: 173.6, name: 'D03 E1 boost in', fn: (t, u) => { const e = e1p(t); const h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(sd, 34)), add(scl(d, 22), [0, 6 - u * 3, 0])), target: up(e, 2), fov: 42, handheld: 0.7 }; } },   // whole RONIN in frame
-  { t0: 173.6, t1: 175.0, name: 'D04 low hero angle', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 24)), add(scl(sd, -12), [0, -12, 0])), target: up(h, 6), fov: 50, roll: 0.12, handheld: 0.2 }; } },
+  { t0: 173.6, t1: 175.0, name: 'D04 low hero angle', fn: (t, u) => { const h = hp(t), d = nrm(sub(e1p(173.6), hp(173.6))); const sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 24)), add(scl(sd, -12), [0, -12, 0])), target: up(h, 6), fov: 50, roll: 0.12, handheld: 0, baseShake: 0 }; } },   // locked: fixed orientation (from the cut's first frame), only carried along with Sigma's drift — no swing as RONIN moves
   { t0: 175.0, t1: 176.4, name: 'D05 E1 medium', fn: (t, u) => { const e = e1p(t), h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(d, 42 - u * 5)), add(scl(sd, -16), [0, 7, 0])), target: up(e, 2.5), fov: 38, handheld: 0.6 }; } },   // whole body in frame (aimed 9 m up it cut him in half)
   { t0: 176.4, t1: 177.5, name: 'D06 profile — the charge', fn: (t, u) => { const c = two(hp(t), e1p(t), { side: 1, dist: 0.9, lift: 5, fov: 44, bias: 0.55 }); return { ...c, handheld: 0.3 }; } },
   // ---- melee with E1
@@ -1488,7 +1488,7 @@ export function duelCamera(t) {
   if (!c) return null;
   const u = sat((t - c.t0) / (c.t1 - c.t0));
   const k = c.fn(t, u);
-  const shake = 0.12 + evShake(t, null, 4.5) * 1.1;
+  const shake = (k.baseShake ?? 0.12) + evShake(t, null, 4.5) * 1.1;   // baseShake 0: a locked-off camera
   const focus = k.target;
   return {
     name: c.name, pos: k.pos, target: k.target, fov: k.fov ?? 40, roll: k.roll ?? 0,
