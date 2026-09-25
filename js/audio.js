@@ -638,17 +638,17 @@ function duelCues() {
 
 function ionShotCues() {
   const out = [], r = rng(97531), R = (a, b) => a + r() * (b - a);
-  // shot sources: laser_cannon slices (heavy) and beam_blast peaks — [spec, region start or 0, dur]
-  const SRC = [['laser_cannon:s0', 0, 0.9], ['laser_cannon:s2', 0, 0.9], ['laser_cannon:s4', 0, 0.9], ['beam_blast1', 2.15, 0.7], ['beam_blast4', 1.7, 0.7]];
   const [ca, cb, shift, from] = ION_COLD_OPEN;
   const shots = [...ION_SHOTS.filter((s) => s.t >= ca && s.t < cb).map((s) => ({ ...s, t: s.t + shift })).filter((s) => s.t >= from), ...ION_SHOTS];
   for (const s of shots) {
     const near = s.near ?? 0.5, far = Math.max(0, Math.min(0.85, (1 - near) / 0.75 * 0.85)), pan = R(-0.6, 0.6);
     for (let b = 0; b < (s.burst || 1); b++) {
-      const t = s.t + b * 0.22, [spec, at, dur] = SRC[Math.floor(r() * SRC.length)];
-      const rate = s.side === 'E' ? R(0.65, 0.85) : R(0.75, 0.95);
-      out.push([t, spec, { ...(at ? { at } : {}), dur: dur * 1.8, fadeOut: 0.6, rate, norand: true, gain: ION_GAIN * (0.5 + 0.5 * near) * (b ? 0.8 : 1),
-        far, pan: pan + (b ? 0.1 : 0), prio: 6 }]);
+      // a HEAVY beam, not a game laser: the heavy_beam attack pitched down + a short sustained beam body + a low thump
+      const t = s.t + b * 0.22, g = ION_GAIN * (0.5 + 0.5 * near) * (b ? 0.75 : 1), P = pan + (b ? 0.1 : 0);
+      const rate = s.side === 'E' ? R(0.62, 0.74) : R(0.7, 0.84);
+      out.push([t, 'heavy_beam', { rate, dur: 1.9, fadeOut: 0.8, gain: g * 0.95, far, pan: P, prio: 6, norand: true }]);
+      out.push([t + 0.04, 'hl_beam', { loop: true, rate: rate * 0.8, dur: 1.0, fadeIn: 0.06, fadeOut: 0.6, gain: g * 0.55, far, pan: P, prio: 5 }]);
+      if (!b) out.push([t, '@boom', { bus: 'sfx', f: 44, vel: 0.28 * (0.4 + 0.6 * near), dur: 0.9, verb: 0.25 }]);
     }
     // impact thud: bolt travel time ≈ distance / ION_BOLT_SPEED (farther shots land later), 0.5–1.2 s
     const travel = Math.min(1.2, Math.max(0.5, (300 + 1100 * (1 - near)) / ION_BOLT_SPEED));
