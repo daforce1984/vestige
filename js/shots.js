@@ -2155,39 +2155,21 @@ function drawDodgeBolt(R, t) {
   const a = madd(hit, dir, -1300 * 0.62);
   bolt(R, t, T - 0.62, T, a, hit, 70, 2.2, [3.4, 0.7, 0.4], 1.8);
   if (t < T) { const hp = V.lerp([0, 0, 0], a, hit, (t - (T - 0.62)) / 0.62); R.glow(hp, 16, [2.2, 0.5, 0.25], 0.5); R.light(hp, 90, [1, 0.3, 0.15], 4); return; }
-  // swatted: the bolt comes apart ON the back of his hand — it bursts right there, a white flash, a shock ring and a
-  // spray of sparks every way (a little more of them thrown along the swat)
-  // (dodgeRight() points to his LEFT — +X is the model's left — so his right is −r)
-  const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], r, -1.0), [0, 0.25, 0]), V.scale([0, 0, 0], fwd, 0.15)));
-  const TB = T, E = madd(hit, out, 1.2), lt = t - T;
-  const k = Math.exp(-lt * 7);                                            // the swat itself on the vambrace
-  R.glow(hit, 4 + 5 * easeOut(sat(lt / 0.08)), [3.5 * k, 1.6 * k, 0.8 * k], 0.45);
-  R.light(hit, 60, [1, 0.55, 0.3], 8 * k);
-  for (let i = 0; i < 18; i++) {                                          // spark fan off the vambrace, along the swat
-    const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 4.1 + 3), out, 1.2));
-    const life = 0.2 + hash(i + 9) * 0.35; if (lt > life) continue;
-    const u = lt / life, p = madd(hit, sd, (3 + 16 * hash(i + 2)) * easeOut(u)), q = madd(p, sd, -(1.2 + 2.5 * (1 - u)));
-    const b = 4 * (1 - u) * (1 - u);
-    spark(R, p, 0.8 + 0.6 * (1 - u), [b, b * 0.6, b * 0.3]);
-  }
-  const lb = t - TB;                                                      // the burst
-  if (lb >= 0 && lb < 1.6) {
-    const f = Math.exp(-lb * 9);
-    R.glow(E, 2.5 + 5 * easeOut(sat(lb / 0.06)), [60 * f, 60 * f, 56 * f], 0.2);                        // blown-out white core (bloom = the glow)
-    R.glow(E, 5 + 12 * easeOut(sat(lb / 0.3)), [2.2 * Math.exp(-lb * 4), 0.8 * Math.exp(-lb * 4), 0.3 * Math.exp(-lb * 4)], 0.6);   // orange fireball
-    R.light(E, 120, [1, 0.6, 0.3], 18 * Math.exp(-lb * 6));
-    if (lb < 0.35) R.ripple(E, 4 + 34 * easeOut(lb / 0.35), [0.4, 0.4, 0.4], (1 - lb / 0.35) * 1.5);
-    for (let i = 0; i < 150; i++) {                                       // sparks: thin burning streaks flung every way,
-      const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 2.37 + 71), out, 0.45));   // white-hot (blooming) at first, then cooling
-      const life = 0.3 + hash(i + 31) * 1.0; if (lb > life) continue;     // orange -> dull red, thinning and fading out
-      const u = lb / life, sp = 30 + 80 * hash(i + 5);
-      const dist = sp * life * 0.55 * (1 - (1 - u) * (1 - u));             // drag: fast out, slowing
-      const vel = sp * (1 - u);                                            // current speed -> streak length
-      const p = madd(E, sd, dist), q = madd(p, sd, -(0.6 + vel * 0.06));
-      const fade = (1 - u) * (1 - u), hot = Math.exp(-lb * 7);
-      const b = (1.2 + 9 * hot) * fade * (hash(i + 17) > 0.85 ? 1.5 : 1);
-      spark(R, p, 0.35 + 1.3 * (1 - u) * (0.5 + hash(i)), [b, b * (0.55 + 0.35 * hot), b * (0.15 + 0.5 * hot)]);   // shrinks as it cools
-    }
+  // swatted away: no blast — the back of the hand knocks the bolt off and a fan of sparks sprays out along the swing
+  // (up and to his right: dodgeRight() points to his LEFT, so his right is −r)
+  const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], r, -0.72), [0, 0.66, 0]), V.scale([0, 0, 0], fwd, 0.15)));
+  const lt = t - T;
+  const kh = Math.exp(-lt * 14);
+  R.glow(hit, 1.2 + 1.2 * kh, [8 * kh, 5 * kh, 2.5 * kh], 0.2);                    // the contact itself: a brief hot point
+  if (lt < 0.1) R.light(hit, 40, [1, 0.6, 0.3], 5 * (1 - lt / 0.1));
+  const side = V.norm([0, 0, 0], V.cross([0, 0, 0], out, [0, 1, 0])), up2 = V.cross([0, 0, 0], side, out);
+  for (let i = 0; i < 46; i++) {                                                   // radial fan along the swing
+    const a2 = hash(i + 71) * 6.283, sp = Math.pow(hash(i + 13), 0.7) * 0.62;      // within ~35° of the swing direction
+    const sd = V.norm([0, 0, 0], V.add([0, 0, 0], out, V.add([0, 0, 0], V.scale([0, 0, 0], side, Math.cos(a2) * sp), V.scale([0, 0, 0], up2, Math.sin(a2) * sp))));
+    const life = 0.25 + hash(i + 9) * 0.55; if (lt > life) continue;
+    const u = lt / life, dist = (8 + 34 * hash(i + 2)) * (1 - (1 - u) * (1 - u));
+    const hot = Math.exp(-lt * 6), b = (1.2 + 7 * hot) * (1 - u) * (1 - u);
+    spark(R, madd(hit, sd, dist), 0.35 + 0.9 * (1 - u), [b, b * (0.55 + 0.35 * hot), b * (0.15 + 0.45 * hot)]);
   }
 }
 // ---------------- energy shield around the well core (261–268), shatter 268–271

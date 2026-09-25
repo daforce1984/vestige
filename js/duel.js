@@ -903,9 +903,9 @@ export function dodgeRight(tw) { const d = nrm(sub(gundamLaunchPath(tw + 0.05), 
 // forearm comes up across the chest (0.3 s before), takes the bolt on the armour at DODGE.t and sweeps it outward;
 // the body gives a little to the hit and the arm settles back with weight
 // the backhand SWAT (FK-solved): the right fist rests folded over the LEFT chest (forearm across it, elbow forward),
-// then the arm whips open all the way out to his right, straight — the back of the hand/vambrace leading into the bolt
+// then the arm whips open up and out to his upper right, straight — the back of the hand/vambrace knocking the bolt away
 const SWAT_A = { arm_R_upper: [-3, 101, -47], arm_R_lower: [-76, 0, 0], hand_R: [-34, 0, 0] };
-const SWAT_B = { arm_R_upper: [-84, 23, -77], arm_R_lower: [-1, 0, 0], hand_R: [23, 0, 0] };
+const SWAT_B = { arm_R_upper: [-144, -7, -28], arm_R_lower: [-1, 0, 0], hand_R: [17, 0, 0] };   // flung out to the upper RIGHT (~45° up), straight
 function parryPose(tw, out) {
   const T = DODGE.t;
   const up = smooth(T - 0.45, T - 0.14, tw), sweep = smooth(T - 0.07, T + 0.12, tw), back = smooth(T + 0.5, T + 1.15, tw);

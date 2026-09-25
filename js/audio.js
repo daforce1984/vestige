@@ -402,8 +402,7 @@ export const SAMPLE_CUES = [
   [166.65, 'metal_knock', { at: 'hit', rate: 0.72, gain: 1.2, pan: 0.3, prio: 10, norand: true }],                             // off the vambrace
   [166.65, 'axe_metal1', { at: 'hit', rate: 0.85, gain: 0.8, pan: 0.3, prio: 9, norand: true }],
   [166.66, '@sparkBurst', { vel: 0.8, pan: 0.35 }],
-  [166.65, 'hl_explosion', { rate: 1.15, gain: 0.85, pan: 0.4, prio: 9, norand: true }],                                          // it bursts on the back of his hand
-  [166.65, '@boom', { bus: 'sfx', f: 55, vel: 0.5, dur: 0.9, verb: 0.3 }],
+  [166.67, 'flyby_fast', { rate: 1.5, gain: 0.45, pan0: 0.3, pan1: 0.8, dur: 0.22, fadeOut: 0.1, prio: 7, norand: true }],     // knocked away up-right (no blast)
   [166.67, '@sparkBurst', { vel: 0.9, pan: 0.45 }],
   [182.05, 'hl_thruster', { loop: true, dur: 1.4, rate: 0.9, rateTo: 1.4, gain: 0.9, fadeIn: 0.05, fadeOut: 0.5, prio: 8, norand: true }],
   [182.5, 'flyby_fast', { rate: 0.8, gain: 1.0, pan0: 0.6, pan1: -0.4, prio: 8, norand: true }],
