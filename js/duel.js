@@ -266,6 +266,14 @@ const _approach = P({
 });
 R.assault = mirror(_approach);
 R.assaultB = mirror(W(_approach, { torso: [20, 20, 3], head: [-16, -18, 0], arm_R_upper: [-58, 22, -22], leg_L_upper: [-24, 0, 8], leg_L_lower: [40, 0, 0], leg_R_upper: [28, 0, -8], leg_R_lower: [78, 0, 0], _body: [18, 6, 4] }));
+// ready to charge (scenes 32–35): katana in BOTH hands in front of the belly, point up at Sigma (FK-solved: blade ~30°
+// over the horizontal on the centre line), leaning in, sword-side leg forward and bent, the other trailing — coiled
+R.ready = W(mirror(P({
+  pelvis: [4, -10, 0], torso: [18, -6, 0], head: [-14, 6, 0],
+  arm_R_upper: [-40, 10, -15], arm_R_lower: [-70, 0, 0],
+  leg_L_upper: [-42, 0, 8], leg_L_lower: [64, 0, 0], foot_L: [18, 0, 0],
+  leg_R_upper: [26, 0, -8], leg_R_lower: [40, 0, 0], foot_R: [40, 0, 0], _body: [12, 0, 0],
+})), { arm_R_upper: [-20, 4, 38], arm_R_lower: [-27, 0, 0], hand_R: [16, 0, 0] });
 export const POSE_LIB = { hero: L, ronin: R };
 // The hero swings a mace, not a sword: a club is held in a fist grip (haft roughly ⟂ forearm), so the wrist flex that
 // let the saber "continue the forearm" (+90°) is compressed into a natural cocked wrist (soft knee at 20°, 90° → ~41°).
@@ -690,7 +698,7 @@ const e1Pos = posTrack([
   [180.2, F1(38, -4, 8), 'out'],
 ]);
 const e1Pose = poseTrack([
-  [170, R.assault], [176.45, R.assault, 'io'],                 // 170–176.45: holds, katana low, floating
+  [170, R.ready], [176.45, R.ready, 'io'],                     // 170–176.45: two-handed, ready to charge, floating
   [176.95, W(R.foreWind, { torso: [30, -40, 0], _body: [30, 0, 0] }), 'io'], [177.35, R.foreWind, 'out'],
   [177.6, R.foreMid, 'in'], [177.72, R.foreEnd, 'out'], [177.88, R.foreEnd], [178.0, R.backMid, 'in'], [178.08, R.backMid],
   [178.2, R.doubled, 'in'], [178.45, R.doubled, 'out'], [178.55, R.hitTorso, 'in'], [179.0, R.tumble, 'out'],
@@ -700,7 +708,7 @@ const e1Imp = impulses([
   [177.0, P({ arm_L_upper: [8, 0, 0] }), 0.07, 0.5],
   [179.0, P({ torso: [-12, 20, 10], head: [-20, 0, 0] }), 0.03, 0.6],
 ]);
-const e1Saber = scalarTrack([[176.85, 0], [177.05, 1, 'out'], [179.9, 1], [180.1, 0.3, 'lin'], [180.2, 0, 'lin']]);
+const e1Saber = scalarTrack([[169.5, 1], [179.9, 1], [180.1, 0.3, 'lin'], [180.2, 0, 'lin']]);
 
 // ---------------- enemy 2 (RONIN/04 #2): dive attack, sword duel, killed by the pass-cut
 const e2Pos = posTrack([
@@ -1112,7 +1120,14 @@ function duelEnemy1_(t) {
     e1Squash(tw, _pose); weightShift(e1Pose, tw, _pose, 'arm_R_upper');
     if (pre) for (let i = 0; i < _pose.length; i++) _pose[i] = lerp(_pose[i], pre[i], e1K); }
   micro(t, _pose, 7.1, tw > 179 ? 0.3 : 1 - e1K);
-  if (e1K > 0) { _pose[PIDX.torso] += Math.sin(t * 1.4 + 2) * 0.02 * e1K; _pose[PIDX.arm_R_upper] += Math.sin(t * 1.4 + 0.8) * 0.025 * e1K; }
+  if (e1K > 0) {   // zero-g float: every joint drifts on its own slow phase, the limbs lagging the body like in water
+    const F = [['torso', 0, 0.022, 1.3, 0], ['torso', 2, 0.012, 0.9, 1.1], ['head', 0, 0.03, 1.3, -0.7], ['head', 1, 0.025, 0.7, 2],
+      ['arm_R_upper', 0, 0.02, 1.3, -0.5], ['arm_R_lower', 0, 0.018, 1.3, -1.0], ['hand_R', 0, 0.02, 1.3, -1.4],
+      ['leg_L_upper', 0, 0.04, 1.1, 0.3], ['leg_L_lower', 0, 0.05, 1.1, -0.4], ['foot_L', 0, 0.07, 1.1, -1.1],
+      ['leg_R_upper', 0, 0.05, 0.95, 1.9], ['leg_R_lower', 0, 0.06, 0.95, 1.2], ['foot_R', 0, 0.08, 0.95, 0.5],
+      ['leg_L_upper', 2, 0.02, 0.7, 2.5], ['leg_R_upper', 2, 0.02, 0.8, 0.9]];
+    for (const [p, c, a, w, ph] of F) _pose[PIDX[p] + c] += Math.sin(t * w + ph) * a * e1K;
+  }
   s._idle = e1K;
   s.anchor = s.pos.slice();
   if (e1K > 0) s.pos = add(s.pos, [Math.sin(t * 0.8 + 2) * 0.12 * e1K, Math.sin(t * 1.1 + 1.3) * 0.4 * e1K, Math.sin(t * 0.6) * 0.12 * e1K]);
@@ -1400,7 +1415,7 @@ function gripBake(who, t, parts, wBlade) {
   return Math.sqrt(gripErr(fkAt(who, t)));
 }
 const ARMS_BOTH = ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R'], ARM_L = ['arm_L_upper', 'arm_L_lower', 'hand_L'];
-const GRIP_ON = { e1: (t) => t >= 177.05 && t <= 179.9, e2: (t) => t >= 181.5 && t <= 192.6 };
+const GRIP_ON = { e1: (t) => t >= 170 && t <= 179.9, e2: (t) => t >= 181.5 && t <= 192.6 };
 export const GRIP_REPORT = [];
 for (const who of ['e1', 'e2']) for (const k of TRACKS[who].pose.keys) if (GRIP_ON[who](k[0])) GRIP_REPORT.push([who, k[0], +gripBake(who, k[0], [...ARMS_BOTH, 'torso'], 0.04).toFixed(2)]);
 export const SOLVE_REPORT = SOLVE.map((ev) => {

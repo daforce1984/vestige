@@ -266,8 +266,8 @@ async function startFilm(from, until = null) {
   play(from);
 }
 $('#start .go').addEventListener('click', () => startFilm(clockOffset >= DURATION ? 0 : clockOffset));
-// the mech battle (scene 32, the Sigma vs RONIN duel) on its own: from just before the first exchange to the last blast
-const DUEL_FROM = 169.8, DUEL_UNTIL = 195.2;
+// the mech battle on its own: from the swatted bolt (scene 30) through the duel to the last blast
+const DUEL_FROM = 165.9, DUEL_UNTIL = 195.2;   // from the bolt Sigma swats away on the way in
 $('#duelBtn').addEventListener('click', () => startFilm(DUEL_FROM, DUEL_UNTIL));
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); if (playing) pause(); else play(now()); }
