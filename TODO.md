@@ -254,3 +254,5 @@
 - [x] 192. Mechs (Sigma, RONINs, mace, articulated hands): no rim light and no camera-side fill — lit only by the sun, sky ambient and real lights.
 - [x] 193. RONIN #2 kill: a 180° spinning strike — coil 70° away, whip round (back passing the enemy) accelerating into the contact at 192.4 (solved, residual 0.01), spin bleeds off in the follow-through; ends facing the dash line for the walk-away.
 - [x] 194. Start screen: '⚔ 메카 전투씬만 보기' button — plays the duel (169.8–195.2) with sound, then returns to the menu (▶ 재생 then starts from the top).
+- [x] 195. Duel opening: RONIN #1's approach re-posed (upright swordsman on boosters, katana low/back, legs split — was a flat "flying superhero" with a levelled gun arm); D04 Sigma tracks it with the cannon arm up then crouches/draws the mace back for the hop (was a frozen guard just bobbing); D03/D05 cameras frame the whole RONIN (aimed 8–9 m above the hip they cut it in half).
+- [x] 196. Scene tag numbers every camera cut (the duel counts one scene per cut) → 89 scenes.

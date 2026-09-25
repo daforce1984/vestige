@@ -1,7 +1,7 @@
 import { Renderer } from './renderer.js';
 import { frame, findShot, DURATION, SHOTS } from './shots.js';
 import { storyT, filmT } from './timemap.js';
-import { duelCamera } from './duel.js';
+import { DUEL_CAMS, bulletTime } from './duel.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
   'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
@@ -98,15 +98,23 @@ function pause() {
   showSceneTag();
 }
 // paused: which scene is this? (numbered in timeline order, with the shot's own code/name and the film time)
-const SCENE_ORDER = [...SHOTS].sort((a, b) => a.t0 - b.t0 || a.t1 - b.t1);
+// every camera cut counts as a scene: a shot with its own cuts (the duel) contributes one scene per cut
+const DUEL_SHOT = SHOTS.find((sh) => sh.name.includes('DUEL'));
+const SCENE_ORDER = [...SHOTS.filter((sh) => sh !== DUEL_SHOT),
+  ...(DUEL_SHOT ? DUEL_CAMS.filter((c) => c.t1 > DUEL_SHOT.t0 && c.t0 < DUEL_SHOT.t1).map((c) => ({ t0: Math.max(c.t0, DUEL_SHOT.t0), t1: Math.min(c.t1, DUEL_SHOT.t1), name: DUEL_SHOT.name + ' · ' + c.name, cam: c })) : []),
+].sort((a, b) => a.t0 - b.t0 || a.t1 - b.t1);
 const sceneTag = document.createElement('div');
 sceneTag.id = 'scenetag';
 document.body.appendChild(sceneTag);
+function sceneAt(st) {
+  const sh = findShot(st);
+  if (sh === DUEL_SHOT) { const c = SCENE_ORDER.find((x) => x.cam && st >= x.t0 && st < x.t1); if (c) return c; }
+  return sh;
+}
 function showSceneTag() {
-  const ft = now(), sh = findShot(storyT(ft)), i = SCENE_ORDER.indexOf(sh);
+  const ft = now(), sc = sceneAt(bulletTime(storyT(ft))), i = SCENE_ORDER.indexOf(sc);
   const mm = Math.floor(ft / 60), ss = (ft % 60).toFixed(1).padStart(4, '0');
-  const dc = sh.name.includes('DUEL') ? duelCamera(storyT(ft)) : null;   // the duel is one scene with many cuts: name the cut too
-  sceneTag.innerHTML = `<b>SCENE ${i + 1}</b> / ${SCENE_ORDER.length}<span>${sh.name}${dc ? ' · ' + dc.name : ''}</span><em>${mm}:${ss}  (story ${storyT(ft).toFixed(2)} s)</em>`;
+  sceneTag.innerHTML = `<b>SCENE ${i + 1}</b> / ${SCENE_ORDER.length}<span>${sc.name}</span><em>${mm}:${ss}  (story ${storyT(ft).toFixed(2)} s)</em>`;
   sceneTag.classList.add('on');
 }
 function hideSceneTag() { sceneTag.classList.remove('on'); }

@@ -245,14 +245,18 @@ L.dive = W(L.flight, { arm_L_upper: [-170, 10, 20], arm_L_lower: [-30, 0, 0], ha
 const R = {};
 for (const k in L) R[k] = mirror(L[k]);
 R.aim = W(mirror(L.aim), {});           // aims the left-arm gun
-// aggressive approach: leaning hard into the flight, gun arm levelled at Sigma, katana cocked back low, legs trailing
-R.assault = W(R.aim, { torso: [28, 8, 0], head: [-22, -6, 0], pelvis: [10, 0, 0],
-  arm_R_upper: [35, -12, -28], arm_R_lower: [-45, 0, 0], hand_R: [45, 0, 0],
-  leg_L_upper: [28, 0, 8], leg_L_lower: [72, 0, 0], foot_L: [35, 0, 0], leg_R_upper: [12, 0, -10], leg_R_lower: [58, 0, 0], foot_R: [30, 0, 0],
-  _body: [22, 0, 0] });
-R.assault[PIDX.arm_L_upper] -= 30 * DEG;                           // keep the gun on target despite the lean
-R.assaultB = W(R.assault, { torso: [34, -10, 6], head: [-26, 8, 0], arm_R_upper: [45, -18, -35], leg_L_upper: [18, 0, 10], leg_R_upper: [30, 0, -6], leg_R_lower: [80, 0, 0], _body: [26, -8, 6] });
-R.assaultB[PIDX.arm_L_upper] = R.assault[PIDX.arm_L_upper] - 6 * DEG;
+// the approach (no gunfire any more): a swordsman closing in on boosters — body upright and leaning into the flight,
+// katana held low and back in the sword hand, the free arm forward for balance, legs split front/back
+// (authored in the hero's convention, then mirrored; the old pose lay flat like a flying superhero with a levelled gun arm)
+const _approach = P({
+  pelvis: [4, 8, 0], torso: [16, 12, 0], head: [-14, -10, 0],
+  arm_L_upper: [22, 8, 28], arm_L_lower: [-32, 0, 0], hand_L: [55, 0, 0],
+  arm_R_upper: [-50, 12, -18], arm_R_lower: [-78, 0, 0], hand_R: [10, 0, 0],
+  leg_L_upper: [-34, 0, 8], leg_L_lower: [52, 0, 0], foot_L: [20, 0, 0],
+  leg_R_upper: [22, 0, -8], leg_R_lower: [68, 0, 0], foot_R: [34, 0, 0], _body: [14, 0, 0],
+});
+R.assault = mirror(_approach);
+R.assaultB = mirror(W(_approach, { torso: [20, 20, 3], head: [-16, -18, 0], arm_R_upper: [-58, 22, -22], leg_L_upper: [-24, 0, 8], leg_L_lower: [40, 0, 0], leg_R_upper: [28, 0, -8], leg_R_lower: [78, 0, 0], _body: [18, 6, 4] }));
 export const POSE_LIB = { hero: L, ronin: R };
 // The hero swings a mace, not a sword: a club is held in a fist grip (haft roughly ⟂ forearm), so the wrist flex that
 // let the saber "continue the forearm" (+90°) is compressed into a natural cocked wrist (soft knee at 20°, 90° → ~41°).
@@ -622,6 +626,8 @@ const heroPos = posTrack([
 const heroPose = poseTrack([
   [169.3, L.flight], [170.4, L.guard, 'io'], [172.4, L.guard],               // closing in behind the mace through the laser fire
   [172.7, W(L.guard, { torso: [20, 25, 0], arm_L_upper: [-60, -40, 20] }), 'out'], [173.4, L.guard, 'io'],
+  [173.95, W(L.guard, { torso: [6, 16, 0], head: [-14, -14, 0], arm_R_upper: [-72, 26, -22], arm_R_lower: [-88, 0, 0], leg_L_upper: [-42, 0, 9], leg_L_lower: [46, 0, 0] }), 'io'],   // tracks RONIN overhead, cannon arm up
+  [174.6, W(L.guard, { torso: [24, -12, 0], head: [8, 10, 0], arm_L_upper: [-8, -22, -38], arm_L_lower: [-72, 0, 0], leg_L_upper: [-58, 0, 9], leg_L_lower: [88, 0, 0], leg_R_upper: [-4, 0, -6], leg_R_lower: [92, 0, 0], _body: [12, 0, 0] }), 'io'],   // gathers: crouches, mace drawn back for the hop
   [175.2, L.guard], [175.5, W(L.guard, { torso: [25, -20, 0], _body: [15, 0, 0] }), 'out'], [176.2, L.guard, 'io'],
   [177.35, L.guard], [177.47, L.guard],
   [177.62, L.sway, 'out'], [177.9, L.forearmBlock, 'io'], [178.0, W(L.forearmBlock, { arm_R_upper: [-68, -35, -35] }), 'in'],
@@ -1430,9 +1436,9 @@ export const DUEL_CAMS = [
   // ---- ranged exchange (AC 'Locked In' language: wide, mostly static frames; the quick-boosts happen inside the frame)
   { t0: 170.0, t1: 171.6, name: 'D01 wide establish', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, -48 + u * 6)), add(scl(sd, 24), [0, 14, 0])), target: lrp(h, e, 0.45), fov: 50, handheld: 0.4 }; } },
   { t0: 171.6, t1: 172.6, name: 'D02 OTS hero fires', fn: (t) => ({ ...ots(hp(t), e1p(t), { right: 1, back: 34, lift: 9, fov: 40, side: 13 }), handheld: 0.6 }) },
-  { t0: 172.6, t1: 173.6, name: 'D03 E1 boost + MG', fn: (t, u) => { const e = e1p(t); const h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(sd, 34)), add(scl(d, 22), [0, 6 - u * 3, 0])), target: up(e, 8), fov: 40, handheld: 0.7 }; } },
+  { t0: 172.6, t1: 173.6, name: 'D03 E1 boost in', fn: (t, u) => { const e = e1p(t); const h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(sd, 34)), add(scl(d, 22), [0, 6 - u * 3, 0])), target: up(e, 2), fov: 42, handheld: 0.7 }; } },   // whole RONIN in frame
   { t0: 173.6, t1: 175.0, name: 'D04 low hero angle', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 24)), add(scl(sd, -12), [0, -12, 0])), target: up(h, 6), fov: 50, roll: 0.12, handheld: 0.5 }; } },
-  { t0: 175.0, t1: 176.4, name: 'D05 E1 medium firing', fn: (t, u) => { const e = e1p(t), h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(d, 30)), add(scl(sd, -14), [0, 4, 0])), target: up(e, 9), fov: 36, handheld: 0.6 }; } },
+  { t0: 175.0, t1: 176.4, name: 'D05 E1 medium', fn: (t, u) => { const e = e1p(t), h = hp(t); const d = nrm(sub(h, e)); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(d, 42 - u * 5)), add(scl(sd, -16), [0, 7, 0])), target: up(e, 2.5), fov: 38, handheld: 0.6 }; } },   // whole body in frame (aimed 9 m up it cut him in half)
   { t0: 176.4, t1: 177.5, name: 'D06 profile — the charge', fn: (t, u) => { const c = two(hp(t), e1p(t), { side: 1, dist: 0.9, lift: 5, fov: 44, bias: 0.55 }); return { ...c, handheld: 0.3 }; } },
   // ---- melee with E1
   { t0: 177.5, t1: 177.74, name: 'D07a insert: slash whips past', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 4)), add(scl(sd, -9), [0, 9, 0])), target: up(lrp(h, e, 0.6), 8), fov: 32, roll: -0.15 }; } },
