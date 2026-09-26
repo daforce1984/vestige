@@ -679,7 +679,10 @@ function warpCues() {
   const ev = warpSchedule().filter((e) => !(e.t > 80 && e.t < 84.8 && e.size < 3)), out = [];
   const LVL = { 1: 1.0, 2: 1.35, 3: 1.8 }, RATE = { 1: 1, 2: 1, 3: 1 },   // full original sound: no pitch change, no distance attenuation
    DUCK = { 1: [0.8, -4], 2: [1.4, -7], 3: [2.5, -10] };
-  out.push([81.6, 'warp_out', { bus: 'dry', gain: 5.7, rate: 1, prio: 10, duck: 2.2, duckDb: -10, norand: true }]);   // the whole enemy line arrives
+  // the whole enemy line arrives: ONE clean deep boom (the warp_out sample's pulsing tail, played 5.7× loud, read as a
+  // clattering, rolling-metal rattle)
+  out.push([81.6, 'boom_cine', { bus: 'dry', gain: 3.2, rate: 0.85, prio: 10, duck: 2.2, duckDb: -10, norand: true }]);
+  out.push([81.6, '@boom', { bus: 'sfx', f: 32, vel: 0.9, dur: 2.4, verb: 0.35 }]);
   for (let i = 0; i < ev.length;) {
     let j = i, size = 0, n = 0;
     while (j < ev.length && ev[j].t - ev[i].t < 0.15) { size = Math.max(size, ev[j].size); n++; j++; }
