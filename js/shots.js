@@ -650,7 +650,8 @@ export function drawGundam(R, t, s, opts = {}) {
   }
   const eyeK = s.eye * (opts.eye ?? 1);
   const bz = s.berserk || 0;
-  const ec = [lerp(0.5 * 2.5, 9, bz) * eyeK, lerp(2.2 * 2.5, 0.4, bz) * eyeK, lerp(1.2 * 2.5, 0.25, bz) * eyeK];
+  const visK = 1 + 2.2 * smooth(175.55, 175.75, t) * (1 - smooth(176.0, 176.4, t));   // the standoff: his visor lights up
+  const ec = [lerp(0.5 * 2.5, 9, bz) * eyeK * visK, lerp(2.2 * 2.5, 0.4, bz) * eyeK * visK, lerp(1.2 * 2.5, 0.25, bz) * eyeK * visK];
   // chest reactor ring (torso 'core'): its own emissive plus a soft glow halo, slow heartbeat pulse; red when berserk
   const coreK = (0.85 + 0.15 * Math.sin(t * 2.2)) * (s.fpv ? 0 : 1) * (s.damage > 0.5 ? 0.4 : 1);
   const cc = [lerp(0.35, 3.5, bz) * 3.2 * coreK, lerp(0.85, 0.35, bz) * 3.2 * coreK, lerp(1.0, 0.2, bz) * 3.2 * coreK];
@@ -742,7 +743,8 @@ function drawEnemyMS(R, t, s, idx) {
   }
   heavyDamage(R, t, e, idx);
   const eye = emitWorld(R, 'enemy_ms', e, 'eye');
-  if (eye) R.glow(eye, 1.6, [3.5, 0.3, 1.2], 0.6);
+  const eyeFl = idx === 1 ? 1 + 1.6 * smooth(174.75, 174.9, t) * (1 - smooth(175.15, 175.6, t)) : 1;   // the standoff: its eye flares
+  if (eye) R.glow(eye, 1.6, [3.5 * eyeFl, 0.3 * eyeFl, 1.2 * eyeFl], 0.3);
   // (no extra beam blade: RONIN already carries its own katana)
   return e;
 }

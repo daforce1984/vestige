@@ -649,8 +649,9 @@ const heroPos = posTrack([
   [194.6, C(6, -4, -34), 'out'],
 ]);
 const heroPose = poseTrack([
-  [169.3, L.flight], [170.4, L.idle, 'io'],                  // 170–175: at the ready, mace hanging, just floating (scenes 32–35)
-  [174.85, L.idle, 'io'],
+  [169.3, L.flight], [170.4, L.idle, 'io'],                  // 170–173.85: heavy wait, mace hanging (scenes 32–35)
+  [173.85, L.idle, 'io'],
+  [174.6, W(L.guard, { torso: [20, -8, 0], head: [6, 6, 0], leg_L_upper: [-40, 0, 9], leg_L_lower: [52, 0, 0] }), 'io'],   // answers the taunt: lifts the mace, slow and heavy
   [175.2, L.guard], [175.5, W(L.guard, { torso: [25, -20, 0], _body: [15, 0, 0] }), 'out'], [176.2, L.guard, 'io'],
   [177.35, L.guard], [177.47, L.guard],
   [177.62, L.sway, 'out'], [177.9, L.forearmBlock, 'io'], [178.0, W(L.forearmBlock, { arm_R_upper: [-68, -35, -35] }), 'in'],
@@ -823,11 +824,16 @@ function finish(s, arr, fwdBase) {
   return s;
 }
 
+// CIRCLING (170.8–176.6): the two machines drift sideways round each other, opposite ways, sizing each other up —
+// then settle back on their marks just before the charge (so every solved contact after 177 is untouched)
+const CIRC_AX = (() => { const a = [-4 - 60, 0, -26 - 28]; const l = Math.hypot(a[0], a[2]); return [a[2] / l, 0, -a[0] / l]; })();   // ⟂ to the hero→E1 line
+const circ = (tw) => easeInOut(sat((tw - 170.8) / 4.2)) * (1 - easeInOut(sat((tw - 175.9) / 0.7)));
 function heroRawPos(tw) {
   if (tw < 170) return gundamLaunchPath(tw);
-  return add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), smooth(170, 171, tw)));
+  const c = circ(tw);
+  return add(add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), smooth(170, 171, tw))), [CIRC_AX[0] * -6 * c, 1.2 * c, CIRC_AX[2] * -6 * c]);
 }
-function e1RawPos(tw) { return add(springPos(e1Pos, tw), hover(tw, 7.1, lerp(0.45, 0.3, smooth(176.3, 176.9, tw)))); }   // (1.2 m of hover read as wobble)
+function e1RawPos(tw) { const c = circ(tw); return add(add(springPos(e1Pos, tw), hover(tw, 7.1, lerp(0.45, 0.3, smooth(176.3, 176.9, tw)))), [CIRC_AX[0] * 6 * c, -0.8 * c, CIRC_AX[2] * 6 * c]); }   // (1.2 m of hover read as wobble)
 function e2RawPos(tw) { return add(springPos(e2Pos, tw), hover(tw, 3.7, 0.3 * (1 - E2_DIVE(tw)))); }
 // the dive from above (180.6–184.25, scenes 43–46): one clean committed plunge — no hover, jitter, squash, weight-shift,
 // inertia lean or re-aiming at Sigma's every wobble
@@ -955,7 +961,7 @@ function duelHero_(t) {
   springPose(heroPose, tw, _pose); heroImp(tw, _pose); volleyParry(tw, _pose);
   // IDLE (173.4–175.1, scene 35): the body is held still — no squash / weight-shift / jitter / inertia lean / turning
   // after RONIN; only a slow float (below: the whole machine drifts up and down a little) and breathing
-  const idleK = smooth(169.8, 170.3, tw) * (1 - smooth(174.85, 175.15, tw));   // scenes 32–35
+  const idleK = smooth(169.8, 170.3, tw) * (1 - smooth(173.75, 174.3, tw));   // scenes 32–35 (until he answers the taunt)
   if (tw >= 170) {
     const pre = idleK > 0 ? Float64Array.from(_pose) : null;
     heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper');
@@ -985,7 +991,7 @@ function duelHero_(t) {
   } else if (tw < 180.25) {
     f = flat(sub(e1RawPos(tw), s.pos));
     if (ROUGH(tw) > 0) f = nrm(lrp(f, roughDir(heroRawPos, e1RawPos, tw), ROUGH(tw)));
-    if (idleK > 0) f = nrm(lrp(f, HERO_HOLD_DIR(), idleK));   // idle: set once, then holds its heading
+    // (sizing each other up: the rough, averaged heading above turns them slowly as they circle — no servoing)
   } else {
     const toE1 = flat(sub(e1RawPos(180.2), s.pos));
     const toE2 = flat(sub(e2RawPos(tw), s.pos), tw < 184 ? 0.6 : 0.35);
@@ -1159,14 +1165,14 @@ function duelEnemy1_(t) {
   const h = heroRawPos(Math.min(tw, 179.0));
   f = flat(sub(h, s.pos));
   if (ROUGH(tw) > 0) f = nrm(lrp(f, roughDir(e1RawPos, heroRawPos, tw), ROUGH(tw)));
-  if (e1K > 0) f = nrm(lrp(f, E1_HOLD_DIR(), e1K));
   if (tw > 179.0) {                                   // dead: tumbling away
     const u = tw - 179.0;
     f = yawRot(f, u * 0.9);
     _pose[PIDX._body] += -u * 0.6; _pose[PIDX._body + 2] += u * 0.8;
   }
   s.saber = e1Saber(tw);
-  s.boost = Math.max(sat((Math.hypot(...s.vel) - 20) / 60), smooth(176.65, 176.95, tw) * (1 - smooth(177.3, 177.5, tw)));
+  s.boost = Math.max(sat((Math.hypot(...s.vel) - 20) / 60), smooth(176.65, 176.95, tw) * (1 - smooth(177.3, 177.5, tw)),
+    0.9 * smooth(172.2, 172.32, tw) * (1 - smooth(172.5, 172.85, tw)));   // brakes onto its mark: one thruster burst
   s.thr = tw > 179 ? 0.15 + 0.5 * (Math.sin(t * 37) > 0.3 ? 1 : 0) : clamp(0.4 + s.boost * 0.6, 0, 1);
   s.damage = 0.1 * smooth(178.2, 178.3, t) + 0.15 * smooth(178.55, 178.6, t) + 0.5 * smooth(179.0, 179.2, t);
   s.eye = tw > 179 ? (Math.sin(t * 43) > 0 ? 0.9 : 0.15) : 1;
@@ -1524,10 +1530,22 @@ function ots(from, to, { right = 1, back = 16, lift = 6, fov = 42, side = 7 } = 
 export const DUEL_CAMS = [
   // ---- ranged exchange (AC 'Locked In' language: wide, mostly static frames; the quick-boosts happen inside the frame)
   { t0: 170.0, t1: 171.6, name: 'D01 wide establish', fn: (t, u) => { const h = hpA(t), e = e1A(t); const d = nrm(sub(e1A(170), hpA(170))), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, -48 + u * 6)), add(scl(sd, 24), [0, 14, 0])), target: lrp(h, e, 0.45), fov: 50, handheld: 0.1, baseShake: 0 }; } },   // steady: axis fixed at the cut
-  { t0: 171.6, t1: 172.6, name: 'D02 OTS hero', fn: (t) => ({ ...ots(hpA(t), e1A(t), { right: 1, back: 34, lift: 9, fov: 40, side: 13 }), handheld: 0.12, baseShake: 0 }) },
-  { t0: 172.6, t1: 173.6, name: 'D03 E1 boost in', fn: (t, u) => { const e = e1A(t); const d = nrm(sub(hpA(172.6), e1A(172.6))); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(sd, 34)), add(scl(d, 22), [0, 6 - u * 3, 0])), target: up(e, 2), fov: 42, handheld: 0.12, baseShake: 0 }; } },   // whole RONIN in frame
-  { t0: 173.6, t1: 175.0, name: 'D04 low hero angle', fn: (t, u) => { const h = duelHero(t).anchor, d = nrm(sub(e1p(173.6), hp(173.6))); const sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 24)), add(scl(sd, -12), [0, -12, 0])), target: up(h, 6), fov: 50, roll: 0.12, handheld: 0, baseShake: 0 }; } },   // locked: fixed orientation (from the cut's first frame), only carried along with Sigma's drift — no swing as RONIN moves
-  { t0: 175.0, t1: 176.4, name: 'D05 E1 medium', fn: (t, u) => { const e = e1A(t); const d = nrm(sub(hpA(175.0), e1A(175.0))); const sd = [d[2], 0, -d[0]]; return { pos: add(add(e, scl(d, 22 - u * 3)), add(scl(sd, -36), [0, 6, 0])), target: up(e, 2.5), fov: 38, handheld: 0, baseShake: 0 }; } },   // locked (axis fixed at the cut, follows RONIN's un-floated anchor), from the side so the katana reads full length   // whole body in frame (aimed 9 m up it cut him in half)
+  // STANDOFF (Leone): each cut tighter than the last — over the shoulder, the taunt, his hand answering, its eye, his
+  // visor — slow push-ins, no shake; then the charge explodes out of the stillness
+  { t0: 171.6, t1: 172.7, name: 'D02 OTS hero — RONIN brakes in', fn: (t, u) => { const h = hpA(t), e = e1A(t), d = nrm(sub(e1A(171.6), hpA(171.6))), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(h, scl(d, -26 + u * 6)), add(scl(sd, 11), [0, 10, 0])), target: up(e, 2), fov: 38 - u * 4, handheld: 0.05, baseShake: 0 }; } },
+  { t0: 172.7, t1: 173.9, name: 'D03 the taunt', fn: (t, u) => { const e = e1A(t), d0 = nrm(sub(hpA(172.7), e1A(172.7))), a = 0.18 * easeInOut(u);
+    const d = [d0[0] * Math.cos(a) + d0[2] * Math.sin(a), 0, -d0[0] * Math.sin(a) + d0[2] * Math.cos(a)], sd = [d[2], 0, -d[0]];
+    return { pos: add(add(e, scl(d, 34 - u * 6)), add(scl(sd, -10), [0, 5, 0])), target: up(e, 3), fov: 36 - u * 3, handheld: 0.05, baseShake: 0 }; } },
+  { t0: 173.9, t1: 174.7, name: 'D04 his hand answers', fn: (t, u) => { const s = duelHero(t), fk = duelFK({ ...s, saber: 1 }, 'gundam'), hand = partPoint(fk, 'hand_L');
+    const d = nrm(sub(e1A(173.9), hpA(173.9))), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(hand, scl(d, 20 - u * 3)), add(scl(sd, -13), [0, 3, 0])), target: up(hand, 3), fov: 40 - u * 4, handheld: 0.03, baseShake: 0 }; } },   // the whole arm + mace in frame as it comes up
+  { t0: 174.7, t1: 175.5, name: 'D05 its eye', fn: (t, u) => { const s = duelEnemy1(t), fk = duelFK({ ...s, saber: 1 }, 'enemy_ms'), hd = partPoint(fk, 'head', [0, 0.6, 0]);
+    const d = nrm(sub(hpA(174.7), e1A(174.7))), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(hd, scl(d, 11 - u * 2.5)), add(scl(sd, 3.5), [0, 0.8, 0])), target: hd, fov: 30 - u * 3, handheld: 0.02, baseShake: 0 }; } },
+  { t0: 175.5, t1: 176.4, name: 'D05b his visor', fn: (t, u) => { const s = duelHero(t), fk = duelFK({ ...s, saber: 1 }, 'gundam'), hd = partPoint(fk, 'head', [0, 0.6, 0]);
+    const d = nrm(sub(e1A(175.5), hpA(175.5))), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(hd, scl(d, 10 - u * 2.5)), add(scl(sd, -3.5), [0, 0.6, 0])), target: hd, fov: 30 - u * 3, handheld: 0.02, baseShake: 0 }; } },
   { t0: 176.4, t1: 177.5, name: 'D06 profile — the charge', fn: (t, u) => { const c = two(hp(t), e1p(t), { side: 1, dist: 0.9, lift: 5, fov: 44, bias: 0.55 }); return { ...c, handheld: 0.3 }; } },
   // ---- melee with E1
   { t0: 177.5, t1: 177.74, name: 'D07a insert: slash whips past', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 4)), add(scl(sd, -9), [0, 9, 0])), target: up(lrp(h, e, 0.6), 8), fov: 32, roll: -0.15 }; } },

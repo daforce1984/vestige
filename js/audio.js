@@ -366,6 +366,12 @@ export const SAMPLE_CUES = [
   // fighter kills (small)
   ...[138, 141.6, 145, 148.6, 152, 157, 163, 171, 178, 189].map((t, i) => [t, 'hl_explosion', { rate: 1.22, gain: 0.75, far: 0.3 + 0.1 * (i % 3), pan: 'rnd', prio: 5 }]),
   ...[138, 145, 152, 163, 178].map((t, i) => [t + 0.04, 'expl_debris', { rate: 1.15, gain: 0.3, far: 0.4, pan: 'rnd', prio: 3 }]),
+  // ---------------- the standoff 171.6–176.4: near-silence, then small sounds that each mean something
+  [172.22, 'hl_thruster', { dur: 0.55, fadeOut: 0.3, rate: 1.1, gain: 0.55, pan: -0.3, far: 0.25, prio: 7, norand: true }],   // RONIN brakes onto its mark
+  [173.95, 'servo', { rate: 0.5, dur: 0.8, fadeOut: 0.3, gain: 0.7, pan: 0.15, prio: 8, norand: true }],                      // the mace comes up, heavy
+  [174.55, 'metal_knock', { at: 'hit', rate: 0.6, gain: 0.35, pan: 0.15, prio: 7, norand: true }],                            // grip locks
+  [174.76, 'charge_up', { at: 0, dur: 0.7, fadeOut: 0.3, rate: 1.7, gain: 0.35, pan: -0.25, prio: 7, norand: true }],          // its eye flares
+  [175.57, 'mech_powerup', { dur: 0.9, fadeOut: 0.4, rate: 0.8, gain: 0.45, prio: 7, norand: true }],                          // his visor answers
   // ---------------- mech launch 150–161
   [151,   'servo',     { gain: 0.6, pan: -0.2, prio: 6 }],
   [152.2, 'servo',     { gain: 0.6, pan: 0.3, rate: 0.85, prio: 6 }],
