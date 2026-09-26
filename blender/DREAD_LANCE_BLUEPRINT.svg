@@ -169,7 +169,7 @@
 <text x="890.0" y="880.0" fill="#e8f4ff" stroke="none" font-size="15" text-anchor="start">D  COPPER BUS BARS + FEEDERS to every coil</text>
 <line x1="789.6" y1="330.9" x2="789.6" y2="908.0" stroke="#9fd0ff" stroke-width="1" />
 <circle cx="789.6" cy="330.9" r="4.0" stroke="#9fd0ff"/>
-<text x="797.6" y="920.0" fill="#e8f4ff" stroke="none" font-size="15" text-anchor="start">E  FOCUSING COIL STACK — 5 wound rings + 4 field shapers</text>
+<text x="797.6" y="920.0" fill="#e8f4ff" stroke="none" font-size="15" text-anchor="start">E  FOCUSING COIL STACK — 9 torus coils (5 field rings + 4 shapers), glowing bore grooves, clamps</text>
 <line x1="1132.8" y1="522.3" x2="1132.8" y2="948.0" stroke="#9fd0ff" stroke-width="1" />
 <circle cx="1132.8" cy="522.3" r="4.0" stroke="#9fd0ff"/>
 <text x="1140.8" y="960.0" fill="#e8f4ff" stroke="none" font-size="15" text-anchor="start">F  GUIDE RAILS, CLAMPS, STATUS LAMPS</text>

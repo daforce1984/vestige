@@ -124,7 +124,7 @@ class Mesh:
         for i in range(len(pts) - 1):
             for s in range(seg):
                 a0, a1, b0, b1 = i * seg + s, i * seg + (s + 1) % seg, (i + 1) * seg + s, (i + 1) * seg + (s + 1) % seg
-                F += [(a0, b0, a1), (a1, b0, b1)]
+                F += [(a0, a1, b0), (a1, b1, b0)]          # outward (v12 fix: was wound inward)
         self.add(mat, P, N, F)
         if caps:
             for end, sg in ((0, -1), (len(pts) - 1, 1)):
@@ -319,7 +319,7 @@ def blueprint(path):
              ('B', 72, -16, 'RADIATOR FIN BANKS ×2 — 26 fins each'),
              ('C', 60, 9.4, 'CAPACITOR BANKS — 2 tiers × 21 cells per wall'),
              ('D', 150, -7, 'COPPER BUS BARS + FEEDERS to every coil'),
-             ('E', 136, 13.5, 'FOCUSING COIL STACK — 5 wound rings + 4 field shapers'),
+             ('E', 136, 13.5, 'FOCUSING COIL STACK — 9 torus coils (5 field rings + 4 shapers), glowing bore grooves, clamps'),
              ('F', 188, -RAIL_Y - 1.5, 'GUIDE RAILS, CLAMPS, STATUS LAMPS'),
              ('G', 208, 7, 'EMITTER CROWN — 6 electrode horns, arc terminals, focus lens')]
     for i, (tag, z, y, txt) in enumerate(notes):
