@@ -10,8 +10,10 @@ Systems (breech → muzzle):
   B  radiator fin banks      z 58–96   above and below the cradle (y ±14), 26 fins each
   C  capacitor banks         z 44–188  both trench walls, two tiers (y ±7): 21 cells per tier, bands + caps
   D  bus bars                z 44–192  copper conductors from the capacitor tiers forward to every coil
-  E  focusing coil stack     z 100–190 the five old field rings get copper windings (32 each) + 4 new field-shaper
-                                       rings between them, each clamped to the guide rails
+  E  focusing coil stack     z 100–190 nine smooth TORUS coils (v12): the five big field rings (sheathing the hull's
+                                       flat annuli completely) + 4 field-shaper rings between them. Each coil: an
+                                       anodised-bronze torus with a glowing coil groove round its bore, rail/strut
+                                       saddle clamps + small clamp bands with hex bolts
   F  guide rails             z 60–206  top and bottom (y ±14) with clamp blocks and red status lamps
   G  emitter crown           z 196–214 base collar, six curved electrode horns (arc terminals at the tips), focus lens
 The arc terminals (horn tips) are also used by js/world.js for the arc-discharge shader.
@@ -27,6 +29,8 @@ MATS = [  # name, base, metal, rough, emissive
     ('lance_cap', [0.13, 0.13, 0.15], 0.6, 0.45, None),
     ('lance_glow', [0.1, 0.02, 0.14], 0.0, 0.3, [0.75, 0.25, 1.0]),
     ('lance_warn', [0.3, 0.02, 0.02], 0.0, 0.4, [1.0, 0.08, 0.05]),
+    ('lance_ring', [0.2, 0.135, 0.1], 0.88, 0.36, None),      # coil torus: dark anodised warm bronze
+    ('lance_clamp', [0.065, 0.058, 0.055], 0.75, 0.55, None),  # clamp bands / saddles: darker, rougher
 ]
 MI = {m[0]: i for i, m in enumerate(MATS)}
 
@@ -34,6 +38,10 @@ MI = {m[0]: i for i, m in enumerate(MATS)}
 CORE_Z, CORE_R = 80.0, 9.0
 OLD_RINGS = [(z, 12 - (z - 100) * 0.03) for z in (100, 124, 148, 170, 190)]     # (z, inner radius) of the hull's coils
 NEW_RINGS = [112.0, 136.0, 159.0, 180.0]
+# coil torus cross-sections (radial semi-axis a, axial semi-axis b, groove half-height g, groove depth d) round the
+# tube centre radius r + off. The big rings' ellipse encloses the hull's 28-gon annulus (r..r+3.5, z ±2) corners.
+BIG_COIL = dict(off=1.75, a=2.45, b=3.05, g=0.55, d=0.5, seg=64, tseg=18)
+SHAPER_COIL = dict(off=1.4, a=1.05, b=1.05, g=0.3, d=0.25, seg=48, tseg=14)
 WALL_X = 16.6            # trench wall (inner face of the prongs) — capacitor backs sit against it
 RAIL_Y = 14.0
 CAP_Z = [44 + k * 7 for k in range(21)]
@@ -49,10 +57,45 @@ def horn_tip(k):
 
 # ---------------------------------------------------------------------------------------------- mesh kit
 class Mesh:
-    def __init__(self): self.g = {m[0]: ([], [], []) for m in MATS}      # verts, normals, indices per material
-    def add(self, mat, P, N, F):
-        v, n, ix = self.g[mat]; b = len(v)
+    def __init__(self): self.g = {m[0]: ([], [], [], []) for m in MATS}  # verts, normals, indices, uvs per material
+    def add(self, mat, P, N, F, UV=None):
+        v, n, ix, uv = self.g[mat]; b = len(v)
         v.extend(P); n.extend(N); ix.extend([[b + a, b + c, b + d] for a, c, d in F])
+        uv.extend(UV if UV is not None else [(0.0, 0.0)] * len(P))
+    def sweep(self, mat, cz, Rc, prof, th0, th1, nseg, caps=False, urep=None):
+        """revolve a closed 2D cross-section round the lance axis (z) from angle th0 to th1.
+        prof: [(dr, dz, nr, nz)] — offsets from the tube centre (radius Rc, height cz) with the smooth 2D normal;
+        repeat a point with a different normal for a hard edge. Faces are wound outward from the normals; UVs:
+        u along the ring (≈ one tile per 4 m), v along the cross-section perimeter."""
+        L = [0.0]
+        for i in range(1, len(prof)): L.append(L[-1] + math.hypot(prof[i][0] - prof[i - 1][0], prof[i][1] - prof[i - 1][1]))
+        L.append(L[-1] + math.hypot(prof[0][0] - prof[-1][0], prof[0][1] - prof[-1][1]))
+        pr = list(prof) + [prof[0]]; np_ = len(pr)
+        urep = urep or max(1.0, (th1 - th0) * Rc / 4.0)
+        P, N, UV, F = [], [], [], []
+        for i in range(nseg + 1):
+            th = th0 + (th1 - th0) * i / nseg; c, s_ = math.cos(th), math.sin(th)
+            for j, (dr, dz, nr, nz) in enumerate(pr):
+                P.append(((Rc + dr) * c, (Rc + dr) * s_, cz + dz)); N.append((nr * c, nr * s_, nz))
+                UV.append((urep * i / nseg, L[j] / L[-1]))
+        P = np.array(P); N = np.array(N)
+        for i in range(nseg):
+            for j in range(np_ - 1):
+                a0, a1, b0, b1 = i * np_ + j, i * np_ + j + 1, (i + 1) * np_ + j, (i + 1) * np_ + j + 1
+                if np.linalg.norm(P[a0] - P[a1]) < 1e-9: continue                    # zero-length hard-edge step
+                gn = np.cross(P[b0] - P[a0], P[a1] - P[a0])
+                F += [(a0, b0, a1), (a1, b0, b1)] if gn @ (N[a0] + N[a1] + N[b0] + N[b1]) > 0 else [(a0, a1, b0), (a1, b1, b0)]
+        self.add(mat, [tuple(p) for p in P], [tuple(n) for n in N], F, UV)
+        if caps:
+            for th, sg in ((th0, -1), (th1, 1)):
+                c, s_ = math.cos(th), math.sin(th); t = np.array([-s_, c, 0.0]) * sg
+                ring = [((Rc + dr) * c, (Rc + dr) * s_, cz + dz) for dr, dz, _, _ in prof]
+                ring = [r for k, r in enumerate(ring) if k == 0 or np.linalg.norm(np.subtract(r, ring[k - 1])) > 1e-9]
+                ctr = (Rc * c, Rc * s_, cz); n = len(ring); Fc = []
+                for k in range(n):
+                    gn = np.cross(np.subtract(ring[k], ctr), np.subtract(ring[(k + 1) % n], ctr))
+                    Fc.append((0, k + 1, (k + 1) % n + 1) if gn @ t > 0 else (0, (k + 1) % n + 1, k + 1))
+                self.add(mat, [ctr] + ring, [tuple(t)] * (n + 1), Fc, [(0.5, 0.5)] + [(0.5 + 0.5 * pp[0] / 3, 0.5 + 0.5 * pp[1] / 3) for pp in prof[:n]])
     def box(self, mat, c, h, R=None):
         """axis box centre c, half extents h, optional 3x3 rotation R (columns = local axes)"""
         R = np.eye(3) if R is None else np.asarray(R)
@@ -114,6 +157,50 @@ def rot_z(a):
     return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
 
 
+def ellipse_prof(a, b, n, g=0.0, d=0.0):
+    """closed elliptical tube cross-section (dr radial, dz axial) with smooth normals; with g > 0 a rectangular
+    groove of half-height g and depth d is cut into the bore side (dr < 0), with hard edges."""
+    al = math.asin(min(g / b, 0.99)) if g > 0 else 0.0
+    P = []
+    for i in range(n + 1 if g > 0 else n):
+        ph = -math.pi + al + (2 * math.pi - 2 * al) * i / n
+        nr, nz = math.cos(ph) / a, math.sin(ph) / b; l = math.hypot(nr, nz)
+        P.append((a * math.cos(ph), b * math.sin(ph), nr / l, nz / l))
+    if g > 0:
+        lip = -a * math.cos(al); bot = lip + d
+        P += [(lip, g, 0, -1), (bot, g, 0, -1), (bot, g, -1, 0), (bot, -g, -1, 0), (bot, -g, 0, 1), (lip, -g, 0, 1)]
+    return P
+
+
+def coil(m, z, r, off, a, b, g, d, seg, tseg):
+    """one focusing coil: smooth PBR torus with a glowing bore groove, saddle clamps where the rail hangers
+    (top/bottom) and hull struts (port/starboard) meet it, small clamp bands between, hex bolts on every clamp"""
+    Rc = r + off
+    m.sweep('lance_ring', z, Rc, ellipse_prof(a, b, tseg, g, d), 0.0, 2 * math.pi, seg)
+    lip = -a * math.cos(math.asin(g / b))
+    m.torus('lance_glow', (0, 0, z), Rc + lip + d + 0.1 * g, 0.72 * g, seg=seg, tseg=6)      # the energised coil in the groove
+    cl = ellipse_prof(a + 0.2 * a / 2.45 + 0.05, b + 0.2 * b / 3.05 + 0.05, 14)
+    for k in range(8):
+        big = k % 2 == 0                                                                     # 0°, 90°, 180°, 270° saddles
+        th = k / 8 * 2 * math.pi
+        half = (1.3 if big else 0.55) * (a / 2.45 * 0.6 + 0.4) / Rc
+        m.sweep('lance_clamp', z, Rc, cl, th - half, th + half, 4 if big else 2, caps=True)
+        if big:                                                                              # raised edge ribs on the saddle
+            rib = ellipse_prof(a + 0.2 * a / 2.45 + 0.16, b + 0.2 * b / 3.05 + 0.16, 12)
+            for e in (-1, 1):
+                m.sweep('lance_clamp', z, Rc, rib, th + e * half * 0.92 - 0.12 * half, th + e * half * 0.92 + 0.12 * half, 1, caps=True)
+        # hex bolts on the clamp's outer face and both flanks
+        ca, cb = a + 0.2 * a / 2.45 + 0.05, b + 0.2 * b / 3.05 + 0.05
+        br = 0.2 if a > 2 else 0.11
+        for ph in ((0.0, 1.05, -1.05) if big else (0.0,)):
+            for e in ((-0.55, 0.55) if big else (0.0,)):
+                t2 = th + e * half
+                nr, nz = math.cos(ph) / ca, math.sin(ph) / cb; l = math.hypot(nr, nz); nr, nz = nr / l, nz / l
+                base = np.array([(Rc + ca * math.cos(ph)) * math.cos(t2), (Rc + ca * math.cos(ph)) * math.sin(t2), z + cb * math.sin(ph)])
+                nn = np.array([nr * math.cos(t2), nr * math.sin(t2), nz])
+                m.cyl('lance_cap', base - nn * br * 0.5, base + nn * br * 1.1, br, 6)
+
+
 # ---------------------------------------------------------------------------------------------- build
 def build():
     m = Mesh()
@@ -147,19 +234,11 @@ def build():
         for z, r in OLD_RINGS + [(z, 12 - (z - 100) * 0.03) for z in NEW_RINGS]:
             for y in CAP_Y:
                 m.tube('lance_copper', [(sd * (WALL_X - 3.3), y, z - 1.5), (sd * (r + 3.6), y * 0.6, z - 0.4), (sd * (r + 2.2), y * 0.35, z)], [0.3] * 3, 6)
-    # E — focusing coil stack: windings on the old rings + new field-shaper rings
+    # E — focusing coil stack: nine smooth torus coils (5 big field rings over the hull annuli + 4 field shapers)
     for z, r in OLD_RINGS:
-        R = r + 1.75
-        for k in range(32):
-            a = k / 32 * 2 * math.pi
-            m.box('lance_copper', (R * math.cos(a), R * math.sin(a), z), (0.55, 2.35, 2.25), rot_z(a))
+        coil(m, z, r, **BIG_COIL)
     for z in NEW_RINGS:
-        r = 12 - (z - 100) * 0.03
-        m.torus('lance_metal', (0, 0, z), r + 1.4, 1.0, seg=40, tseg=8)
-        m.torus('lance_glow', (0, 0, z), r + 0.2, 0.35, seg=40, tseg=6)              # field aperture (glows with charge)
-        for k in range(16):
-            a = k / 16 * 2 * math.pi + 0.1
-            m.box('lance_copper', ((r + 1.4) * math.cos(a), (r + 1.4) * math.sin(a), z), (0.5, 1.2, 1.3), rot_z(a))
+        coil(m, z, 12 - (z - 100) * 0.03, **SHAPER_COIL)
     # F — guide rails top & bottom, clamps at every ring, status lamps
     for sy in (1, -1):
         m.box('lance_metal', (0, sy * RAIL_Y, 133), (1.1, 1.1, 73))
@@ -264,11 +343,13 @@ def write_glb(m, path):
         if mm: a['min'] = arr.min(0).tolist(); a['max'] = arr.max(0).tolist()
         accs.append(a); return len(accs) - 1
     tris = 0
-    for name, (v, n, ix) in m.g.items():
+    for name, (v, n, ix, uv) in m.g.items():
         if not ix: continue
         P = np.array(v, np.float32); N = np.array(n, np.float32); N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-9)
+        UV = np.array(uv, np.float32)
         F = np.array(ix, np.uint32); tris += len(F)
-        prims.append({'attributes': {'POSITION': add(P, 'VEC3', 5126, 34962, True), 'NORMAL': add(N, 'VEC3', 5126, 34962)},
+        prims.append({'attributes': {'POSITION': add(P, 'VEC3', 5126, 34962, True), 'NORMAL': add(N, 'VEC3', 5126, 34962),
+                                     'TEXCOORD_0': add(UV, 'VEC2', 5126, 34962)},
                       'indices': add(F.reshape(-1), 'SCALAR', 5125, 34963), 'material': MI[name]})
     while len(bin_) % 4: bin_.append(0)
     mats = []

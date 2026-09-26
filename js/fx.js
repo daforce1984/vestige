@@ -301,25 +301,52 @@ export function bolt(R, t, t0, t1, a, b, len, radius, col, intensity = 1) {
 
 /** Energy being sucked into a charging emitter. Speed is integrated so it is fast from the first frame and keeps
  * accelerating: rate(u) = r0 + (r1 - r0)·u², u = (t - t0)/dur. Streaks lengthen with speed. */
-export function chargeInflow(R, t, t0, dur, pos, radius, n, col, r0 = 3, r1 = 15, width = 0.2, seed = 0) {
+const _ci_a = [0, 0, 0], _ci_b = [0, 0, 0], _ci_n = [0, 0, 0], _ci_p = [0, 0, 0], _ci_q = [0, 0, 0];
+// energy gathering into a weapon: every mote spirals in on its own orbit (own plane, own start distance, 1.2–2.6
+// turns), fading in small and transparent and swelling to full as it goes, then swallowed at the core. The whole
+// effect also starts transparent and small and grows in over the first part of the charge (no sudden pop).
+// `on` (0..1) lets a caller gate it further (e.g. a charge level).
+export function chargeInflow(R, t, t0, dur, pos, radius, n, col, r0 = 3, r1 = 15, width = 0.2, seed = 0, on = 1) {
   const lt = Math.max(0, Math.min(t - t0, dur)), u = lt / dur;
-  // ∫ rate dt (cycles); past the ramp it keeps flowing at the final rate (it used to freeze there)
+  // ∫ rate dt (cycles); past the ramp it keeps flowing at the final rate
   const P = r0 * lt + (r1 - r0) * dur * u * u * u / 3 + r1 * Math.max(0, t - t0 - dur);
-  const rate = r0 + (r1 - r0) * u * u;
-  const k = 0.45 + 0.55 * u;
+  const grow = smooth(0, Math.min(1.5, dur * 0.35), t - t0) * on;           // the effect fades + swells in
+  if (grow <= 0.002) return;
+  const k = (0.45 + 0.55 * u) * grow;
+  const rad = radius * (0.35 + 0.65 * grow);
   for (let i = 0; i < n; i++) {
     const s = i * 1.913 + seed;
-    const cyc = P * (0.75 + 0.5 * hash(s)) + hash(s + 1);
-    const ph = cyc % 1;
-    const d = randDir(tmp, s + Math.floor(cyc) * 2.3);
-    const r = radius * (1 - ph) * (0.6 + 0.4 * hash(s + 2)) + radius * 0.04;
-    if (R.camPos) {                                                // never let a streak flare across the lens
-      const px = pos[0] + d[0] * r - R.camPos[0], py = pos[1] + d[1] * r - R.camPos[1], pz = pos[2] + d[2] * r - R.camPos[2];
-      if (px * px + py * py + pz * pz < (radius * 0.45) * (radius * 0.45)) continue;
+    const cyc = P * (0.35 + 0.3 * hash(s)) + hash(s + 1);                 // orbits are slower than the old straight dives
+    const ph = cyc % 1, gen = Math.floor(cyc);
+    // this generation's orbit: plane normal + in-plane basis, start distance 55–125 %, turns, handedness
+    randDir(_ci_n, s + gen * 2.3);
+    V.norm(_ci_a, V.cross(_ci_a, _ci_n, Math.abs(_ci_n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])); V.cross(_ci_b, _ci_n, _ci_a);
+    const rs = rad * (0.55 + 0.7 * hash(s + gen * 1.7 + 2)), turns = (1.2 + 1.4 * hash(s + gen * 3.1 + 3)) * (hash(s + gen + 4) > 0.5 ? 1 : -1);
+    const th0 = hash(s + gen * 5.3 + 5) * 6.283;
+    const at = (q, out) => {                                                   // position on the spiral at phase q
+      const r = rs * Math.pow(1 - q, 1.35) + rad * 0.03;
+      const th = th0 + turns * 6.283 * q * q * 0.9 + turns * 6.283 * q * 0.1;  // speeds up as it falls in
+      const c = Math.cos(th) * r, sn = Math.sin(th) * r, wob = Math.sin(q * 9 + i) * r * 0.12;
+      out[0] = pos[0] + _ci_a[0] * c + _ci_b[0] * sn + _ci_n[0] * wob; out[1] = pos[1] + _ci_a[1] * c + _ci_b[1] * sn + _ci_n[1] * wob; out[2] = pos[2] + _ci_a[2] * c + _ci_b[2] * sn + _ci_n[2] * wob;
+      return out;
+    };
+    at(ph, _ci_p);
+    if (R.camPos) {                                                           // never let a streak flare across the lens
+      const px = _ci_p[0] - R.camPos[0], py = _ci_p[1] - R.camPos[1], pz = _ci_p[2] - R.camPos[2];
+      if (px * px + py * py + pz * pz < (radius * 0.3) * (radius * 0.3)) continue;
     }
-    const len = Math.min(r * (1 - 0.7 * smooth(0.6, 1, ph)), radius * (0.06 + rate * 0.012));
-    const b = k * (0.3 + 0.7 * ph) * 3 * smooth(0, 0.12, ph) * (1 - smooth(0.62, 0.98, ph));   // fade in, then dim out as it is swallowed
-    R.beam(V.madd(tmp2, pos, d, r + len), V.madd(tmp3, pos, d, r), width, [col[0] * b, col[1] * b, col[2] * b], 1, 10);
+    const born = smooth(0, 0.22, ph);                                          // each mote: transparent + small at birth
+    const b = k * (0.3 + 0.7 * ph) * 3 * born * (1 - smooth(0.7, 0.98, ph));
+    const w = width * (0.25 + 0.75 * born) * (0.4 + 0.6 * grow);
+    // a short curved trail along the orbit (3 segments back in phase)
+    let prev = _ci_p;
+    for (let j = 1; j <= 3; j++) {
+      const q = Math.max(0, ph - j * 0.025);
+      at(q, _ci_q);
+      const f = 1 - j / 4;
+      R.beam([_ci_q[0], _ci_q[1], _ci_q[2]], [prev[0], prev[1], prev[2]], w * f, [col[0] * b * f, col[1] * b * f, col[2] * b * f], 1, 10);
+      prev = [_ci_q[0], _ci_q[1], _ci_q[2]];
+    }
   }
 }
 
