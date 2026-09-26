@@ -29,8 +29,8 @@ MATS = [  # name, base, metal, rough, emissive
     ('lance_cap', [0.13, 0.13, 0.15], 0.6, 0.45, None),
     ('lance_glow', [0.1, 0.02, 0.14], 0.0, 0.3, [0.75, 0.25, 1.0]),
     ('lance_warn', [0.3, 0.02, 0.02], 0.0, 0.4, [1.0, 0.08, 0.05]),
-    ('lance_ring', [0.2, 0.135, 0.1], 0.88, 0.36, None),      # coil torus: dark anodised warm bronze
-    ('lance_clamp', [0.065, 0.058, 0.055], 0.75, 0.55, None),  # clamp bands / saddles: darker, rougher
+    ('lance_ring', [0.62, 0.3, 0.1], 0.82, 0.46, None),       # coil torus: bright orange bronze (worn in the shader)
+    ('lance_clamp', [0.2, 0.12, 0.07], 0.7, 0.62, None),       # clamp bands / saddles: darker, rougher, weathered
 ]
 MI = {m[0]: i for i, m in enumerate(MATS)}
 

@@ -840,7 +840,8 @@ function drawDreadnought(R, t, tmpM) {
   // the gravity-lance firing system (tools/make_dread_lance.py, blueprint blender/DREAD_LANCE_BLUEPRINT.svg)
   const ln = R.add('dread_lance', e.m);
   if (ln) {
-    ln.seed = 41; ln.rimK = 0.3; ln.revealZ = e.revealZ; ln.revealDir = e.revealDir; ln.revealWidth = e.revealWidth; ln.tint = e.tint; ln.stretch = e.stretch;
+    ln.seed = 41; ln.rimK = 0.3; ln.wear = 1;   // used hardware: chipped edges, grime in the crevices, streaks, scorch
+    ln.revealZ = e.revealZ; ln.revealDir = e.revealDir; ln.revealWidth = e.revealWidth; ln.tint = e.tint; ln.stretch = e.stretch;
     const ch = t < LANCE_FIRE ? sat((t - 200) / 16) : Math.max(0, 1 - (t - LANCE_FIRE) / 5);
     const g = 0.12 + 1.3 * ch * (0.85 + 0.15 * Math.sin(t * (6 + 20 * ch)));
     const blink = (Math.sin(t * 5) > 0 ? 1 : 0.15) * (0.4 + 0.6 * ch);
