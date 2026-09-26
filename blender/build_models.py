@@ -11,7 +11,8 @@ import lib
 
 ASSETS = os.path.join(os.path.dirname(HERE), 'assets')
 BUILDERS = {
-    'mothership': ('ships_hiigaran_v5', 'mothership'),
+    'mothership': ('ships_hiigaran_v5', 'mothership'),   # !! OLD v5 hull — the shipped mothership.glb is built by running
+                                                        #    blender/ships_mothership_v9.py directly (see that file's header)
     'ion_frigate': ('ships_ion_frigate', 'ion_frigate'),   # v10 redesign (ION_FRIGATE_DESIGN.md)
     'assault_frigate': ('ships_assault_frigate', 'assault_frigate'),   # v11 redesign (ASSAULT_FRIGATE_DESIGN.md); v5 builder kept in ships_hiigaran_v5
     # v6 fighter variants (fighters_ours.py / fighters_enemy.py; the v4 designs remain in small_craft.py)

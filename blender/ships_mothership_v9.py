@@ -539,46 +539,256 @@ def stern(mb, H, R):
         beacon(mb, Vector((sg * 64, ys + 0.2, 40)), Vector((0, 1, 0)), 1.25, 'blue_light', LAMP_BODY, 'trim')
 
 
-# ------------------------------------------------------------------------------------------ bow cannon
-def bow_cannon(mb, H, R):
-    sB = 309
+# ------------------------------------------------------------------------------------------ bow cannon (v12)
+# v12 bow: spinal ion cannon assembly forward of the hull nose (s = 309): breech collar, a coil-stacked accelerator
+# stage, a vaned emitter crown (muzzle tip s <= 332.8, total length <= 640), armoured accumulator housings with
+# radiator fins either side, a bevelled shroud hood over the barrel carrying the fire-control head, a chin sensor
+# fairing.  Only geometry at s >= 273 changes; the brow (s 243..311) is kept verbatim.  The v9 cannon consumed
+# 54 draws of R (cheek window rows); they are burned here so every later builder sees the same random stream.
+# New parts use their own generator (rng(1212)).
+BOW_TIP = 332.8
 
-    def YB(s):          # bow parts were laid out for a bow at s=316; shifted 7 m aft (length <= 640)
-        return Y(s - 7.0)
-    w, h, cz, _ = H.at(sB)
+
+def P(x, s, z):
+    return Vector((x, Y(s), z))
+
+
+def csect(s, x0, x1, z0, z1, c):
+    """Chamfered rectangle cross-section at station s (8 points, counter-clockwise seen from the bow)."""
+    return [P(x0 + c, s, z0), P(x1 - c, s, z0), P(x1, s, z0 + c), P(x1, s, z1 - c), P(x1 - c, s, z1),
+            P(x0 + c, s, z1), P(x0, s, z1 - c), P(x0, s, z0 + c)]
+
+
+def cprism(mb, s0, s1, a, b, c, mat, bevel=0.25):
+    """Chamfered prism from section a=(x0,x1,z0,z1) at s0 to section b at s1."""
+    mb.loft([csect(s0, *a, c), csect(s1, *b, c)], mat, bevel=bevel)
+
+
+def ring_at(mb, s, r_in, r_out, depth, mat, zc, seg=32):
+    annulus(mb, P(0, s, zc), Vector((0, -1, 0)), r_in, r_out, depth, mat, seg=seg)
+
+
+def accumulator(mb, sg, zc, Rb):
+    """Armoured accumulator housing flanking the barrel: three bevelled segments split by panel-break grooves,
+    radiator fin bank on the outer face, capacitor-head cap, coil-glow slot on the inner face, markers."""
+    def xs(a, b):
+        return (min(sg * a, sg * b), max(sg * a, sg * b))
+    # (s0, s1, (xin, xout, z0, z1) at s0, same at s1) -- kept below the barrel's upper half so the coil stack
+    # stays visible from the side between the housing tops and the shroud hood
+    segs = [(300.2, 314.6, (11.5, 24.0, -12.0, 9.5), (12.0, 23.4, -11.0, 9.0)),
+            (315.4, 322.5, (12.3, 23.0, -10.4, 8.6), (13.0, 21.2, -8.6, 7.4))]
+    for k, (s0, s1, a, b) in enumerate(segs):
+        A = xs(a[0], a[1]) + a[2:]
+        B = xs(b[0], b[1]) + b[2:]
+        cprism(mb, s0, s1, A, B, 1.6 if k == 0 else 1.3, 'hull' if k == 0 else 'hull2', bevel=0.22)
+    cprism(mb, 314.4, 315.6, xs(12.3, 22.8) + (-10.8, 8.4), xs(12.3, 22.8) + (-10.8, 8.4), 1.2, 'greeble', bevel=0.0)
+    # front cap: recessed capacitor-head face with blue charge slots
+    cprism(mb, 322.4, 323.4, xs(13.8, 20.4) + (-7.8, 6.9), xs(14.2, 20.0) + (-7.4, 6.5), 1.0, 'plate', bevel=0.12)
+    for z in (-4.2, -0.4, 3.4):
+        obox(mb, P(sg * 17.1, 323.4, z), Vector((0, -1, 0)), (0.7, 4.6, 0.35), 'blue_light', lift=0.1,
+             fwd=Vector((1, 0, 0)))
+    # outer face (x ~ +-23.4 .. 21.2 over s 309..322): radiator fin banks between trim header pipes
+    for s0, s1, x0, x1, zc_, fh, zp in ((309.8, 313.8, 23.5, 23.35, -0.5, 12.0, (6.0, -7.0)),
+                                        (316.4, 321.8, 22.65, 21.25, -0.8, 10.0, (4.7, -6.3))):
+        n = max(3, int((s1 - s0) / 1.1))
+        for i in range(n + 1):
+            s = lerp(s0, s1, i / n)
+            x = lerp(x0, x1, i / n)
+            mb.box((sg * (x + 0.8), Y(s), zc_), (1.6, 0.28, fh), 'trim' if i % 4 == 0 else 'greeble')
+        for z in zp:
+            xm = (x0 + x1) / 2
+            mb.cyl(P(sg * (xm + 0.9), s0 - 0.3, z), P(sg * (xm + 0.9), s1 + 0.3, z), 0.55, 0.55, 'trim', seg=8)
+    # inner face toward the barrel: coil-glow slots
+    for s0, s1, xin, zs in ((309.6, 314.0, 11.9, (6.2, -8.5)), (316.0, 322.0, 12.6, (5.6, -7.6))):
+        for z in zs:
+            mb.box((sg * (xin - 0.15), Y((s0 + s1) / 2), z), (0.35, s1 - s0, 1.1), 'blue_light')
+    # top of the housings: capacitor cans laid along the axis with collars + charge band, bus bar, markers
+    for s0, s1, z0, z1 in ((309.8, 314.0, 9.17, 9.02), (316.2, 321.6, 8.46, 7.55)):
+        zt = lambda s: lerp(z0, z1, (s - s0) / (s1 - s0)) + 1.0
+        sm = (s0 + s1) / 2
+        for x in (15.0, 19.5):
+            mb.cyl(P(sg * x, s0, zt(s0)), P(sg * x, s1, zt(s1)), 1.25, 1.25, 'trim', seg=10)
+            for sb in (s0 + 0.6, s1 - 0.6):
+                mb.cyl(P(sg * x, sb - 0.3, zt(sb)), P(sg * x, sb + 0.3, zt(sb)), 1.5, 1.5, 'greeble', seg=10)
+            mb.cyl(P(sg * x, sm - 0.2, zt(sm)), P(sg * x, sm + 0.2, zt(sm)), 1.32, 1.32, 'blue_light', seg=10)
+        mb.box((sg * 17.25, Y(sm), zt(sm) + 1.3), (4.5, 0.8, 0.5), 'hull2')
+        lamp_fixture(mb, P(sg * 17.25, s1 - 0.8, zt(s1 - 0.8) - 1.05), Vector((0, 0, 1)), (0.7, 1.0, 0.35), 'amber',
+                     LAMP_BODY, lift=0.12)
+    beacon(mb, P(sg * 21.0, 322.0, 7.45), Vector((0, 0, 1)), 0.8, 'blue_light', LAMP_BODY, 'trim')
+    # rear outer face (clear of the nose wall from s ~303): bolted access panel, rib stack, marker
+    n = Vector((sg, 0, 0))
+    obox(mb, P(sg * 23.78, 305.8, 1.5), n, (9.0, 4.6, 0.3), 'plate', lift=0.0, bevel=0.05)
+    for z in (-2.0, 0.0, 2.0, 4.0):
+        obox(mb, P(sg * 24.05, 305.8, z), n, (0.45, 3.6, 0.35), 'greeble', lift=0.0)
+    obox(mb, P(sg * 23.8, 305.8, -6.5), n, (1.6, 4.6, 0.5), 'trim', lift=0.0)
+    lamp_fixture(mb, P(sg * 23.8, 305.8, 7.2), n, (0.6, 0.9, 0.3), 'amber', LAMP_BODY, lift=0.1)
+    # lower outer edge: window strip into the gunnery gallery
+    light_row(mb, P(sg * 23.5, 310.0, -9.3), P(sg * 23.4, 314.0, -9.3), (sg, 0, 0), 2.0, (0.5, 1.4, 0.25),
+              'window', R=Rb, dropout=0.25)
+
+
+def bow_cannon(mb, H, R):
+    for _ in range(54):         # v9 cheek window rows drew 54 numbers from R (see header)
+        R.random()
+    Rb = rng(1212)
+    w, h, cz, _ = H.at(309)
     zc = cz
     ax = Vector((0, -1, 0))
-    # armoured cheek blocks flanking the barrel
     for sg in (1, -1):
-        b = [(sg * 10, YB(280), zc - 17), (sg * 27, YB(280), zc - 17), (sg * 27, YB(280), zc + 19), (sg * 10, YB(280), zc + 19)]
-        t = [(sg * 12, YB(328), zc - 11), (sg * 21, YB(328), zc - 11), (sg * 21, YB(328), zc + 12), (sg * 12, YB(328), zc + 12)]
-        mb.loft([b, t], 'hull2', bevel=0.8)
-        for z in (zc - 6, zc + 1, zc + 8):
-            light_row(mb, (sg * 24.2, YB(290), z), (sg * 20.2, YB(322), z), (sg, -0.2, 0), 4.0, (0.6, 2.0, 0.3),
-                      'window', R=R, dropout=0.2)
-        beacon(mb, Vector((sg * 17, YB(327.5), zc + 11.95)), Vector((0, 0, 1)), 1.05, 'blue_light', LAMP_BODY, 'trim')
-    # barrel body + armour collars
-    mb.cyl((0, YB(290), zc), (0, YB(326), zc), 15.5, 13.5, 'hull', seg=32)
-    for s, r in ((300, 17.0), (311, 16.2), (321, 15.4)):
-        annulus(mb, (0, YB(s), zc), ax, 12.5, r, 4.0, 'trim', seg=32)
-    # muzzle: thick ring-armoured mouth around a dark bore with faintly glowing inner ring + bore floor
-    annulus(mb, (0, YB(330.5), zc), ax, 8.0, 14.0, 9.0, 'plate', seg=32)
-    annulus(mb, (0, YB(335.8), zc), ax, 8.0, 15.0, 2.2, 'trim', seg=32)
-    annulus(mb, (0, YB(331), zc), ax, 7.2, 8.05, 6.0, 'muzzle', seg=32)       # inner emissive bore ring
-    mb.cyl((0, YB(326.2), zc), (0, YB(326.6), zc), 8.0, 8.0, 'muzzle', seg=32)  # bore floor glow
-    mb.cyl((0, YB(326.6), zc), (0, YB(329.5), zc), 2.6, 1.6, 'greeble', seg=12)  # emitter spike
-    for k in range(8):   # radial armour lugs on the mouth ring
-        a = k / 8 * 2 * math.pi + math.pi / 8
-        c = Vector((math.cos(a) * 15.5, YB(333), zc + math.sin(a) * 15.5))
+        accumulator(mb, sg, zc, Rb)
+    # breech: heavy collar at the nose face with bolt lugs and a trim mounting ring
+    mb.cyl(P(0, 290, zc), P(0, 312.0, zc), 13.0, 12.0, 'hull', seg=32)
+    ring_at(mb, 310.2, 9.0, 15.2, 3.6, 'hull2', zc)
+    ring_at(mb, 308.9, 14.8, 16.0, 1.0, 'trim', zc)
+    for k in range(12):
+        a = k / 12 * 2 * math.pi + math.pi / 12
         n = Vector((math.cos(a), 0, math.sin(a)))
-        obox(mb, c, n, (3.0, 7.0, 2.2), 'hull2', lift=0.0)
+        obox(mb, P(math.cos(a) * 15.2, 310.2, zc + math.sin(a) * 15.2), n, (1.2, 2.2, 0.8), 'greeble', lift=0.3)
+    # accelerator stage: dark core, blue coil-glow sleeve, stacked focusing coils (alternating radii, tapering)
+    mb.cyl(P(0, 311.8, zc), P(0, 324.6, zc), 9.6, 9.2, 'greeble', seg=32)
+    mb.cyl(P(0, 312.2, zc), P(0, 324.2, zc), 9.85, 9.45, 'blue_light', seg=32, caps=False)
+    s = 312.8
+    k = 0
+    while s < 324.0:
+        big = (k % 2 == 0)
+        ro = lerp(12.2, 11.0, (s - 312.8) / 11.2) if big else lerp(10.9, 10.3, (s - 312.8) / 11.2)
+        ring_at(mb, s, 9.3, ro, 1.25 if big else 0.8, 'trim' if big else 'hull2', zc)
+        if big:
+            ring_at(mb, s, ro - 0.05, ro + 0.25, 0.45, 'greeble', zc)
+        s += 1.4 if big else 1.25
+        k += 1
+    # four tie-rod rails clamping the coil stack (diagonals), with clamp blocks
+    for q in range(4):
+        a = math.pi / 4 + q * math.pi / 2
+        c, sn = math.cos(a), math.sin(a)
+        mb.cyl(P(c * 12.6, 311.0, zc + sn * 12.6), P(c * 11.5, 325.2, zc + sn * 11.5), 0.55, 0.5, 'trim', seg=8)
+        for sb in (312.0, 318.3, 324.4):
+            rr = lerp(12.6, 11.5, (sb - 311.0) / 14.2)
+            obox(mb, P(c * rr, sb, zc + sn * rr), Vector((c, 0, sn)), (1.6, 1.3, 1.3), 'hull2', lift=0.0)
+    # feed conduits top and bottom of the stack, from the breech collar into the crown base
+    for sz in (1, -1):
+        mb.cyl(P(0, 310.5, zc + sz * 12.9), P(0, 325.0, zc + sz * 11.7), 0.8, 0.8, 'trim', seg=8)
+        for sb in (313.8, 317.9, 321.9):
+            rr = lerp(12.9, 11.7, (sb - 310.5) / 14.5)
+            mb.cyl(P(0, sb - 0.35, zc + sz * rr), P(0, sb + 0.35, zc + sz * rr), 1.15, 1.15, 'greeble', seg=8)
+    # emitter crown: base ring, trim ring, eight radial vanes flaring forward around a glowing bore
+    ring_at(mb, 325.6, 8.2, 13.4, 2.4, 'plate', zc)
+    ring_at(mb, 327.4, 8.2, 13.9, 1.2, 'trim', zc)
+    ring_at(mb, 328.5, 8.2, 12.6, 1.0, 'hull2', zc)
+    for q in range(8):
+        a = q * math.pi / 4 + math.pi / 8
+        c, sn = math.cos(a), math.sin(a)
+        rad = Vector((c, 0, sn))
+        tan = Vector((-sn, 0, c))
+        o = P(0, 0, zc)
+
+        def vp(r, s, t):
+            return Vector((o.x, Y(s), o.z)) + rad * r + tan * t
+        b = [vp(8.7, 327.8, -0.8), vp(14.0, 327.8, -0.8), vp(14.0, 327.8, 0.8), vp(8.7, 327.8, 0.8)]
+        f = [vp(8.9, BOW_TIP, -0.45), vp(10.6, BOW_TIP, -0.45), vp(10.6, BOW_TIP, 0.45), vp(8.9, BOW_TIP, 0.45)]
+        mb.hexa(b + f, 'hull2', bevel=0.12)
+        obox(mb, vp(8.75, 330.6, 0.0), -rad, (0.5, 2.2, 0.2), 'blue_light', lift=0.05, fwd=ax)
+        if q % 2 == 0:
+            lamp_fixture(mb, vp(13.2, 328.9, 0.0) + rad * 0.0, rad, (0.6, 0.6, 0.3), 'amber', LAMP_BODY,
+                         fwd=ax, lift=0.1)
+    annulus(mb, P(0, 327.8, zc), ax, 7.2, 8.2, 8.0, 'muzzle', seg=32)          # inner emissive bore ring
+    mb.cyl(P(0, 323.6, zc), P(0, 324.0, zc), 8.0, 8.0, 'muzzle', seg=32)       # bore floor glow
+    mb.cyl(P(0, 324.0, zc), P(0, 328.4, zc), 3.0, 1.1, 'greeble', seg=16)      # focusing spike
+    ring_at(mb, 325.4, 2.5, 3.6, 0.7, 'trim', zc, seg=16)
+    ring_at(mb, 331.4, 7.9, 9.0, 1.2, 'trim', zc)                              # bore lip
+    # shroud hood over the barrel, grown out of the brow front: bevelled plates, panel break, under-lamps
     dk = min(H.at(245)[2] + H.at(245)[1] / 2, H.at(311)[2] + H.at(311)[1] / 2)
+    hood = [(300.0, 311.4, (-11.4, 11.4, zc + 13.6, dk + 1.0), (-11.4, 11.4, zc + 13.6, dk + 0.6)),
+            (312.2, 321.8, (-11.2, 11.2, zc + 13.4, dk + 0.4), (-10.2, 10.2, zc + 12.6, dk - 2.2))]
+    for s0, s1, a, b in hood:
+        cprism(mb, s0, s1, a, b, 2.0, 'hull2', bevel=0.22)
+    cprism(mb, 311.2, 312.4, (-10.6, 10.6, zc + 13.9, dk - 0.1), (-10.6, 10.6, zc + 13.9, dk - 0.1), 1.6, 'greeble', 0.0)
+    cprism(mb, 321.6, 323.2, (-9.6, 9.6, zc + 12.8, dk - 2.4), (-8.4, 8.4, zc + 13.2, dk - 3.4), 1.6, 'plate', 0.15)
+    for s0, s1, zt in ((302.0, 310.8, dk + 0.8), (313.0, 321.0, dk - 0.9)):
+        for x0 in (-9.6, 0.6):
+            obox(mb, P(x0 + 4.5, (s0 + s1) / 2, zt), Vector((0, -0.27 if s0 > 312 else 0.0, 1)).normalized(),
+                 (8.4, s1 - s0, 0.45), 'plate', lift=0.0, bevel=0.08)
+    for sg in (1, -1):                              # hood flanks: armour panels, vent slots, edge light strip
+        obox(mb, P(sg * 11.4, 306.0, zc + 19.2), Vector((sg, 0, 0)), (4.6, 8.0, 0.35), 'plate', lift=0.0, bevel=0.06)
+        for k in range(4):
+            sb = 313.6 + k * 2.0
+            xh = lerp(11.2, 10.2, (sb - 312.2) / 9.6)
+            obox(mb, P(sg * xh, sb, zc + 18.4), Vector((sg, 0, 0)), (2.6, 1.0, 0.3), 'greeble', lift=0.0)
+        mb.box((sg * 10.7, Y(317.0), zc + 13.25), (0.6, 8.6, 0.3), 'blue_light')
+    for x in (-7.5, -2.5, 2.5, 7.5):               # under-lamps washing the coil stack blue
+        lamp_fixture(mb, P(x, 318.0, zc + 12.95), Vector((0, 0, -1)), (1.4, 0.7, 0.3), 'blue_light', LAMP_BODY,
+                     lift=0.05)
+    # fire-control head on the hood nose: armoured box, dark lens slits, rangefinder pods, markers
+    obox(mb, P(0, 317.5, dk - 1.2), Vector((0, 0, 1)), (8.0, 5.0, 2.6), 'hull', lift=0.0, bevel=0.15)
+    obox(mb, P(0, 317.9, dk + 1.4), Vector((0, 0, 1)), (5.6, 3.6, 1.2), 'hull2', lift=0.0, bevel=0.1)
+    for x in (-2.0, 0.0, 2.0):
+        obox(mb, P(x, 320.0, dk + 0.1), Vector((0, -1, 0)), (1.3, 0.5, 0.2), 'glass', lift=0.0, fwd=Vector((0, 0, 1)))
+    for sg in (1, -1):
+        mb.cyl(P(sg * 5.4, 315.8, dk + 0.4), P(sg * 5.4, 320.4, dk + 0.4), 0.9, 0.9, 'trim', seg=10)
+        mb.cyl(P(sg * 5.4, 320.4, dk + 0.4), P(sg * 5.4, 320.7, dk + 0.4), 0.7, 0.7, 'glass', seg=10)
+        lamp_fixture(mb, P(sg * 10.3, 311.8, dk + 0.4), Vector((0, 0, 1)), (0.6, 0.6, 0.3), 'amber', LAMP_BODY,
+                     lift=0.1)
+    # chin fairing below the barrel: keel block with sensor blister and a hatch
+    cprism(mb, 305.0, 319.5, (-8.6, 8.6, zc - 18.0, zc - 14.2), (-6.8, 6.8, zc - 16.0, zc - 14.0), 1.4, 'hull2', 0.2)
+    mb.sphere(P(0, 316.4, zc - 16.5), 1.8, 'glass', seg=12, rings=6, scale=(1, 1, 0.7))
+    obox(mb, P(0, 309.6, zc - 17.4), Vector((0, 0, -1)), (6.0, 4.0, 0.3), 'plate', lift=0.0)
+    lamp_fixture(mb, P(0, 312.6, zc - 17.0), Vector((0, 0, -1)), (0.9, 0.6, 0.3), 'amber', LAMP_BODY, lift=0.1)
+    # armoured brow (unchanged from v9)
     blk(mb, 243, 311, -15, 15, dk - 1.5, dk + 5.5, 'hull2', ins=3.0, ins_s=5.0)      # armoured brow
     blk(mb, 255, 305, -9, 9, dk + 5.0, dk + 8.0, 'plate', ins=1.5, ins_s=3.0)
     for sg in (1, -1):
-        light_row(mb, (sg * 13.2, YB(256), dk + 3.0), (sg * 13.2, YB(314), dk + 3.0), (sg, 0, 0.5), 3.5,
+        light_row(mb, (sg * 13.2, Y(256 - 7.0), dk + 3.0), (sg * 13.2, Y(314 - 7.0), dk + 3.0), (sg, 0, 0.5), 3.5,
                   (0.6, 1.8, 0.3), 'amber')
-    empty('main_cannon', (0, YB(337.2), zc), size=8)
+    empty('main_cannon', (0, Y(330.2), zc), size=8)
+
+
+def bow_systems(mb, H, S):
+    """v12 post-pass (after the zoning systems, so no site search sees it): power conduits, cable trays and a
+    maintenance catwalk on the nose walls (s 274..309), deck feeds from the housings to the capacitor racks."""
+    def wall(sg, s, z):
+        return S.flank(sg, s, z)
+    for sg in (1, -1):
+        # conduit bundle along the upper wall, from the accumulator housing aft into the hull
+        pts = []
+        for s in [308.0 - 3.0 * k for k in range(12)]:
+            h = wall(sg, s, 16.5)
+            if h:
+                pts.append((h[0], h[1]))
+        conduit(mb, pts, npipes=3, r=0.5, gap=1.25, clamp=True, mat='trim')
+        # cable tray (open channel with cross ribs) below the conduits
+        for (p0, n0), (p1, n1) in zip(pts, pts[1:]):
+            d = (p1 - p0).normalized()
+            c = (p0 + p1) / 2 + Vector((0, 0, -3.2))
+            n = ((n0 + n1) / 2).normalized()
+            obox(mb, c, n, (0.3, (p1 - p0).length, 0.9), 'hull2', lift=0.0, fwd=d)
+            obox(mb, c + Vector((0, 0, -0.9)), n, (0.3, (p1 - p0).length, 0.9), 'hull2', lift=0.0, fwd=d)
+            obox(mb, c + Vector((0, 0, -0.45)), n, (1.2, 0.35, 0.5), 'greeble', lift=0.0, fwd=d)
+        # maintenance catwalk low on the wall with hand rail, posts, amber walkway lights
+        wp = []
+        for s in [306.0 - 4.0 * k for k in range(9)]:
+            h = wall(sg, s, -6.0)
+            if h:
+                wp.append((h[0], h[1]))
+        walkway(mb, wp, -1 if sg > 0 else 1, width=1.8, rail=1.2)
+        for p, n in wp:
+            obox(mb, p + n * 1.0 + Vector((0, 0, 0.9)), Vector((0, 0, 1)), (0.18, 0.18, 1.4), 'trim', lift=0.0)
+            lamp_fixture(mb, p + Vector((0, 0, 1.6)), n, (0.5, 0.8, 0.25), 'amber', LAMP_BODY, lift=0.1)
+        # access hatch between the runs
+        F = S.site_flank(sg, 297.0, 4.0, 12.0, 7.0, 'bow_radiator', tol=3.5)
+        if F:
+            radiator_bank(mb, F, 7.0, 14.0, pitch=1.4, fh=1.6)
+        F = S.site_flank(sg, 282.0, 5.0, 5.0, 4.0, 'bow_hatch')
+        if F:
+            G = LF(F.o, F.n, (0, 0, 1))
+            G.sink = F.sink
+            hatch(mb, G, 4.0, 5.0)
+        # deck feeds: housing -> capacitor racks (s 309 -> 282) beside the brow
+        tp = []
+        for s in [308.0 - 3.0 * k for k in range(10)]:
+            h = S.top(sg * 18.5, s)
+            if h:
+                tp.append((h[0], h[1]))
+        conduit(mb, tp, npipes=2, r=0.45, gap=1.1, clamp=True, mat='trim')
 
 
 # ------------------------------------------------------------------------------------------ flanks
@@ -1373,6 +1583,7 @@ def mothership(probe=False):
     print('SITES placed/rejected:', S.stats, flush=True)
     print('LAUNCH BAY MOUTH: faces before systems = %d, after = %d (must be equal)' % (mouth0, mouth_faces(mb)),
           flush=True)
+    bow_systems(mb, H, S)
     obj = mb.to_object('mothership', smooth_angle=26)
     fix_engine_normals(obj)
     return [obj]
