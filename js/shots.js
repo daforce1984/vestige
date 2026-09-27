@@ -716,10 +716,13 @@ function drawBreakup(R, t, idx) {
   const t0 = idx === 2 ? E2_FIN : E1_FIN;
   if (!_fin[idx]) { const s0 = idx === 2 ? enemyMS2(t0) : enemyMS1(t0); _fin[idx] = { m: msMatrix(new Float32Array(16), s0), pose: JSON.parse(JSON.stringify(s0.pose)) }; }
   // RONIN #2 (the finisher) comes apart in slow motion until its reactor blows at 194; RONIN #1 in real time
-  const tt = idx === 2 ? E2_FIN + Math.min(1.6, t - E2_FIN) * 0.28 + Math.max(0, t - 194) * 1.1 : t;
+  const tt = idx === 2 ? E2_FIN + Math.min(1.6, t - E2_FIN) * 0.6 + Math.max(0, t - 194) * 1.1 : t;   // the fan opens up in the slow beat before the reactor goes
   // the pieces are thrown along the killing blow (the mace swing direction), in the dead machine's model space
   if (!_fin[idx].imp && BLOWS[idx]) { const ev = BLOWS[idx].ev; const inv = M.invert(M.new(), _fin[idx].m); _fin[idx].imp = V.norm([0, 0, 0], M.transformDir([0, 0, 0], inv, V.sub([0, 0, 0], ev.cut[1], ev.cut[0]))); }
-  shatter(R, 'enemy_ms', _fin[idx].m, tt, t0, idx === 2 ? 88 : 77, [3, 4, 3], idx === 2 ? 2.6 : 3.2, { tint: [2, 0.4, 0.3], pose: _fin[idx].pose, texSet: R.texLoaded & 4 ? 2 : 0, impulse: _fin[idx].imp, impulseK: idx === 2 ? 1.6 : 2.6 });
+  // RONIN #2 (the finisher): its own armour thrown out BEHIND it in a flat fan along the blow (no energy spray);
+  // RONIN #1: chunks thrown along the smash as before
+  const fin = _fin[idx], fan = idx === 2 && fin.imp ? { dir: fin.imp, side: V.norm([0, 0, 0], V.cross([0, 0, 0], fin.imp, [0, 1, 0])), spread: 55 * Math.PI / 180 } : null;
+  shatter(R, 'enemy_ms', fin.m, tt, t0, idx === 2 ? 88 : 77, [3, 4, 3], idx === 2 ? 2.6 : 3.2, { tint: [2, 0.4, 0.3], pose: fin.pose, texSet: R.texLoaded & 4 ? 2 : 0, impulse: fan ? null : fin.imp, impulseK: 2.6, fan });
 }
 function drawEnemyMS(R, t, s, idx) {
   if (idx === 2 && t > E2_FIN + 0.03 && t < 200) { drawBreakup(R, t, 2); return null; }
@@ -866,7 +869,7 @@ function drawMSBattle(R, t) {
         R.ripple(ev.pos, 8 + 90 * easeOut(ls / 0.5), [0.5, 0.5, 0.5], (1 - ls / 0.5) * 1.0);
         R.ripple(ev.pos, 4 + 40 * easeOut(ls / 0.35), [0.5, 0.5, 0.5], sat(1 - ls / 0.35) * 1.6);
       }
-      for (let i = 0; i < 70; i++) {                  // spark fan, biased along the swing
+      for (let i = 0; i < (ev.t > 190 ? 0 : 70); i++) {   // spark fan, biased along the swing (not on the finisher: its armour fans out instead)
         const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.9 + 11), d, 1.1));
         const life = 0.3 + hash(i + 40) * 0.9; if (ls > life) continue;
         const a = ls / life, p = madd(ev.pos, sd, (6 + 40 * hash(i + 7)) * easeOut(a)), q = madd(p, sd, -(2 + 4 * (1 - a)));
@@ -880,7 +883,7 @@ function drawMSBattle(R, t) {
         const de = R.add('debris', _dbM);
         if (de) { de.hidden = debrisOnly(R, 'hull' + (i % 4)); de.damage = 0.5; }
       }
-      if (ls < 0.35) {                                    // pile-driver: the blow punches clean THROUGH — a white-hot shaft out the back
+      if (ls < 0.35 && ev.t < 190) {                      // pile-driver: the blow punches clean THROUGH — a white-hot shaft out the back
         const kp = 1 - ls / 0.35, len = 6 + 30 * easeOut(sat(ls / 0.12));
         R.beam(ev.pos, madd(ev.pos, d, len), 0.9 * kp + 0.3, [4 * kp, 3 * kp, 2 * kp], 1, 12);
       }

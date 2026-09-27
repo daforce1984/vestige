@@ -392,7 +392,13 @@ export function shatter(R, name, base, t, t0, seed, grid = [2, 2, 3], speed = 1,
     // velocity: away from the break point + random tumble; bigger ships drift slower
     let dir = V.norm([0, 0, 0], [c[0] + (hash(s) - 0.5) * size * 0.3, c[1] + (hash(s + 1) - 0.5) * size * 0.3, c[2] * 0.6]);
     if (opts.impulse) dir = V.norm([0, 0, 0], V.madd([0, 0, 0], dir, opts.impulse, opts.impulseK ?? 2.5));   // thrown along the blow
-    const v = size * (0.06 + hash(s + 2) * 0.1) * speed;
+    if (opts.fan) {   // a FAN of fragments: every piece leaves along the blow, spread across a flat sector (± spread), a little off-plane
+      const f = opts.fan, n = V.norm([0, 0, 0], V.cross([0, 0, 0], f.dir, f.side));
+      const th = (hash(s + 11) * 2 - 1) * f.spread, ph = (hash(s + 12) - 0.5) * 0.35;
+      const inPlane = V.madd([0, 0, 0], V.scale([0, 0, 0], f.dir, Math.cos(th)), f.side, Math.sin(th));
+      dir = V.norm([0, 0, 0], V.madd([0, 0, 0], V.scale([0, 0, 0], inPlane, Math.cos(ph)), n, Math.sin(ph)));
+    }
+    const v = size * (0.06 + hash(s + 2) * 0.1) * speed * (opts.fan ? 1.6 + hash(s + 13) * 0.8 : 1);
     const d = v * lt * (1 - Math.min(0.5, lt * 0.02));
     Q.fromEuler(_sq, lt * (hash(s + 3) - 0.5) * 0.5 * speed, lt * (hash(s + 4) - 0.5) * 0.4 * speed, lt * (hash(s + 5) - 0.5) * 0.6 * speed);
     // local: translate(-c) -> rotate -> translate(c + dir*d)

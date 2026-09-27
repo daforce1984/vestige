@@ -396,7 +396,9 @@ function computeTangents(keys, dim, free) {
       let m = 0;
       if (i > 0 && i < n - 1) {
         m = (sl * tR + sr * tL) / (tL + tR);
-        if (!free && !(tagIn === 'cr' || tagNext === 'cr')) { if (sl * sr <= 0) m = 0; else { const lim = 3 * Math.min(Math.abs(sl), Math.abs(sr)); m = clamp(m, -lim, lim); } }
+        // monotone, and never faster through a key than the SLOWER side: a move that leaves a slow / resting key starts
+        // slow and accelerates through its segment (no constant-speed starts), and decelerates into a slower one
+        if (!free && !(tagIn === 'cr' || tagNext === 'cr')) { if (sl * sr <= 0) m = 0; else { const lim = Math.min(Math.abs(sl), Math.abs(sr)); m = clamp(m, -lim, lim); } }
       }
       let mi = m, mo = m;
       if (tagNext === 'in' || tagIn === 'hold' || tagNext === 'hold') { mi = 0; mo = 0; }
@@ -484,7 +486,7 @@ function impulses(list) {
 // y = x(t−d) − Σ e(τ_k)·[x(t−d−kΔ) − x(t−d−(k+1)Δ)] : the output of a damped spring driven by the key curve x.
 // e(τ) is the spring's step-response error, so y lags, overshoots and settles (2–3 visible wobbles).
 // Torso leads, upper arm +1 fr, forearm +2 fr, hand +3 fr; head is the most damped (it stabilises).
-const SPRING_K = 8;
+const SPRING_K = 20;   // taps (8 left a ripple on the motion after every move)
 function springGroup(parts, w, z, d) {
   const chans = parts.flatMap((p) => [PIDX[p], PIDX[p] + 1, PIDX[p] + 2]);
   const Wn = 3.5 / (z * w), D = Wn / SPRING_K, wd = w * Math.sqrt(1 - z * z);
@@ -495,25 +497,24 @@ const GROUPS = [
   // heavy machines: low spring frequencies (limbs lag and settle with weight), damped close to critical — the parts
   // trail and settle ONCE; the old 0.5 damping rang 2–3 times after every blow, and under bullet time that ringing
   // read as the whole machine / the blade swaying back and forth
-  springGroup(['pelvis', 'torso', '_body'], 14, 0.9, 0),
-  springGroup(['head'], 8, 0.9, 1 / 48),
-  springGroup(['arm_L_upper', 'arm_R_upper'], 13, 0.88, 1 / 48),
-  springGroup(['arm_L_lower', 'arm_R_lower'], 11, 0.88, 2 / 48),
-  springGroup(['hand_L', 'hand_R'], 9, 0.88, 3 / 48),
-  springGroup(['leg_L_upper', 'leg_R_upper', 'leg_L_lower', 'leg_R_lower', 'foot_L', 'foot_R'], 11, 0.88, 1 / 48),
+  // only the secondary chains: the head (always) and the legs (exact only round the kicks). The torso / arms carry the
+  // weapons and every contact must be exact — blending a lagged pose out and back in round each blow made a little
+  // back-and-forth hitch after every move, so they follow their keys directly (the keys themselves ease in / out)
+  Object.assign(springGroup(['head'], 13, 0.99, 1 / 48), { crisp: null }),
+  Object.assign(springGroup(['leg_L_upper', 'leg_R_upper', 'leg_L_lower', 'leg_R_lower', 'foot_L', 'foot_R'], 18, 0.99, 1 / 48), { crisp: [178.2, 178.55, 189.45] }),
 ];
 // filter strength: 0 at impacts (exact, crisp contact), back to 1 within ~0.15 s
 function springAmount(tw) {
   let s = 1;
-  for (const ti of CRISP) { const x = Math.abs(tw - ti); if (x < 0.17) s *= smooth(0.035, 0.17, x); }
+  for (const ti of CRISP) { const x = Math.abs(tw - ti); if (x < 0.32) s *= smooth(0.03, 0.32, x); }   // eased wide: no hitch
   return s;
 }
 const _xa = new Float64Array(NCH), _xb = new Float64Array(NCH), _y = new Float64Array(NCH);
 function springPose(track, tw, out) {
   track(tw, out);
-  const amt = springAmount(tw);
-  if (amt <= 0) return out;
   for (const g of GROUPS) {
+    let amt = 1; if (g.crisp) for (const ti of g.crisp) { const x = Math.abs(tw - ti); if (x < 0.32) amt *= smooth(0.03, 0.32, x); }
+    if (amt <= 0) continue;
     track(tw - g.d, _xa, g.chans);
     for (const c of g.chans) _y[c] = _xa[c];
     for (let k = 0; k < SPRING_K; k++) {
@@ -525,9 +526,9 @@ function springPose(track, tw, out) {
   }
   return out;
 }
-const POS_SPRING = (() => { const w = 15, z = 0.9, Wn = 3.5 / (z * w), D = Wn / SPRING_K, wd = w * Math.sqrt(1 - z * z); const e = []; for (let k = 0; k < SPRING_K; k++) { const x = (k + 0.5) * D; e.push(Math.exp(-z * w * x) * (Math.cos(wd * x) + (z * w / wd) * Math.sin(wd * x))); } return { D, e }; })();
+const POS_SPRING = (() => { const w = 15, z = 0.99, Wn = 3.5 / (z * w), D = Wn / SPRING_K, wd = w * Math.sqrt(1 - z * z); const e = []; for (let k = 0; k < SPRING_K; k++) { const x = (k + 0.5) * D; e.push(Math.exp(-z * w * x) * (Math.cos(wd * x) + (z * w / wd) * Math.sin(wd * x))); } return { D, e }; })();
 function springPos(track, tw) {
-  const x = track(tw), amt = springAmount(tw);
+  const x = track(tw), amt = 0;   // (the position spring's exact-contact blend made the same hitch — the keys ease instead)
   if (amt <= 0) return x;
   const y = x.slice(); let a = x;
   for (let k = 0; k < SPRING_K; k++) { const b = track(tw - (k + 1) * POS_SPRING.D); const ek = POS_SPRING.e[k]; for (let c = 0; c < 3; c++) y[c] -= ek * (a[c] - b[c]); a = b; }
