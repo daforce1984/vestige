@@ -172,6 +172,7 @@ L.backMid = P({  // backhand horizontal at contact: arm straight forward, blade 
   leg_R_upper: [25, 0, -8], leg_R_lower: [60, 0, 0], foot_R: [35, 0, 0],
 });
 L.backEnd = W(L.backMid, { torso: [8, 30, 0], pelvis: [0, 20, 0], arm_L_upper: [-85, 65, 10], head: [5, -20, 0] });
+L.thrustChamber = null;   // (set below, from thrustWind: the free arm forward to aim instead of up by the head)
 L.thrustWind = P({
   pelvis: [0, 15, 0], torso: [5, 28, 0], head: [5, -25, 0],
   arm_L_upper: [-25, 5, 22], arm_L_lower: [-70, 0, 0], hand_L: [95, 0, 0],
@@ -179,6 +180,7 @@ L.thrustWind = P({
   leg_L_upper: [-45, 0, 10], leg_L_lower: [75, 0, 0], foot_L: [25, 0, 0],
   leg_R_upper: [15, 0, -8], leg_R_lower: [80, 0, 0], foot_R: [35, 0, 0], _body: [-6, 0, 0],
 });
+L.thrustChamber = W(L.thrustWind, { arm_R_upper: [-72, -12, -6], arm_R_lower: [-22, 0, 0], head: [6, -22, 0] });
 L.thrust = P({
   pelvis: [0, -20, 0], torso: [15, -28, 0], head: [10, 22, 0],
   arm_L_upper: [-88, -10, 0], arm_L_lower: [-2, 0, 0], hand_L: [90, 0, 0],
@@ -232,6 +234,9 @@ L.sideBlock = P({   // blade vertical-ish on own weapon side, catching a cut fro
   leg_R_upper: [25, 0, -8], leg_R_lower: [70, 0, 0], foot_R: [35, 0, 0], _body: [-5, 0, 0],
 });
 L.crossBlock = W(L.sideBlock, { arm_L_upper: [-80, -45, 0], arm_L_lower: [-60, 0, 0], hand_L: [10, 0, 0], torso: [12, -25, 0] });
+// scene 50: a braced crossed block (feet set, hips turned into it) and a controlled side-step (no flailing lean)
+L.crossBlockB = W(L.crossBlock, { pelvis: [0, -12, 0], leg_L_upper: [-45, 0, 12], leg_L_lower: [70, 0, 0], foot_L: [20, 0, 0], leg_R_upper: [20, 0, -10], leg_R_lower: [65, 0, 0], foot_R: [30, 0, 0], _body: [4, 0, 0] });
+L.sideStep = W(L.guard, { torso: [8, 18, -10], head: [0, -15, 6], leg_L_upper: [-22, 0, 26], leg_L_lower: [55, 0, 0], leg_R_upper: [-35, 0, -4], leg_R_lower: [72, 0, 0], _body: [0, 12, 12] });
 L.dodge = W(L.guard, { torso: [5, 25, -20], head: [0, -20, 10], arm_L_upper: [-40, 30, 40], arm_L_lower: [-50, 0, 0], arm_R_upper: [-30, 0, -50], leg_L_upper: [-10, 0, 30], leg_L_lower: [60, 0, 0], leg_R_upper: [-40, 0, -5], leg_R_lower: [70, 0, 0], _body: [0, 20, 25] });
 L.foreWind = P({   // horizontal forehand wind-up: arm out to own weapon side and back
   pelvis: [0, 25, 0], torso: [5, 40, 0], head: [5, -35, 0],
@@ -667,7 +672,7 @@ const heroPose = poseTrack([
   [185.3, L.guard, 'out'],
   [185.45, L.guard], [185.85, L.raise, 'io'], [186.0, L.cutMid, 'in'], [186.15, W(L.cutMid, { arm_L_upper: [-105, -25, 10] }), 'out'],
   [186.35, W(L.foreEnd, { arm_L_upper: [-105, -70, -5], hand_L: [80, 0, 0] }), 'io'], [186.45, L.backMid, 'in'], [186.52, L.backMid],
-  [186.72, L.thrustWind, 'out'], [186.85, L.thrust, 'in'], [187.05, L.thrust, 'out'],
+  [186.72, L.thrustChamber, 'out'], [186.85, L.thrust, 'in'], [187.05, L.thrust, 'out'],
   [187.28, L.duck, 'out'], [187.45, L.highBlock, 'snap'], [187.6, L.highBlockHit, 'in'],
   [187.95, L.chargeWind, 'out'], [188.2, L.charge, 'in'], [188.42, W(L.charge, { _body: [15, 45, 0] }), 'out'],
   [188.7, L.guard, 'io'], [188.85, L.lock, 'in'], [189.08, L.lock2, 'io'], [189.3, L.lock, 'io'],
@@ -776,7 +781,7 @@ const e2Pos = posTrack([
 const e2Pose = poseTrack([
   [180.8, R.dive], [183.5, R.dive], [184.25, R.raise, 'io'], [184.5, R.overCut, 'in'], [184.62, R.recoil, 'out'],
   [184.85, R.tuck, 'io'], [185.3, R.tuck], [185.55, R.untuck, 'io'], [185.8, R.land, 'io'], [186.0, R.sideBlock, 'in'], [186.2, R.guard, 'out'],
-  [186.45, R.crossBlock, 'in'], [186.6, R.guard, 'out'], [186.9, R.dodge, 'out'],
+  [186.45, R.crossBlockB, 'in'], [186.6, R.guard, 'out'], [186.9, R.sideStep, 'out'],
   [187.05, R.foreWind, 'io'], [187.2, W(R.foreMid, { arm_R_upper: [-100, 5, 0], hand_R: [98, 0, 0], torso: [0, 8, 0] }), 'in'], [187.35, R.foreEnd, 'out'],
   [187.47, R.raise, 'io'], [187.6, R.overMid, 'in'],
   [187.95, W(R.guard, { arm_R_upper: [-125, 20, -10], hand_R: [25, 0, 0] })], [188.2, R.hitTorso, 'in'], [188.5, R.tumble, 'out'], [188.68, R.raise, 'io'], [188.85, R.lock, 'in'],
@@ -1038,6 +1043,7 @@ function duelHero_(t) {
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
   { const ks = STAFF(tw); if (ks > 0) staffHold(s, ks, tw); }
+  hitReact('hero', tw, s, 'gundam');
   // hand-over to the old aftermath formula (identical at t = 200)
   if (t > 194.0) {
     const o = oldAftermath(t);
@@ -1257,6 +1263,71 @@ function gripLock(s) {
   s.twoHandErr = V.dist(M.transformPoint([0, 0, 0], fk.hand_L, GRIP_L), M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R));
   return s;
 }
+// ---------------------------------------------------------------- HIT REACTION (partial ragdoll)
+// Every blow physically shoves the part it lands on: the struck joint and the ones above it (weights 1 / 0.6 / 0.3)
+// swing about the lever from each joint to the contact point, along the blow — one critically damped hump (0 at the
+// contact frame, so solved contacts stay exact; peak ≈ 0.14 s; settled by 1 s), then back to the keyed pose.
+const REACT_CHAIN = (() => {
+  const c = { torso: ['torso'], head: ['head', 'torso'], pelvis: ['pelvis'] };
+  for (const S of ['L', 'R']) {
+    c['arm_' + S + '_upper'] = ['arm_' + S + '_upper', 'torso']; c['arm_' + S + '_lower'] = ['arm_' + S + '_lower', 'arm_' + S + '_upper', 'torso'];
+    c['hand_' + S] = ['hand_' + S, 'arm_' + S + '_lower', 'arm_' + S + '_upper'];
+    c['leg_' + S + '_upper'] = ['leg_' + S + '_upper', 'pelvis']; c['leg_' + S + '_lower'] = ['leg_' + S + '_lower', 'leg_' + S + '_upper', 'pelvis'];
+    c['foot_' + S] = ['foot_' + S, 'leg_' + S + '_lower', 'leg_' + S + '_upper'];
+  }
+  return c;
+})();
+const REACT_W = [1, 0.6, 0.3];
+let REACTS = [];   // { who, t, part, local (contact point in the part's frame), dir (world, the blow), amp (rad) } — built at the end
+function hitReact(who, tw, s, model) {
+  if (SOLVING || !REACTS.length || !s || !s.vis) return s;
+  for (const r of REACTS) {
+    if (r.who !== who) continue;
+    const lt = tw - r.t;
+    if (lt <= 0 || lt > 1) continue;
+    const env = (lt * 7) * Math.exp(1 - lt * 7) * (1 - lt);
+    if (env < 1e-3) continue;
+    (REACT_CHAIN[r.part] || [r.part]).forEach((j, i) => {
+      const fk = duelFK(s, model);
+      if (!fk[j] || !fk[r.part]) return;
+      const P = M.transformPoint([0, 0, 0], fk[r.part], r.local), pivot = M.transformPoint([0, 0, 0], fk[j], [0, 0, 0]);
+      const ax = V.cross([0, 0, 0], sub(P, pivot), r.dir), L = Math.hypot(ax[0], ax[1], ax[2]);
+      if (L < 1e-6) return;
+      const A = r3axis(scl(ax, 1 / L), r.amp * env * REACT_W[i]);
+      const par = PARENT[j], Wp = r3(par ? fk[par] : fk.root);
+      s.pose[j] = euler3(r3mul(r3T(Wp), r3mul(A, r3(fk[j]))));
+    });
+  }
+  return s;
+}
+function buildReacts() {
+  const out = [];
+  const add = (who, t, part, pos, dir, amp) => {
+    const st = stateOf(who, t);
+    if (!st || !st.vis || !pos) return;
+    const fk = duelFK({ ...st, saber: 1 }, MODEL[who]);
+    if (!fk[part]) return;
+    out.push({ who, t, part, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk[part]), pos), dir: nrm(dir), amp });
+  };
+  const hip = (w, t) => stateOf(w, t).pos;
+  for (const [t, type, st, sp] of EV) {
+    if (sp.cut || (type !== 'hit' && type !== 'block' && type !== 'clash')) continue;
+    const e = DUEL_EVENTS.find((x) => Math.abs(x.t - t) < 1e-6), foe = t < 180.25 ? 'e1' : 'e2';
+    if (!e || !e.pos) continue;
+    if (sp.kind === 'part-part') add(sp.b[0], t, sp.b[1], e.pos, sub(hip(sp.b[0], t), hip(sp.a[0], t)), (sp.b[1] === 'torso' ? 0.6 : 0.35) * st);   // a body blow folds the chest (short lever: more swing)
+    else if (sp.kind === 'blade-part') { const att = sp.blade === 'hero' ? 'hero' : foe; add(sp.part[0], t, sp.part[1], e.pos, sub(hip(sp.part[0], t), hip(att, t)), (type === 'block' ? 0.22 : 0.35) * st); }
+    else if (sp.kind === 'blade-blade') {           // a clash knocks both weapon hands back
+      add('hero', t, 'hand_L', e.pos, sub(hip('hero', t), hip(foe, t)), 0.12 * st);
+      add(foe, t, 'hand_R', e.pos, sub(hip(foe, t), hip('hero', t)), 0.16 * st);
+    }
+  }
+  for (const c of AUTO_CONTACTS) {                   // hitbox-detected contacts: n points hero → foe
+    if (c.kind === 'weapon-body') { if (c.partA === 'weapon') add(c.b, c.t, c.partB, c.pos, c.n, 0.25 * c.strength); else add('hero', c.t, c.partA, c.pos, scl(c.n, -1), 0.25 * c.strength); }
+    else if (c.kind === 'body-body') { add(c.b, c.t, c.partB, c.pos, c.n, 0.15 * c.strength); add('hero', c.t, c.partA, c.pos, scl(c.n, -1), 0.12 * c.strength); }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- analytic arm IK (exact, per frame)
 // Rotations are 3×3 column-major arrays; the FK's Euler order is R = Ry(y)·Rx(x)·Rz(z).
 const r3 = (m) => [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]];
@@ -1439,7 +1510,7 @@ function duelEnemy1_(t) {
   s.thr = tw > 179 ? 0.15 + 0.5 * (Math.sin(t * 37) > 0.3 ? 1 : 0) : clamp(0.4 + s.boost * 0.6, 0, 1);
   s.damage = 0.1 * smooth(178.2, 178.3, t) + 0.15 * smooth(178.55, 178.6, t) + 0.5 * smooth(179.0, 179.2, t);
   s.eye = tw > 179 ? (Math.sin(t * 43) > 0 ? 0.9 : 0.15) : 1;
-  return twoHand(finish(s, _pose, f));
+  return twoHand(hitReact('e1', tw, finish(s, _pose, f), 'enemy_ms'));
 }
 
 const _c_duelEnemy2 = new Map();
@@ -1482,7 +1553,7 @@ function duelEnemy2_(t) {
   s.thr = tw > 192.4 ? 0.1 : clamp(0.45 + s.boost * 0.55, 0, 1);
   s.damage = 0.12 * smooth(188.2, 188.3, t) + 0.6 * smooth(192.4, 193.2, t);
   s.eye = tw > 192.5 ? Math.max(0, 1 - (tw - 192.5) / 1.2) * (Math.sin(t * 50) > -0.2 ? 1 : 0.2) : 1;
-  return twoHand(finish(s, _pose, f));
+  return twoHand(hitReact('e2', tw, finish(s, _pose, f), 'enemy_ms'));
 }
 
 // ============================================================================ forward kinematics (same math as renderer + msMatrix)
@@ -1599,7 +1670,7 @@ const EV = [
   [194.0, 'shake', 1.2, { on: 'e2', note: 'E2 explodes' }],
 ];
 const MODEL = { hero: 'gundam', e1: 'enemy_ms', e2: 'enemy_ms' };
-const stateOf = (who, t) => (who === 'hero' ? duelHero(t) : who === 'e1' ? duelEnemy1(t) : duelEnemy2(t));
+export const stateOf = (who, t) => (who === 'hero' ? duelHero(t) : who === 'e1' ? duelEnemy1(t) : duelEnemy2(t));
 function fkAt(who, t) { const s = stateOf(who, t); return duelFK({ ...s, saber: 1 }, MODEL[who]); }
 // ---------------------------------------------------------------- contact solver
 // Hand-authored key poses are refined at module load so blades really meet at every clash and limbs really land
@@ -1625,10 +1696,12 @@ function contactCost(ev, t) {
   const own = ev.kind === 'blade-blade' || (ev.kind === 'blade-part' && ev.blade !== 'hero');   // RONIN's sword is in play
   return contactCost_(ev, t, H, E, F) + REACH_W * (own && GRIP_ON[foe](t) ? 4 * Math.max(0, gripDeficit(E).d) : 0);   // two hands stay on the hilt
 }
+const hipGap = (H, E) => V.dist(M.transformPoint([0, 0, 0], H.pelvis, [0, 0, 0]), M.transformPoint([0, 0, 0], E.pelvis, [0, 0, 0]));
 function contactCost_(ev, t, H, E, F) {
   if (ev.kind === 'blade-blade') {
     const r = segSeg(H.saber[0], H.saber[1], E.saber[0], E.saber[1]);
     return r.d + 8 * (band(r.s, ev.hs?.[0] ?? 0.3, ev.hs?.[1] ?? 0.85) + band(r.t, ev.es?.[0] ?? 0.3, ev.es?.[1] ?? 0.85))
+      + 2 * Math.max(0, (ev.minGap ?? 0) - hipGap(H, E))   // blades meet at weapon length, not with the machines jammed together
       + 4 * (bladeIntrusion(H.saber, E, 'enemy_ms') + bladeIntrusion(E.saber, H, 'gundam'));
   }
   if (ev.kind === 'part-part') {
@@ -1705,8 +1778,8 @@ const SOLVE = [
   { t: 178.55, kind: 'part-part', a: ['hero', 'foot_R', [0, -1, 0.5]], b: ['e1', 'torso', [0, 1, 2.4]], gap: 2.0, adj: [['hero', 'pos', D1, 6], ['hero', 'pos', [0, 1, 0], 3], ['hero', 'pose', 'leg_R_upper', 0]] },
   { t: 179.0, kind: 'blade-part', blade: 'hero', part: ['e1', 'torso', [0, 1, 0]], u: [0.6, 0.78], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'arm_L_lower', 0], ['hero', 'pose', 'hand_L', 0], ['hero', 'pos', D1, 5], ['hero', 'pos', [0, 1, 0], 4], ['e1', 'pos', [0, 1, 0], 3], ['e1', 'pos', D1, 4], ['hero', 'pose', 'torso', 0]] },
   { t: 184.5, kind: 'blade-blade', hs: [0.12, 0.34], es: [0.4, 0.75], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'torso', 0], ['e2', 'pos', [0, 1, 0], 5], ['e2', 'pos', [0, 0, 1], 5], ['e2', 'pos', [1, 0, 0], 4]] },   // on the SHAFT
-  { t: 186.0, kind: 'blade-blade', hs: [0.3, 0.75], es: [0.3, 0.75], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'hand_R', 1], ['e2', 'pose', 'torso', 1], ['e2', 'pos', [1, 0, 0], 5], ['e2', 'pos', [0, 1, 0], 5], ['e2', 'pos', [0, 0, 1], 6]] },
-  { t: 186.45, kind: 'blade-blade', hs: [0.3, 0.75], es: [0.3, 0.75], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'hand_R', 1], ['e2', 'pose', 'torso', 1], ['e2', 'pos', [1, 0, 0], 5], ['e2', 'pos', [0, 1, 0], 5], ['e2', 'pos', [0, 0, 1], 6]] },
+  { t: 186.0, kind: 'blade-blade', minGap: 14, hs: [0.3, 0.75], es: [0.3, 0.75], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'hand_R', 1], ['e2', 'pose', 'torso', 1], ['e2', 'pos', [1, 0, 0], 5], ['e2', 'pos', [0, 1, 0], 5], ['e2', 'pos', [0, 0, 1], 6]] },
+  { t: 186.45, kind: 'blade-blade', minGap: 14, hs: [0.3, 0.75], es: [0.3, 0.75], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'hand_R', 1], ['e2', 'pose', 'torso', 1], ['e2', 'pos', [1, 0, 0], 5], ['e2', 'pos', [0, 1, 0], 5], ['e2', 'pos', [0, 0, 1], 6]] },
   { t: 187.6, kind: 'blade-blade', hs: [0.25, 0.6], es: [0.45, 0.85], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'arm_L_lower', 0], ['hero', 'pose', 'hand_L', 1]] },
   { t: 188.2, kind: 'part-part', a: ['hero', 'arm_R_upper', [0, 0, 0]], b: ['e2', 'torso', [0, 1.5, 2.2]], gap: 3.6, adj: [['hero', 'pos', TO_E2, 6], ['hero', 'pos', [1, 0, 0], 4], ['hero', 'pos', [0, 1, 0], 3]] },
   ...[188.85, 189.08].map((t) => ({ t, kind: 'blade-blade', hs: [0.2, 0.45], es: [0.2, 0.5], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'torso', 1], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0]] })),
@@ -1868,7 +1941,7 @@ export const DUEL_CAMS = [
     return { pos: add(add(h, scl(d0, -28 - 6 * easeInOut(u))), add(scl(sd, -22 - 4 * easeInOut(u)), [0, 3 + 2 * u, 0])), target: lrp(up(h, 9), e, 0.5 + 0.15 * easeInOut(u)), fov: 46, handheld: 0.12 }; } },
   // ---- sword exchange
   { t0: 185.75, t1: 186.3, name: 'D15 profile dash + S1', fn: (t, u) => { const c = two(hp(t), e2p(t), { side: 1, dist: 1.3, lift: 4, fov: 40, bias: 0.45 }); return { ...c, target: lrp(c.target, evPos(186.0), 0.45) }; } },   // the clash in frame
-  { t0: 186.3, t1: 187.0, name: 'D16 OTS E2 → hero', fn: (t) => ots(e2p(t), hp(t), { right: -1, back: 30, lift: 8, fov: 42, side: 17 }) },
+  { t0: 186.3, t1: 187.0, name: 'D16 three-quarter: backhand, thrust, side-step', fn: (t) => { const c = two(hpA(t), e2p(t), { side: -1, dist: 1.35, lift: 5, fov: 42, bias: 0.5 }); return { ...c, handheld: 0.12 }; } },   // both machines clear in frame
   { t0: 187.0, t1: 187.75, name: 'D17 low angle duck', fn: (t, u) => { const h = hp(t), e = e2p(t); const m = lrp(h, e, 0.4), sd = sideOf(h, e); return { pos: add(add(m, scl(sd, 30)), [0, -12, 0]), target: lrp(up(m, 6), evPos(187.6), 0.45), fov: 46, roll: 0.14 }; } },
   { t0: 187.75, t1: 188.5, name: 'D18 wide shoulder charge', fn: (t) => two(hp(t), e2p(t), { side: -1, dist: 1.8, lift: 8, fov: 42, bias: 0.55 }) },
   { t0: 188.5, t1: 189.4, name: 'D19 blade-lock close-up', fn: (t, u) => { const ev = DUEL_EVENTS.find((e) => e.t === 188.85); const X = ev.pos; const h = hp(t), e = e2p(t); const sd = sideOf(h, e); return { pos: add(add(X, scl(sd, 30 - u * 4)), [0, 1, 0]), target: lrp(X, lrp(up(h, 8), up(e, 8), 0.5), 0.4), fov: 38 }; } },
@@ -2051,3 +2124,7 @@ export function applyImpulses(who, t, s) {
 // the solidity corrections, smoothed in time (needs the impulse-driven free motion, so after AUTO_READY)
 SOLID = buildSolid();
 _c_duelEnemy1.clear(); _c_duelEnemy2.clear();
+
+// the hit reactions (from the final contacts), then drop every cached state so they are applied
+REACTS = buildReacts();
+_c_duelHero.clear(); _c_duelEnemy1.clear(); _c_duelEnemy2.clear(); _c_free.e1.clear(); _c_free.e2.clear();
