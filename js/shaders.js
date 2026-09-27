@@ -1565,13 +1565,15 @@ fn h12(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(12.9898, 78.233))) * 437
   let bl = textureSampleLevel(bloom0, smp, uv, 0.0).rgb;
   col += bl * P.a.y;
   // anamorphic streak (horizontal smear of a low bloom mip)
+  // one texel per tap (the old 17 taps 4 texels apart stamped a small bright source — the sun — into a row of dots)
   if (P.c.y > 0.0) {
     var st = vec3f(0.0);
-    for (var k = -8; k <= 8; k++) {
-      let w = exp(-abs(f32(k)) * 0.28);
-      st += textureSampleLevel(bloom2, smp, uv + vec2f(f32(k) * 0.018, 0.0), 0.0).rgb * w;
+    let tx = 1.0 / f32(textureDimensions(bloom2).x);
+    for (var k = -20; k <= 20; k++) {
+      let w = exp(-abs(f32(k)) * 0.07);
+      st += textureSampleLevel(bloom2, smp, uv + vec2f(f32(k) * tx, 0.0), 0.0).rgb * w;
     }
-    col += st * vec3f(0.45, 0.6, 1.0) * P.c.y * 0.08;
+    col += st * vec3f(0.45, 0.6, 1.0) * P.c.y * 0.0197;   // same total energy as before (Σw 6.4 → 26)
   }
   // SUN LENS FLARE (shader): round glare + fine starburst + chromatic ghosts along the sun→centre line + halo ring
   if (P.flare.w > 0.5) {
@@ -1586,17 +1588,7 @@ fn h12(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(12.9898, 78.233))) * 437
     var fl = vec3f(1.0, 0.92, 0.8) * exp(-r * 38.0) * 3.0                       // hot core
            + vec3f(1.0, 0.7, 0.42) * (exp(-r * r * 60.0) * 0.28 + exp(-r * 5.0) * 0.06)   // warm glare: soft gaussian + faint wide tail (no hard-edged disc)
            + vec3f(1.0, 0.75, 0.5) * rays * exp(-r * 9.0) * 0.35;               // starburst (short, subtle)
-    let axis = vec2f(0.5) - sp;
-    for (var k = 0; k < 5; k++) {
-      let f = array<f32, 5>(0.45, 0.7, 1.05, 1.35, 1.7)[k];
-      let rad = array<f32, 5>(0.035, 0.018, 0.06, 0.028, 0.09)[k];
-      let tintk = array<vec3f, 5>(vec3f(0.9, 0.55, 0.25), vec3f(0.35, 0.7, 0.5), vec3f(0.3, 0.4, 0.9), vec3f(0.9, 0.4, 0.6), vec3f(0.4, 0.55, 0.9))[k];
-      let gp = sp + axis * f;
-      let gd = length((uv - gp) * asp2) / rad;
-      fl += tintk * (smoothstep(1.0, 0.75, gd) * 0.08 + exp(-pow((gd - 0.95) * 9.0, 2.0)) * 0.05);
-    }
-    let hr = length((uv - (sp + axis * 1.0)) * asp2);
-    fl += vec3f(0.45, 0.6, 0.9) * exp(-pow((hr - 0.32) * 28.0, 2.0)) * 0.03;          // halo ring
+    // (no chromatic ghost discs / halo ring: they read as stray fake dots of light across the frame)
     col += fl * I;
   }
   // god rays: radial march over bloom toward light
