@@ -1,8 +1,8 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, bulletTime, bulletSpeed, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
-import { storyT, tearU, FILM_DURATION } from './timemap.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { storyT, tearU, slowSpeed, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
 import {
@@ -1219,7 +1219,7 @@ shot(70, 80, 'B2 the well switches on', (c) => {
   camLook(c, pos, V.add([0, 0, 0], WELL, [0, 0, 400]), 32 - u * 5, 0.02);
   c.env.planet = { dir: V.norm([0, 0, 0], [0.12, -0.3, 1]), radius: 0.42, col: [0.62, 0.46, 0.34], earth: false };
   c.env.planetInSky = true;
-  c.env.sunDir = V.norm([0, 0, 0], [-0.45, 0.55, -0.7]);
+  // (both suns stay where they are in every space scene — no per-shot sun moves)
   c.env.sunDisc = 0;
   c.env.rim = [0.5, 0.45, 0.4, 0.25];
   const k1 = Math.exp(-Math.max(0, t - 70) * 2.2), k2 = t > 74.5 ? Math.exp(-(t - 74.5) * 2.5) : 0;
@@ -1262,7 +1262,7 @@ shot(80, 100, 'B3 DREADNOUGHT REVEAL', (c) => {
 });
 shot(100, 110, 'B4 standoff', (c) => {
   const { t, u } = c;
-  c.env.sunDir = V.norm([0, 0, 0], [0.75, 0.55, -0.35]);        // key from high behind the camera: the moon behind the fleets shows its lit face
+  // (both suns stay fixed — the old per-shot key from behind the camera made this scene lit differently)
   // side-on profile of the whole gap: our flagship on the left, the dreadnought on the right, bows facing
   const d = dreadPos(t), m = motherPoint([0, 0, 0], t, [0, 0, 0]);
   const mid = V.lerp([0, 0, 0], m, d, 0.5);
@@ -1472,7 +1472,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   c.post.lensA = { enable: 0 };   // distant ships they only washed the hulls out white)   the well is far away: no background lensing (it smeared the planet into grey)
   if (k.slowmo) { c.post.saturation = 0.75; c.post.streak = 0.45; c.post.gradeHighlights = [1.2, 1.0, 0.85]; }
   { // bullet time: the picture drains a little and the edges fall away while time crawls
-    const bs = sat((0.75 - bulletSpeed(storyT(FILM_NOW))) / 0.5);
+    const bs = sat((0.75 - slowSpeed(FILM_NOW)) / 0.5);
     if (bs > 0) { c.post.saturation = lerp(c.post.saturation ?? 0.9, 0.62, bs); c.post.vignette = lerp(c.post.vignette ?? 0.8, 1.25, bs); c.post.contrast = lerp(c.post.contrast ?? 1.08, 1.16, bs); c.post.streak = Math.max(c.post.streak ?? 0, 0.4 * bs); }
   }
   // ---- the second RONIN from above (180.9–184.4): sensor spike → a silhouette against the light → the dive
@@ -1696,7 +1696,7 @@ shot(266.95, 268.05, 'B2b POV tear', (c) => {
   c.fpv = true;
   const film = c.filmT;
   const u = Math.max(0, tearU(film));                       // 0..1 across the stretched window
-  const pre = film < 267.2 ? 1 : 0;
+  const pre = t < 267.2 ? 1 : 0;
   const strain = pre ? 0.3 : 0.3 + 0.7 * Math.pow(u, 1.4);
   const g = gundamState(t);
   const f = V.norm([0, 0, 0], g.fwd);
@@ -2144,7 +2144,7 @@ function moonFor(R, s, film) {
 }
 export function frame(R, film) {
   FILM_NOW = film;
-  const t = bulletTime(storyT(film));                     // bullet time round the duel's big blows (identity elsewhere)
+  const t = storyT(film);                                 // (includes the duel's bullet time — timemap.js)
   const s = findShot(t);
   ctx.R = R; ctx.t = t; ctx.lt = t - s.t0; ctx.u = sat((t - s.t0) / (s.t1 - s.t0));
   ctx.env = spaceEnv(t); ctx.post = basePost();

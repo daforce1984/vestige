@@ -1,7 +1,7 @@
 import { Renderer } from './renderer.js';
 import { frame, findShot, DURATION, SHOTS } from './shots.js';
-import { storyT, filmT } from './timemap.js';
-import { DUEL_CAMS, bulletTime, bulletReal } from './duel.js';
+import { storyT, filmT, insertFilm } from './timemap.js';
+import { DUEL_CAMS } from './duel.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
   'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
@@ -36,7 +36,7 @@ let SUBS = [];
 async function loadSubs() {
   try {
     const d = await (await fetch('assets/voice/lines.json')).json();
-    SUBS = d.lines.map((l) => [l.filmTime ? l.t : filmT(l.t), l.filmTime ? l.t + (l.dur || 3) + 0.35 : Math.min(filmT(l.cut ?? 1e9), filmT(l.t) + (l.dur || 3) + 0.35), WHO[l.voice] ?? l.voice,
+    SUBS = d.lines.map((l) => [l.filmTime ? insertFilm(l.t) : filmT(l.t), l.filmTime ? insertFilm(l.t) + (l.dur || 3) + 0.35 : Math.min(filmT(l.cut ?? 1e9), filmT(l.t) + (l.dur || 3) + 0.35), WHO[l.voice] ?? l.voice,
       l.text.replace(/\[[^\]]*\]\s*/g, '').trim(), l.ko || '', l.voice === 'NARRATOR']);
   } catch (e) { console.warn('subtitles unavailable', e); }
 }
@@ -112,20 +112,20 @@ function sceneAt(st) {
   return sh;
 }
 function showSceneTag() {
-  const ft = now(), sc = sceneAt(bulletTime(storyT(ft))), i = SCENE_ORDER.indexOf(sc);
+  const ft = now(), sc = sceneAt(storyT(ft)), i = SCENE_ORDER.indexOf(sc);
   const mm = Math.floor(ft / 60), ss = (ft % 60).toFixed(1).padStart(4, '0');
   sceneTag.innerHTML = `<b>SCENE ${i + 1}</b> / ${SCENE_ORDER.length}<span>${sc.name}</span><em>${mm}:${ss}  (story ${storyT(ft).toFixed(2)} s)</em>`;
   sceneTag.classList.add('on');
 }
 // ←/→: one scene (camera cut) at a time
 function stepScene(dir) {
-  const st = bulletTime(storyT(now()));
+  const st = storyT(now());
   const starts = [...new Set(SCENE_ORDER.map((x) => x.t0))].sort((a, b) => a - b);
   const cur = [...starts].reverse().find((x) => x <= st + 0.001) ?? starts[0];
   const to = dir > 0 ? starts.find((x) => x > st + 0.001)
     : st - cur > 0.3 ? cur : [...starts].reverse().find((x) => x < cur - 0.0005);   // ←: back to this cut's start, again → previous cut
   if (to === undefined) return;
-  seek(filmT(bulletReal(to)) + 0.002);
+  seek(filmT(to) + 0.002);
   showSceneTag();
 }
 function hideSceneTag() { sceneTag.classList.remove('on'); }
@@ -267,8 +267,8 @@ async function startFilm(from, until = null) {
 }
 $('#start .go').addEventListener('click', () => startFilm(clockOffset >= DURATION ? 0 : clockOffset));
 // the mech battle on its own: from the swatted bolt (scene 30) through the duel to the last blast
-const DUEL_FROM = 165.9, DUEL_UNTIL = 195.2;   // from the bolt Sigma swats away on the way in
-$('#duelBtn').addEventListener('click', () => startFilm(DUEL_FROM, DUEL_UNTIL));
+const DUEL_FROM = 165.9, DUEL_UNTIL = 195.2;   // story   // from the bolt Sigma swats away on the way in
+$('#duelBtn').addEventListener('click', () => startFilm(filmT(DUEL_FROM), filmT(DUEL_UNTIL)));
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); if (playing) pause(); else play(now()); }
   else if (e.code === 'Escape') { if (playing) pause(); }

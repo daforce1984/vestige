@@ -16,10 +16,10 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, bulletReal } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2 } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
-import { filmT, TEAR_S0, TEAR_S1, TEAR_F1, FILM_DURATION, STORY_DURATION } from './timemap.js';
+import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
 // The Score clock is FILM time. Every table below (CUES, SAMPLE_CUES, SECTIONS, AUTOMATION, ION_SHOTS, DUEL_EVENTS,
 // lines.json `t`) is STORY time and is mapped with filmT() when events are built. The first-person tear insert
 // (film TEAR_S0–TEAR_F1) is designed directly in film time (insertCues). Voice lines with "filmTime": true are film time.
@@ -490,7 +490,7 @@ export const SAMPLE_CUES = [
 // choir / sub / taiko bed keeps growing underneath. Everything is cut clean at 278.0 so the shatter lands hard.
 export const INSERT_GAIN = 1.0;
 function insertCues() {
-  const out = [], r = rng(26726), R = (a, b) => a + r() * (b - a), F0 = TEAR_S0, F1 = TEAR_F1, L = F1 - F0, G = INSERT_GAIN;
+  const out = [], r = rng(26726), R = (a, b) => a + r() * (b - a), F0 = TEAR_F0, F1 = TEAR_F1, L = F1 - F0, G = INSERT_GAIN;
   const u = (t) => Math.max(0, Math.min(1, (t - F0) / L));
   // struggle bed (both modes)
   out.push([F0, '@strings', { notes: [50, 51, 56, 57, 62, 63], dur: L, vel: 0.5 * G, atk: 2, rel: 0.05, trem: 9, swell: true, bend: 700 }]);
@@ -651,7 +651,6 @@ function duelCues() {
   out.push([156.9, 'hit_heavy', { rate: 0.7, lp: 1200, gain: G * 0.5, prio: 7, norand: true }]);
   out.push([157.3, 'servo', { rate: 0.6, gain: G * 0.6, prio: 7, norand: true }]);
   out.push([157.35, '@steam', { dur: 1.2, vel: 0.5 }]);
-  for (const c of out) c[0] = bulletReal(c[0]);               // follow the picture through the bullet-time ramps
   return out;
 }
 
@@ -719,14 +718,20 @@ SAMPLE_CUES.push(...ionShotCues(), ...duelCues(), ...warpCues(), ...lossCues());
 //   warp    : sample playbackRate multiplier → slow-motion pitch-down 190–194
 // duckMusic / duckSfx are generated from the voice schedule and the `duck` sample cues.
 // =====================================================================================
+const DUEL_RESYNC = 194.0;   // story: E2 explodes — the music stem re-syncs here after the duel's bullet time
+// bullet time on every blow (timemap.js SLOW_WIN): samples pitch down, the score sinks back while the picture is slowed
+// (the 190–194 slow-motion section already has its own curves)
+const slowKeys = (lo, hi) => SLOW_WIN.filter((w) => w.h < 190 || w.h > 194.1).flatMap((w) => [
+  [w.h - w.pre - w.rin, hi], [w.h - w.pre, lo], [w.h + w.post, lo], [w.h + w.post + w.rout, hi]]);
+const withSlow = (kf, lo, hi) => [...kf, ...slowKeys(lo, hi)].sort((x, y) => x[0] - y[0]);
 export const AUTOMATION = {
   lowpass: [[0, 20000], [190.1, 20000], [190.6, 900], [193.6, 900], [194.05, 20000],
             [216.8, 20000], [217.5, 380], [223.5, 380], [226, 20000],
             [278.3, 20000], [279.95, 520], [280.0, 20000],            // engulfed: everything but the swell closes down
             [280.02, 20000], [280.15, 2200], [284, 20000]],
-  music:   [[0, 1], [69.3, 1], [69.6, 0.03], [70.02, 0.03], [70.4, 1], [217.2, 1], [218, 0.2], [223, 0.2], [226, 1], [277.9, 1], [279.95, 0.25], [280.02, 1]],
+  music:   withSlow([[0, 1], [69.3, 1], [69.6, 0.03], [70.02, 0.03], [70.4, 1], [217.2, 1], [218, 0.2], [223, 0.2], [226, 1], [277.9, 1], [279.95, 0.25], [280.02, 1]], 0.45, 1),
   master:  [[0, 1], [384.5, 1], [386.8, 0.0003]],
-  warp:    [[0, 1], [190.05, 1], [190.5, 0.62], [193.6, 0.62], [194.05, 1]],
+  warp:    withSlow([[0, 1], [190.05, 1], [190.5, 0.62], [193.6, 0.62], [194.05, 1]], 0.62, 1),
 };
 
 // =====================================================================================
@@ -843,8 +848,8 @@ export default class Score {
       catch (e) { console.warn('[audio] voice', l.id, 'failed:', e.message || e); return null; }
     }));
     for (const l of got) if (l) {   // film-time start / cut (lines with "filmTime": true are already film time)
-      l.tf = l.filmTime ? l.t : filmT(l.t);
-      l.cutF = l.cut != null ? (l.filmTime ? l.cut : filmT(l.cut)) : undefined;
+      l.tf = l.filmTime ? insertFilm(l.t) : filmT(l.t);
+      l.cutF = l.cut != null ? (l.filmTime ? insertFilm(l.cut) : filmT(l.cut)) : undefined;
     }
     this.voiceLines = got.filter(Boolean).sort((a, b) => a.tf - b.tf);
   }
@@ -1014,8 +1019,12 @@ export default class Score {
     if (stems) this.stems.forEach((s) => {
       const base = { ref: s, resume: true, offset: s.offset || 0, gain: s.gain, fadeIn: s.fadeIn || 0, fadeOut: s.fadeOut };
       const a = s.t, b = s.t + s.dur;
-      if (a < TEAR_S0 && b > TEAR_S0) {   // e.g. E_climax: play to TEAR_S0, hold through the insert, resume at TEAR_F1
-        ev.push({ film: true, t: a, type: 'stem', p: { ...base, dur: TEAR_S0 - a + 0.45, fadeOut: 0.45 } });
+      if (a < DUEL_RESYNC && b > DUEL_RESYNC && a < SLOW_WIN[0].h) {   // C_battle: the score plays straight on through the
+        // bullet-time blows (it never slows), so it runs ahead of the story; it jumps back into step under E2's explosion
+        ev.push({ film: true, t: filmT(a), type: 'stem', p: { ...base, dur: filmT(DUEL_RESYNC) - filmT(a) + 0.5, fadeOut: 0.5 } });
+        ev.push({ film: true, t: filmT(DUEL_RESYNC), type: 'stem', p: { ...base, offset: base.offset + (DUEL_RESYNC - a), dur: filmT(b) - filmT(DUEL_RESYNC), fadeIn: 0.35 } });
+      } else if (a < TEAR_S0 && b > TEAR_S0) {   // e.g. E_climax: play to TEAR_S0, hold through the insert, resume at TEAR_F1
+        ev.push({ film: true, t: filmT(a), type: 'stem', p: { ...base, dur: TEAR_F0 - filmT(a) + 0.45, fadeOut: 0.45 } });
         ev.push({ film: true, t: TEAR_F1, type: 'stem', p: { ...base, offset: base.offset + (TEAR_S0 - a), dur: b - TEAR_S0, fadeIn: 0.02 } });
       } else ev.push({ film: true, t: filmT(a), type: 'stem', p: { ...base, dur: filmT(b) - filmT(a) } });
     });
