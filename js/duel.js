@@ -249,6 +249,22 @@ L.limp = W(PR(POSES.limp), {});
 L.hitCut = W(L.limp, { torso: [-20, 25, 20], head: [-30, 20, 0], arm_L_upper: [-70, 30, 50], _body: [-10, 15, 15] });
 L.plunge = W(L.cutDown, { arm_L_upper: [-95, -20, 0], arm_L_lower: [-20, 0, 0], hand_L: [70, 0, 0], torso: [25, -15, 0], _body: [10, 0, 0] });
 L.dive = W(L.flight, { arm_L_upper: [-170, 10, 20], arm_L_lower: [-30, 0, 0], hand_L: [30, 0, 0], _body: [55, 0, 0] });
+// SHAFT BLOCK (scene 48): the mace held two-handed flat over the head like a quarterstaff — the arms are placed by IK
+// (staffHold); these carry the legs / chest: braced wide, knees giving under the blow, then driving up to throw it off
+L.staffBlock = W(L.guard, { pelvis: [0, -5, 0], torso: [-4, 0, 0], head: [-28, 0, 0], leg_L_upper: [-45, 0, 14], leg_L_lower: [70, 0, 0], foot_L: [20, 0, 0], leg_R_upper: [8, 0, -14], leg_R_lower: [75, 0, 0], foot_R: [30, 0, 0], _body: [-6, 0, 0] });
+L.staffHit = W(L.staffBlock, { torso: [8, 0, 0], head: [-18, 0, 0], leg_L_upper: [-64, 0, 14], leg_L_lower: [108, 0, 0], leg_R_upper: [-14, 0, -14], leg_R_lower: [118, 0, 0], foot_R: [40, 0, 0], _body: [2, 0, 0] });
+L.staffPush = W(L.staffBlock, { torso: [-12, 0, 0], head: [-32, 0, 0], leg_L_upper: [-28, 0, 12], leg_L_lower: [36, 0, 0], leg_R_upper: [16, 0, -12], leg_R_lower: [42, 0, 0], _body: [-10, 0, 0] });
+// RONIN #2 over the top (authored in the hero convention, mirrored below): the overhead cut that meets the shaft, thrown
+// up off it, a tight backward somersault (knees to chest, free hand on the shins, katana tucked along the body), opening
+// out, and a heavy landing — knees deep, katana low in both hands — before it comes again
+L.overCut = W(L.overMid, { torso: [22, 0, 0], head: [6, 0, 0], leg_L_upper: [-55, 0, 10], leg_L_lower: [85, 0, 0], leg_R_upper: [-5, 0, -10], leg_R_lower: [95, 0, 0], foot_L: [25, 0, 0], foot_R: [35, 0, 0], _body: [-10, 0, 0] });
+L.recoil = W(L.raise, { torso: [-25, 0, 0], head: [-20, 0, 0], arm_L_upper: [-170, 0, 20], arm_L_lower: [-20, 0, 0], leg_L_upper: [-20, 0, 10], leg_L_lower: [40, 0, 0], leg_R_upper: [10, 0, -10], leg_R_lower: [50, 0, 0], _body: [-25, 0, 0] });
+L.tuck = P({ torso: [45, 0, 0], head: [25, 0, 0], arm_L_upper: [-40, 0, 25], arm_L_lower: [-95, 0, 0], hand_L: [20, 0, 0], arm_R_upper: [-75, 0, -15], arm_R_lower: [-80, 0, 0],
+  leg_L_upper: [-125, 0, 12], leg_L_lower: [145, 0, 0], foot_L: [35, 0, 0], leg_R_upper: [-120, 0, -12], leg_R_lower: [145, 0, 0], foot_R: [35, 0, 0] });
+L.untuck = P({ torso: [15, 0, 0], head: [-5, 0, 0], arm_L_upper: [-50, 0, 40], arm_L_lower: [-40, 0, 0], hand_L: [20, 0, 0], arm_R_upper: [-40, 0, -45], arm_R_lower: [-30, 0, 0],
+  leg_L_upper: [-50, 0, 12], leg_L_lower: [70, 0, 0], foot_L: [20, 0, 0], leg_R_upper: [-10, 0, -12], leg_R_lower: [60, 0, 0], foot_R: [30, 0, 0] });
+L.land = P({ pelvis: [0, -10, 0], torso: [30, -5, 0], head: [-10, 5, 0], arm_L_upper: [-40, -10, 20], arm_L_lower: [-60, 0, 0], hand_L: [20, 0, 0], arm_R_upper: [-30, 20, -20], arm_R_lower: [-70, 0, 0],
+  leg_L_upper: [-80, 0, 12], leg_L_lower: [120, 0, 0], foot_L: [30, 0, 0], leg_R_upper: [-20, 0, -12], leg_R_lower: [125, 0, 0], foot_R: [40, 0, 0], _body: [10, 0, 0] });
 
 // RONIN (right-hand katana) = mirrored library
 const R = {};
@@ -604,8 +620,9 @@ const heroPos = posTrack([
   [182.6, C(16, 10, 24), 'io'],                         // boost to meet the diving E2
   [183.5, C(4, 3, 17), 'io'],
   [184.35, C(0, 0, 14), 'io'],
-  [184.5, C(0, -1.2, 14), 'in'],                         // overhead block impact
-  [185.0, C(0, -4, 13), 'out'],
+  [184.5, C(0, -1.2, 14), 'in'],                         // overhead block impact on the shaft
+  [184.7, C(0, -3.4, 14), 'out'],                        // sinks under the weight of the blow
+  [184.95, C(0, -2.2, 13.6), 'io'],                      // drives up, throwing it off
   [185.45, C(0, -4, 14), 'io'],
   [185.85, C(0, -1, 8), 'io'],                          // dash in during the raise
   [186.0, C(0, 0, 6), 'in'],                            // S1 clash
@@ -643,8 +660,8 @@ const heroPose = poseTrack([
   [178.47, L.kickWind, 'io'], [178.55, L.kick, 'in'], [178.8, L.raise, 'out'],
   [179.0, L.cutMid, 'in'], [179.18, L.cutDown, 'out'], [179.9, L.cutDown], [180.4, L.shield, 'io'], [180.95, L.shield],   // overhead mace smash
   [181.15, L.lookUp, 'snap'], [182.0, L.lookUp], [182.6, L.boost, 'io'], [183.4, L.guardBare, 'io'],
-  [184.0, L.ignite, 'io'], [184.35, L.highBlock, 'out'], [184.5, L.highBlockHit, 'in'], [184.65, L.highBlockHit],
-  [185.25, L.guard, 'out'],
+  [184.0, L.ignite, 'io'], [184.3, L.staffBlock, 'out'], [184.5, L.staffHit, 'in'], [184.66, L.staffHit], [184.9, L.staffPush, 'io'],   // shaft block, throws it off
+  [185.3, L.guard, 'out'],
   [185.45, L.guard], [185.85, L.raise, 'io'], [186.0, L.cutMid, 'in'], [186.15, W(L.cutMid, { arm_L_upper: [-105, -25, 10] }), 'out'],
   [186.35, W(L.foreEnd, { arm_L_upper: [-105, -70, -5], hand_L: [80, 0, 0] }), 'io'], [186.45, L.backMid, 'in'], [186.52, L.backMid],
   [186.72, L.thrustWind, 'out'], [186.85, L.thrust, 'in'], [187.05, L.thrust, 'out'],
@@ -669,6 +686,21 @@ const heroImp = impulses([
   [189.45, P({ torso: [20, 0, 0], head: [25, 0, 0], _body: [-10, 0, 0] }), 0.04, 0.4],
   [190.9, P({ arm_L_upper: [0, -10, 0] }), 0.06, 0.6],
 ]);
+// two hands on the shaft (scene 48): left fist on the grip, right fist 42 % up the haft, the mace flat over the head
+const STAFF = (tw) => smooth(184.05, 184.3, tw) * (1 - smooth(184.95, 185.25, tw));
+function staffHold(s, k, tw) {
+  const piv = PIV.gundam, fk = duelFK(s, 'gundam'), W0 = fk.root;
+  const h = 8.8 + 1.4 * smooth(184.62, 184.9, tw);
+  const base = M.transformPoint([0, 0, 0], W0, add(piv.torso, [4.4, h, 2.4]));
+  const dir = nrm(M.transformDir([0, 0, 0], W0, [-1, 0.06, 0.1])), upv = nrm(M.transformDir([0, 0, 0], W0, [0, 1, 0]));
+  const yL = nrm(sub(scl(dir, V.dot(upv, dir)), upv)), xL = V.cross([0, 0, 0], yL, dir);
+  const Hw = [...xL, ...yL, ...dir], G = [0, -1.2, 0.6];
+  const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
+  s.pose = { ...s.pose };
+  armIK(s, fk, 'gundam', 'L', sub(base, r3v(Hw, G)), Hw);
+  armIK(s, duelFK(s, 'gundam'), 'gundam', 'R', sub(add(base, scl(dir, 0.42 * s.saberLen)), r3v(Hw, G)), Hw);
+  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+}
 const heroSaber = scalarTrack([[160, 1], [200, 1]]);        // the mace is in hand for the whole fight
 const heroBoost = scalarTrack([[170, 0.8], [171.0, 0.5], [175.25, 0.5], [175.3, 1, 'lin'], [175.6, 0.5], [177.35, 0.6],
   [178.15, 0.6], [178.2, 1, 'lin'], [178.5, 0.5], [178.78, 0.5], [178.84, 1, 'lin'], [179.2, 0.6],   // thruster-driven smash [181.2, 0.4], [181.4, 1, 'lin'], [182.9, 0.9], [184.4, 0.6], [185.45, 0.6], [185.5, 1, 'lin'], [186.0, 0.7],
@@ -708,11 +740,13 @@ const e1Saber = scalarTrack([[169.5, 1], [179.9, 1], [180.1, 0.3, 'lin'], [180.2
 // ---------------- enemy 2 (RONIN/04 #2): dive attack, sword duel, killed by the pass-cut
 const e2Pos = posTrack([
   [180.8, C(60, 240, -200)],
-  [182.0, C(40, 150, -120), 'cr'], [183.2, C(16, 72, -46), 'cr'], [184.0, C(4, 34, -14), 'cr'], [184.35, C(1, 23, -5), 'cr'],
-  [184.5, C(0, 17, -1), 'in'],                        // overhead plunge — blocked
-  [184.65, C(0, 19, -4), 'out'],
-  [185.3, C(0, 3, -8), 'out'],                         // back-flip away
-  [185.85, C(0, 1, -15), 'io'], [186.0, C(0, 1, -15), 'io'],
+  [182.0, C(40, 150, -120), 'cr'], [183.2, C(16, 72, -46), 'cr'], [184.0, C(6, 30, -10), 'cr'], [184.3, C(2, 17, 1), 'io'],
+  [184.5, C(0, 13, 4), 'in'],                         // overhead cut — caught on the mace shaft
+  [184.7, C(0, 18, 0), 'out'],                        // thrown up off it
+  [185.15, C(0, 21, -7), 'io'],                       // backward somersault: apex
+  [185.55, C(0, 9, -13), 'io'],                       // opening out, coming down
+  [185.8, C(0, -0.5, -15), 'out'],                    // lands heavy, knees deep
+  [186.0, C(0, 1, -15), 'io'],
   [186.2, C(0, 0, -17), 'out'], [186.45, C(0, 0, -18.5), 'io'],
   [186.65, C(0, 0, -15), 'io'],
   [186.9, C(10, 0, -13), 'out'],                       // side-step the thrust
@@ -734,8 +768,8 @@ const e2Pos = posTrack([
   [194.0, C(-2, -3, -2), 'io'],
 ]);
 const e2Pose = poseTrack([
-  [180.8, R.dive], [183.5, R.dive], [184.2, R.raise, 'io'], [184.5, R.plunge, 'in'], [184.65, R.plunge],
-  [185.3, R.guard, 'out'], [185.85, R.guard], [186.0, R.sideBlock, 'in'], [186.2, R.guard, 'out'],
+  [180.8, R.dive], [183.5, R.dive], [184.25, R.raise, 'io'], [184.5, R.overCut, 'in'], [184.62, R.recoil, 'out'],
+  [184.85, R.tuck, 'io'], [185.3, R.tuck], [185.55, R.untuck, 'io'], [185.8, R.land, 'io'], [186.0, R.sideBlock, 'in'], [186.2, R.guard, 'out'],
   [186.45, R.crossBlock, 'in'], [186.6, R.guard, 'out'], [186.9, R.dodge, 'out'],
   [187.05, R.foreWind, 'io'], [187.2, W(R.foreMid, { arm_R_upper: [-100, 5, 0], hand_R: [98, 0, 0], torso: [0, 8, 0] }), 'in'], [187.35, R.foreEnd, 'out'],
   [187.47, R.raise, 'io'], [187.6, R.overMid, 'in'],
@@ -750,7 +784,10 @@ const e2Imp = impulses([
   [187.6, P({ arm_R_upper: [10, 0, 0] }), 0.03, 0.25],
   [190.9, P({ arm_R_upper: [0, 20, 0], torso: [0, 12, 0] }), 0.08, 0.7],
 ]);
-const e2Flip = (t) => (t > 184.65 && t < 185.3 ? -2 * Math.PI * easeOut((t - 184.65) / 0.65) : 0);   // back-flip
+// backward somersault off the shaft (184.62–185.6): one full turn about the hips, slow out of the recoil, fastest tucked
+const FLIP_A = 184.62, FLIP_B = 185.6;
+const e2Flip = (t) => { const u = sat((t - FLIP_A) / (FLIP_B - FLIP_A)); return u <= 0 || u >= 1 ? 0 : -2 * Math.PI * u * u * u * (u * (6 * u - 15) + 10); };
+const E2_FLIP = (tw) => smooth(FLIP_A - 0.05, FLIP_A + 0.08, tw) * (1 - smooth(FLIP_B - 0.08, FLIP_B + 0.1, tw));
 const e2Saber = scalarTrack([[181.0, 0], [181.5, 1, 'out'], [192.6, 1], [193.0, 0, 'io']]);
 
 // ============================================================================ state assembly
@@ -990,6 +1027,7 @@ function duelHero_(t) {
   s.boost = heroBoost(tw);
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
+  { const ks = STAFF(tw); if (ks > 0) staffHold(s, ks, tw); }
   // hand-over to the old aftermath formula (identical at t = 200)
   if (t > 194.0) {
     const o = oldAftermath(t);
@@ -1016,8 +1054,64 @@ function spinYaw(t) {       // degrees, relative to facing RONIN #2 (270 = facin
 export function duelEnemy1(t) {
   if (!STATE_CACHE) return duelEnemy1_(t);
   let r = _c_duelEnemy1.get(t);
-  if (r === undefined) { r = duelEnemy1_(t); if (AUTO_READY && r) r = applyImpulses('e1', t, r); if (_c_duelEnemy1.size > 64) _c_duelEnemy1.clear(); _c_duelEnemy1.set(t, r); }
+  if (r === undefined) { r = weaponConstrain('e1', t, enemyFree('e1', t)); if (_c_duelEnemy1.size > 64) _c_duelEnemy1.clear(); _c_duelEnemy1.set(t, r); }
   return r;
+}
+// ---------------------------------------------------------------- weapons are solid: katana vs mace
+// Per frame, the katana (capsule r 0.3) may not sink into the mace (shaft r 0.45, head r 2.1). The side it must stay
+// on is the side it came from (looked up in the last frames where the two were apart), so a blade can never tunnel
+// through the other weapon between frames — a blow that would pass through is stopped on the surface. The katana is
+// pushed out by swinging the sword arm about its shoulder; the left fist re-closes on the hilt.
+const _c_free = { e1: new Map(), e2: new Map() };
+function enemyFree(who, t) {
+  const c = _c_free[who];
+  let r = c.get(t);
+  if (r === undefined) { r = who === 'e1' ? duelEnemy1_(t) : duelEnemy2_(t); if (AUTO_READY && r) r = applyImpulses(who, t, r); if (c.size > 256) c.clear(); c.set(t, r); }
+  return r;
+}
+const KATANA_R = 0.3;
+const WEAPON = { hero: { shaft: 0.45, head: 2.1, headFrom: 0.78 }, e1: { shaft: 0.3 }, e2: { shaft: 0.3 } };
+function maceCaps(hs) {
+  const H = duelFK({ ...hs, saber: Math.max(hs.saber, 1e-3) }, 'gundam'), [a, b] = H.saber;
+  return [[a, b, WEAPON.hero.shaft], [lrp(a, b, WEAPON.hero.headFrom), b, WEAPON.hero.head]];
+}
+function approachNormal(who, t, cap, rs) {   // unit normal (mace → katana) from the last frames the two were clearly apart
+  for (let k = 1; k <= 12; k++) {
+    const tt = t - k / 24, hs = duelHero_(tt), es = enemyFree(who, tt);
+    if (!hs || !es || !es.vis || !(es.saber > 0.5)) break;
+    const c = maceCaps(hs)[cap], E = duelFK(es, 'enemy_ms'), q = segSeg(c[0], c[1], E.saber[0], E.saber[1]);
+    if (q.d > rs * 0.7) return nrm(sub(q.c2, q.c1));
+  }
+  return null;
+}
+function weaponConstrain(who, t, s) {
+  if (!s || !s.vis || !(s.saber > 0.5)) return s;
+  const hs = duelHero(t);
+  if (!hs || !(hs.saber > 0.5)) return s;
+  const caps = maceCaps(hs), piv = PIV.enemy_ms, normals = [null, null];
+  let out = s;
+  for (let it = 0; it < 10; it++) {
+    const E = duelFK(out, 'enemy_ms');
+    let best = null;
+    caps.forEach((c, i) => {
+      const rs = c[2] + KATANA_R, q = segSeg(c[0], c[1], E.saber[0], E.saber[1]);
+      if (q.d >= rs) return;
+      const n = normals[i] || (normals[i] = approachNormal(who, t, i, rs) || (q.d > 1e-4 ? nrm(sub(q.c2, q.c1)) : null));
+      if (!n) return;
+      const depth = rs - V.dot(sub(q.c2, q.c1), n);
+      if (depth > 0.002 && (!best || depth > best.depth)) best = { depth, n, x: q.c2 };
+    });
+    if (!best) break;
+    if (out === s) out = { ...s, pose: { ...s.pose } };
+    const SR = M.transformPoint([0, 0, 0], E.torso, sub(piv.arm_R_upper, piv.torso));
+    const A = r3between(sub(best.x, SR), sub(add(best.x, scl(best.n, best.depth + 0.01)), SR));
+    out.pose.arm_R_upper = euler3(r3mul(r3T(r3(E.torso)), r3mul(A, r3(E.arm_R_upper))));
+    const moved = add(SR, r3v(A, sub(best.x, SR))), rest = sub(add(best.x, scl(best.n, best.depth + 0.01)), moved);
+    out.pos = add(out.pos, rest);                               // what the arm can't give, the whole machine is shoved back
+    out._pushed = (out._pushed || 0) + best.depth;
+    gripLock(out);
+  }
+  return out;
 }
 // SAMURAI GRIP: RONIN holds the katana in BOTH hands — the left hand is solved (FK coordinate descent, joint-limited)
 // onto the hilt just below the right fist, aligned with the blade. Only the left arm moves: the blade and every solved
@@ -1032,28 +1126,95 @@ function gripLock(s) {
   if (SOLVING || !s || !s.vis || !(s.saber > 0.5)) return s;
   const gw = s._grip ?? 1;
   if (gw <= 0.001) return s;                                  // hand off the hilt (taunt)
-  const pose = s.pose;
-  for (const [p] of LOCK_VARS) pose[p] = (pose[p] || [0, 0, 0]).slice();
-  const free = gw < 1 ? Object.fromEntries(LOCK_VARS.map(([p]) => [p, pose[p].slice()])) : null;
-  const cost = () => gripErr(duelFK(s, 'enemy_ms'));
-  let best = cost();
-  for (let step = 0.6; step > 0.002; step *= 0.6) {
-    for (let it = 0; it < 6; it++) {
-      let imp = false;
-      for (const [p, k] of LOCK_VARS) {
-        const L = [-3.3, 3.3];                              // (the wrist/elbow limits made the hilt unreachable)
-        for (const sg of [1, -1]) {
-          const v0 = pose[p][k]; pose[p][k] = clamp(v0 + sg * step, L[0], L[1]);
-          const c = cost(); if (c < best - 1e-7) { best = c; imp = true; break; } pose[p][k] = v0;
-        }
-      }
-      if (!imp) break;
-    }
-  }
-  if (free) for (const p in free) for (let c = 0; c < 3; c++) pose[p][c] = lerp(free[p][c], pose[p][c], gw);   // eases onto / off the hilt
+  // exact: the left fist is placed on the hilt just below the right one, turned the same way (analytic arm IK)
+  const pose = s.pose, free = Object.fromEntries(['arm_L_upper', 'arm_L_lower', 'hand_L'].map((p) => [p, (pose[p] || [0, 0, 0]).slice()]));
+  s.pose = { ...pose };
+  reachFix(s, gw);
+  const fk0 = duelFK(s, 'enemy_ms');
+  const Hr = r3(fk0.hand_R), tgt = M.transformPoint([0, 0, 0], fk0.hand_R, GRIP_R);
+  const P = sub(tgt, r3v(Hr, GRIP_L));
+  s.gripReach = armIK(s, fk0, 'enemy_ms', 'L', P, Hr);
+  if (gw < 1) for (const p in free) s.pose[p] = [0, 1, 2].map((c) => lerp(free[p][c], s.pose[p][c], gw));   // eases onto / off the hilt
   const fk = duelFK(s, 'enemy_ms');
   s.twoHandErr = V.dist(M.transformPoint([0, 0, 0], fk.hand_L, GRIP_L), M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R));
   return s;
+}
+// ---------------------------------------------------------------- analytic arm IK (exact, per frame)
+// Rotations are 3×3 column-major arrays; the FK's Euler order is R = Ry(y)·Rx(x)·Rz(z).
+const r3 = (m) => [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]];
+const r3mul = (a, b) => { const o = new Array(9); for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) o[c * 3 + r] = a[r] * b[c * 3] + a[3 + r] * b[c * 3 + 1] + a[6 + r] * b[c * 3 + 2]; return o; };
+const r3T = (a) => [a[0], a[3], a[6], a[1], a[4], a[7], a[2], a[5], a[8]];
+const r3v = (a, v) => [a[0] * v[0] + a[3] * v[1] + a[6] * v[2], a[1] * v[0] + a[4] * v[1] + a[7] * v[2], a[2] * v[0] + a[5] * v[1] + a[8] * v[2]];
+const r3x = (t) => { const c = Math.cos(t), s = Math.sin(t); return [1, 0, 0, 0, c, s, 0, -s, c]; };
+function r3axis(ax, ang) {   // rotation about unit axis
+  const [x, y, z] = ax, c = Math.cos(ang), s = Math.sin(ang), k = 1 - c;
+  return [c + x * x * k, y * x * k + z * s, z * x * k - y * s, x * y * k - z * s, c + y * y * k, z * y * k + x * s, x * z * k + y * s, y * z * k - x * s, c + z * z * k];
+}
+function r3between(a, b) {   // minimal rotation taking direction a onto direction b
+  const u = nrm(a), v = nrm(b), ax = V.cross([0, 0, 0], u, v), sn = Math.hypot(ax[0], ax[1], ax[2]), cs = V.dot(u, v);
+  if (sn < 1e-9) return cs > 0 ? [1, 0, 0, 0, 1, 0, 0, 0, 1] : r3axis(nrm(Math.abs(u[0]) < 0.9 ? V.cross([0, 0, 0], u, [1, 0, 0]) : V.cross([0, 0, 0], u, [0, 1, 0])), Math.PI);
+  return r3axis(scl(ax, 1 / sn), Math.atan2(sn, cs));
+}
+const euler3 = (m) => [Math.asin(clamp(-m[7], -1, 1)), Math.atan2(m[6], m[8]), Math.atan2(m[1], m[4])];   // → [x, y, z]
+/**
+ * Place the wrist pivot of one arm at world point `P` with world hand rotation `Hw` (3×3), shoulder → elbow → wrist:
+ * the elbow hinge (lower rx) is solved from the reach distance, the upper arm is swung by the minimal rotation from
+ * its current pose (keeps the elbow's swivel), the wrist takes whatever rotation is left. Writes s.pose, returns the
+ * residual (m) — > 0 only when P is out of reach (the arm then points straight at it).
+ */
+function armIK(s, fk, model, side, P, Hw) {
+  const piv = PIV[model], up = 'arm_' + side + '_upper', lo = 'arm_' + side + '_lower', hd = 'hand_' + side;
+  const eOff = sub(piv[lo], piv[up]), wOff = sub(piv[hd], piv[lo]);
+  const S = M.transformPoint([0, 0, 0], fk.torso, sub(piv[up], piv.torso));
+  const T = r3(fk.torso), U0 = r3(fk[up]);
+  const reach = (th) => Math.hypot(...add(eOff, r3v(r3x(th), wOff)));
+  const d = V.dist(P, S), lim = JOINT_LIMITS[lo][0];
+  let th;
+  const hi = Math.min(0, lim[1]), lowTh = Math.max(-150 * DEG, lim[0]);
+  if (d >= reach(hi)) th = hi;
+  else if (d <= reach(lowTh)) th = lowTh;
+  else { let a = lowTh, b = hi; for (let i = 0; i < 40; i++) { const m = (a + b) / 2; if (reach(m) < d) a = m; else b = m; } th = (a + b) / 2; }
+  const vLoc = add(eOff, r3v(r3x(th), wOff));
+  const U = r3mul(r3between(r3v(U0, vLoc), sub(P, S)), U0);
+  const upL = euler3(r3mul(r3T(T), U));
+  const handL = euler3(r3mul(r3T(r3mul(U, r3x(th))), Hw));
+  s.pose[up] = upL; s.pose[lo] = [th, 0, 0]; s.pose[hd] = handL;
+  return Math.max(0, d - reach(hi));
+}
+// how far (m) the hilt sits beyond the left arm's reach (0 = the left fist can close on it)
+let _armReach = null;   // [min (elbow folded to 150°), max (straight)] shoulder → wrist distance, with a small margin
+const ARM_REACH_ = () => _armReach || (_armReach = (() => {
+  const piv = PIV.enemy_ms, e = sub(piv.arm_L_lower, piv.arm_L_upper), w = sub(piv.hand_L, piv.arm_L_lower);
+  return [Math.hypot(...add(e, r3v(r3x(-150 * DEG), w))) + 0.08, Math.hypot(...add(e, w)) - 0.05];
+})());
+function gripDeficit(fk) {
+  const Hr = r3(fk.hand_R), P = sub(M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R), r3v(Hr, GRIP_L));
+  const S = M.transformPoint([0, 0, 0], fk.torso, sub(PIV.enemy_ms.arm_L_upper, PIV.enemy_ms.torso));
+  const [lo, hi] = ARM_REACH_(), dist = V.dist(P, S);
+  return { d: dist > hi ? dist - hi : dist < lo ? lo - dist : 0, far: dist > lo, P, S };   // d: how far out of range (either way)
+}
+// a two-handed grip keeps the hilt near the centre line: if the sword arm has the hilt out of the left hand's reach,
+// the sword arm draws in (swung about its shoulder) until the left fist can close on it
+// Around its own sword contacts the blade must not leave the solved contact: there the whole machine shifts so the
+// blade pivots about the contact point instead (keep → 1 at the contact frame).
+const E_BLADE_T = { e1: [178.0], e2: [184.5, 186.0, 186.45, 187.6, 188.85, 189.08, 190.9] };
+function reachFix(s, w = 1) {
+  const upR = 'arm_R_upper', piv = PIV.enemy_ms, t = s._t ?? 0, who = t < 180.25 ? 'e1' : 'e2';
+  let keep = 0; for (const te of E_BLADE_T[who]) keep = Math.max(keep, 1 - smooth(0.04, 0.4, Math.abs(t - te)));
+  let hw = null;
+  if (keep > 0) { const hs = duelHero(t); if (hs) { const H = duelFK({ ...hs, saber: Math.max(hs.saber, 1e-3) }, 'gundam'); hw = H.saber; } }
+  for (let it = 0; it < 4; it++) {
+    const fk = duelFK(s, 'enemy_ms'), g = gripDeficit(fk);
+    if (g.d <= 0.01) return;
+    const SR = M.transformPoint([0, 0, 0], fk.torso, sub(piv[upR], piv.torso));
+    const X = g.P, X2 = add(X, scl(nrm(sub(g.S, X)), (g.d + 0.06) * w * (g.far ? 1 : -1)));   // too far: draw in; jammed: push out
+    const A = r3between(sub(X, SR), sub(X2, SR));
+    s.pose[upR] = euler3(r3mul(r3T(r3(fk.torso)), r3mul(A, r3(fk[upR]))));
+    if (hw) {   // the contact point on the blade (nearest the hero's weapon) goes back where it was
+      const Xa = segSeg(hw[0], hw[1], fk.saber[0], fk.saber[1]).c2, Xb = add(SR, r3v(A, sub(Xa, SR)));
+      s.pos = add(s.pos, scl(sub(Xa, Xb), keep));
+    }
+  }
 }
 function twoHand(s) {
   return gripLock(s);
@@ -1139,7 +1300,7 @@ function duelEnemy1_(t) {
   const bk = smooth(172.8, 172.95, tw) * (1 - smooth(173.45, 173.6, tw));
   if (bk > 0) { const c = Math.pow(Math.max(0, Math.sin((tw - 172.85) * Math.PI * 2 * 1.45)), 2);
     _pose[PIDX.hand_L] += 0.75 * c * bk; _pose[PIDX.arm_L_lower] += 0.22 * c * bk; }
-  s._grip = 1 - smooth(172.35, 172.6, tw) * (1 - smooth(173.7, 174.2, tw));   // left hand off the hilt for the taunt
+  s._grip = (1 - smooth(172.35, 172.6, tw) * (1 - smooth(173.7, 174.2, tw))) * (1 - smooth(179.02, 179.12, tw));   // left hand off the hilt for the taunt / when smashed
   s._idle = e1K;
   s.anchor = s.pos.slice();
   if (e1K > 0) s.pos = add(s.pos, [Math.sin(t * 0.8 + 2) * 0.12 * e1K, Math.sin(t * 1.1 + 1.3) * 0.4 * e1K, Math.sin(t * 0.6) * 0.12 * e1K]);
@@ -1167,7 +1328,7 @@ const _c_duelEnemy2 = new Map();
 export function duelEnemy2(t) {
   if (!STATE_CACHE) return duelEnemy2_(t);
   let r = _c_duelEnemy2.get(t);
-  if (r === undefined) { r = duelEnemy2_(t); if (AUTO_READY && r) r = applyImpulses('e2', t, r); if (_c_duelEnemy2.size > 64) _c_duelEnemy2.clear(); _c_duelEnemy2.set(t, r); }
+  if (r === undefined) { r = weaponConstrain('e2', t, enemyFree('e2', t)); if (_c_duelEnemy2.size > 64) _c_duelEnemy2.clear(); _c_duelEnemy2.set(t, r); }
   return r;
 }
 function duelEnemy2_(t) {
@@ -1180,17 +1341,19 @@ function duelEnemy2_(t) {
   const co = collisionOffset('e2', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => e2RawPos(warp(x)), t); s._pf = (x) => e2RawPos(warp(x)); s._t = t;
   springPose(e2Pose, tw, _pose); e2Imp(tw, _pose);
-  const dk = E2_DIVE(tw);
+  const dk = Math.max(E2_DIVE(tw), E2_FLIP(tw));
   { const pre = dk > 0 ? Float64Array.from(_pose) : null;
     e2Squash(tw, _pose); weightShift(e2Pose, tw, _pose, 'arm_R_upper');
     if (pre) for (let i = 0; i < _pose.length; i++) _pose[i] = lerp(_pose[i], pre[i], dk); }
   micro(t, _pose, 3.7, (tw > 192.4 ? 0.3 : 1) * (1 - dk));
   s._idle = dk;
+  s._grip = (1 - smooth(184.6, 184.72, tw) * (1 - smooth(185.55, 185.72, tw))) * (1 - smooth(192.45, 192.6, tw));   // free hand off for the somersault / cut down
   _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
   _pose[PIDX._body] += e2Flip(tw);
   const h = heroRawPos(Math.min(tw, 192.4));
-  let f = flat(sub(h, s.pos), tw < 184.6 ? 0.8 : 0.35);
-  if (dk > 0) f = nrm(lrp(f, flat(sub(heroRawPos(184.5), s.pos), 0.8), dk));   // aims at where it will strike, not at the wobble
+  // over the top (184–185.6): upright, heading level — it cuts DOWN at Sigma and turns over in a clean vertical somersault
+  let f = flat(sub(h, s.pos), tw < 184.0 ? 0.8 : lerp(0.35, 0.05, smooth(183.95, 184.2, tw) * (1 - smooth(185.55, 185.85, tw))));
+  const dv = E2_DIVE(tw); if (dv > 0) f = nrm(lrp(f, flat(sub(heroRawPos(184.5), s.pos), 0.8), dv));   // aims at where it will strike, not at the wobble
   if (tw > 192.4) {
     const u = tw - 192.4;
     f = yawRot(f, -u * 0.35);
@@ -1324,10 +1487,15 @@ function bladeIntrusion(blade, fk, model, margin = 0.6) {
   for (const [p, l, r] of BODY_VOL[model]) { const d = segPoint(blade[0], blade[1], partPoint(fk, p, l)).d; pen += Math.max(0, r + margin - d); }
   return pen;
 }
+let REACH_W = 1;   // contact solve pass 1: contact only (0); pass 2: contact + two-hand reach (1)
 function contactCost(ev, t) {
   const foe = t < 180.25 ? 'e1' : 'e2';
   const H = fkAt('hero', t), E = fkAt(foe, t);
   const F = { hero: H, e1: E, e2: E };
+  const own = ev.kind === 'blade-blade' || (ev.kind === 'blade-part' && ev.blade !== 'hero');   // RONIN's sword is in play
+  return contactCost_(ev, t, H, E, F) + REACH_W * (own && GRIP_ON[foe](t) ? 4 * Math.max(0, gripDeficit(E).d) : 0);   // two hands stay on the hilt
+}
+function contactCost_(ev, t, H, E, F) {
   if (ev.kind === 'blade-blade') {
     const r = segSeg(H.saber[0], H.saber[1], E.saber[0], E.saber[1]);
     return r.d + 8 * (band(r.s, ev.hs?.[0] ?? 0.3, ev.hs?.[1] ?? 0.85) + band(r.t, ev.es?.[0] ?? 0.3, ev.es?.[1] ?? 0.85))
@@ -1389,12 +1557,12 @@ const SOLVE = [
   { t: 178.2, kind: 'part-part', a: ['hero', 'leg_L_lower', [0, 0, 1]], b: ['e1', 'torso', [0, 0, 2.4]], gap: 0.8, adj: [['hero', 'pos', D1, 5], ['hero', 'pos', [0, 1, 0], 3], ['hero', 'pos', L1, 2], ['hero', 'pose', 'leg_L_upper', 0], ['hero', 'pose', 'leg_L_upper', 1]] },
   { t: 178.55, kind: 'part-part', a: ['hero', 'foot_R', [0, -1, 0.5]], b: ['e1', 'torso', [0, 1, 2.4]], gap: 0.8, adj: [['hero', 'pos', D1, 6], ['hero', 'pos', [0, 1, 0], 3], ['hero', 'pose', 'leg_R_upper', 0]] },
   { t: 179.0, kind: 'blade-part', blade: 'hero', part: ['e1', 'torso', [0, 1, 0]], u: [0.6, 0.78], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'arm_L_lower', 0], ['hero', 'pose', 'hand_L', 0], ['hero', 'pos', D1, 5], ['hero', 'pos', [0, 1, 0], 4], ['e1', 'pos', [0, 1, 0], 3], ['e1', 'pos', D1, 4], ['hero', 'pose', 'torso', 0]] },
-  { t: 184.5, kind: 'blade-blade', hs: [0.3, 0.6], es: [0.35, 0.8], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['hero', 'pose', 'arm_L_upper', 1], ['e2', 'pos', [0, -0.7, 0.7], 5]] },
-  { t: 186.0, kind: 'blade-blade', hs: [0.45, 0.85], es: [0.25, 0.6], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0]] },
-  { t: 186.45, kind: 'blade-blade', hs: [0.45, 0.85], es: [0.25, 0.6], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0]] },
+  { t: 184.5, kind: 'blade-blade', hs: [0.12, 0.34], es: [0.4, 0.75], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'torso', 0], ['e2', 'pos', [0, 1, 0], 5], ['e2', 'pos', [0, 0, 1], 5], ['e2', 'pos', [1, 0, 0], 4]] },   // on the SHAFT
+  { t: 186.0, kind: 'blade-blade', hs: [0.45, 0.85], es: [0.25, 0.6], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'torso', 1]] },
+  { t: 186.45, kind: 'blade-blade', hs: [0.45, 0.85], es: [0.25, 0.6], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'hand_R', 1], ['e2', 'pose', 'torso', 1], ['e2', 'pos', [1, 0, 0], 3], ['e2', 'pos', [0, 1, 0], 3]] },
   { t: 187.6, kind: 'blade-blade', hs: [0.25, 0.6], es: [0.45, 0.85], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'arm_L_lower', 0], ['hero', 'pose', 'hand_L', 1]] },
   { t: 188.2, kind: 'part-part', a: ['hero', 'arm_R_upper', [0, 0, 0]], b: ['e2', 'torso', [0, 1.5, 2.2]], gap: 3.6, adj: [['hero', 'pos', TO_E2, 6], ['hero', 'pos', [1, 0, 0], 4], ['hero', 'pos', [0, 1, 0], 3]] },
-  ...[188.85, 189.08].map((t) => ({ t, kind: 'blade-blade', hs: [0.2, 0.45], es: [0.2, 0.5], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'hand_R', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0]] })),
+  ...[188.85, 189.08].map((t) => ({ t, kind: 'blade-blade', hs: [0.2, 0.45], es: [0.2, 0.5], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'torso', 1], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0]] })),
   { t: 189.45, kind: 'part-part', a: ['e2', 'foot_L', [0, -1, 0.5]], b: ['hero', 'torso', [0, 1, 3.2]], gap: 0.8, adj: [['e2', 'pos', [0, 0, 1], 6], ['e2', 'pos', [0, 1, 0], 3], ['e2', 'pos', [1, 0, 0], 3], ['e2', 'pose', 'leg_L_upper', 0], ['e2', 'pose', 'leg_L_upper', 1], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0], ['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'hand_R', 0]] },
   { t: 190.9, kind: 'blade-blade', hs: [0.2, 0.5], es: [0.45, 0.85], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0], ['hero', 'pose', 'arm_L_lower', 0]] },
   { t: 192.4, kind: 'blade-part', blade: 'hero', part: ['e2', 'torso', [0, 1, 0]], u: [0.6, 0.78], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'arm_L_lower', 0], ['hero', 'pose', 'hand_L', 0], ['e2', 'pos', [1, 0, 0], 4], ['e2', 'pos', [0, 1, 0], 4], ['e2', 'pos', [0, 0, 1], 4]] },
@@ -1434,17 +1602,20 @@ function gripBake(who, t, parts, wBlade) {
   return Math.sqrt(gripErr(fkAt(who, t)));
 }
 const ARMS_BOTH = ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R'], ARM_L = ['arm_L_upper', 'arm_L_lower', 'hand_L'];
-const GRIP_ON = { e1: (t) => t >= 170 && t <= 179.9 && !(t > 172.4 && t < 174.2), e2: (t) => t >= 181.5 && t <= 192.6 };
+const GRIP_ON = { e1: (t) => t >= 170 && t <= 179.02 && !(t > 172.4 && t < 174.2), e2: (t) => t >= 180.8 && t <= 192.45 && !(t > 184.58 && t < 185.62) };
 export const GRIP_REPORT = [];
 for (const who of ['e1', 'e2']) for (const k of TRACKS[who].pose.keys) if (GRIP_ON[who](k[0])) GRIP_REPORT.push([who, k[0], +gripBake(who, k[0], [...ARMS_BOTH, 'torso'], 0.04).toFixed(2)]);
 export const SOLVE_REPORT = SOLVE.map((ev) => {
-  const residual = solveContact(ev);
+  REACH_W = 0; solveContact(ev);
+  REACH_W = 1; const residual = solveContact(ev);
   for (const tc of ev.copyTo || []) {   // hold the solved aim steady from the end of the raise to the shot
     const src = keyAt(TRACKS.hero.pose, ev.t), dst = keyAt(TRACKS.hero.pose, tc);
     for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R', 'torso']) for (let c = 0; c < 3; c++) dst[1][PIDX[p] + c] = src[1][PIDX[p] + c];
     TRACKS.hero.pose.dirty = true;
   }
-  return { t: ev.t, kind: ev.kind, residual };
+  const foe = ev.t < 180.25 ? 'e1' : 'e2';
+  SOLVING = true; const H = fkAt('hero', ev.t), E = fkAt(foe, ev.t); const contact = contactCost_(ev, ev.t, H, E, { hero: H, e1: E, e2: E }), reach = gripDeficit(E).d; SOLVING = false;
+  return { t: ev.t, kind: ev.kind, residual, contact, reach };
 });
 // contact keys: the right arm now holds the solved blade — close the left fist on the hilt with the left arm only
 for (const ev of SOLVE) for (const who of ['e1', 'e2']) {
@@ -1500,6 +1671,7 @@ const hpA = (t) => duelHero(t).anchor || hp(t), e1A = (t) => duelEnemy1(Math.min
 const up = (p, h) => [p[0], p[1] + h, p[2]];
 const evShake = (t, list, decay = 5) => { let s = 0; for (const e of [...DUEL_EVENTS, ...(AUTO_READY ? AUTO_FX : [])]) { if (list && !list.includes(e.type)) continue; if (t >= e.t && t < e.t + 1.2) s = Math.max(s, e.strength * Math.exp(-(t - e.t) * decay)); } return s; };
 const evFlash = (t) => { let f = 0; for (const e of DUEL_EVENTS) { if (e.type === 'shake' || e.type === 'spark') continue; const d = t - e.t; if (d >= 0 && d < 0.09) f = Math.max(f, 0.35 * e.strength); } return f; };
+const evPos = (te) => DUEL_EVENTS.find((e) => Math.abs(e.t - te) < 1e-6).pos;
 // side vector of a two-shot line (perpendicular, horizontal)
 const sideOf = (a, b) => { const d = nrm(sub(b, a)); return nrm([d[2], 0, -d[0]]); };
 function two(a, b, { side = 1, dist = 1.6, lift = 4, along = 0.5, fov = 40, bias = 0.5 } = {}) {
@@ -1542,11 +1714,14 @@ export const DUEL_CAMS = [
   { t0: 181.6, t1: 182.6, name: 'D11b the shadow', fn: (t, u) => { const h = hp(t); const e = e2p(t); const f = nrm(duelHero(t).fwd); const sd = nrm([f[2], 0, -f[0]]); return { pos: add(add(h, scl(f, -16)), add(scl(sd, 12), [0, -3, 0])), target: lrp(up(h, 30), e, 0.97), fov: 24 - u * 5, roll: 0.05, handheld: 0.2 }; } },
   { t0: 182.6, t1: 183.6, name: 'D12 the dive', fn: (t, u) => { const h = hp(t); const e = e2p(t); const d = nrm(sub(h, e)); const sd = nrm([d[2], 0, -d[0]]); return { pos: add(add(e, scl(d, -18)), add(scl(sd, 7), [0, 4, 0])), target: lrp(e, up(h, 6), 0.6), fov: 58 + u * 10, roll: 0.35 * Math.sin(u * 2), handheld: 0.6 }; } },
   { t0: 183.6, t1: 184.45, name: 'D13 saber ignite close', fn: (t, u) => { const s = duelHero(t); const fk = duelFK({ ...s, saber: 1 }, 'gundam'); const hand = partPoint(fk, 'hand_L'); const f = nrm(s.fwd); const sd = [f[2], 0, -f[0]]; return { pos: add(add(hand, scl(f, 9)), add(scl(sd, 7 - u * 2), [0, 1, 0])), target: lrp(hand, fk.saber[1], 0.25), fov: 34 }; } },
-  { t0: 184.45, t1: 185.4, name: 'D14 overhead impact wide', fn: (t, u) => two(hp(t), e2p(t), { side: -1, dist: 1.2, lift: -4, fov: 44, bias: 0.5 }) },
+  // low behind Sigma, looking up past the mace held flat overhead at RONIN coming down on it; eases back and tilts up as
+  // it is thrown off and turns over (the heading is fixed at the cut, the frame follows the somersault slowly)
+  { t0: 184.45, t1: 185.75, name: 'D14 shaft block + somersault', fn: (t, u) => { const h = hp(t), e = e2p(t), d0 = flat(sub(e2p(184.45), hp(184.45)), 0), sd = [d0[2], 0, -d0[0]];
+    return { pos: add(add(h, scl(d0, -28 - 6 * easeInOut(u))), add(scl(sd, -22 - 4 * easeInOut(u)), [0, 3 + 2 * u, 0])), target: lrp(up(h, 9), e, 0.5 + 0.15 * easeInOut(u)), fov: 46, handheld: 0.12 }; } },
   // ---- sword exchange
-  { t0: 185.4, t1: 186.3, name: 'D15 profile dash + S1', fn: (t, u) => two(hp(t), e2p(t), { side: 1, dist: 1.25, lift: 4, fov: 38, bias: 0.45 }) },
+  { t0: 185.75, t1: 186.3, name: 'D15 profile dash + S1', fn: (t, u) => { const c = two(hp(t), e2p(t), { side: 1, dist: 1.3, lift: 4, fov: 40, bias: 0.45 }); return { ...c, target: lrp(c.target, evPos(186.0), 0.45) }; } },   // the clash in frame
   { t0: 186.3, t1: 187.0, name: 'D16 OTS E2 → hero', fn: (t) => ots(e2p(t), hp(t), { right: -1, back: 30, lift: 8, fov: 42, side: 17 }) },
-  { t0: 187.0, t1: 187.75, name: 'D17 low angle duck', fn: (t, u) => { const h = hp(t), e = e2p(t); const m = lrp(h, e, 0.4), sd = sideOf(h, e); return { pos: add(add(m, scl(sd, 26)), [0, -12, 0]), target: up(m, 6), fov: 44, roll: 0.14 }; } },
+  { t0: 187.0, t1: 187.75, name: 'D17 low angle duck', fn: (t, u) => { const h = hp(t), e = e2p(t); const m = lrp(h, e, 0.4), sd = sideOf(h, e); return { pos: add(add(m, scl(sd, 30)), [0, -12, 0]), target: lrp(up(m, 6), evPos(187.6), 0.45), fov: 46, roll: 0.14 }; } },
   { t0: 187.75, t1: 188.5, name: 'D18 wide shoulder charge', fn: (t) => two(hp(t), e2p(t), { side: -1, dist: 1.8, lift: 8, fov: 42, bias: 0.55 }) },
   { t0: 188.5, t1: 189.4, name: 'D19 blade-lock close-up', fn: (t, u) => { const ev = DUEL_EVENTS.find((e) => e.t === 188.85); const X = ev.pos; const h = hp(t), e = e2p(t); const sd = sideOf(h, e); return { pos: add(add(X, scl(sd, 30 - u * 4)), [0, 1, 0]), target: lrp(X, lrp(up(h, 8), up(e, 8), 0.5), 0.4), fov: 38 }; } },
   { t0: 189.4, t1: 190.0, name: 'D20 kick', fn: (t) => two(hp(t), e2p(t), { side: 1, dist: 1.5, lift: 2, fov: 40, bias: 0.4 }) },
@@ -1567,7 +1742,7 @@ export function duelCamera(t) {
   const focus = k.target;
   return {
     name: c.name, pos: k.pos, target: k.target, fov: k.fov ?? 40, roll: k.roll ?? 0,
-    shake, shakeFreq: 14, handheld: k.handheld ?? 0.25, flash: evFlash(t), blur: 0.0015 * evShake(t, ['clash', 'hit'], 8),
+    shake, shakeFreq: 9, handheld: k.handheld ?? 0.25, flash: evFlash(t), blur: 0.0015 * evShake(t, ['clash', 'hit'], 8),
     slowmo: !!c.slowmo, focus, shadowRadius: 70,
   };
 }
@@ -1597,7 +1772,6 @@ const HITBOX = {
     ...capsL('leg_L_lower', [0, 0, 0], [0.79, -4.38, -0.11], 1.1), ...capsL('foot_L', [0, -0.5, 0.1], [0, -1.1, 1.3], 0.9),
   ],
 };
-const WEAPON = { hero: { shaft: 0.45, head: 2.1, headFrom: 0.78 }, e1: { shaft: 0.3 }, e2: { shaft: 0.3 } };
 function capsules(who, s) {
   const model = MODEL[who], fk = duelFK({ ...s, saber: Math.max(s.saber, 1e-3) }, model), out = [];
   for (const [part, a, b, r] of HITBOX[model]) out.push({ who, part, kind: 'body', a: M.transformPoint([0, 0, 0], fk[part], a), b: M.transformPoint([0, 0, 0], fk[part], b), r });
@@ -1624,7 +1798,8 @@ export const AUTO_CONTACTS = (() => {
       for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++) {
         const ca = A[i], cb = B[j];
         if (ca.kind === 'body' && cb.kind === 'body' && (ca.part === 'pelvis' || cb.part === 'pelvis')) continue;
-        const q = segSeg(ca.a, ca.b, cb.a, cb.b), depth = ca.r + cb.r - q.d, key = i * 64 + j;
+        const q = segSeg(ca.a, ca.b, cb.a, cb.b), key = i * 64 + j;
+        const depth = ca.r + cb.r - q.d + (ca.kind === 'weapon' && cb.kind === 'weapon' ? 0.08 : 0);   // solid weapons only ever touch
         const was = prevIn.get(key) || false, now = depth > 0;
         prevIn.set(key, now);
         if (!now || was) continue;

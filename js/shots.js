@@ -2,7 +2,7 @@
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
 import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
-import { storyT, tearU, slowSpeed, FILM_DURATION } from './timemap.js';
+import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
 import {
@@ -1472,7 +1472,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   c.post.lensA = { enable: 0 };   // distant ships they only washed the hulls out white)   the well is far away: no background lensing (it smeared the planet into grey)
   if (k.slowmo) { c.post.saturation = 0.75; c.post.streak = 0.45; c.post.gradeHighlights = [1.2, 1.0, 0.85]; }
   { // bullet time: the picture drains a little and the edges fall away while time crawls
-    const bs = sat((0.75 - slowSpeed(FILM_NOW)) / 0.5);
+    const bs = slowHit(FILM_NOW);
     if (bs > 0) { c.post.saturation = lerp(c.post.saturation ?? 0.9, 0.62, bs); c.post.vignette = lerp(c.post.vignette ?? 0.8, 1.25, bs); c.post.contrast = lerp(c.post.contrast ?? 1.08, 1.16, bs); c.post.streak = Math.max(c.post.streak ?? 0, 0.4 * bs); }
   }
   // ---- the second RONIN from above (180.9–184.4): sensor spike → a silhouette against the light → the dive
