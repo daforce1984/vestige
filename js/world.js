@@ -97,9 +97,11 @@ export function modelLen(R, name) { const b = R.models[name]?.bounds; return b ?
 export function modelSize(R, name) { const b = R.models[name]?.bounds; return b ? [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]] : [20, 20, 50]; }
 
 // ------------------------------------------------------------------ fleet kinematics
+export const MOTHER_SNAP_T = 70;   // the cut from 'B1 red alert' to 'B2 the well switches on'
 export function motherYaw(t) {
   const final = Math.atan2(DREAD[0], DREAD[2]);
-  let y = lerp(0, final, easeInOut(sat((t - 66) / 24)));      // slow, heavy turn to face the enemy (66–90)
+  let y = t < MOTHER_SNAP_T ? 0 : final;                      // faces the enemy: switched on the cut after scene 8 (70 s) —
+  // the old slow turn (66–90) was seen from the hull camera in scene 8; now it happens between shots, never on camera
   let home = HOME_YAW; while (home - y > Math.PI) home -= 2 * Math.PI; while (home - y < -Math.PI) home += 2 * Math.PI;
   return lerp(y, home, easeInOut(sat((t - 330) / 22)));
 }
