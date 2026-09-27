@@ -723,7 +723,7 @@ function drawBreakup(R, t, idx) {
 }
 function drawEnemyMS(R, t, s, idx) {
   if (idx === 2 && t > E2_FIN + 0.03 && t < 200) { drawBreakup(R, t, 2); return null; }
-  if (idx === 1 && t > E1_FIN + 0.05 && t < 195) { drawBreakup(R, t, 1); return null; }
+  if (idx === 1 && t > E1_FIN + 0.05 && t < 200) { drawBreakup(R, t, 1); return null; }   // pieces stay until the duel's last cut (195 was mid-shot)
   if (!s.vis) return null;
   const e = R.add('enemy_ms', msMatrix(tmpM, s));
   if (!e) return null;
@@ -2176,7 +2176,9 @@ export function frame(R, film) {
     drawMSBattle(R, wt);
     drawLanceAndCannon(R, wt, ctx);
     drawImplosion(R, wt, ctx);
-    if (ctx.debris || (wt > 280 && wt < 346)) drawDebrisField(R, wt);
+    // the drifting field after the shockwave: switched only ON A CUT (the shots from S18a to F1) — it used to pop in at
+    // 280.0 (inside 'S17d engulfed') and vanish at 346.0 (inside 'F1 the jump'), in view
+    { const sh = findShot(wt); if (ctx.debris || (ctx.worldT === undefined && sh && sh.t0 >= DEBRIS_S0 && sh.t0 < DEBRIS_S1)) drawDebrisField(R, wt); }
     if (ctx.worldT === undefined && t > 62 && t < IMPLODE + 0.5 && !ctx.post.lensA) ctx.post.lensA = wellLens(ctx, wellMass(t), 1.2, true, 1);
     drawShield(R, wt, ctx);
     drawDodgeBolt(R, wt);
@@ -2399,6 +2401,7 @@ function astOnly(R, name) {
   const h = {}; for (const p of R.models.asteroids.parts) if (p.name !== name && p.name !== '__root') h[p.name] = 1;
   return (_astHidden[name] = h);
 }
+const DEBRIS_S0 = 280.2, DEBRIS_S1 = 347.3;   // shot starts: 'S18a shockwave' … (up to, not incl.) 'F2 HOME'
 function drawDebrisField(R, t) {
   const base = addv(WELL, [40, 60, -1150]);
   const m = M.new();
