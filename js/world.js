@@ -922,7 +922,15 @@ function drawWell(R, t, tmpM) {
   if (!e) return;
   e.pose = { ring: [0, 0, t * 0.25 * (0.3 + on)], pylons: [0, 0, -t * 0.05] };
   e.emissive = 0.05 + on * 0.18;    // dark machine: no neon
-  e.matOverride = { violet: { base: [0.05, 0.05, 0.06], metal: 0.8, rough: 0.4, emissive: [0.35 * on, 0.3 * on, 0.28 * on] } };
+  // running lights on the ring (port lamps + collar / spike beacons): dim standby lights on the dormant machine, a
+  // stuttering power-up when it switches on at 70, then steady lamps and slow beacon pulses. Material emissive is
+  // multiplied by e.emissive in the shader, so the absolute values are divided by it here.
+  const ek = e.emissive || 1, dead = t > 272.5 ? Math.max(0, 1 - (t - 272.5) / 1.5) : 1;
+  const up = smooth(70.0, 70.5, t), stut = t > 70 && t < 71.2 ? 0.55 + 0.45 * Math.sign(Math.sin(t * 57) + Math.sin(t * 23.3)) : 1;
+  const lamp = (0.14 + 0.86 * up * stut) * dead, beacon = (0.2 + 0.8 * up) * (0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(t * 2.1), 3)) * dead;
+  e.matOverride = { violet: { base: [0.05, 0.05, 0.06], metal: 0.8, rough: 0.4, emissive: [0.35 * on, 0.3 * on, 0.28 * on] },
+    gw_lamp: { base: [0.85, 0.82, 0.95], metal: 0, rough: 0.2, emissive: [2.4 * lamp / ek, 2.2 * lamp / ek, 2.8 * lamp / ek] },
+    gw_beacon: { base: [0.7, 0.35, 0.95], metal: 0, rough: 0.2, emissive: [2.8 * beacon / ek, 1.1 * beacon / ek, 3.6 * beacon / ek] } };
   e.seed = 9;
   if (t > 273) {                                  // crumpled in by the mace blow, caving further as it collapses
     const c = [WELL[0], WELL[1] - 4, WELL[2] - 22];

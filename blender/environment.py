@@ -14,6 +14,9 @@ def gw_palette():
     reg('gw_trim', (0.22, 0.2, 0.24), 0.9, 0.25)
     reg('core', (0.002, 0.002, 0.003), 0.9, 0.08)
     reg('violet', (0.2, 0.05, 0.35), 0.0, 0.3, (0.62, 0.22, 1.0), 4.0)
+    # running lights (the renderer drives their brightness): cool white-violet port lamps, violet beacons
+    reg('gw_lamp', (0.85, 0.82, 0.95), 0.0, 0.2, (0.9, 0.82, 1.0), 4.0)
+    reg('gw_beacon', (0.7, 0.35, 0.95), 0.0, 0.2, (0.75, 0.3, 1.0), 4.0)
 
 
 def polar(r, a, y):
@@ -61,6 +64,10 @@ def gravity_well():
         aj = i / NSEG * 2 * math.pi
         ring_block(mb, RI - 2.5, RO + 5, aj - 1.8 * D2R, aj + 1.8 * D2R, -DEP / 2 - 2.5, DEP / 2 + 2.5, 'gw_trim',
                    bevel=0.3)
+        # collar beacon on each face, at the collar's outer end
+        for sy in (1, -1):
+            ring_block(mb, 107.2, 110.4, aj - 0.95 * D2R, aj + 0.95 * D2R, sy * (DEP / 2 + 2.5), sy * (DEP / 2 + 3.1), 'gw_dark')
+            ring_block(mb, 107.8, 109.8, aj - 0.6 * D2R, aj + 0.6 * D2R, sy * (DEP / 2 + 3.1), sy * (DEP / 2 + 3.3), 'gw_beacon')
         # big outward spike per segment, smaller pair beside
         base = polar(RO + 3, am, 0)
         tip = polar(RO + 34, am, 0)
@@ -69,6 +76,15 @@ def gravity_well():
             _spike(mb, am + off * D2R, RO + 3, RO + 16, 3.0, 2.4, 'gw_metal')
         # violet glow slit on spike root
         ring_block(mb, RO + 3.4, RO + 10, am - 0.6 * D2R, am + 0.6 * D2R, -1.2, 1.2, 'violet')
+        # nav beacon near the big spike's tip (a small lit band round the tapering spike)
+        ring_block(mb, RO + 27.5, RO + 28.7, am - 0.55 * D2R, am + 0.55 * D2R, -1.05, 1.05, 'gw_beacon')
+        # ---- running lights (small, recessed — they follow the plates and collars, the silhouette is unchanged)
+        # port lamps: a row of 6 on each face plate, just outside the violet strip — dark bezel, bright lens set in it
+        for sy in (1, -1):
+            for k in range(6):
+                ak = lerp(a0 + 4.5 * D2R, a1 - 4.5 * D2R, k / 5)
+                ring_block(mb, 100.0, 102.2, ak - 0.85 * D2R, ak + 0.85 * D2R, sy * (DEP / 2 + 1.2), sy * (DEP / 2 + 1.55), 'gw_dark')
+                ring_block(mb, 100.4, 101.8, ak - 0.55 * D2R, ak + 0.55 * D2R, sy * (DEP / 2 + 1.55), sy * (DEP / 2 + 1.7), 'gw_lamp')
         # rear radiator fins (+Y side)
         for k in range(3):
             ak = lerp(a0, a1, (k + 1) / 4)
