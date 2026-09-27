@@ -746,7 +746,14 @@ function drawEnemyMS(R, t, s, idx) {
   heavyDamage(R, t, e, idx);
   const eye = emitWorld(R, 'enemy_ms', e, 'eye');
   const eyeFl = idx === 1 ? 1 + 1.6 * smooth(174.75, 174.9, t) * (1 - smooth(175.15, 175.6, t)) : 1;   // the standoff: its eye flares
-  if (eye) R.glow(eye, 1.6, [3.5 * eyeFl, 0.3 * eyeFl, 1.2 * eyeFl], 0.3);
+  if (eye) {   // one thin VISOR line across the face (the mesh strip, x ±0.8 along the helmet curve) — a row of small glows, no round eye
+    const hm = R.partWorld('enemy_ms', e, 'head'), q = [0, 0, 0];
+    for (let i = 0; i <= 10; i++) {
+      const x = -0.78 + 1.56 * i / 10;
+      M.transformPoint(q, hm, [x, 1.11, 1.39 - 0.55 * x * x + 0.05]);
+      R.glow(q, 0.22 * (0.8 + 0.2 * eyeFl), [2.4 * eyeFl, 0.22 * eyeFl, 0.85 * eyeFl], 0.2);
+    }
+  }
   // (no extra beam blade: RONIN already carries its own katana)
   return e;
 }
