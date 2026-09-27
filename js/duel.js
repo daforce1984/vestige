@@ -1075,12 +1075,15 @@ function maceCaps(hs) {
   const H = duelFK({ ...hs, saber: Math.max(hs.saber, 1e-3) }, 'gundam'), [a, b] = H.saber;
   return [[a, b, WEAPON.hero.shaft], [lrp(a, b, WEAPON.hero.headFrom), b, WEAPON.hero.head]];
 }
-function approachNormal(who, t, cap, rs) {   // unit normal (mace → katana) from the last frames the two were clearly apart
+// the mace is one rigid body: one side for the katana to stay on, taken (mace axis → katana) from the last frame
+// where the katana was clearly clear of both the haft and the head
+function approachNormal(who, t) {
   for (let k = 1; k <= 12; k++) {
     const tt = t - k / 24, hs = duelHero_(tt), es = enemyFree(who, tt);
     if (!hs || !es || !es.vis || !(es.saber > 0.5)) break;
-    const c = maceCaps(hs)[cap], E = duelFK(es, 'enemy_ms'), q = segSeg(c[0], c[1], E.saber[0], E.saber[1]);
-    if (q.d > rs * 0.7) return nrm(sub(q.c2, q.c1));
+    const caps = maceCaps(hs), E = duelFK(es, 'enemy_ms');
+    const clear = caps.every((c) => segSeg(c[0], c[1], E.saber[0], E.saber[1]).d > (c[2] + KATANA_R) * 0.7);
+    if (clear) { const q = segSeg(caps[0][0], caps[0][1], E.saber[0], E.saber[1]); return nrm(sub(q.c2, q.c1)); }
   }
   return null;
 }
@@ -1088,7 +1091,8 @@ function weaponConstrain(who, t, s) {
   if (!s || !s.vis || !(s.saber > 0.5)) return s;
   const hs = duelHero(t);
   if (!hs || !(hs.saber > 0.5)) return s;
-  const caps = maceCaps(hs), piv = PIV.enemy_ms, normals = [null, null];
+  const caps = maceCaps(hs), piv = PIV.enemy_ms;
+  let side;
   let out = s;
   for (let it = 0; it < 10; it++) {
     const E = duelFK(out, 'enemy_ms');
@@ -1096,7 +1100,8 @@ function weaponConstrain(who, t, s) {
     caps.forEach((c, i) => {
       const rs = c[2] + KATANA_R, q = segSeg(c[0], c[1], E.saber[0], E.saber[1]);
       if (q.d >= rs) return;
-      const n = normals[i] || (normals[i] = approachNormal(who, t, i, rs) || (q.d > 1e-4 ? nrm(sub(q.c2, q.c1)) : null));
+      if (side === undefined) side = approachNormal(who, t);
+      const n = side || (q.d > 1e-4 ? nrm(sub(q.c2, q.c1)) : null);
       if (!n) return;
       const depth = rs - V.dot(sub(q.c2, q.c1), n);
       if (depth > 0.002 && (!best || depth > best.depth)) best = { depth, n, x: q.c2 };
