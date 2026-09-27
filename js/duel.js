@@ -1546,7 +1546,7 @@ export const DUEL_CAMS = [
   { t0: 175.5, t1: 176.4, name: 'D05b his visor', fn: (t, u) => { const s = duelHero(t), fk = duelFK({ ...s, saber: 1 }, 'gundam'), hd = partPoint(fk, 'head', [0, 0.6, 0]);
     const d = nrm(sub(e1A(175.5), hpA(175.5))), sd = [d[2], 0, -d[0]];
     return { pos: add(add(hd, scl(d, 10 - u * 2.5)), add(scl(sd, -3.5), [0, 0.6, 0])), target: hd, fov: 30 - u * 3, handheld: 0.02, baseShake: 0 }; } },
-  { t0: 176.4, t1: 177.5, name: 'D06 profile — the charge', fn: (t, u) => { const c = two(hp(t), e1p(t), { side: 1, dist: 0.9, lift: 5, fov: 44, bias: 0.55 }); return { ...c, handheld: 0.3 }; } },
+  { t0: 176.4, t1: 177.5, name: 'D06 profile — the charge', fn: (t, u) => { const c = two(hpA(t), e1A(t), { side: -1, dist: 0.9, lift: 5, fov: 44, bias: 0.55 }); return { ...c, handheld: 0.15 }; } },   // from the other side: the blue sun no longer sits between them
   // ---- melee with E1
   { t0: 177.5, t1: 177.74, name: 'D07a insert: slash whips past', fn: (t, u) => { const h = hp(t), e = e1p(t); const d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, 4)), add(scl(sd, -9), [0, 9, 0])), target: up(lrp(h, e, 0.6), 8), fov: 32, roll: -0.15 }; } },
   { t0: 177.74, t1: 178.12, name: 'D07b close two-shot block', fn: (t) => two(hp(t), e1p(t), { side: 1, dist: 1.3, lift: 3, fov: 36, bias: 0.4 }) },
