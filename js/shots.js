@@ -2282,8 +2282,18 @@ function drawLanceAndCannon(R, t, c) {
     const reach = Math.min(1, lt / 0.9);
     const end = lerpv(em, hit, reach);
     const k = lt < 0.9 ? 1 : Math.max(0, 1 - (lt - 2.5) / 2.5);
-    R.beam(em, end, 5 * k, [LANCE_COL[0] * k, LANCE_COL[1] * k, LANCE_COL[2] * k], 1.1, 36, 3.5, 1.5);
-    R.beam(em, end, 14 * k, [LANCE_COL[0] * 0.04 * k, LANCE_COL[1] * 0.04 * k, LANCE_COL[2] * 0.04 * k], 1, 2, 3, 0.6);
+    // the lance keeps ITS purple in every shot: a shot that drains the colour (S14b 'tinnitus', saturation 0.35–0.75)
+    // would turn it white, so its chroma is pre-boosted by 1 / saturation (the rest of the frame stays drained)
+    const satK = Math.pow(1 / Math.max(0.3, c?.post?.saturation ?? 1), 1.4);
+    const LC = (() => { const l = (LANCE_COL[0] + LANCE_COL[1] + LANCE_COL[2]) / 3; return LANCE_COL.map((v) => Math.max(0, l + (v - l) * satK)); })();
+    // seen up close (S14b / S15) the white-hot core filled the frame and clipped to white: dim it with camera distance
+    const cp = c?.cam?.pos, segD = (() => { if (!cp) return 1e4; const d = V.sub([0, 0, 0], end, em), L2 = V.dot(d, d) || 1, u = clamp(V.dot(V.sub([0, 0, 0], cp, em), d) / L2, 0, 1); return V.dist(cp, madd(em, d, u)); })();
+    const nearK = clamp(segD / 500, 0.45, 1);   // close up the core is dimmed a little so it stays in colour
+    // (the beam shader adds a fixed white core ∝ intensity on top of the tint: scale the intensity, not the tint)
+    R.beam(em, end, 5 * k, [LC[0] * k, LC[1] * k, LC[2] * k], 1.1 * nearK, 36, 3.5, 1.5);
+    // wide violet halo: faint through the INTENSITY (the beam shader's white core scales with it — a tiny tint at full
+    // intensity made this 14 m halo a white beam, which is what turned the lance white in the close shots)
+    R.beam(em, end, 14 * k, [LC[0] * k, LC[1] * k, LC[2] * k], 0.05, 2, 3, 0.6);
     // helix strands
     const dir = V.norm([0, 0, 0], V.sub([0, 0, 0], end, em));
     const side = V.norm([0, 0, 0], V.cross([0, 0, 0], dir, [0, 1, 0]));
@@ -2297,20 +2307,22 @@ function drawLanceAndCannon(R, t, c) {
         const ang = a * 40 + t * 14 + strand * 2.09;
         const r = 22 * k * (0.6 + 0.4 * Math.sin(a * 13 + t * 6));
         const p = madd(madd(madd(em, dir, a * L), side, Math.cos(ang) * r), up, Math.sin(ang) * r);
-        if (prev) R.beam(prev, p, 1.2 * k, [1.2 * k, 0.4 * k, 2.0 * k], 1, 14);
+        if (prev) R.beam(prev, p, 1.2 * k, [LC[0] * k, LC[1] * 1.1 * k, LC[2] * k], nearK, 14);
         prev = p;
       }
     }
     if (reach >= 1) {
-      R.glow(hit, 60 * k, [2.5 * k, 1.4 * k, 3 * k], 0.5);
+      R.glow(hit, 60 * k, [2.5 * k * satK, 1.4 * k, 3 * k * satK], 0.5);
       R.light(hit, 170, [1, 0.5, 1.2], 6 * k);                   // lights the wound only (900 m washed the whole flagship white)
       // glancing blow: the deflected beam carries on off the hull at the mirrored angle, spraying molten sparks
       const n = V.norm([0, 0, 0], V.sub([0, 0, 0], motherPoint([0, 0, 0], t, [LANCE_HIT[0] + 10, LANCE_HIT[1], LANCE_HIT[2]]), motherPoint([0, 0, 0], t, LANCE_HIT)));
-      const dn = V.dot(dir, n), rdir = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], dir, n, -2 * dn), n, 0.25));
+      // glances OFF — kicked out away from the hull and up, so it never runs on through the ship's side structure
+      const upM = V.norm([0, 0, 0], V.sub([0, 0, 0], motherPoint([0, 0, 0], t, [LANCE_HIT[0], LANCE_HIT[1] + 10, LANCE_HIT[2]]), motherPoint([0, 0, 0], t, LANCE_HIT)));
+      const dn = V.dot(dir, n), rdir = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], dir, n, -2 * dn), n, 2.2), upM, 0.8));
       const kr = k * Math.min(1, (lt - 0.9) / 0.15);
       const rEnd = madd(hit, rdir, 60000 * Math.min(1, (lt - 0.9) / 0.6));   // flies on out to the end of space
-      R.beam(hit, rEnd, 3.2 * kr, [LANCE_COL[0] * 0.8 * kr, LANCE_COL[1] * 0.8 * kr, LANCE_COL[2] * 0.8 * kr], 1.1, 30, 3, 1.2);
-      R.beam(hit, rEnd, 10 * kr, [LANCE_COL[0] * 0.03 * kr, LANCE_COL[1] * 0.03 * kr, LANCE_COL[2] * 0.03 * kr], 1, 2, 3, 0.6);
+      R.beam(hit, rEnd, 3.2 * kr, [LC[0] * 0.8 * kr, LC[1] * 0.8 * kr, LC[2] * 0.8 * kr], 1.1 * nearK, 30, 3, 1.2);
+      R.beam(hit, rEnd, 10 * kr, [LC[0] * kr, LC[1] * kr, LC[2] * kr], 0.04, 2, 3, 0.6);
       for (let i = 0; i < 40; i++) {
         const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.3 + Math.floor(t * 8)), rdir, 1.6), n, 0.6));
         const ph = ((t * 3 + hash(i)) % 1), p = madd(hit, sd, 10 + ph * 140), q = madd(p, sd, -12 * (1 - ph));

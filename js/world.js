@@ -102,6 +102,10 @@ export function motherYaw(t) {
   const final = Math.atan2(DREAD[0], DREAD[2]);
   let y = t < MOTHER_SNAP_T ? 0 : final;                      // faces the enemy: switched on the cut after scene 8 (70 s) —
   // the old slow turn (66–90) was seen from the hull camera in scene 8; now it happens between shots, never on camera
+  // …10° off the dead-ahead line, starboard flank toward the enemy: dead-on, the lance ran ~2° off the keel and scraped
+  // 100 m down the flank fittings (no damage) before the wound; angled, it strikes the flank cleanly. Eased back onto
+  // the exact heading 262–274 (the berserk / tear, the flagship off screen) so the main cannon bears on the dreadnought.
+  if (t >= MOTHER_SNAP_T) y += -10 * Math.PI / 180 * (1 - easeInOut(sat((t - 262) / 12)));
   let home = HOME_YAW; while (home - y > Math.PI) home -= 2 * Math.PI; while (home - y < -Math.PI) home += 2 * Math.PI;
   return lerp(y, home, easeInOut(sat((t - 330) / 22)));
 }
