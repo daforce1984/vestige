@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -579,10 +579,7 @@ function heavyDamage(R, t, e, who) {
         ch.hidden = {}; for (const pt of R.models[h.model].parts) if (pt.name !== 'torso') ch.hidden[pt.name] = 1;
         ch.seed = e.seed + 5; ch.wear = 1; ch.texSet = e.texSet; ch.damage = 0.3; ch.emissive = 0;
       }
-      if (lt < 1.5) {                                            // sparks and a puff of burning coolant from the wound
-        const hp = M.transformPoint([0, 0, 0], tm, h.p);
-        R.fire(hp, 1.2 + 2.5 * easeOut(lt / 1.5), lt, h.t * 7, [1, 1, 1], 0.8 * (1 - lt / 1.5));
-      }
+      // (no fire puff at the wound: a round ball of light in the middle of the spark burst)
     }
   }
   if (dent && !e.crush) e.crush = dent;
@@ -694,7 +691,9 @@ export function drawGundam(R, t, s, opts = {}) {
       me.seed = 3.3; me.wear = 1;
       // calm glow (bright emissive panels shimmered through the bloom as the camera moved); dimmer still in the hangar
       const gk = t < 163 ? 0.35 : 1;
-      const gc = bz > 0.05 ? [6 * bz + 0.3, 0.6, 0.35] : [(0.08 + 2 * (1 - k)) * gk, (0.45 + 2 * (1 - k)) * gk, (0.7 + 2 * (1 - k)) * gk];
+      let gc = bz > 0.05 ? [6 * bz + 0.3, 0.6, 0.35] : [(0.08 + 2 * (1 - k)) * gk, (0.45 + 2 * (1 - k)) * gk, (0.7 + 2 * (1 - k)) * gk];
+      const ch = maceCharge(t);                                  // the last blow: the panels flood with power
+      if (ch > 0) { const q = ch * ch * (1 + 0.08 * Math.sin(t * 37)), m = 1 + 30 * q; gc = [gc[0] * m + 3 * q, gc[1] * m, gc[2] * m]; R.light(head, 70, [0.45, 0.8, 1], 16 * q); }
       me.matOverride = { mace_glow: { base: [0.2, 0.8, 1], metal: 0, rough: 0.3, emissive: gc } };
     }
     if (hot > 0.05) {
@@ -843,7 +842,7 @@ function drawMSBattle(R, t) {
     const st = ev.strength ?? 1;
     const k = Math.exp(-lt * 7);
     if (ev.type === 'clash' || ev.type === 'block' || ev.type === 'spark' || ev.type === 'hit') {
-      R.glow(ev.pos, (2 + st * 3) * (0.6 + lt), [3 * k, 2.2 * k, 1.8 * k], 0.4);
+      // (no glow disc at the contact: a round blob of light sat in the middle of every spark burst — the sparks + light spill carry it)
       R.light(ev.pos, 90, [1, 0.65, 0.5], 14 * k * st);
       const n = ev.type === 'spark' ? 10 : 22;
       for (let i = 0; i < n; i++) {
@@ -863,8 +862,6 @@ function drawMSBattle(R, t) {
       const d = V.norm([0, 0, 0], V.sub([0, 0, 0], ev.cut[1], ev.cut[0]));
       const kc = Math.exp(-ls * 4);
       R.light(ev.pos, 60, [1, 0.6, 0.35], 10 * kc);
-      const kg = Math.exp(-ls * 14);                   // short hot pop, then the crumpled metal stays readable
-      R.glow(ev.pos, 3 + 8 * easeOut(sat(ls / 0.1)), [4 * kg, 2.6 * kg, 1.5 * kg], 0.45);
       if (ls < 0.5) {
         R.ripple(ev.pos, 8 + 90 * easeOut(ls / 0.5), [0.5, 0.5, 0.5], (1 - ls / 0.5) * 1.0);
         R.ripple(ev.pos, 4 + 40 * easeOut(ls / 0.35), [0.5, 0.5, 0.5], sat(1 - ls / 0.35) * 1.6);
@@ -883,11 +880,9 @@ function drawMSBattle(R, t) {
         const de = R.add('debris', _dbM);
         if (de) { de.hidden = debrisOnly(R, 'hull' + (i % 4)); de.damage = 0.5; }
       }
-      if (ls < 1.2) R.fire(ev.pos, 3 + 6 * easeOut(ls / 1.2), ls, 192.4, [1, 1, 1], 0.9 * (1 - ls / 1.2));
       if (ls < 0.35) {                                    // pile-driver: the blow punches clean THROUGH — a white-hot shaft out the back
         const kp = 1 - ls / 0.35, len = 6 + 30 * easeOut(sat(ls / 0.12));
         R.beam(ev.pos, madd(ev.pos, d, len), 0.9 * kp + 0.3, [4 * kp, 3 * kp, 2 * kp], 1, 12);
-        R.glow(madd(ev.pos, d, len), 4 * kp, [3 * kp, 1.8 * kp, 0.8 * kp], 0.4);
       }
     }
   }
