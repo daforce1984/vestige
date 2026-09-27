@@ -492,13 +492,15 @@ function springGroup(parts, w, z, d) {
   return { chans, d, D, e };
 }
 const GROUPS = [
-  // heavy machines: low spring frequencies (limbs lag and settle with weight), a little more damping
-  springGroup(['pelvis', 'torso', '_body'], 14, 0.58, 0),
-  springGroup(['head'], 8, 0.62, 1 / 48),
-  springGroup(['arm_L_upper', 'arm_R_upper'], 13, 0.52, 1 / 48),
-  springGroup(['arm_L_lower', 'arm_R_lower'], 11, 0.5, 2 / 48),
-  springGroup(['hand_L', 'hand_R'], 9, 0.5, 3 / 48),
-  springGroup(['leg_L_upper', 'leg_R_upper', 'leg_L_lower', 'leg_R_lower', 'foot_L', 'foot_R'], 11, 0.55, 1 / 48),
+  // heavy machines: low spring frequencies (limbs lag and settle with weight), damped close to critical — the parts
+  // trail and settle ONCE; the old 0.5 damping rang 2–3 times after every blow, and under bullet time that ringing
+  // read as the whole machine / the blade swaying back and forth
+  springGroup(['pelvis', 'torso', '_body'], 14, 0.9, 0),
+  springGroup(['head'], 8, 0.9, 1 / 48),
+  springGroup(['arm_L_upper', 'arm_R_upper'], 13, 0.88, 1 / 48),
+  springGroup(['arm_L_lower', 'arm_R_lower'], 11, 0.88, 2 / 48),
+  springGroup(['hand_L', 'hand_R'], 9, 0.88, 3 / 48),
+  springGroup(['leg_L_upper', 'leg_R_upper', 'leg_L_lower', 'leg_R_lower', 'foot_L', 'foot_R'], 11, 0.88, 1 / 48),
 ];
 // filter strength: 0 at impacts (exact, crisp contact), back to 1 within ~0.15 s
 function springAmount(tw) {
@@ -523,7 +525,7 @@ function springPose(track, tw, out) {
   }
   return out;
 }
-const POS_SPRING = (() => { const w = 15, z = 0.55, Wn = 3.5 / (z * w), D = Wn / SPRING_K, wd = w * Math.sqrt(1 - z * z); const e = []; for (let k = 0; k < SPRING_K; k++) { const x = (k + 0.5) * D; e.push(Math.exp(-z * w * x) * (Math.cos(wd * x) + (z * w / wd) * Math.sin(wd * x))); } return { D, e }; })();
+const POS_SPRING = (() => { const w = 15, z = 0.9, Wn = 3.5 / (z * w), D = Wn / SPRING_K, wd = w * Math.sqrt(1 - z * z); const e = []; for (let k = 0; k < SPRING_K; k++) { const x = (k + 0.5) * D; e.push(Math.exp(-z * w * x) * (Math.cos(wd * x) + (z * w / wd) * Math.sin(wd * x))); } return { D, e }; })();
 function springPos(track, tw) {
   const x = track(tw), amt = springAmount(tw);
   if (amt <= 0) return x;
@@ -729,8 +731,9 @@ const e1Pose = poseTrack([
   [170, R.ready], [172.3, R.ready, 'io'], [172.75, R.taunt, 'io'], [173.6, R.taunt], [174.25, R.ready, 'io'],   // the taunt, then back to two hands
   [176.45, R.ready, 'io'],                                     // 170–176.45: two-handed, ready to charge, floating
   [176.95, W(R.foreWind, { torso: [30, -40, 0], _body: [30, 0, 0] }), 'io'], [177.35, R.foreWind, 'out'],
-  [177.6, R.foreMid, 'in'], [177.72, R.foreEnd, 'out'], [177.88, R.foreEnd], [178.0, R.backMid, 'in'], [178.08, R.backMid],
-  [178.2, R.doubled, 'in'], [178.45, R.doubled, 'out'], [178.55, R.hitTorso, 'in'], [179.0, R.tumble, 'out'],
+  [177.6, R.foreMid, 'in'], [177.72, R.foreEnd, 'out'], [177.88, R.foreEnd], [178.0, R.backMid, 'in'],
+  [178.1, W(R.backMid, { arm_R_upper: [-125, -25, -55], arm_R_lower: [-30, 0, 0] }), 'out'],   // the blocked blade is knocked up and away
+  [178.2, W(R.doubled, { arm_R_upper: [-110, -20, -60], arm_R_lower: [-35, 0, 0] }), 'in'], [178.45, W(R.doubled, { arm_R_upper: [-95, -15, -55] }), 'out'],   // doubled over, the sword flung out wide [178.55, R.hitTorso, 'in'], [179.0, R.tumble, 'out'],
   [179.08, R.hitCut, 'in'], [179.8, R.limp, 'out'], [180.2, R.limp],
 ]);
 const e1Imp = impulses([
@@ -752,7 +755,7 @@ const e2Pos = posTrack([
   [186.2, C(0, 0, -17), 'out'], [186.45, C(0, 0, -18.5), 'io'],
   [186.65, C(0, 0, -15), 'io'],
   [186.9, C(10, 0, -13), 'out'],                       // side-step the thrust
-  [187.2, C(8, 0, -12.5), 'in'],                       // counter cut (hero ducks)
+  [187.2, C(8, 2.5, -12.5), 'in'],                     // counter cut, high over the ducking hero
   [187.35, C(6, 1, -11), 'out'],
   [187.6, C(6, 2, -13.5), 'in'],                       // overhead — blocked
   [187.95, C(5, 1, -12), 'out'],
@@ -828,13 +831,17 @@ function base(vis) { return { vis, pos: [0, 0, 0], fwd: [0, 0, 1], roll: 0, pitc
 // faded out around contact frames so solved contacts stay exact
 function inertiaLean(s, fwdBase) {
   if (SOLVING || !s._pf) return [0, 0];
-  const h = 1 / 24, t = s._t;
-  const v0 = velOf(s._pf, t - h), v1 = velOf(s._pf, t + h);
-  const acc = scl(sub(v1, v0), 1 / (2 * h));
+  // acceleration of the SUSTAINED motion: velocities over ±0.1 s, differenced across ±0.18 s and averaged over a
+  // ±0.2 s window — the body leans into a thrust or a brake that lasts, not into every closely spaced key (the old
+  // ±1/24 s estimate flipped sign between the keys round each clash and rocked the whole machine back and forth)
+  const t = s._t, vh = 0.1, vel = (x) => scl(sub(s._pf(x + vh), s._pf(x - vh)), 1 / (2 * vh));
+  let acc = [0, 0, 0], wsum = 0;
+  for (const [o, w] of [[-0.2, 1], [-0.1, 2], [0, 3], [0.1, 2], [0.2, 1]]) { acc = add(acc, scl(sub(vel(t + o + 0.18), vel(t + o - 0.18)), w / 0.36)); wsum += w; }
+  acc = scl(acc, 1 / wsum);
   const f = nrm([fwdBase[0], 0, fwdBase[2]]), r = [f[2], 0, -f[0]];
-  let near = 1; for (const ti of IMPACTS) near = Math.min(near, smooth(0.05, 0.3, Math.abs(t - ti)));
+  let near = 1; for (const ti of IMPACTS) near = Math.min(near, smooth(0.1, 0.5, Math.abs(t - ti)));
   const k = near * (1 - (s._idle || 0));
-  return [clamp((acc[0] * f[0] + acc[2] * f[2]) * 0.0022, -0.32, 0.32) * k, clamp(-(acc[0] * r[0] + acc[2] * r[2]) * 0.0018, -0.3, 0.3) * k];
+  return [clamp((acc[0] * f[0] + acc[2] * f[2]) * 0.0016, -0.22, 0.22) * k, clamp(-(acc[0] * r[0] + acc[2] * r[2]) * 0.0013, -0.2, 0.2) * k];
 }
 function finish(s, arr, fwdBase) {
   const b = PIDX._body;
@@ -1056,7 +1063,7 @@ function spinYaw(t) {       // degrees, relative to facing RONIN #2 (270 = facin
 export function duelEnemy1(t) {
   if (!STATE_CACHE) return duelEnemy1_(t);
   let r = _c_duelEnemy1.get(t);
-  if (r === undefined) { r = weaponConstrain('e1', t, enemyFree('e1', t)); if (_c_duelEnemy1.size > 64) _c_duelEnemy1.clear(); _c_duelEnemy1.set(t, r); }
+  if (r === undefined) { r = solid('e1', t, enemyFree('e1', t)); if (_c_duelEnemy1.size > 64) _c_duelEnemy1.clear(); _c_duelEnemy1.set(t, r); }
   return r;
 }
 // ---------------------------------------------------------------- weapons are solid: katana vs mace
@@ -1065,7 +1072,7 @@ export function duelEnemy1(t) {
 // through the other weapon between frames — a blow that would pass through is stopped on the surface. The katana is
 // pushed out by swinging the sword arm about its shoulder; the left fist re-closes on the hilt.
 const _c_free = { e1: new Map(), e2: new Map() };
-function enemyFree(who, t) {
+export function enemyFree(who, t) {
   const c = _c_free[who];
   let r = c.get(t);
   if (r === undefined) { r = who === 'e1' ? duelEnemy1_(t) : duelEnemy2_(t); if (AUTO_READY && r) r = applyImpulses(who, t, r); if (c.size > 256) c.clear(); c.set(t, r); }
@@ -1083,11 +1090,11 @@ function closestPair(A, B) {   // deepest-penetrating pair of capsule lists → 
 }
 // the mace is one rigid body: one side for the katana to stay on, taken (mace → katana) from the last frame where the
 // katana was clearly clear of it
-function approachNormal(who, t) {
+function approachNormal(who, t, offAt = null) {   // offAt(tt): the hold already applied at an earlier time
   for (let k = 1; k <= 12; k++) {
     const tt = t - k / 24, hs = duelHero_(tt), es = enemyFree(who, tt);
     if (!hs || !es || !es.vis || !(es.saber > 0.5)) break;
-    const c = closestPair(maceCaps(hs), katanaCapsOf(duelFK(es, 'enemy_ms')));
+    const c = closestPair(maceCaps(hs), katanaCapsOf(duelFK(offAt ? { ...es, pos: add(es.pos, offAt(tt)) } : es, 'enemy_ms')));
     if (c.depth < -0.4) return nrm(sub(c.q.c2, c.q.c1));
   }
   return null;
@@ -1097,6 +1104,75 @@ export function solidReport(H, E, eArmed, hArmed) {
   const mace = hArmed ? maceCapsOf(H) : [], kat = eArmed ? katanaCapsOf(E) : [], hb = bodyCaps('gundam', H), eb = bodyCaps('enemy_ms', E);
   const ww = mace.length && kat.length ? closestPair(mace, kat).depth : -9, b = closestPair(hb, eb), kb = kat.length ? closestPair(hb, kat).depth : -9;
   return { ww, bb: b.depth, bbParts: HITBOX.gundam[b.i][0] + '/' + HITBOX.enemy_ms[b.j][0], kb };
+}
+// ---- SOLIDITY as a continuous motion (not a per-frame projection, which popped: the blade stuck to the surface, then
+// teleported through once its side was lost). RONIN is simply HELD BACK — one world offset for the whole machine —
+// computed by a forward simulation on a 96 Hz grid: each frame starts from the last offset relaxing back to zero
+// (τ 0.12 s), any penetration (katana vs mace on the side it came from, katana vs Sigma, body vs body / mace) is resolved
+// from there, the change per frame is rate-limited, and the track is lightly blurred. At runtime: free motion + offset.
+const HOLD_MAX = 4;   // m — the hold stays a small correction; deeper overlaps are fixed in the choreography itself
+const SOLID_DT = 1 / 96, SOLID_T0 = 170.3, SOLID_T1 = 194.3, SOLID_N = Math.ceil((SOLID_T1 - SOLID_T0) / SOLID_DT) + 1;
+let SOLID = null;
+function resolveOffset(who, t, st, H, ctx) {   // translation that frees `st` (already offset) from Sigma and his mace
+  const killed = t >= KILL_T[who], armed = st.saber > 0.5;
+  const mace = H.mace, hb = H.body;
+  let off = [0, 0, 0];
+  for (let it = 0; it < 10; it++) {
+    const E = duelFK({ ...st, pos: add(st.pos, off) }, 'enemy_ms');
+    let best = null;
+    if (armed && mace.length) {
+      const kat = katanaCapsOf(E), c = closestPair(mace, kat);
+      if (c.depth > -0.05) {
+        if (!ctx.side) ctx.side = approachNormal(who, t, ctx.offAt) || (c.q.d > 1e-4 ? nrm(sub(c.q.c2, c.q.c1)) : null);
+        if (ctx.side) { const dp = mace[c.i][2] + kat[c.j][2] - V.dot(sub(c.q.c2, c.q.c1), ctx.side); if (dp > 0.005) best = { n: ctx.side, d: dp }; }
+        ctx.lastContact = t;
+      }
+    }
+    // (katana into Sigma's armour is not shoved out here — pushing the whole machine for a blade that passes too low read
+    // as a lurch; those passes are fixed in the choreography)
+    { const c = closestPair(killed ? hb : [...hb, ...mace], bodyCaps('enemy_ms', E));
+      if (c.depth > 0.005 && (!best || c.depth > best.d)) best = { n: c.q.d > 1e-4 ? nrm(sub(c.q.c2, c.q.c1)) : nrm(sub(st.pos, H.pos)), d: c.depth }; }
+    if (!best) break;
+    off = add(off, scl(best.n, best.d + 0.01));
+  }
+  return off;
+}
+function buildSolid() {
+  // reactive (causal) and smooth: the hold only ever answers a contact that is happening, relaxes back slowly enough
+  // (τ 0.3 s) to carry through a quick exchange instead of letting go and grabbing again, and never changes faster
+  // than 60 m/s of story time
+  const out = {}, relax = Math.exp(-SOLID_DT / 0.3), vmax = 120 * SOLID_DT;
+  for (const who of ['e1', 'e2']) {
+    const raw = new Float64Array(SOLID_N * 3), ctx = {};
+    ctx.offAt = (tt) => { const j = Math.max(0, Math.min(SOLID_N - 1, Math.round((tt - SOLID_T0) / SOLID_DT))); return [raw[j * 3], raw[j * 3 + 1], raw[j * 3 + 2]]; };
+    let prev = [0, 0, 0];
+    for (let i = 0; i < SOLID_N; i++) {
+      const t = SOLID_T0 + i * SOLID_DT, fr = enemyFree(who, t), hs = duelHero(t);
+      if (!fr || !fr.vis || !hs || !hs.vis) { prev = scl(prev, relax); raw.set(prev, i * 3); continue; }
+      if (ctx.lastContact !== undefined && t - ctx.lastContact > 0.25) { ctx.side = null; ctx.lastContact = undefined; }   // contact episode over
+      const Hf = duelFK({ ...hs, saber: Math.max(hs.saber, 1e-3) }, 'gundam');
+      const H = { mace: hs.saber > 0.5 ? maceCapsOf(Hf) : [], body: bodyCaps('gundam', Hf), pos: hs.pos };
+      const base = scl(prev, relax);
+      let c = add(base, resolveOffset(who, t, { ...fr, pos: add(fr.pos, base) }, H, ctx));
+      const dc = sub(c, prev), L = Math.hypot(dc[0], dc[1], dc[2]);
+      if (L > vmax) c = add(prev, scl(dc, vmax / L));
+      const Lc = Math.hypot(c[0], c[1], c[2]); if (Lc > HOLD_MAX) c = scl(c, HOLD_MAX / Lc);   // never a big visible shove
+      raw.set(c, i * 3); prev = c;
+    }
+    const sg = 3, Rr = 9, G = []; let gs = 0; for (let j = -Rr; j <= Rr; j++) { const g = Math.exp(-(j * j) / (2 * sg * sg)); G.push(g); gs += g; }
+    const sm = new Float64Array(SOLID_N * 3);
+    for (let i = 0; i < SOLID_N; i++) for (let j = -Rr; j <= Rr; j++) { const q = Math.min(SOLID_N - 1, Math.max(0, i + j)), g = G[j + Rr] / gs; for (let k = 0; k < 3; k++) sm[i * 3 + k] += raw[q * 3 + k] * g; }
+    out[who] = sm;
+  }
+  return out;
+}
+function solid(who, t, fr) {
+  if (!SOLID || !fr || !fr.vis || t < SOLID_T0 || t > SOLID_T1 - SOLID_DT) return fr;
+  const x = (t - SOLID_T0) / SOLID_DT, i = Math.floor(x), f = x - i, T = SOLID[who];
+  const d = (k) => T[i * 3 + k] + (T[(i + 1) * 3 + k] - T[i * 3 + k]) * f;
+  const o = [d(0), d(1), d(2)];
+  if (Math.abs(o[0]) + Math.abs(o[1]) + Math.abs(o[2]) < 1e-5) return fr;
+  return { ...fr, pos: add(fr.pos, o), _held: Math.hypot(o[0], o[1], o[2]) };   // the whole machine moves: the grip is unchanged
 }
 // the killing blows: the mace goes THROUGH (the breakup takes over) — no body push from then on
 const KILL_T = { e1: 178.95, e2: 192.35 };
@@ -1369,7 +1445,7 @@ const _c_duelEnemy2 = new Map();
 export function duelEnemy2(t) {
   if (!STATE_CACHE) return duelEnemy2_(t);
   let r = _c_duelEnemy2.get(t);
-  if (r === undefined) { r = weaponConstrain('e2', t, enemyFree('e2', t)); if (_c_duelEnemy2.size > 64) _c_duelEnemy2.clear(); _c_duelEnemy2.set(t, r); }
+  if (r === undefined) { r = solid('e2', t, enemyFree('e2', t)); if (_c_duelEnemy2.size > 64) _c_duelEnemy2.clear(); _c_duelEnemy2.set(t, r); }
   return r;
 }
 function duelEnemy2_(t) {
@@ -1624,8 +1700,8 @@ const SOLVE = [
   ...SHOT_TIMES.map((t) => ({ t, kind: 'aim', adj: AIM_ADJ, copyTo: t === 179 ? [178.84] : [t - 0.12] })),
   { t: 178.0, kind: 'blade-part', blade: 'e1', part: ['hero', 'arm_R_lower', [0, -2.2, 0]], u: [0.25, 0.8],
     adj: [['e1', 'pose', 'arm_R_upper', 0], ['e1', 'pose', 'arm_R_upper', 1], ['e1', 'pose', 'arm_R_upper', 2], ['e1', 'pose', 'arm_R_lower', 0], ['e1', 'pose', 'hand_R', 0], ['e1', 'pose', 'hand_R', 1], ['e1', 'pose', 'torso', 1], ['e1', 'pos', D1, 5], ['e1', 'pos', [0, 1, 0], 3], ['e1', 'pos', L1, 3]] },
-  { t: 178.2, kind: 'part-part', a: ['hero', 'leg_L_lower', [0, 0, 1]], b: ['e1', 'torso', [0, 0, 2.4]], gap: 0.8, adj: [['hero', 'pos', D1, 5], ['hero', 'pos', [0, 1, 0], 3], ['hero', 'pos', L1, 2], ['hero', 'pose', 'leg_L_upper', 0], ['hero', 'pose', 'leg_L_upper', 1]] },
-  { t: 178.55, kind: 'part-part', a: ['hero', 'foot_R', [0, -1, 0.5]], b: ['e1', 'torso', [0, 1, 2.4]], gap: 0.8, adj: [['hero', 'pos', D1, 6], ['hero', 'pos', [0, 1, 0], 3], ['hero', 'pose', 'leg_R_upper', 0]] },
+  { t: 178.2, kind: 'part-part', a: ['hero', 'leg_L_lower', [0, 0, 1]], b: ['e1', 'torso', [0, 0, 2.4]], gap: 1.9, adj: [['hero', 'pos', D1, 5], ['hero', 'pos', [0, 1, 0], 3], ['hero', 'pos', L1, 2], ['hero', 'pose', 'leg_L_upper', 0], ['hero', 'pose', 'leg_L_upper', 1]] },
+  { t: 178.55, kind: 'part-part', a: ['hero', 'foot_R', [0, -1, 0.5]], b: ['e1', 'torso', [0, 1, 2.4]], gap: 2.0, adj: [['hero', 'pos', D1, 6], ['hero', 'pos', [0, 1, 0], 3], ['hero', 'pose', 'leg_R_upper', 0]] },
   { t: 179.0, kind: 'blade-part', blade: 'hero', part: ['e1', 'torso', [0, 1, 0]], u: [0.6, 0.78], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'arm_L_lower', 0], ['hero', 'pose', 'hand_L', 0], ['hero', 'pos', D1, 5], ['hero', 'pos', [0, 1, 0], 4], ['e1', 'pos', [0, 1, 0], 3], ['e1', 'pos', D1, 4], ['hero', 'pose', 'torso', 0]] },
   { t: 184.5, kind: 'blade-blade', hs: [0.12, 0.34], es: [0.4, 0.75], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'torso', 0], ['e2', 'pos', [0, 1, 0], 5], ['e2', 'pos', [0, 0, 1], 5], ['e2', 'pos', [1, 0, 0], 4]] },   // on the SHAFT
   { t: 186.0, kind: 'blade-blade', hs: [0.3, 0.75], es: [0.3, 0.75], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'hand_R', 1], ['e2', 'pose', 'torso', 1], ['e2', 'pos', [1, 0, 0], 5], ['e2', 'pos', [0, 1, 0], 5], ['e2', 'pos', [0, 0, 1], 6]] },
@@ -1633,7 +1709,7 @@ const SOLVE = [
   { t: 187.6, kind: 'blade-blade', hs: [0.25, 0.6], es: [0.45, 0.85], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'arm_L_lower', 0], ['hero', 'pose', 'hand_L', 1]] },
   { t: 188.2, kind: 'part-part', a: ['hero', 'arm_R_upper', [0, 0, 0]], b: ['e2', 'torso', [0, 1.5, 2.2]], gap: 3.6, adj: [['hero', 'pos', TO_E2, 6], ['hero', 'pos', [1, 0, 0], 4], ['hero', 'pos', [0, 1, 0], 3]] },
   ...[188.85, 189.08].map((t) => ({ t, kind: 'blade-blade', hs: [0.2, 0.45], es: [0.2, 0.5], adj: [['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'arm_R_upper', 1], ['e2', 'pose', 'arm_R_upper', 2], ['e2', 'pose', 'arm_R_lower', 0], ['e2', 'pose', 'hand_R', 0], ['e2', 'pose', 'torso', 1], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0]] })),
-  { t: 189.45, kind: 'part-part', a: ['e2', 'foot_L', [0, -1, 0.5]], b: ['hero', 'torso', [0, 1, 3.2]], gap: 0.8, adj: [['e2', 'pos', [0, 0, 1], 6], ['e2', 'pos', [0, 1, 0], 3], ['e2', 'pos', [1, 0, 0], 3], ['e2', 'pose', 'leg_L_upper', 0], ['e2', 'pose', 'leg_L_upper', 1], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0], ['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'hand_R', 0]] },
+  { t: 189.45, kind: 'part-part', a: ['e2', 'foot_L', [0, -1, 0.5]], b: ['hero', 'torso', [0, 1, 3.2]], gap: 2.0, adj: [['e2', 'pos', [0, 0, 1], 6], ['e2', 'pos', [0, 1, 0], 3], ['e2', 'pos', [1, 0, 0], 3], ['e2', 'pose', 'leg_L_upper', 0], ['e2', 'pose', 'leg_L_upper', 1], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0], ['e2', 'pose', 'arm_R_upper', 0], ['e2', 'pose', 'hand_R', 0]] },
   { t: 190.9, kind: 'blade-blade', hs: [0.2, 0.5], es: [0.45, 0.85], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'hand_L', 0], ['hero', 'pose', 'arm_L_lower', 0], ['e2', 'pos', [1, 0, 0], 3], ['e2', 'pos', [0, 1, 0], 3], ['e2', 'pos', [0, 0, 1], 4]] },
   { t: 192.4, kind: 'blade-part', blade: 'hero', part: ['e2', 'torso', [0, 1, 0]], u: [0.6, 0.78], adj: [['hero', 'pose', 'arm_L_upper', 0], ['hero', 'pose', 'arm_L_upper', 1], ['hero', 'pose', 'arm_L_lower', 0], ['hero', 'pose', 'hand_L', 0], ['e2', 'pos', [1, 0, 0], 4], ['e2', 'pos', [0, 1, 0], 4], ['e2', 'pos', [0, 0, 1], 4]] },
 ];
@@ -1970,3 +2046,7 @@ export function applyImpulses(who, t, s) {
   o.fwd = yawRot(s.fwd, res.ang[1]);
   return o;
 }
+
+// the solidity corrections, smoothed in time (needs the impulse-driven free motion, so after AUTO_READY)
+SOLID = buildSolid();
+_c_duelEnemy1.clear(); _c_duelEnemy2.clear();
