@@ -600,7 +600,7 @@ const heroPos = posTrack([
   [CUT_T, DP(1, -10, 1.8), 'cr'],                       // THE CUT, passing
   [192.3, DP(16, -9, 2.2), 'out'],                      // carried on past it
   [192.9, DP(24, -3, 2), 'io'],
-  [193.8, C(14, -3, -10), 'io'], [194.6, C(10, -4, -20), 'io'],
+  [193.8, DP(36, -12, 3), 'io'], [194.6, DP(44, -14, 3), 'io'],   // on away from it (the reactor goes behind him)
 ]);
 const heroPose = poseTrack([
   [169.3, L.flight], [170.4, L.idle, 'io'],                  // 170–175.35: at ease, arms in an A, the rifle hanging
