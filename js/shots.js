@@ -1020,7 +1020,7 @@ function drawMSBattle(R, t) {
     const k = Math.exp(-lt * 7);
     if (ev.type === 'clash' || ev.type === 'block' || ev.type === 'spark' || ev.type === 'hit') {
       // (no glow disc at the contact: a round blob of light sat in the middle of every spark burst — the sparks + light spill carry it)
-      R.light(ev.pos, 90, [1, 0.65, 0.5], 14 * k * st);
+      R.light(ev.pos, 90, [1, 0.65, 0.5], (ev.shotDir ? 3 : 14) * k * st);   // (beam hits on the white enemy: a small light, or it blooms out)
       const n = ev.type === 'spark' ? 10 : 22;
       for (let i = 0; i < n; i++) {
         const d = randDir([0, 0, 0], ev.t * 13.1 + i * 3.7);
@@ -1132,7 +1132,7 @@ function drawHeroFire(R, t) {
       rifleShot(R, t, sh.t, sh.from, sh.to, false);   // (no flash ball on the wing hit: the sparks + light carry it)
       if (sh.hit && lt > 0.01 && lt < 0.7) {                     // the wing torn off: a burst of sparks at its root
         const la = lt - 0.01;
-        R.light(sh.to, 50, [1, 0.6, 0.3], 5 * Math.exp(-la * 6));
+        R.light(sh.to, 40, [1, 0.6, 0.3], 2 * Math.exp(-la * 6));   // (white armour blooms out easily)
         for (let i = 0; i < 40; i++) { const life = 0.3 + hash(i + 7) * 0.5; if (la > life) continue;
           const a = la / life, sd = randDir([0, 0, 0], i * 4.1 + 3), b = 4.5 * (1 - a) * (1 - a);
           spark(R, madd(sh.to, sd, (3 + 24 * hash(i + 2)) * easeOut(a)), 0.5 + 0.4 * (1 - a), [b, b * 0.6, b * 0.3]); }

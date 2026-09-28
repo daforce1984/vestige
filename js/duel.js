@@ -459,7 +459,7 @@ const withParts = (base, src, parts) => { const a = Float64Array.from(base); for
 const LEGS = ['pelvis', 'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
 VG.idle = fromClip('tryout.Idle_Pose', 0);
 VG.aim = fromClip('tryout.GunPose', 0);                                          // the rifle up in both hands
-VG.guard = W(VG.aim, { pelvis: [0, 25, 0], torso: [6, 50, 0], head: [0, -42, 0], arm_L_upper: [-30, 0, 30], arm_L_lower: [-55, 0, 0] });   // turns its shield shoulder to him
+VG.guard = W(VG.aim, { pelvis: [0, -20, 0], torso: [6, -40, 0], head: [0, 45, 0], arm_L_upper: [-25, 0, 35], arm_L_lower: [-40, 0, 0], _body: [0, -40, 0] });   // turns to its RIGHT so the shield (outside of the left forearm) faces him
 VG.guardAim = VG.aim;
 VG.crouch = withParts(VG.aim, fromClip('tryout.Jump', 0.3), LEGS);               // loading the jump
 VG.boost = withParts(VG.aim, fromClip('tryout.Jump', 0.62), LEGS);               // driving up, the rifle still on him
