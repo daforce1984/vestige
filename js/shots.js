@@ -1373,7 +1373,8 @@ shot(110, 120, 'B5 ion muzzle charge', (c) => {
   const st = ionFrigate(t, 0);
   const L = modelLen(c.R, 'ion_frigate');
   const m = ionMuzzle(c.R, t, 0);
-  const side = V.norm([0, 0, 0], V.cross([0, 0, 0], st.fwd, [0, 1, 0]));
+  let side = V.norm([0, 0, 0], V.cross([0, 0, 0], st.fwd, [0, 1, 0]));
+  if (V.dot(side, V.sub([0, 0, 0], motherPoint([0, 0, 0], t, [0, 0, 0]), st.pos)) > 0) side = V.scale(side, side, -1);   // outboard: never between it and the flagship
   // when the charge starts bleeding away the camera swings round to follow it: past the muzzle, down the line into
   // the distance where the gravity well waits
   const wellDir = V.norm([0, 0, 0], V.sub([0, 0, 0], WELL, m)), kc = easeInOut(sat((t - 116.4) / 2.4));

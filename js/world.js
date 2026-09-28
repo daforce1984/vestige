@@ -19,7 +19,7 @@ export const BC = [0, 40, -480];          // dogfight centre
 export const GC = [230, 90, -640];        // gundam combat centre
 
 export const IONF = [
-  { p: [-170, 40, 160], arrive: 40.5, seed: 1 },
+  { p: [-265, 50, 150], arrive: 40.5, seed: 1 },   // (was −170: with the flagship turned it sat in its flank — scene 13's camera was inside the hull)
   { p: [175, -25, 190], arrive: 41.3, seed: 2 },
   { p: [-130, -70, 330], arrive: 42.1, seed: 3 },
   { p: [150, 70, 340], arrive: 42.9, seed: 4 },
