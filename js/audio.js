@@ -639,23 +639,7 @@ function duelCues() {
         out.push([t - 0.1, 'whoosh:b', { at: 0.55, dur: 0.7, fadeOut: 0.25, rate: R(1.3, 1.6), gain: G * 0.5, pan, prio: 6, norand: true }]);
       }
     }
-    // servo / hydraulics on big pose changes: joint angular-speed peaks, quiet, pitched down
-    const w = S.map((x, i) => {
-      if (!i || !x.on || !S[i - 1].on || !x.s.pose || !S[i - 1].s.pose) return 0;
-      let sum = 0;
-      for (const j in x.s.pose) { const p0 = S[i - 1].s.pose[j], p1 = x.s.pose[j]; if (p0 && p1) for (let c = 0; c < 3; c++) sum += Math.abs(p1[c] - p0[c]); }
-      return sum / DT;
-    });
-    const sorted = w.filter((x) => x > 0).sort((a, b) => a - b), th = sorted[Math.floor(sorted.length * 0.9)] || Infinity;
-    let lastServo = -9;
-    for (let i = 1; i < w.length - 1; i++) {
-      if (w[i] >= th && w[i] >= w[i - 1] && w[i] >= w[i + 1] && S[i].t - lastServo > 0.45) {
-        lastServo = S[i].t;
-        const k = Math.min(1, w[i] / (th * 2));
-        out.push([S[i].t - 0.05, r() < 0.6 ? 'servo' : 'mech_steps:four',
-          { at: r() < 0.5 ? 0 : 0.3, dur: 0.5, fadeOut: 0.2, rate: R(0.55, 0.75), gain: G * (0.2 + 0.2 * k), pan: pan + R(-0.1, 0.1), prio: 5, norand: true }]);
-      }
-    }
+    // (no servo / footstep rattle on pose changes: under the AMBAC limb motion it read as a constant "drrrr")
   }
   // ---- hangar launch additions (clamp release + hydraulics before the 157.9 catapult)
   out.push([156.9, 'hit_heavy', { rate: 0.7, lp: 1200, gain: G * 0.5, prio: 7, norand: true }]);

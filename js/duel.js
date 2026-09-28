@@ -530,7 +530,7 @@ const e1Pos = posTrack([
   [179.0, ringE(1.02, 34.5, -2), 'out'],              // (pushed back a little)
   [179.3, ringE(1.1, 34, -3), 'io'],                  // crouches …
   [179.62, ringE(1.2, 37, 8), 'out'],                 // … and boost-jumps
-  [179.95, ringE(1.26, 41, 16), 'io'],                // inverted at the top of its flip: fires
+  [179.95, ringE(1.26, 41, 16), 'io'],                // at the top of the boost: fires down at him
   [180.4, ringE(1.3, 46, 21), 'io'],
   [180.9, ringE(1.36, 50, 23), 'io'],
 ]);
@@ -641,7 +641,8 @@ const enemyPose = poseTrack([
   [177.35, VG.stepL, 'out'], [177.6, VG.fly, 'io'], [178.1, VG.stepR, 'out'], [178.4, VG.fly, 'io'],
   [178.6, VG.guard, 'io'], [178.9, VG.guard], [179.1, VG.fly, 'io'],   // the shield up for his 178.7
   [179.3, VG.crouch, 'io'], [179.55, VG.boost, 'out'],
-  [180.45, VG.boost, 'io'], [180.9, VG.fly, 'io'],
+  [179.82, W(VG.aim, { _body: [28, 0, 0] }), 'io'], [180.15, W(VG.aim, { _body: [22, 0, 0] })],   // over him: nose-down, the rifle on him
+  [180.5, VG.boost, 'io'], [180.9, VG.fly, 'io'],
   [181.15, VG.stepR, 'out'], [181.4, VG.fly, 'io'], [181.75, VG.stepL, 'out'], [182.1, VG.fly, 'io'],
   [182.45, VG.stepR, 'out'], [182.8, VG.fly, 'io'], [183.2, VG.fly],
   [183.4, VG.hit, 'out'], [183.8, VG.aim, 'io'],       // the shield gone, it fights on one-handed
@@ -658,6 +659,7 @@ const enemyImp = impulses([
 const FLIP0 = 179.6, FLIP1 = 180.42;
 const flipK = (tw) => { const u = sat((tw - FLIP0) / (FLIP1 - FLIP0)); return u; };
 function flipLayer(tw, out) {
+  return 0;                                             // (no backflip any more: it boosts straight up and fires down)
   const u = flipK(tw); if (u <= 0 || u >= 1) return 0;
   const w = smooth(0, 0.12, u) * (1 - smooth(0.88, 1, u));
   const cp = clipPose('vanguard.Backflip', 1.0 + 1.7 * u);
@@ -1337,7 +1339,7 @@ export const DUEL_CAMS = [
     return { pos: at(E, -150, -40, 6, T), target: pan(up(E, 2), up(ep(t), 2), 0.9), fov: 12, handheld: 0.06 }; } },
   { t0: 178.55, t1: 179.25, snap: 1.8, name: 'D09 CU — the shield takes it', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T);
     return { pos: at(E, -16, -14, 3, T), target: pan(up(E, 3), up(ep(t), 3), 0.8), fov: 38, handheld: 0.05 }; } },
-  { t0: 179.25, t1: 180.45, name: 'D10 from far below — it jumps and turns over', fn: (t, u) => { const T = 179.25, E = ep(T);
+  { t0: 179.25, t1: 180.45, name: 'D10 from far below — it boosts up and fires down', fn: (t, u) => { const T = 179.25, E = ep(T);
     return { pos: at(lrp(hp(T), E, 0.75), 0, 70, -60, T), target: pan(up(E, 8), ep(t), 0.85), fov: 38, handheld: 0.06 }; } },
   { t0: 180.45, t1: 181.4, roll: -0.1, name: 'D11 profile — he rolls out and answers', fn: (t, u) => { const T = 180.45, H = hp(T);
     return { pos: add(at(H, 0, 38, 2, T), scl(sub(hp(t), H), 0.4)), target: up(hp(t), 3), fov: 38, handheld: 0.08 }; } },   // a slow dolly, half his speed
