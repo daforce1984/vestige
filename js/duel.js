@@ -453,23 +453,27 @@ function withArm(base, src, side) {   // copy one arm (upper, lower, hand) from 
 }
 const VG = {};
 // at ease in the standoff: arms down by its sides, the rifle hanging from the right fist, the shield on the left forearm
-VG.idle = P({ pelvis: [0, -4, 0], torso: [5, -4, 0], head: [2, 6, 0], arm_L_upper: [4, 6, -31], arm_L_lower: [-16, 0, 0],
-  arm_R_upper: [8, -8, 27], arm_R_lower: [-24, 0, 0], leg_L_upper: [-14, 0, 3], leg_L_lower: [20, 0, 0], foot_L: [8, 0, 0],
-  leg_R_upper: [5, 0, -3], leg_R_lower: [24, 0, 0], foot_R: [12, 0, 0], _body: [2, 0, 0] });
-VG.aim = fromClip('vanguard.RifleBurst', 1.2);                                   // rifle up, support hand forward
-VG.guard = fromClip('vanguard.ShieldGuard', 1.0);                                // shield raised in front
-VG.guardAim = withArm(VG.aim, VG.guard, 'L');                                   // shield forward, rifle levelled past it
-VG.crouch = fromClip('vanguard.BoostJump', 0.6, {}, ['arm_R_upper', 'arm_R_lower', 'hand_R']);   // loading the jump
-VG.boost = withArm(fromClip('vanguard.BoostJump', 1.4), VG.aim, 'R');           // launching up, rifle still on him
-VG.tuck = fromClip('vanguard.Backflip', 1.8, { pelvis: [0, 0, 0], torso: [20, 0, 0] });   // (flip layer drives the limbs)
-VG.fly = W(VG.guardAim, { pelvis: [8, 0, 0], leg_L_upper: [-38, 0, 6], leg_L_lower: [62, 0, 0], leg_R_upper: [8, 0, -6], leg_R_lower: [72, 0, 0], foot_L: [28, 0, 0], foot_R: [38, 0, 0], _body: [12, 0, 0] });   // on thrusters: knees drawn, one leg trailing
-VG.stepL = W(VG.fly, { torso: [5, 18, -12], head: [0, -14, 8], _body: [0, 12, 20] });
-VG.stepR = W(VG.fly, { torso: [5, -18, 12], head: [0, 14, -8], _body: [0, -12, -20] });
+// (the enemy is TryoutIndie's white real-robot mech — its own clips: GunPose / Boost_* / Jump / Idle_Pose; rest = arms
+// hanging straight down beside the thighs)
+const withParts = (base, src, parts) => { const a = Float64Array.from(base); for (const p of parts) for (let c = 0; c < 3; c++) a[PIDX[p] + c] = src[PIDX[p] + c]; return a; };
+const LEGS = ['pelvis', 'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
+VG.idle = fromClip('tryout.Idle_Pose', 0);
+VG.aim = fromClip('tryout.GunPose', 0);                                          // the rifle up in both hands
+VG.guard = W(VG.aim, { pelvis: [0, 25, 0], torso: [6, 50, 0], head: [0, -42, 0], arm_L_upper: [-30, 0, 30], arm_L_lower: [-55, 0, 0] });   // turns its shield shoulder to him
+VG.guardAim = VG.aim;
+VG.crouch = withParts(VG.aim, fromClip('tryout.Jump', 0.3), LEGS);               // loading the jump
+VG.boost = withParts(VG.aim, fromClip('tryout.Jump', 0.62), LEGS);               // driving up, the rifle still on him
+VG.tuck = VG.boost;
+VG.fly = withParts(W(VG.aim, { _body: [10, 0, 0] }), fromClip('tryout.Boost_Forward', 0), LEGS);   // on thrusters: legs trailing
+VG.stepL = withParts(W(VG.aim, { _body: [0, 10, 16] }), fromClip('tryout.Boost_Left', 0), [...LEGS, 'torso']);
+VG.stepR = withParts(W(VG.aim, { _body: [0, -10, -16] }), fromClip('tryout.Boost_Right', 0), [...LEGS, 'torso']);
 VG.hit = W(VG.aim, { torso: [-22, 25, 12], head: [-18, 12, 0], arm_L_upper: [10, -25, 40], arm_L_lower: [-10, 0, 0], _body: [-18, 30, 18] });
-VG.brace = W(VG.aim, { pelvis: [0, -8, 0], torso: [10, 12, 0], leg_L_upper: [-40, 0, 6], leg_L_lower: [60, 0, 0], leg_R_upper: [18, 0, -6], leg_R_lower: [70, 0, 0], _body: [6, 0, 0] });
-VG.limp = P({ pelvis: [10, 0, 0], torso: [28, 10, 15], head: [30, 0, 0], arm_L_upper: [20, 0, -15], arm_L_lower: [-35, 0, 0], arm_R_upper: [25, 0, 18], arm_R_lower: [-40, 0, 0],
+// the full-power shot: feet set wide like a gunner on a firing step, weight low and forward, both hands on the rifle
+VG.brace = W(VG.aim, { pelvis: [0, -10, 0], torso: [14, 8, 0], head: [-6, -6, 0], leg_L_upper: [-45, 0, 12], leg_L_lower: [70, 0, 0], foot_L: [20, 0, 0],
+  leg_R_upper: [22, 0, -12], leg_R_lower: [60, 0, 0], foot_R: [30, 0, 0], _body: [8, 0, 0] });
+VG.limp = P({ pelvis: [10, 0, 0], torso: [28, 10, 15], head: [30, 0, 0], arm_L_upper: [20, 0, 10], arm_L_lower: [-35, 0, 0], arm_R_upper: [25, 0, -8], arm_R_lower: [-40, 0, 0],
   leg_L_upper: [-40, 0, 5], leg_L_lower: [70, 0, 0], leg_R_upper: [-25, 0, -5], leg_R_lower: [60, 0, 0], _body: [0, 0, 0] });
-VG.recoil = W(VG.brace, { torso: [-10, 12, 0], head: [-10, 0, 0], _body: [-10, 0, 0] });
+VG.recoil = W(VG.brace, { torso: [-6, 8, 0], head: [-10, 0, 0], _body: [-8, 0, 0] });
 export const POSE_LIB = { hero: L, vanguard: VG };
 
 // ============================================================================ choreography
@@ -497,7 +501,7 @@ export const BLOCK_T = 178.7, SHIELD_HIT_T = 183.25;
 // and crosses the ~95 m in a blink — the world all but frozen round him (a long bullet-time window, timemap.js), a trail
 // of neon afterimages behind — and cuts it in half at the waist as he passes
 export const SANDE0 = 191.3, SANDE1 = 192.2, CUT_T = 192.05;
-export const CUT_Y = 0.9;
+export const CUT_Y = 3.7;   // (above the pelvis block's top, so the halves don't overlap)
 export const CUT_SPLIT = CUT_T + 0.04;   // the blade is through: the halves start to part   // the cut: torso-local height of the waist line (VANGUARD torso pivot 10.9 m)
 export const KILL_SHOT_T = CUT_T;   // (old name: the killing blow)
 export const WING_HIT_T = SHIELD_HIT_T;   // (old name)
@@ -688,13 +692,36 @@ const enemyBoost = scalarTrack([[170, 0.5], [172.2, 0.5], [172.3, 0.9, 'lin'], [
   ...[177.2, 177.85, 179.5, 180.9, 181.55, 182.25, 183.3, 184.85, 185.85, 186.86, 188.5].flatMap((t) => [[t - 0.02, 0.5], [t + 0.03, 1, 'lin'], [t + 0.35, 0.55]]),
   [183.8, 0.7], [184.3, 1], [187.8, 1], [189.5, 0.6], [190.85, 0.6], [192.4, 0.1], [200, 0.1]]);
 
+// TWO-HANDED AIM (the enemy's 8.6 m rifle): the rifle is PLACED — its grip in front of the chest, a little right of the
+// centre line, the barrel on the target, its top toward the chest's up — and both arms are solved onto it by IK: the
+// right fist on the grip, the left on the fore-end. (Swinging the gun arm alone left the fore-end out of the left arm's reach.)
+// k = aim weight (pose → placed rifle), kL = the left hand's weight (off while the shield is up / after the cut)
+const TWO_HAND = (tw) => (1 - smooth(178.4, 178.55, tw) * (1 - smooth(179.05, 179.25, tw))) * (1 - smooth(183.25, 183.3, tw) * (1 - smooth(183.8, 184.1, tw))) * (1 - smooth(CUT_T - 0.02, CUT_T, tw)) * smooth(176.3, 176.6, tw);
+const HAND_TO_RIFLE = () => sub(PIV.enemy_ms.rifle, PIV.enemy_ms.hand_R);
+function aim2H(s, target, k, kL) {
+  s.pose = { ...s.pose };
+  const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
+  let fk = duelFK(s, 'enemy_ms');
+  const grip = M.transformPoint([0, 0, 0], fk.torso, [-0.35, 3.9, 2.3]);
+  const d = nrm(sub(target, grip)), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
+  const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
+  const b = VAN_BARREL, u0 = GUN_UP.enemy_ms, u = nrm(sub(u0, scl(b, V.dot(u0, b)))), x = V.cross([0, 0, 0], u, b);
+  // world rotation taking the rifle frame (x, u, b) onto (X, U, d)
+  const Rw = r3mul([...X, ...U, ...d], r3T([...x, ...u, ...b]));
+  const hr = HAND_TO_RIFLE();
+  armIK(s, fk, 'enemy_ms', 'R', sub(grip, r3v(Rw, hr)), Rw);
+  fk = duelFK(s, 'enemy_ms');
+  const fore = M.transformPoint([0, 0, 0], fk.rifle, scl(VAN_MUZZLE, 0.2));
+  armIK(s, fk, 'enemy_ms', 'L', sub(fore, r3v(Rw, hr)), Rw);
+  for (const p in keep) { const w = p.includes('_L') || p === 'hand_L' ? k * kL : k; s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], w)); }
+}
 // ---------------- Sigma's aim: laid on the target round each shot. Misses go just past (it quick-boosts); 178.7 lands on
 // the shield (it blocks), 183.25 on the shield (torn off), the charged shot on its chest
 const HERO_AIM = (tw) => { let k = smooth(176.4, 176.6, tw) * (1 - smooth(190.95, 191.12, tw));
   for (const ts of HERO_SHOTS) k = Math.max(k, smooth(ts - 0.4, ts - 0.2, tw) * (1 - smooth(ts + 0.12, ts + 0.3, tw)));
   return Math.min(1, k); };
 const MISS = [[0, 6], [6, 1], null, [-6, 4], [2, -6], [6, 3], null, [1, 7], [-7, 0], [5, -5], [-5, 5]];   // [side, up] (m) across the line of fire
-const SHIELD_C = [2.0, -1.88, 0.5];   // the shield's centre in its part frame (assets/enemy_ms.glb)
+const SHIELD_C = [1.351, -2.337, 0.17];   // the centre of the shield's outer face, in its part frame (assets/enemy_ms.glb)
 function heroAimPoint(tw) {
   let bi = 0; for (let i = 0; i < HERO_SHOTS.length; i++) if (Math.abs(tw - HERO_SHOTS[i]) < Math.abs(tw - HERO_SHOTS[bi])) bi = i;
   const ts = HERO_SHOTS[bi], es = enemyRaw_(ts + 0.02), fk = es ? duelFK(es, 'enemy_ms') : null;
@@ -987,7 +1014,7 @@ function enemyState_(t) {
   s.eye = tw > CUT_T + 0.1 ? Math.max(0, 1 - (tw - CUT_T - 0.1) / 1.2) * (Math.sin(t * 50) > -0.2 ? 1 : 0.2) : 1;
   finish(s, _epose, f, false);
   const ak = ENEMY_AIM(tw);
-  if (ak > 0 && !(tw > CUT_T)) aimEnemy(s, enemyAim(tw), ak);        // the rifle laid on where he is going
+  if (ak > 0 && !(tw > CUT_T)) aim2H(s, enemyAim(tw), ak, TWO_HAND(tw));   // the rifle levelled on where he is going, in both hands
   return hitReact(tw < SERAPH_HANDOFF ? 'e1' : 'e2', tw, s, 'enemy_ms');
 }
 // ============================================================================ forward kinematics (same math as renderer + msMatrix)
@@ -1000,13 +1027,13 @@ const PIV = {
     leg_L_upper: [2.2, 9.35, 0], leg_L_lower: [3.0, 6.65, 0.2], foot_L: [3.65, 1.7, 0],
     leg_R_upper: [-2.2, 9.35, 0], leg_R_lower: [-3.0, 6.65, 0.2], foot_R: [-3.65, 1.7, 0],
   },
-  enemy_ms: {   // VANGUARD / 07 (assets/enemy_ms.glb, painted white; SERAPH / 03 kept in assets/v15_backup)
-    ms_root: [0, 8.942, 0], pelvis: [0, 8.942, 0], torso: [0, 10.894, 0], head: [0, 15.776, -0.206],
-    arm_L_upper: [3.392, 15.314, -0.36], arm_L_lower: [5.139, 13.413, -0.308], hand_L: [6.783, 11.665, 0.719],
-    arm_R_upper: [-3.392, 15.314, -0.36], arm_R_lower: [-5.139, 13.413, -0.308], hand_R: [-6.783, 11.665, 0.719],
-    leg_L_upper: [1.953, 8.942, 0], leg_L_lower: [2.518, 6.629, -0.308], foot_L: [3.083, 2.056, -0.514],
-    leg_R_upper: [-1.953, 8.942, 0], leg_R_lower: [-2.518, 6.629, -0.308], foot_R: [-3.083, 2.056, -0.514],
-    rifle: [-7.811, 11.1, 2.981],
+  enemy_ms: {   // TryoutIndie '3D Mech Asset' (MIT; assets/enemy_ms.glb via blender/convert_tryout.py; VANGUARD in assets/v15_backup)
+    ms_root: [0, 9.651, 0], pelvis: [0, 9.651, 0], torso: [0, 10.462, 0], head: [0, 15.454, 0],
+    arm_L_upper: [3.371, 15.776, 0], arm_L_lower: [3.371, 12.331, -0.175], hand_L: [3.371, 9.388, 0.241],
+    arm_R_upper: [-3.371, 15.776, 0], arm_R_lower: [-3.371, 12.331, -0.175], hand_R: [-3.371, 9.388, 0.241],
+    leg_L_upper: [1.897, 10.462, 0], leg_L_lower: [1.897, 6.198, 0.132], foot_L: [1.897, 0.284, 0],
+    leg_R_upper: [-1.897, 10.462, 0], leg_R_lower: [-1.897, 6.198, 0.132], foot_R: [-1.897, 0.284, 0],
+    rifle: [-3.344, 8.550, 0.232],
   },
 };
 const PARENT = { ms_root: null, pelvis: 'ms_root', torso: 'ms_root', head: 'torso', arm_L_upper: 'torso', arm_L_lower: 'arm_L_upper', hand_L: 'arm_L_lower',
@@ -1018,8 +1045,8 @@ const FK_ORDER = Object.keys(PARENT);
 export const RIFLE_T = [-0.10266, -1.69395, 0.25666];
 export const MUZZLE_T = [0, 0.55, 8.4];
 // VANGUARD's rifle (assets/enemy_ms.glb): rifle_muzzle in the rifle part's frame; the barrel runs from the grip pivot to it
-export const VAN_MUZZLE = [-2.98552, -4.29353, 1.72814];
-const VAN_BARREL = nrm(VAN_MUZZLE);
+export const VAN_MUZZLE = [0.4134, -8.6024, 0.7292];            // the enemy rifle (rifle part frame)
+const VAN_BARREL = nrm([0.1296, -0.9892, 0.0678]);
 export function msMatrixOf(s, out = M.new()) {
   const f = nrm(s.fwd);
   const yaw = Math.atan2(f[0], f[2]);
@@ -1130,7 +1157,7 @@ function armIK(s, fk, model, side, P, Hw) {
 // rifle rolled on its side or upside down whenever the arm came up from a hanging pose.)
 // rifle "top" in the rifle part's frame: ATLAS's rifle is modelled bore-above-grip along +Y; VANGUARD's measured from
 // its mesh (the barrel sits on the grip's +up side)
-const GUN_UP = { gundam: [0, 1, 0], enemy_ms: [0.502, -0.598, -0.62] };
+const GUN_UP = { gundam: [0, 1, 0], enemy_ms: [-0.0337, 0.064, 0.9974] };
 function layRifle(s, model, target, k, twist = 1) {
   s.pose = { ...s.pose };
   for (let it = 0; it < 3; it++) {

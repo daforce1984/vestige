@@ -16,8 +16,22 @@ TEX = os.path.join(ASSETS, 'tex')
 EMISSIVE = {'eye', 'core', 'engine'}
 RES = 4096
 DETAIL_BOOST = {'head': 1.7, 'torso': 1.35}   # extra texel density for close-up parts
-# per model options (enemy_ms = VANGUARD / 07 repainted crimson)
-MODEL_OPTS = {'enemy_ms': dict(wear=0.45, bare=(0.4, 0.4, 0.42), paint_rough=0.4, paint_metal=0.15)}   # VANGUARD in white: satin paint, light wear
+# per model options. enemy_ms = the TryoutIndie.Dev mech (blender/convert_tryout.py): satin white paint (albedo kept at
+# ~sRGB 0.7: paint_floor 0.04 so the gunmetal frame is not lifted to mid-grey), edge wear to bare metal, per-panel
+# value variation, and its own PBR for the metallic gunmetal frame / grey detail / red accents (mat_pbr: metal, rough)
+MODEL_OPTS = {'enemy_ms': dict(wear=0.6, bare=(0.52, 0.52, 0.54), paint_rough=0.4, paint_metal=0.08, paint_floor=0.04,
+                               panel_var=0.05, mat_pbr={'tryout_frame': (0.6, 0.42), 'tryout_grey': (0.55, 0.38),
+                                                        'tryout_red': (0.08, 0.36)},
+                               # AI-generated tileable 1024² sources (assets/tex/src), box-projected in model space:
+                               # material -> (albedo, tile metres, linear tint multiplier)
+                               tex_class={'tryout_white': ('white', 4.5, (0.8, 0.8, 0.8)),
+                                          'tryout_red': ('white', 4.5, (0.78, 0.055, 0.06)),
+                                          'tryout_frame': ('frame', 3.0, (1.0, 1.0, 1.0)),
+                                          'tryout_grey': ('metal', 2.5, (0.55, 0.55, 0.57))},
+                               tex_height_mats={'tryout_frame', 'tryout_grey'})}
+TEX_SRC = {'white': 'vestige_mech_white_armor_albedo_v1.png', 'frame': 'vestige_mech_dark_frame_albedo_v1.png',
+           'metal': 'vestige_mech_metal_detail_albedo_v1.png', 'height': 'vestige_mech_panel_height_v1.png',
+           'mask': 'vestige_mech_wear_grime_mask_v1.png'}
 OPT = {}
 
 
@@ -93,6 +107,16 @@ class G:
         return [s for s in n.outputs if s.type == 'VALUE'][0]
 
 
+def box_tex(g, key, pos, tile, color=True):
+    """tileable source texture, box (tri-planar) projected: vector = model-space position / tile metres"""
+    img = bpy.data.images.load(os.path.join(TEX, 'src', TEX_SRC[key]), check_existing=True)
+    img.colorspace_settings.name = 'sRGB' if color else 'Non-Color'
+    n = g.node('ShaderNodeTexImage', projection='BOX', projection_blend=0.3, interpolation='Linear')
+    n.image = img
+    g.link(g.vmath('DIVIDE', pos, (tile, tile, tile)), n.inputs['Vector'])
+    return n.outputs['Color']
+
+
 def principled(m):
     return next(n for n in m.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
 
@@ -119,6 +143,7 @@ def build_bake_graph(m, scorches, seed):
         k = min(max(OPT.get('paint_floor', 0.12) / max(lum, 1e-4), 1.0), 4.5)
         base = tuple(min(0.75, c * k) for c in base)
         paint_metal, paint_rough = OPT.get('paint_metal', 0.12), OPT.get('paint_rough', max(rough0, 0.55))
+        paint_metal, paint_rough = OPT.get('mat_pbr', {}).get(m.name, (paint_metal, paint_rough))
     else:
         grey = max(lum, 1e-4)
         base = tuple(0.05 * (0.6 + 0.4 * c / grey) for c in base)   # ~0.05 linear, slight original tint
@@ -151,6 +176,17 @@ def build_bake_graph(m, scorches, seed):
     # --- vertical streaks
     sv = g.vmath('MULTIPLY', posn, (9.0, 9.0, 0.45))
     streak = g.math('MULTIPLY', g.mr(g.noise(sv, 1.0, 3.0, 0.5), 0.52, 0.72), 0.45)
+    tcls = OPT.get('tex_class', {}).get(m.name)
+    cav = None
+    if tcls:
+        # the AI wear / grime mask: its bright flecks chip the paint to bare metal, its dim smears are grime
+        wm = box_tex(g, 'mask', posn, 4.0, color=False)
+        worn = g.math('MAXIMUM', worn, g.math('MULTIPLY', g.mr(wm, 0.3, 0.6), OPT.get('wear', 1.0)))
+        grime = g.math('MAXIMUM', grime, g.mr(wm, 0.06, 0.28, 0.0, 0.55))
+        streak = g.math('MULTIPLY', streak, 0.5)                 # the sources carry their own streaking
+        if m.name in OPT.get('tex_height_mats', ()):
+            h = box_tex(g, 'height', posn, tcls[1], color=False)
+            cav = g.mr(h, 0.47, 0.3)                              # panel grooves / vents / bolt rims (height < plateau)
     # --- scratches (thin stretched noise iso-lines, masked)
     sc = g.vmath('MULTIPLY', posn, (30.0, 30.0, 2.5))
     s_n = g.noise(sc, 1.0, 2.0, 0.4)
@@ -166,7 +202,36 @@ def build_bake_graph(m, scorches, seed):
         ring = rg if ring == 0.0 else g.math('MAXIMUM', ring, rg)
     # --- colour
     dark_paint = tuple(c * 0.45 for c in base)
-    col = g.mix(chip, base, dark_paint)
+    col = base
+    if tcls:
+        mt = g.node('ShaderNodeMix', data_type='RGBA', blend_type='MULTIPLY', clamp_factor=True)
+        mt.inputs['Factor'].default_value = 1.0
+        ins_t = [x for x in mt.inputs if x.type == 'RGBA']
+        g.link(box_tex(g, tcls[0], posn, tcls[1]), ins_t[0])
+        g.val(tuple(tcls[2]), ins_t[1])
+        base = [x for x in mt.outputs if x.type == 'RGBA'][0]
+        col = base
+        dark_paint = (0.02, 0.02, 0.022)
+    if OPT.get('panel_var') and painted:
+        # per-panel value variation: ~1.5 m Voronoi cells, each a slightly different paint batch (+-panel_var)
+        vor = g.node('ShaderNodeTexVoronoi')
+        g.link(posn, vor.inputs['Vector'])
+        vor.inputs['Scale'].default_value = 0.65
+        sep = g.node('ShaderNodeSeparateColor')
+        g.link(vor.outputs['Color'], sep.inputs[0])
+        pv = g.mr(sep.outputs[0], 0.0, 1.0, 1.0 - OPT['panel_var'], 1.0 + OPT['panel_var'])
+        grey = g.node('ShaderNodeCombineColor')
+        for k in range(3):
+            g.link(pv, grey.inputs[k])
+        mul = g.node('ShaderNodeMix', data_type='RGBA', blend_type='MULTIPLY', clamp_factor=True)
+        mul.inputs['Factor'].default_value = 1.0
+        ins = [x for x in mul.inputs if x.type == 'RGBA']
+        g.val(base, ins[0])
+        g.link(grey.outputs[0], ins[1])
+        col = [x for x in mul.outputs if x.type == 'RGBA'][0]
+    col = g.mix(chip, col, dark_paint)
+    if cav is not None:                                           # height map baked as cavity shading (no normal slot)
+        col = g.mix(g.math('MULTIPLY', cav, 0.55), col, (0.008, 0.008, 0.009))
     col = g.mix(worn, col, OPT.get('bare', (0.72, 0.72, 0.74)))
     col = g.mix(g.math('MULTIPLY', scratch, 0.7), col, (0.55, 0.55, 0.57))
     col = g.mix(g.math('MULTIPLY', grime, 0.45), col, (0.06, 0.052, 0.042))
@@ -176,6 +241,8 @@ def build_bake_graph(m, scorches, seed):
     # --- roughness / metal / ao
     rough = g.mixf(worn, paint_rough, 0.3)
     rough = g.math('ADD', rough, g.math('MULTIPLY', grime, 0.18), clamp=True)
+    if cav is not None:
+        rough = g.math('ADD', rough, g.math('MULTIPLY', cav, 0.2), clamp=True)
     rough = g.mixf(soot, rough, 0.85)
     metal = g.mixf(worn, paint_metal, 1.0)
     metal = g.mixf(g.math('MULTIPLY', scratch, 0.6), metal, 1.0)

@@ -785,7 +785,7 @@ function drawHalves(R, t, s) {
 // (torso-local, from the mesh bounds); the blade line crosses it as a chord that sweeps through. Where the chord meets the
 // armour, the cut edge glows white → orange and cools behind it, molten metal sprays off both ends, and crimson armour
 // plates cut loose are flung out along the swing. All motion in story seconds (the picture runs at 1/40 here).
-const CUT_E = { cx: 0, cz: -0.6, rx: 2.9, rz: 3.2 };   // waist section (torso local)
+const CUT_E = { cx: 0, cz: 0.6, rx: 1.6, rz: 1.4 };   // waist section at CUT_Y (torso local, measured from the mesh)
 let _cutPath = null;
 function cutPath() {   // sampled once: per story time, the chord's two ends as ellipse angles (NaN = not in contact)
   if (_cutPath) return _cutPath;
@@ -1116,7 +1116,7 @@ function drawSeraphFire(R, t) {
       const lt = t - FINALE_T, k = t < FINALE_END ? 1.1 + 0.12 * Math.sin(t * 43) : Math.max(0, 1 - (t - FINALE_END) / 0.3);
       serBeam(R, L.from, madd(L.from, L.dir, Math.min(4000, 3000 * lt + 5)), k, 2.4);
       if (lt < 0.35) R.ripple(L.from, 10 + 60 * easeOut(lt / 0.35), [0.5, 0.5, 0.5], (1 - lt / 0.35) * 1.3);
-      R.light(L.from, 110, [1, 0.3, 0.45], 16 * k);
+      R.light(madd(L.from, L.dir, 30), 110, [1, 0.3, 0.45], 9 * k);   // out along the beam (at the muzzle it washed its own body pink)
       const g = gundamState(t); if (g && g.vis) { const d = V.sub([0, 0, 0], g.pos, L.from), u = Math.max(0, V.dot(d, L.dir)); R.light(madd(L.from, L.dir, u), 90, [1, 0.3, 0.45], 10 * k); }   // it lights him as it tears past
     }
   }
