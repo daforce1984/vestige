@@ -1815,6 +1815,142 @@ function breath(E, t, p) {
   perc(gg.gain, t + ti + 0.05, vel * 0.08, to / 3, 0.05);
 }
 
+// ================================================================ v9: BEAM SABER (procedural, no samples)
+// Reference analysis (CC0 recordings in assets/sfx_src/saber_ref, see the README there; numpy/scipy, 2026-09):
+//  • HUM: steady motor hum, f0 80.9 Hz (sd 0.6 Hz, ~1 Hz drift) / 83–86 Hz in a second loop, ~97–100 Hz in the swing
+//    takes. Sawtooth-like series: h2 −10, h3 −9.5, h4 −15, h5 −13, h6 −28 dB re h1, plus a SUB-octave at −7 dB (40 Hz).
+//    Energy: 40–700 Hz ≈ all of it; the "projector buzz" band 0.7–4 kHz sits −21…−26 dB (tonal peaks ~1.4/1.7/2.0 kHz),
+//    >4 kHz only −37…−48 dB. Flutter: amplitude wobble ≈ 10 Hz (env CV 0.34) + a slow ±5 dB level drift at ~0.4 Hz.
+//  • SWING: a level swell, not a pitch sweep: −30 → 0 dB in ~80 ms, back to −30 dB in ~350 ms. Pitch sits ~3 % LOW at
+//    the loud peak and rises +5…+13 % in the quiet tail (Doppler-ish); centroid low (~200 Hz) at the peak, ~500 Hz tail.
+//  • IGNITE: 50 ms attack, peak at 0.15 s, then ≈ 30 dB/s exponential decay into the hum (−20 dB @0.8 s); starts BRIGHT
+//    (centroid 3.4–5.4 kHz, 33–48 % of the energy above 3 kHz = crackle/snap) and darkens to ~2.6 kHz; f0 sweeps in from
+//    above and settles (87 → 72 Hz in 0.3 s) — the blade "shooting out".
+//  • RETRACT: hum pitches/darkens away, ending in a short very bright hiss/click (centroid ~11 kHz at the cut-off).
+//  • CLASH: < 10 ms onset, then a ~1.2 s sustained broadband sizzle (centroid 2–4.4 kHz vs 0.45 kHz for the hum, dense —
+//    HF kurtosis 4 vs 15–60 for the sparse crackle of the hum/swing takes) over the hum, whose pitch jitters at ~6.7 Hz.
+// Built from a few oscillators + shared noise buffers (like every voice above); `red` = berserk variant (lower, driven
+// through the fold curve, dirtier buzz). Hum swings: p.swings = [[tRel, amount 0..1, len s], …] (sorted, non-overlapping).
+const BS_F = 88, BS_F_RED = 70;
+function bsTone(v, t, stop, o = {}) {
+  const red = o.red || 0, f = o.f ?? (red ? BS_F_RED : BS_F), bright = o.bright ?? (red ? 900 : 620);
+  const lp = v.f('lowpass', bright, 0.9), pre = v.g(0.9 + 1.6 * red), sh = v.ws(red ? 'fold' : 'soft'), post = v.f('lowpass', red ? 2200 : 3500, 0.7);
+  const am = v.g(1), g = v.g(0);
+  lp.connect(pre); pre.connect(sh); sh.connect(post); post.connect(am); am.connect(g); g.connect(v.out);
+  const pc = v.add(v.c.createConstantSource()); pc.offset.value = 0; v._run(pc, t, stop);   // shared pitch (cents)
+  const a = v.osc('sawtooth', f, t, stop), b = v.osc('sawtooth', f * 2.003, t, stop), bg2 = v.g(0.4), s = v.osc('square', f / 2, t, stop), sg = v.g(0.4 + 0.05 * red);
+  const dr = v.osc('sine', R(0.8, 1.2), t, stop), drg = v.g(7 + 18 * red);                   // ~1 Hz pitch drift
+  dr.connect(drg);
+  for (const x of [a, b, s]) { pc.connect(x.detune); drg.connect(x.detune); }
+  a.connect(lp); b.connect(bg2); bg2.connect(lp); s.connect(sg); sg.connect(lp);
+  const fl = v.osc('sine', R(9.5, 10.5), t, stop), flg = v.g(0.13 + 0.1 * red);             // 10 Hz flutter
+  fl.connect(flg); flg.connect(am.gain);
+  // projector buzz: the hum's own upper harmonics, clipped and band-passed (−22 dB)
+  const bp = v.g(4 + 6 * red), bs = v.ws('hard'), bb = v.f('bandpass', red ? 1250 : 1600, red ? 1.2 : 2), bg = v.g(0.035 + 0.05 * red);
+  a.connect(bp); bp.connect(bs); bs.connect(bb); bb.connect(bg); bg.connect(am);
+  return { g, lp, pc, bright };
+}
+function beamSaberIgnite(E, t, p) {
+  const vel = p.vel ?? 0.8, red = p.red ? 1 : 0, stop = t + 1.6;
+  const v = new Voice(E, 'sfx', { verb: 0.45, pan: p.pan ?? 0 });
+  const { g, lp, pc, bright } = bsTone(v, t, stop, { red });
+  pc.offset.setValueAtTime(-1300, t); pc.offset.linearRampToValueAtTime(350, t + 0.12); pc.offset.linearRampToValueAtTime(0, t + 0.45);
+  sweep(lp.frequency, t, 350, t + 0.12, 4500); lp.frequency.setTargetAtTime(bright, t + 0.15, 0.2);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vel * 0.35, t + 0.05);
+  g.gain.setValueAtTime(vel * 0.35, t + 0.15); g.gain.setTargetAtTime(0, t + 0.15, 0.29);
+  const n = v.noise('white', t, t + 0.6), nb = v.f('bandpass', 1500, 1.2), ng = v.g(0);        // snap-hiss
+  sweep(nb.frequency, t, 1500, t + 0.12, 5000);
+  n.connect(nb); nb.connect(ng); ng.connect(v.out);
+  perc(ng.gain, t + 0.01, vel * 0.9, 0.1, 0.02);
+  const z = v.noise('white', t, stop), zb = v.f('bandpass', 3000, 0.7), zg = v.g(0);            // sizzle riding the decay
+  z.connect(zb); zb.connect(zg); zg.connect(v.out);
+  zg.gain.setValueAtTime(0, t); zg.gain.linearRampToValueAtTime(vel * 0.6, t + 0.06); zg.gain.setTargetAtTime(0, t + 0.15, 0.3);
+  const c = v.noise('crackle', t, stop, R(1.2, 1.6)), ch = v.f('highpass', 2500, 0.7), cg = v.g(0);
+  c.connect(ch); ch.connect(cg); cg.connect(v.out);
+  perc(cg.gain, t + 0.02, vel * (0.9 + 0.3 * red), 0.25, 0.01);
+}
+function beamSaberHum(E, t, p) {
+  const dur = p.dur ?? 4, into = p.into ?? 0, vel = p.vel ?? 0.5, red = p.red ? 1 : 0, stop = t + dur + 0.6;
+  const fi = into > 0 ? 0.05 : p.fadeIn ?? 0.25, fo = p.fadeOut ?? 0.3;
+  const v = new Voice(E, 'sfx', { verb: 0.3, pan: p.pan ?? 0 });
+  const { g, lp, pc, bright } = bsTone(v, t, stop, { red, f: p.f });
+  const L = vel * 0.3;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(L, t + fi);
+  const ld = v.osc('sine', R(0.35, 0.45), t, stop), ldg = v.g(0); ld.connect(ldg); ldg.connect(g.gain);   // slow ±1.5 dB drift
+  ldg.gain.setValueAtTime(0, t); ldg.gain.linearRampToValueAtTime(L * 0.15, t + fi);
+  g.gain.setValueAtTime(L, t + Math.max(fi, dur - fo)); g.gain.linearRampToValueAtTime(0, t + dur);
+  ldg.gain.setValueAtTime(L * 0.15, t + Math.max(fi, dur - fo)); ldg.gain.linearRampToValueAtTime(0, t + dur);
+  // blade motion: level swell (up to +8 dB), pitch dips at the peak and rises in the tail, brighter while it moves
+  const sw = v.g(1); g.disconnect(); g.connect(sw); sw.connect(v.out);
+  for (const [r, amt, len = 0.45] of p.swings || []) {
+    const s0 = t + r - into, pk = s0 + len * 0.22, end = s0 + len;
+    if (end <= t || s0 + 0.01 >= t + dur) continue;
+    sw.gain.setValueAtTime(1, Math.max(t, s0)); sw.gain.linearRampToValueAtTime(1 + 1.5 * amt, Math.max(t, pk)); sw.gain.setValueAtTime(1 + 1.5 * amt, Math.max(t, pk + len * 0.2));
+    sw.gain.setTargetAtTime(1, Math.max(t, pk + len * 0.2), len * 0.2);
+    pc.offset.setValueAtTime(0, Math.max(t, s0)); pc.offset.linearRampToValueAtTime(-45 * amt, Math.max(t, pk));
+    pc.offset.linearRampToValueAtTime(110 * amt, Math.max(t, end - len * 0.2)); pc.offset.linearRampToValueAtTime(0, Math.max(t, end));
+    lp.frequency.setValueAtTime(bright, Math.max(t, s0)); lp.frequency.linearRampToValueAtTime(bright * (1 + 0.4 * amt), Math.max(t, pk));
+    lp.frequency.setTargetAtTime(bright, Math.max(t, pk), len * 0.25);
+  }
+}
+function beamSaberSwing(E, t, p) {
+  const vel = p.vel ?? 0.7, red = p.red ? 1 : 0, len = p.dur ?? 0.45, stop = t + len + 0.5;
+  const v = new Voice(E, 'sfx', { verb: 0.35, pan: p.pan ?? 0 });
+  const { g, lp, pc, bright } = bsTone(v, t, stop, { red });
+  const pk = t + 0.08;
+  pc.offset.setValueAtTime(20, t); pc.offset.linearRampToValueAtTime(-50, pk); pc.offset.linearRampToValueAtTime(160, t + len);
+  sweep(lp.frequency, t, bright, pk, bright * 0.8); lp.frequency.setTargetAtTime(bright * 0.8, pk, len * 0.3);
+  g.gain.setValueAtTime(vel * 0.012, t); g.gain.exponentialRampToValueAtTime(vel * 0.45, pk);
+  g.gain.setValueAtTime(vel * 0.45, pk + len * 0.3); g.gain.setTargetAtTime(0, pk + len * 0.3, len * 0.2);
+  if (p.pan0 !== undefined) v.panRamp(p.pan0, p.pan1 ?? -p.pan0, t, t + len);
+  const n = v.noise('white', t, stop), nb = v.f('bandpass', 700, 0.9), ng = v.g(0);            // air displaced by the blade
+  sweep(nb.frequency, t, 700, pk, 2600); nb.frequency.setTargetAtTime(900, pk, len * 0.3);
+  n.connect(nb); nb.connect(ng); ng.connect(v.out);
+  ng.gain.setValueAtTime(vel * 0.001, t); ng.gain.exponentialRampToValueAtTime(vel * 0.025, pk); ng.gain.setTargetAtTime(0, pk + len * 0.2, len * 0.2);
+}
+function beamSaberRetract(E, t, p) {
+  const vel = p.vel ?? 0.6, red = p.red ? 1 : 0, L = p.dur ?? 0.5, stop = t + L + 0.4;
+  const v = new Voice(E, 'sfx', { verb: 0.4, pan: p.pan ?? 0 });
+  const { g, lp, pc, bright } = bsTone(v, t, stop, { red });
+  pc.offset.setValueAtTime(0, t); pc.offset.linearRampToValueAtTime(-1600, t + L);
+  sweep(lp.frequency, t, bright * 1.8, t + L, 220);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vel * 0.45, t + 0.03);
+  g.gain.setTargetAtTime(0, t + 0.1, L * 0.3);
+  const c = v.noise('crackle', t, t + L, 1.4), ch = v.f('highpass', 2500, 0.7), cg = v.g(0);
+  c.connect(ch); ch.connect(cg); cg.connect(v.out);
+  perc(cg.gain, t, vel * 0.35, L * 0.25, 0.01);
+  const h = v.noise('white', t + L * 0.8, stop), hh = v.f('highpass', 6500, 0.7), hg = v.g(0);  // the "pfft" cut-off
+  h.connect(hh); hh.connect(hg); hg.connect(v.out);
+  perc(hg.gain, t + L * 0.8, vel * 0.16, 0.035, 0.005);
+}
+function beamSaberClash(E, t, p) {
+  const vel = p.vel ?? 1, red = p.red ? 1 : 0, grind = p.grind ?? 0.6, stop = t + grind + 1.2;
+  const f = red ? BS_F_RED : BS_F;
+  const v = new Voice(E, 'sfx', { verb: 0.5, pan: p.pan ?? 0 });
+  const n = v.noise('white', t, t + 0.5), nb = v.f('bandpass', 3000, 0.6), ng = v.g(0);        // the crack
+  n.connect(nb); nb.connect(ng); ng.connect(v.out);
+  perc(ng.gain, t, vel * 0.4, 0.05, 0.002);
+  const zg = v.g(0); zg.connect(v.out);                                                        // sustained sizzle (dense)
+  const c = v.noise('crackle', t, stop, R(1.5, 1.9)), ch = v.f('highpass', 1200, 0.7);
+  c.connect(ch); ch.connect(zg);
+  const w = v.noise('white', t, stop), wb = v.f('bandpass', 2500, 0.8), wg = v.g(0.9), zl = v.f('lowpass', 4500, 0.7);
+  w.connect(wb); wb.connect(wg); wg.connect(zg); zg.disconnect(); zg.connect(zl); zl.connect(v.out);
+  envAR(zg.gain, t, grind, 0.005, 0.5, vel * 0.65);
+  // the clashing blades' buzz: clipped saw, pitch jittering at ~6.7 Hz
+  const z = v.osc('sawtooth', f * 1.12, t, stop), zj = v.osc('square', 6.7, t, stop), zjg = v.g(70 + 60 * red);
+  zj.connect(zjg); zjg.connect(z.detune);
+  const zp = v.g(3 + 3 * red), zs = v.ws('hard'), zb = v.f('bandpass', 1300, 0.9), zo = v.g(0);
+  z.connect(zp); zp.connect(zs); zs.connect(zb); zb.connect(zo); zo.connect(v.out);
+  envAR(zo.gain, t, grind, 0.005, 0.4, vel * 0.3);
+  const zl2 = v.f('lowpass', 450, 0.8), zo2 = v.g(0);                                          // the hum body under it
+  z.connect(zl2); zl2.connect(zo2); zo2.connect(v.out);
+  envAR(zo2.gain, t, grind, 0.005, 0.4, vel * 0.2);
+  const s = v.osc('sine', 100, t, t + 1), sg = v.g(0);                                         // body thump
+  sweep(s.frequency, t, 100, t + 0.3, 40);
+  s.connect(sg); sg.connect(v.out);
+  perc(sg.gain, t, vel * 0.5, 0.12);
+}
+
 export const INSTR = {
   // music
   strings, choir, brass, lead, stac, bass, sub, glass, harp, taiko, kick, snare, hat, cymbal, boom, braam, riser, revswell,
@@ -1833,4 +1969,6 @@ export const INSTR = {
   metalRing, freezeSting, crunch, sparkBurst, sizzle, steam,
   // v8 (first-person tear insert)
   beep, breath,
+  // v9 beam saber (procedural)
+  beamSaberIgnite, beamSaberHum, beamSaberSwing, beamSaberRetract, beamSaberClash,
 };

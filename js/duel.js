@@ -1,42 +1,22 @@
-// Mech-vs-mech duel choreography for film time 160–200 s (keyframed, seek-safe, pure functions of t).
+// Mech-vs-mech duel for story time 160–200 s: THE GUNFIGHT — Sigma (ATLAS, beam rifle) against VANGUARD (repainted
+// crimson; beam rifle + shield). Keyframed, seek-safe, pure functions of t.
 //
-// Reference studied for timing / rhythm / camera only (no designs copied):
-//   * PRIMARY: Secret Level — Armored Core "Locked In" (Prime Video)  https://www.youtube.com/watch?v=TiQCkRQwEqk
-//   * Mobile Suit Gundam 00 — Masurao vs Susanowo sword duel          https://www.youtube.com/watch?v=-EAfZeIDL9Y
-//   * Pacific Rim (2013) — Gipsy Danger vs Otachi, sword finish        https://www.youtube.com/watch?v=AYQjmj7cSM0
-//   Beat sheet + numbers: blender/DUEL_NOTES.md.  Previews: blender/duel_dump.mjs → blender/duel_preview.py.
-//   Contacts are exact: a small solver (see SOLVE) refines the key poses at every clash/hit so blades really cross.
+// Reference studied for rhythm / staging only (nothing copied): the ranged mobile-suit duels of Mobile Suit Gundam
+// Unicorn — two machines circling far apart on opposite ends of a turning diameter, quick-boost side-steps out of each
+// shot, a shield taking a hit, the opponent jumping and flipping to fire inverted, a zig-zag advance, a long circling run
+// trading fire, one full-power shot slipped at the last instant and a single decisive magnum shot across the distance;
+// Armored Core "Locked In" for the quick-boost language (sharp starts, long settles). They never close to melee:
+// the nearest they come is ~60 m.
+// Motion data: the source mechs' own animation clips (CC0 — js/motion.js / tools/extract_motion.py): VANGUARD's
+// RifleBurst (aim), ShieldGuard (the block), BoostJump (the jump) and Backflip (the inverted shot) drive its poses.
 //
-// ─────────────────────────────────────────────── HOOK-IN (js/shots.js) ───────────────────────────────────────────────
-//   import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS } from './duel.js';
-//
-//   gundamState(t):   first line after the vis check →   { const d = duelHero(t); if (d) return d; }
-//                     (replaces the t<170 / t<180 / t<186 / t<190 / t<194 / t<226(→200) branches; t≥200 keeps the old code,
-//                      duelHero(200-) hands over continuously to the old 194–226 'aftermath' formula)
-//   enemyMS1(t):      first line →  { const d = duelEnemy1(t); if (d) return d; }
-//   enemyMS2(t):      first line →  { const d = duelEnemy2(t); if (d) return d; }
-//   shots 170–200:    delete S12a…S12f and add one shot:
-//     shot(170, 200, 'S12 DUEL', (c) => {
-//       const k = duelCamera(c.t);
-//       camLook(c, k.pos, k.target, k.fov, k.roll);
-//       shake(c, k.shake, k.shakeFreq); handheld(c, k.handheld);
-//       c.env.shadowCenter = k.focus; c.env.shadowRadius = k.shadowRadius;
-//       c.post.flash = Math.max(c.post.flash, k.flash); c.post.shakeBlur = k.blur;
-//       if (k.slowmo) { c.post.saturation = 0.75; c.post.streak = 0.45; c.post.gradeHighlights = [1.2, 1.0, 0.85]; }
-//     });
-//     (findShot can also use DUEL_CAMS for the per-cut names.)
-//   drawMSBattle: E1 now closes to melee (saber on 176.9–180.2) — drawEnemyMS already draws s.saber>0;
-//     the old fixed "saber clash sparks at CP+[0,12,0]" (186–190.5) → drive sparks/flash/shake from DUEL_EVENTS
-//     (each has an exact world contact point `p`, `hitstop`, `strength`); the 192.4 cut beam → DUEL_EVENTS 'hit' with `cut:[a,b]`.
-//   State extras: vel (m/s world), speed, smear (0..1 for motion-blur / thruster streaks), boost (0..1 thruster burst).
-//   RIFLE: fire each bolt from the muzzle —  for (const s of DUEL_SHOTS) { … rifleShot(R, t, s.t, s.from, s.to, s.hit) }
-//     DUEL_SHOTS[i] = { t, from (muzzle world pos at t), dir (barrel unit vector), to (aim point on E1), hit, aimError }
-//     duelMuzzle(t) → { pos, dir } of `rifle_muzzle` at any t (FK with the gundam.glb rifle/rifle_muzzle offsets).
-//   Motion: C1 Hermite keys + spring follow-through (torso→upper arm→forearm→hand 0/1/2/3-frame lag, 2–3 settle
-//     wobbles), arc'd dash paths, auto crouch before dashes, continuous hover micro-motion; filters bypass impacts.
-// ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// Exports used by shots.js / audio.js / main.js: duelHero / duelEnemy1 (≤ 180.9) / duelEnemy2 (≥ 180.9) states,
+// duelCamera + DUEL_CAMS, DUEL_EVENTS, DUEL_SHOTS (Sigma's shots), SERAPH_SHOTS (= the enemy's shots; name kept),
+// seraphMuzzle (enemy muzzle), FINALE_T/END (its full-power shot), SHIELD_HIT_T (the shot that tears its shield off),
+// KILL_SHOT_T, rifleCharge, duelFK.
 import { M, V, Q, sat, clamp, lerp, easeIn, easeOut, easeInOut, noise1, smooth, DEG } from './math.js';
 import { GC, POSES, blendPose, breathe, gundamLaunchPath } from './world.js';
+import { clipPose } from './motion.js';
 
 export const DUEL_T0 = 160, DUEL_T1 = 200;
 export const CP = [GC[0], GC[1] + 25, GC[2]];
@@ -50,7 +30,7 @@ const C = (x, y, z) => [CP[0] + x, CP[1] + y, CP[2] + z];
 
 // ============================================================================ pose channels
 export const PARTS = ['pelvis', 'torso', 'head', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R',
-  'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R', '_body'];
+  'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R', 'rifle', '_body'];
 // _body = [pitch (+ leans forward / nose down), yaw offset (+ turns to own left), roll (+ own right side down)]
 const NCH = PARTS.length * 3;
 const PIDX = Object.fromEntries(PARTS.map((p, i) => [p, i * 3]));
@@ -84,8 +64,7 @@ function mirror(src) {       // left/right swap (for the right-handed RONIN): x 
   return a;
 }
 const DEF_NO_BODY = (a) => { const b = Float64Array.from(a); b[PIDX._body] = b[PIDX._body + 1] = b[PIDX._body + 2] = 0; return b; };
-
-// ============================================================================ pose library (hero = left-hand saber)
+// ============================================================================ pose library — Sigma (ATLAS; rifle in the right hand)
 const L = {};
 L.flight = W(PR(POSES.flight), { _body: [28, 0, 0] });
 L.aim = PR(POSES.aim);
@@ -140,138 +119,7 @@ L.idle = P({   // RELAXED, at ease (scenes 32–36): upright, both arms hanging 
   leg_L_upper: [-12, 0, 8], leg_L_lower: [18, 0, 0], foot_L: [8, 0, 0],
   leg_R_upper: [4, 0, -8], leg_R_lower: [20, 0, 0], foot_R: [12, 0, 0], _body: [2, 0, 0],
 });
-L.ignite = W(L.guard, { arm_L_upper: [-70, -30, 0], arm_L_lower: [-60, 0, 0], hand_L: [60, 0, 0], head: [-15, 5, 0] });
-L.highBlock = W(L.guard, { torso: [-5, -5, 0], head: [-30, 0, 0], arm_L_upper: [-150, -35, -10], arm_L_lower: [-45, 0, 0], hand_L: [40, 80, 0], arm_R_upper: [-140, 20, 10], arm_R_lower: [-50, 0, 0], leg_L_upper: [-50, 0, 10], leg_L_lower: [75, 0, 0], leg_R_upper: [0, 0, -8], leg_R_lower: [85, 0, 0], _body: [-10, 0, 0] });
-L.highBlockHit = W(L.highBlock, { torso: [5, -5, 0], arm_L_upper: [-140, -35, -10], arm_L_lower: [-65, 0, 0], leg_L_upper: [-65, 0, 10], leg_L_lower: [100, 0, 0], leg_R_upper: [-15, 0, -8], leg_R_lower: [110, 0, 0] });
-L.raise = P({
-  pelvis: [0, 10, 0], torso: [-8, 25, 0], head: [5, -18, 0],
-  arm_L_upper: [-160, 10, 20], arm_L_lower: [-35, 0, 0], hand_L: [20, 0, 0],
-  arm_R_upper: [-35, 0, -35], arm_R_lower: [-60, 0, 0],
-  leg_L_upper: [-50, 0, 10], leg_L_lower: [70, 0, 0], foot_L: [25, 0, 0],
-  leg_R_upper: [25, 0, -8], leg_R_lower: [50, 0, 0], foot_R: [30, 0, 0], _body: [-8, 0, 0],
-});
-L.cutMid = P({   // diagonal down-cut at contact (blade up-forward)
-  pelvis: [0, -10, 0], torso: [15, -10, 4], head: [10, 5, 0],
-  arm_L_upper: [-120, -18, 10], arm_L_lower: [-15, 0, 0], hand_L: [70, 0, 0],
-  arm_R_upper: [-20, 0, -40], arm_R_lower: [-60, 0, 0],
-  leg_L_upper: [-40, 0, 10], leg_L_lower: [50, 0, 0], foot_L: [20, 0, 0],
-  leg_R_upper: [30, 0, -8], leg_R_lower: [60, 0, 0], foot_R: [35, 0, 0], _body: [6, 0, 0],
-});
-L.cutDown = P({  // follow-through low across to the right
-  pelvis: [0, -25, 0], torso: [30, -32, 8], head: [15, 18, 0],
-  arm_L_upper: [-55, -40, -10], arm_L_lower: [-10, 0, 0], hand_L: [85, 0, 0],
-  arm_R_upper: [-10, 0, -45], arm_R_lower: [-60, 0, 0],
-  leg_L_upper: [-25, 0, 10], leg_L_lower: [40, 0, 0], foot_L: [20, 0, 0],
-  leg_R_upper: [35, 0, -10], leg_R_lower: [70, 0, 0], foot_R: [35, 0, 0], _body: [12, 0, 0],
-});
-L.backMid = P({  // backhand horizontal at contact: arm straight forward, blade continuing the arm
-  pelvis: [0, 5, 0], torso: [10, 5, 0], head: [5, -5, 0],
-  arm_L_upper: [-88, -5, 0], arm_L_lower: [-5, 0, 0], hand_L: [90, 0, 0],
-  arm_R_upper: [-25, 0, -30], arm_R_lower: [-70, 0, 0],
-  leg_L_upper: [-35, 0, 12], leg_L_lower: [45, 0, 0], foot_L: [20, 0, 0],
-  leg_R_upper: [25, 0, -8], leg_R_lower: [60, 0, 0], foot_R: [35, 0, 0],
-});
-L.backEnd = W(L.backMid, { torso: [8, 30, 0], pelvis: [0, 20, 0], arm_L_upper: [-85, 65, 10], head: [5, -20, 0] });
-L.thrustChamber = null;   // (set below, from thrustWind: the free arm forward to aim instead of up by the head)
-L.thrustWind = P({
-  pelvis: [0, 15, 0], torso: [5, 28, 0], head: [5, -25, 0],
-  arm_L_upper: [-25, 5, 22], arm_L_lower: [-70, 0, 0], hand_L: [95, 0, 0],
-  arm_R_upper: [-50, 0, -25], arm_R_lower: [-70, 0, 0],
-  leg_L_upper: [-45, 0, 10], leg_L_lower: [75, 0, 0], foot_L: [25, 0, 0],
-  leg_R_upper: [15, 0, -8], leg_R_lower: [80, 0, 0], foot_R: [35, 0, 0], _body: [-6, 0, 0],
-});
-L.thrustChamber = W(L.thrustWind, { arm_R_upper: [-72, -12, -6], arm_R_lower: [-22, 0, 0], head: [6, -22, 0] });
-L.thrust = P({
-  pelvis: [0, -20, 0], torso: [15, -28, 0], head: [10, 22, 0],
-  arm_L_upper: [-88, -10, 0], arm_L_lower: [-2, 0, 0], hand_L: [90, 0, 0],
-  arm_R_upper: [-10, 0, -40], arm_R_lower: [-40, 0, 0],
-  leg_L_upper: [-50, 0, 8], leg_L_lower: [30, 0, 0], foot_L: [10, 0, 0],
-  leg_R_upper: [40, 0, -8], leg_R_lower: [15, 0, 0], foot_R: [40, 0, 0], _body: [16, 0, 0],
-});
-L.duck = W(L.guard, { torso: [40, -10, 0], head: [20, 10, 0], arm_L_upper: [-40, -20, 20], arm_L_lower: [-30, 0, 0], hand_L: [60, 0, 0], leg_L_upper: [-95, 0, 10], leg_L_lower: [120, 0, 0], leg_R_upper: [-60, 0, -10], leg_R_lower: [130, 0, 0], _body: [20, 0, 0] });
-L.chargeWind = W(L.guard, { torso: [30, 30, 0], head: [10, -25, 0], arm_L_upper: [-10, 20, 30], arm_L_lower: [-40, 0, 0], hand_L: [120, 0, 0], arm_R_upper: [-30, 30, -20], arm_R_lower: [-110, 0, 0], leg_L_upper: [-70, 0, 10], leg_L_lower: [100, 0, 0], leg_R_upper: [-20, 0, -10], leg_R_lower: [110, 0, 0], _body: [15, 30, 0] });
-L.charge = W(L.chargeWind, { torso: [25, 40, 0], head: [5, -35, 0], arm_R_upper: [-20, 40, -10], arm_R_lower: [-120, 0, 0], leg_L_upper: [-30, 0, 10], leg_L_lower: [40, 0, 0], leg_R_upper: [30, 0, -10], leg_R_lower: [30, 0, 0], foot_R: [50, 0, 0], _body: [20, 55, 0] });
-L.lock = P({
-  pelvis: [0, -10, 0], torso: [22, -8, 0], head: [12, 5, 0],
-  arm_L_upper: [-105, -25, 5], arm_L_lower: [-35, 0, 0], hand_L: [75, 0, 0],
-  arm_R_upper: [-80, 30, -5], arm_R_lower: [-45, 0, 0],
-  leg_L_upper: [-35, 0, 10], leg_L_lower: [40, 0, 0], foot_L: [20, 0, 0],
-  leg_R_upper: [40, 0, -10], leg_R_lower: [35, 0, 0], foot_R: [45, 0, 0], _body: [12, 0, 0],
-});
-L.lock2 = W(L.lock, { torso: [26, -2, 3], arm_L_upper: [-100, -20, 5], arm_L_lower: [-42, 0, 0], leg_R_upper: [45, 0, -10], _body: [15, 0, 0] });
-L.hitBack = W(L.guard, { torso: [35, 0, 0], head: [30, 0, 0], arm_L_upper: [-35, 45, 75], arm_L_lower: [-30, 0, 0], hand_L: [-45, 0, 0], arm_R_upper: [-40, 0, -40], arm_R_lower: [-40, 0, 0], leg_L_upper: [-60, 0, 10], leg_L_lower: [70, 0, 0], leg_R_upper: [-50, 0, -10], leg_R_lower: [80, 0, 0], _body: [-25, 0, 0] });
-L.recover = W(L.guard, { torso: [25, -10, 0], head: [-5, 10, 0], leg_L_upper: [-50, 0, 10], leg_L_lower: [80, 0, 0], leg_R_upper: [10, 0, -10], leg_R_lower: [90, 0, 0] });
-L.parry = W(L.cutDown, { torso: [20, -30, 5], arm_L_upper: [-80, -45, 0], arm_L_lower: [-10, 0, 0], hand_L: [60, 0, 0], _body: [5, -10, 0] });
-// iai pass-cut: wind (blade low across to the right), mid (arm straight out-left, blade continues the arm), end (swept back)
-L.iaiWind = P({
-  pelvis: [0, -30, 0], torso: [35, -45, 0], head: [5, 40, 0],
-  arm_L_upper: [-60, -70, -10], arm_L_lower: [-25, 0, 0], hand_L: [110, 0, 0],
-  arm_R_upper: [-30, 0, -30], arm_R_lower: [-80, 0, 0],
-  leg_L_upper: [-80, 0, 10], leg_L_lower: [110, 0, 0], foot_L: [30, 0, 0],
-  leg_R_upper: [-20, 0, -10], leg_R_lower: [120, 0, 0], foot_R: [40, 0, 0], _body: [22, 0, 0],
-});
-L.iaiMid = P({
-  pelvis: [0, 10, 0], torso: [20, 20, 0], head: [5, 30, 0],
-  arm_L_upper: [-88, 100, 0], arm_L_lower: [-5, 0, 0], hand_L: [90, 0, 0],
-  arm_R_upper: [-10, 0, -45], arm_R_lower: [-40, 0, 0],
-  leg_L_upper: [-30, 0, 10], leg_L_lower: [30, 0, 0], foot_L: [30, 0, 0],
-  leg_R_upper: [45, 0, -10], leg_R_lower: [20, 0, 0], foot_R: [50, 0, 0], _body: [25, 0, 0],
-});
-L.iaiEnd = P({
-  pelvis: [0, 25, 0], torso: [20, 48, 0], head: [5, -10, 0],
-  arm_L_upper: [-38, 72, 15], arm_L_lower: [-40, 0, 0], hand_L: [30, 0, 0],   // follow-through across the body, elbow soft (no wrap-back)
-  arm_R_upper: [-20, 0, -40], arm_R_lower: [-60, 0, 0],
-  leg_L_upper: [-20, 0, 10], leg_L_lower: [40, 0, 0], foot_L: [30, 0, 0],
-  leg_R_upper: [30, 0, -10], leg_R_lower: [50, 0, 0], foot_R: [40, 0, 0], _body: [10, 0, 0],
-});
-L.finish = W(L.iaiEnd, { torso: [8, 30, 0], arm_L_upper: [-22, 45, 18], arm_L_lower: [-42, 0, 0], hand_L: [15, 0, 0], _body: [0, 0, 0] });   // mace lowered, arm relaxed
-// defender poses (hero-side authoring; RONIN uses mirror())
-L.sideBlock = P({   // blade vertical-ish on own weapon side, catching a cut from the upper weapon side
-  pelvis: [0, -10, 0], torso: [10, -15, 0], head: [-5, 10, 0],
-  arm_L_upper: [-100, 25, 20], arm_L_lower: [-55, 0, 0], hand_L: [10, 0, 0],
-  arm_R_upper: [-30, 0, -25], arm_R_lower: [-80, 0, 0],
-  leg_L_upper: [-30, 0, 10], leg_L_lower: [50, 0, 0], foot_L: [20, 0, 0],
-  leg_R_upper: [25, 0, -8], leg_R_lower: [70, 0, 0], foot_R: [35, 0, 0], _body: [-5, 0, 0],
-});
-L.crossBlock = W(L.sideBlock, { arm_L_upper: [-80, -45, 0], arm_L_lower: [-60, 0, 0], hand_L: [10, 0, 0], torso: [12, -25, 0] });
-// scene 50: a braced crossed block (feet set, hips turned into it) and a controlled side-step (no flailing lean)
-L.crossBlockB = W(L.crossBlock, { pelvis: [0, -12, 0], leg_L_upper: [-45, 0, 12], leg_L_lower: [70, 0, 0], foot_L: [20, 0, 0], leg_R_upper: [20, 0, -10], leg_R_lower: [65, 0, 0], foot_R: [30, 0, 0], _body: [4, 0, 0] });
-L.sideStep = W(L.guard, { torso: [8, 18, -10], head: [0, -15, 6], leg_L_upper: [-22, 0, 26], leg_L_lower: [55, 0, 0], leg_R_upper: [-35, 0, -4], leg_R_lower: [72, 0, 0], _body: [0, 12, 12] });
-L.dodge = W(L.guard, { torso: [5, 25, -20], head: [0, -20, 10], arm_L_upper: [-40, 30, 40], arm_L_lower: [-50, 0, 0], arm_R_upper: [-30, 0, -50], leg_L_upper: [-10, 0, 30], leg_L_lower: [60, 0, 0], leg_R_upper: [-40, 0, -5], leg_R_lower: [70, 0, 0], _body: [0, 20, 25] });
-L.foreWind = P({   // horizontal forehand wind-up: arm out to own weapon side and back
-  pelvis: [0, 25, 0], torso: [5, 40, 0], head: [5, -35, 0],
-  arm_L_upper: [-80, 100, 5], arm_L_lower: [-30, 0, 0], hand_L: [70, 0, 0],
-  arm_R_upper: [-40, 0, -30], arm_R_lower: [-70, 0, 0],
-  leg_L_upper: [-40, 0, 10], leg_L_lower: [60, 0, 0], foot_L: [20, 0, 0],
-  leg_R_upper: [20, 0, -8], leg_R_lower: [70, 0, 0], foot_R: [35, 0, 0], _body: [0, 0, 0],
-});
-L.foreMid = W(L.backMid, { torso: [12, -8, 0], pelvis: [0, -8, 0] });
-L.foreEnd = W(L.backMid, { pelvis: [0, -30, 0], torso: [20, -40, 5], head: [5, 30, 0], arm_L_upper: [-80, -75, -5], _body: [8, 0, 0] });
-L.overMid = W(L.cutMid, { arm_L_upper: [-125, 0, 10], torso: [18, 0, 0] });
 L.hitTorso = W(L.guard, { torso: [-30, 15, 0], head: [-25, 10, 0], arm_L_upper: [-60, 20, 60], arm_L_lower: [-30, 0, 0], arm_R_upper: [-50, 0, -60], arm_R_lower: [-30, 0, 0], leg_L_upper: [-60, 0, 15], leg_L_lower: [50, 0, 0], leg_R_upper: [-40, 0, -15], leg_R_lower: [60, 0, 0], _body: [-25, 0, 10] });
-L.doubled = W(L.hitTorso, { torso: [45, 0, 0], head: [35, 0, 0], arm_L_upper: [-30, 0, 20], arm_L_lower: [-70, 0, 0], arm_R_upper: [-30, 0, -20], arm_R_lower: [-70, 0, 0], leg_L_upper: [-80, 0, 10], leg_L_lower: [110, 0, 0], leg_R_upper: [-70, 0, -10], leg_R_lower: [110, 0, 0], _body: [25, 0, 0] });
-L.tumble = W(L.hitTorso, { torso: [-35, 20, 15], head: [-30, 10, 0], _body: [-40, 10, 20] });
-L.limp = W(PR(POSES.limp), {});
-L.hitCut = W(L.limp, { torso: [-20, 25, 20], head: [-30, 20, 0], arm_L_upper: [-70, 30, 50], _body: [-10, 15, 15] });
-L.plunge = W(L.cutDown, { arm_L_upper: [-95, -20, 0], arm_L_lower: [-20, 0, 0], hand_L: [70, 0, 0], torso: [25, -15, 0], _body: [10, 0, 0] });
-L.dive = W(L.flight, { arm_L_upper: [-170, 10, 20], arm_L_lower: [-30, 0, 0], hand_L: [30, 0, 0], _body: [55, 0, 0] });
-// SHAFT BLOCK (scene 48): the mace held two-handed flat over the head like a quarterstaff — the arms are placed by IK
-// (staffHold); these carry the legs / chest: braced wide, knees giving under the blow, then driving up to throw it off
-L.staffBlock = W(L.guard, { pelvis: [0, -5, 0], torso: [-4, 0, 0], head: [-28, 0, 0], leg_L_upper: [-45, 0, 14], leg_L_lower: [70, 0, 0], foot_L: [20, 0, 0], leg_R_upper: [8, 0, -14], leg_R_lower: [75, 0, 0], foot_R: [30, 0, 0], _body: [-6, 0, 0] });
-L.staffHit = W(L.staffBlock, { torso: [8, 0, 0], head: [-18, 0, 0], leg_L_upper: [-64, 0, 14], leg_L_lower: [108, 0, 0], leg_R_upper: [-14, 0, -14], leg_R_lower: [118, 0, 0], foot_R: [40, 0, 0], _body: [2, 0, 0] });
-L.staffPush = W(L.staffBlock, { torso: [-12, 0, 0], head: [-32, 0, 0], leg_L_upper: [-28, 0, 12], leg_L_lower: [36, 0, 0], leg_R_upper: [16, 0, -12], leg_R_lower: [42, 0, 0], _body: [-10, 0, 0] });
-// RONIN #2 over the top (authored in the hero convention, mirrored below): the overhead cut that meets the shaft, thrown
-// up off it, a tight backward somersault (knees to chest, free hand on the shins, katana tucked along the body), opening
-// out, and a heavy landing — knees deep, katana low in both hands — before it comes again
-L.overCut = W(L.overMid, { torso: [22, 0, 0], head: [6, 0, 0], leg_L_upper: [-55, 0, 10], leg_L_lower: [85, 0, 0], leg_R_upper: [-5, 0, -10], leg_R_lower: [95, 0, 0], foot_L: [25, 0, 0], foot_R: [35, 0, 0], _body: [-10, 0, 0] });
-L.recoil = W(L.raise, { torso: [-25, 0, 0], head: [-20, 0, 0], arm_L_upper: [-170, 0, 20], arm_L_lower: [-20, 0, 0], leg_L_upper: [-20, 0, 10], leg_L_lower: [40, 0, 0], leg_R_upper: [10, 0, -10], leg_R_lower: [50, 0, 0], _body: [-25, 0, 0] });
-L.tuck = P({ torso: [45, 0, 0], head: [25, 0, 0], arm_L_upper: [-40, 0, 25], arm_L_lower: [-95, 0, 0], hand_L: [20, 0, 0], arm_R_upper: [-75, 0, -15], arm_R_lower: [-80, 0, 0],
-  leg_L_upper: [-125, 0, 12], leg_L_lower: [145, 0, 0], foot_L: [35, 0, 0], leg_R_upper: [-120, 0, -12], leg_R_lower: [145, 0, 0], foot_R: [35, 0, 0] });
-L.untuck = P({ torso: [15, 0, 0], head: [-5, 0, 0], arm_L_upper: [-50, 0, 40], arm_L_lower: [-40, 0, 0], hand_L: [20, 0, 0], arm_R_upper: [-40, 0, -45], arm_R_lower: [-30, 0, 0],
-  leg_L_upper: [-50, 0, 12], leg_L_lower: [70, 0, 0], foot_L: [20, 0, 0], leg_R_upper: [-10, 0, -12], leg_R_lower: [60, 0, 0], foot_R: [30, 0, 0] });
-L.land = P({ pelvis: [0, -10, 0], torso: [30, -5, 0], head: [-10, 5, 0], arm_L_upper: [-40, -10, 20], arm_L_lower: [-60, 0, 0], hand_L: [20, 0, 0], arm_R_upper: [-30, 20, -20], arm_R_lower: [-70, 0, 0],
-  leg_L_upper: [-80, 0, 12], leg_L_lower: [120, 0, 0], foot_L: [30, 0, 0], leg_R_upper: [-20, 0, -12], leg_R_lower: [125, 0, 0], foot_R: [40, 0, 0], _body: [10, 0, 0] });
-
 // ---- the gunfight (beam rifle in the right hand; the exact aim is laid per frame — aimRifle)
 L.flyAim = W(L.aimRifle, { leg_L_upper: [-20, 0, 10], leg_L_lower: [50, 0, 0], leg_R_upper: [15, 0, -8], leg_R_lower: [60, 0, 0], _body: [18, 0, 0] });
 L.dodgeAimL = W(L.flyAim, { torso: [5, 20, -15], head: [0, -15, 8], _body: [0, 15, 22] });
@@ -282,57 +130,6 @@ L.flee = W(L.flight, { head: [-20, 0, 0], arm_R_upper: [-20, 0, -20], arm_R_lowe
 L.brace = W(L.aimRifle, { torso: [10, -12, 0], arm_L_upper: [-70, -35, -10], arm_L_lower: [-60, 0, 0], hand_L: [10, 0, 0],
   leg_L_upper: [-50, 0, 12], leg_L_lower: [70, 0, 0], leg_R_upper: [20, 0, -10], leg_R_lower: [75, 0, 0], _body: [6, 0, 0] });
 L.recoilShot = W(L.brace, { torso: [-8, -12, 0], head: [-10, 20, 0], _body: [-10, 0, 0] });
-// ---- the Unicorn-style ranged duel (176.4–180.9): Sigma charges and flash-steps out of SERAPH's cannon shots
-L.dashFwd = W(L.guard, { torso: [25, 0, 0], head: [-15, 0, 0], arm_L_upper: [-20, 10, 20], arm_L_lower: [-60, 0, 0], leg_L_upper: [-20, 0, 10], leg_L_lower: [60, 0, 0], leg_R_upper: [20, 0, -8], leg_R_lower: [70, 0, 0], _body: [28, 0, 0] });
-L.dodgeR = W(L.guard, { torso: [5, -25, 20], head: [0, 20, -10], arm_L_upper: [-40, -30, 10], leg_L_upper: [-40, 0, 5], leg_L_lower: [70, 0, 0], leg_R_upper: [-10, 0, -30], leg_R_lower: [60, 0, 0], _body: [0, -20, -25] });
-L.beamBlock = W(L.guard, { torso: [18, -5, 0], head: [8, 5, 0], arm_L_upper: [-100, -8, 5], arm_L_lower: [-35, 0, 0], hand_L: [35, 0, 0], arm_R_upper: [-90, 25, -5], arm_R_lower: [-60, 0, 0], leg_L_upper: [-55, 0, 12], leg_L_lower: [80, 0, 0], leg_R_upper: [10, 0, -10], leg_R_lower: [85, 0, 0], _body: [12, 0, 0] });
-// SERAPH (authored in the hero convention — weapon arm L — and mirrored: its cannon is on the right arm)
-L.aimGun = P({ pelvis: [0, -10, 0], torso: [6, -15, 0], head: [0, 12, 0], arm_L_upper: [-85, -5, 5], arm_L_lower: [-5, 0, 0], hand_L: [0, 0, 0],
-  arm_R_upper: [-30, 10, -20], arm_R_lower: [-70, 0, 0], leg_L_upper: [-35, 0, 10], leg_L_lower: [45, 0, 0], foot_L: [20, 0, 0],
-  leg_R_upper: [15, 0, -10], leg_R_lower: [55, 0, 0], foot_R: [30, 0, 0] });
-L.kickOff = P({ torso: [-20, 0, 0], head: [-10, 0, 0], arm_L_upper: [-40, 0, 20], arm_L_lower: [-30, 0, 0], arm_R_upper: [-20, 0, -40], arm_R_lower: [-40, 0, 0],
-  leg_L_upper: [-80, 0, 10], leg_L_lower: [20, 0, 0], foot_L: [10, 0, 0], leg_R_upper: [-60, 0, -10], leg_R_lower: [30, 0, 0], foot_R: [15, 0, 0], _body: [-30, 0, 0] });
-L.fireBack = W(L.aimGun, { pelvis: [0, 30, 0], torso: [0, 55, 0], head: [0, 45, 0], _body: [-15, 0, 0] });
-L.gunReady = P({ pelvis: [0, -6, 0], torso: [8, -6, 0], head: [-6, 6, 0], arm_L_upper: [-22, 2, 12], arm_L_lower: [-32, 0, 0], hand_L: [0, 0, 0],   // low ready: the cannon angled forward-down
-  arm_R_upper: [2, 4, -16], arm_R_lower: [-22, 0, 0], hand_R: [6, 0, 0], leg_L_upper: [-24, 0, 8], leg_L_lower: [36, 0, 0], foot_L: [14, 0, 0],
-  leg_R_upper: [8, 0, -8], leg_R_lower: [40, 0, 0], foot_R: [22, 0, 0], _body: [4, 0, 0] });
-L.flyAway = W(L.flight, { head: [-30, 0, 0], arm_L_upper: [-20, 0, 25], arm_L_lower: [-20, 0, 0], _body: [60, 0, 0] });
-// RONIN (right-hand katana) = mirrored library
-const R = {};
-for (const k in L) R[k] = mirror(L[k]);
-R.aim = W(mirror(L.aim), {});           // aims the left-arm gun
-// the approach (no gunfire any more): a swordsman closing in on boosters — body upright and leaning into the flight,
-// katana held low and back in the sword hand, the free arm forward for balance, legs split front/back
-// (authored in the hero's convention, then mirrored; the old pose lay flat like a flying superhero with a levelled gun arm)
-const _approach = P({
-  pelvis: [4, 8, 0], torso: [16, 12, 0], head: [-14, -10, 0],
-  arm_L_upper: [22, 8, 28], arm_L_lower: [-32, 0, 0], hand_L: [55, 0, 0],
-  arm_R_upper: [-50, 12, -18], arm_R_lower: [-78, 0, 0], hand_R: [10, 0, 0],
-  leg_L_upper: [-34, 0, 8], leg_L_lower: [52, 0, 0], foot_L: [20, 0, 0],
-  leg_R_upper: [22, 0, -8], leg_R_lower: [68, 0, 0], foot_R: [34, 0, 0], _body: [14, 0, 0],
-});
-R.assault = mirror(_approach);
-R.assaultB = mirror(W(_approach, { torso: [20, 20, 3], head: [-16, -18, 0], arm_R_upper: [-58, 22, -22], leg_L_upper: [-24, 0, 8], leg_L_lower: [40, 0, 0], leg_R_upper: [28, 0, -8], leg_R_lower: [78, 0, 0], _body: [18, 6, 4] }));
-// ready to charge (scenes 32–35): katana in BOTH hands in front of the belly, point up at Sigma (FK-solved: blade ~30°
-// over the horizontal on the centre line), leaning in, sword-side leg forward and bent, the other trailing — coiled
-R.ready = W(mirror(P({
-  pelvis: [4, -10, 0], torso: [18, -6, 0], head: [-14, 6, 0],
-  arm_R_upper: [-40, 10, -15], arm_R_lower: [-70, 0, 0],
-  leg_L_upper: [-42, 0, 8], leg_L_lower: [64, 0, 0], foot_L: [18, 0, 0],
-  leg_R_upper: [26, 0, -8], leg_R_lower: [40, 0, 0], foot_R: [40, 0, 0], _body: [12, 0, 0],
-})), { arm_R_upper: [-20, 4, 38], arm_R_lower: [-27, 0, 0], hand_R: [16, 0, 0] });
-// TAUNT (RONIN #1's entrance): katana swung up to rest on its shoulder, the free hand held out to Sigma palm-up,
-// beckoning — chest back, head cocked. (hero convention: weapon arm = L, free arm = R; mirrored for RONIN)
-R.taunt = mirror(P({
-  pelvis: [0, 12, 0], torso: [-8, 16, 0], head: [-10, -12, 14],
-  arm_L_upper: [-62, -24, 58], arm_L_lower: [-128, 0, 0], hand_L: [38, 0, 0],
-  arm_R_upper: [-72, 12, -12], arm_R_lower: [-16, 0, 0], hand_R: [-25, 0, 0],
-  leg_L_upper: [-16, 0, 8], leg_L_lower: [22, 0, 0], foot_L: [12, 0, 0],
-  leg_R_upper: [12, 0, -6], leg_R_lower: [36, 0, 0], foot_R: [24, 0, 0], _body: [-5, 0, 0],
-}));
-export const POSE_LIB = { hero: L, ronin: R };
-// The hero swings a mace, not a sword: a club is held in a fist grip (haft roughly ⟂ forearm), so the wrist flex that
-// let the saber "continue the forearm" (+90°) is compressed into a natural cocked wrist (soft knee at 20°, 90° → ~41°).
 // zero-g ragdoll: after an impulse at t0 every joint swings loose as a heavy damped oscillation (0.8–1.8 Hz, decaying
 // over a few seconds), then keeps a slow floating drift. Deterministic (seeded per joint). pose values are radians.
 const RAG = { torso: 0.35, head: 0.5, pelvis: 0.15, arm_L_upper: 0.7, arm_R_upper: 0.7, arm_L_lower: 0.6, arm_R_lower: 0.6, hand_L: 0.5, hand_R: 0.5,
@@ -374,7 +171,6 @@ for (const p in LIM_DEG) {
   JOINT_LIMITS[p] = r;
   if (p.includes('_L')) JOINT_LIMITS[p.replace('_L', '_R')] = [r[0], [-r[1][1], -r[1][0]], [-r[2][1], -r[2][0]]];
 }
-
 // ============================================================================ interpolation (C1 Hermite) + hit-stop warp
 // Keys are [t, value, tag]. Between keys: cubic Hermite with non-uniform Catmull-Rom tangents (monotone-clamped per
 // channel so poses never wobble past a key). Tags only shape the tangents:
@@ -386,13 +182,13 @@ export const HITSTOPS = [
   // [t, freeze, release] — the gunfight: only the killing shot bites (a short hold as it goes through)
   [192.4, 0.05, 0.6],
 ];
-export const SHOT_TIMES = [];          // Sigma fights with the mace only (no rifle)
+export const SHOT_TIMES = [];
 // impacts: filters are bypassed here so contacts / aims are exact and crisp
-export const IMPACTS = [...HITSTOPS.map((h) => h[0]), ...SHOT_TIMES, 189.08];
+export const IMPACTS = [...HITSTOPS.map((h) => h[0]), ...SHOT_TIMES];
 const isImpact = (t) => IMPACTS.some((x) => Math.abs(x - t) < 1e-6);
-const isClashT = (t) => EV.some((e) => e[1] === 'clash' && Math.abs(e[0] - t) < 1e-6) || Math.abs(t - 189.08) < 1e-6;
+const isClashT = () => false;
 // fast whiff strikes also bypass the spring lag (crisp, exact), but keep their follow-through tangents
-const CRISP = [...IMPACTS, 177.6, 186.85, 187.2];
+const CRISP = [...IMPACTS];
 // BULLET TIME (slow motion on every blow) lives in timemap.js: the film clock is stretched round each contact.
 // Hit-stop: freeze d, then an eased release (Hermite offset, speed ramps 0 → >1 → 1) so anchors keep their times.
 export function warp(t) {
@@ -524,7 +320,7 @@ const GROUPS = [
   // weapons and every contact must be exact — blending a lagged pose out and back in round each blow made a little
   // back-and-forth hitch after every move, so they follow their keys directly (the keys themselves ease in / out)
   Object.assign(springGroup(['head'], 13, 0.99, 1 / 48), { crisp: null }),
-  Object.assign(springGroup(['leg_L_upper', 'leg_R_upper', 'leg_L_lower', 'leg_R_lower', 'foot_L', 'foot_R'], 18, 0.99, 1 / 48), { crisp: [178.2, 178.55, 189.45] }),
+  Object.assign(springGroup(['leg_L_upper', 'leg_R_upper', 'leg_L_lower', 'leg_R_lower', 'foot_L', 'foot_R'], 18, 0.99, 1 / 48), { crisp: null }),
 ];
 // filter strength: 0 at impacts (exact, crisp contact), back to 1 within ~0.15 s
 function springAmount(tw) {
@@ -615,231 +411,250 @@ function micro(t, out, seed, amp = 1) {
 }
 const hover = (t, seed, amp) => [amp * (0.6 * Math.sin(t * 0.83 + seed) + 0.4 * Math.sin(t * 1.91 + seed * 2.3)), amp * 0.8 * (0.6 * Math.sin(t * 1.13 + seed * 1.7) + 0.4 * Math.sin(t * 2.37 + seed)), amp * (0.6 * Math.sin(t * 0.71 + seed * 3.1) + 0.4 * Math.sin(t * 1.57 + seed * 0.3))];
 
+// ============================================================================ VANGUARD pose library (from its own clips)
+// VANGUARD's rig rests in an A-pose (arms ~43° out): its arms hang by the sides with arm_L_upper rz ≈ −35°,
+// arm_R_upper rz ≈ +35°. Clip poses come straight from js/motion.js (radians, engine convention).
+function fromClip(name, ct, over = {}, skip = []) {
+  const o = clipPose(name, ct), a = new Float64Array(NCH);
+  for (const p in o) { if (skip.includes(p)) continue; const i = PIDX[p]; if (i === undefined) continue; a[i] = o[p][0]; a[i + 1] = o[p][1]; a[i + 2] = o[p][2]; }
+  for (const k in over) { const i = PIDX[k]; a[i] = over[k][0] * DEG; a[i + 1] = over[k][1] * DEG; a[i + 2] = over[k][2] * DEG; }
+  return a;
+}
+function withArm(base, src, side) {   // copy one arm (upper, lower, hand) from another pose
+  const a = Float64Array.from(base);
+  for (const p of ['arm_' + side + '_upper', 'arm_' + side + '_lower', 'hand_' + side]) for (let c = 0; c < 3; c++) a[PIDX[p] + c] = src[PIDX[p] + c];
+  return a;
+}
+const VG = {};
+// at ease in the standoff: arms down by its sides, the rifle hanging from the right fist, the shield on the left forearm
+VG.idle = P({ pelvis: [0, -4, 0], torso: [5, -4, 0], head: [2, 6, 0], arm_L_upper: [4, 6, -31], arm_L_lower: [-16, 0, 0],
+  arm_R_upper: [8, -8, 27], arm_R_lower: [-24, 0, 0], leg_L_upper: [-14, 0, 3], leg_L_lower: [20, 0, 0], foot_L: [8, 0, 0],
+  leg_R_upper: [5, 0, -3], leg_R_lower: [24, 0, 0], foot_R: [12, 0, 0], _body: [2, 0, 0] });
+VG.aim = fromClip('vanguard.RifleBurst', 1.2);                                   // rifle up, support hand forward
+VG.guard = fromClip('vanguard.ShieldGuard', 1.0);                                // shield raised in front
+VG.guardAim = withArm(VG.aim, VG.guard, 'L');                                   // shield forward, rifle levelled past it
+VG.crouch = fromClip('vanguard.BoostJump', 0.6, {}, ['arm_R_upper', 'arm_R_lower', 'hand_R']);   // loading the jump
+VG.boost = withArm(fromClip('vanguard.BoostJump', 1.4), VG.aim, 'R');           // launching up, rifle still on him
+VG.tuck = fromClip('vanguard.Backflip', 1.8, { pelvis: [0, 0, 0], torso: [20, 0, 0] });   // (flip layer drives the limbs)
+VG.fly = W(VG.guardAim, { leg_L_upper: [-20, 0, 4], leg_L_lower: [45, 0, 0], leg_R_upper: [12, 0, -4], leg_R_lower: [55, 0, 0], foot_L: [20, 0, 0], foot_R: [30, 0, 0], _body: [14, 0, 0] });
+VG.stepL = W(VG.fly, { torso: [5, 18, -12], head: [0, -14, 8], _body: [0, 12, 20] });
+VG.stepR = W(VG.fly, { torso: [5, -18, 12], head: [0, 14, -8], _body: [0, -12, -20] });
+VG.hit = W(VG.aim, { torso: [-22, 25, 12], head: [-18, 12, 0], arm_L_upper: [10, -25, 40], arm_L_lower: [-10, 0, 0], _body: [-18, 30, 18] });
+VG.brace = W(VG.aim, { pelvis: [0, -8, 0], torso: [10, 12, 0], leg_L_upper: [-40, 0, 6], leg_L_lower: [60, 0, 0], leg_R_upper: [18, 0, -6], leg_R_lower: [70, 0, 0], _body: [6, 0, 0] });
+VG.limp = P({ pelvis: [10, 0, 0], torso: [28, 10, 15], head: [30, 0, 0], arm_L_upper: [20, 0, -15], arm_L_lower: [-35, 0, 0], arm_R_upper: [25, 0, 18], arm_R_lower: [-40, 0, 0],
+  leg_L_upper: [-40, 0, 5], leg_L_lower: [70, 0, 0], leg_R_upper: [-25, 0, -5], leg_R_lower: [60, 0, 0], _body: [0, 0, 0] });
+VG.recoil = W(VG.brace, { torso: [-10, 12, 0], head: [-10, 0, 0], _body: [-10, 0, 0] });
+export const POSE_LIB = { hero: L, vanguard: VG };
+
 // ============================================================================ choreography
-// Fight 1 frame: origin HM (hero melee spot), D1 = hero→E1 axis, L1 = hero's left.
+// Frame: HM = where Sigma held in the standoff, D1 = Sigma → VANGUARD, L1 = Sigma's left. The fight turns round MID:
+// both machines ride opposite ends of a turning diameter (ringH / ringE: angle φ, radius r, height h).
 const HM = G(42, 52, 10);
 const D1 = nrm([-38, 0, -32]);
 const L1 = [D1[2], 0, -D1[0]];
 const F1 = (a, l, h) => [HM[0] + D1[0] * a + L1[0] * l, HM[1] + h, HM[2] + D1[2] * a + L1[2] * l];
+const MID = F1(27.5, 1.5, -2);
+const ringH = (phi, r, h) => [MID[0] - r * (Math.cos(phi) * D1[0] + Math.sin(phi) * L1[0]), MID[1] + h, MID[2] - r * (Math.cos(phi) * D1[2] + Math.sin(phi) * L1[2])];
+const ringE = (phi, r, h) => ringH(phi + Math.PI, r, h);
 
-// SERAPH's cannon shots (story time). First half: at range, then over its shoulder as it kicks off; second half: raining
-// down in the dive, point-blank in the pass, from his tail, after it recovers. (The finale full-power beam: FINALE_T.)
-export const SERAPH_SHOTS = [176.95, 177.5, 178.05, 179.3, 182.35, 183.05, 183.75, 184.5, 186.0, 186.5, 188.9];
-export const FINALE_T = 190.85, FINALE_END = 191.35;   // the sustained full-power beam (he slips it)
-// Sigma's beam-rifle shots; two land: the reversal shot takes its left wing, the charged shot goes through its chest
-export const HERO_SHOTS = [177.28, 177.85, 178.45, 179.5, 182.8, 183.45, 184.45, 186.95, 188.45, 189.25, 192.35];
-export const WING_HIT_T = 186.95, KILL_SHOT_T = 192.35;
-// ---------------- hero
+// the enemy's shots (name kept from the SERAPH version): at range, from the top of its flip (inverted), in the zig-zag
+// advance, round the circling run. Its full-power shot: FINALE_T (he slips it).
+export const SERAPH_SHOTS = [176.75, 177.5, 178.35, 179.95, 181.4, 182.1, 182.8, 184.45, 185.35, 186.4, 187.45];
+export const FINALE_T = 190.85, FINALE_END = 191.35;
+// Sigma's shots: 178.7 is taken on the shield; 183.25 tears the shield off; the charged 192.35 goes through its chest
+export const HERO_SHOTS = [177.2, 177.85, 178.7, 180.55, 181.7, 182.4, 183.25, 184.9, 185.9, 186.85, 187.9, 192.35];
+export const BLOCK_T = 178.7, SHIELD_HIT_T = 183.25, KILL_SHOT_T = 192.35;
+export const WING_HIT_T = SHIELD_HIT_T;   // (old name)
+export const SERAPH_HANDOFF = 180.9;       // duelEnemy1 → duelEnemy2 (one machine; the slot changes on a cut)
+
+// the circling run (183.8–188.4): both ride the ring fast (φ sweeps 3.2 rad, ~40 m/s at the peak), weaving up and down
+// in counterpoint; quick-boost jinks out of each other's shots
+const RUN0 = 183.8, RUN1 = 188.4, PH0 = 1.84, PH1 = 5.05, PE0 = 1.74;
+const runU = (t) => { const u = sat((t - RUN0) / (RUN1 - RUN0)); return u * u * (3 - 2 * u); };
+const jink = (t, t0, dur = 0.8) => { const x = (t - t0) / dur; return x <= 0 || x >= 1 ? 0 : easeOut(Math.min(1, x / 0.3)) * (1 - smooth(0.3, 1, x)); };
+const runH = (t) => ringH(PH0 + (PH1 - PH0) * runU(t) - 0.12 * jink(t, 186.35), 40 + 2 * Math.sin((t - RUN0) * 1.3), -2 + 6 * Math.sin((t - RUN0) * 2.7) - 7 * jink(t, 185.3));
+const runE = (t) => ringE(PE0 + (PH1 - PH0 + 0.05) * runU(t) + 0.14 * jink(t, 184.85) - 0.14 * jink(t, 185.85), 38 - 2 * Math.sin((t - RUN0) * 1.1), 6 - 6 * Math.sin((t - RUN0) * 2.7 + 0.8));
+const RUN_KEYS = (f) => { const k = []; for (let t = 184.1; t < RUN1 - 0.05; t += 0.3) k.push([+t.toFixed(3), f(t), 'cr']); return k; };
+const PHH = PH1, PHE = PE0 + (PH1 - PH0 + 0.05);   // where the run ends
+
+// ---------------- Sigma
 const heroPos = posTrack([
   [170.0, G(60, 10, 120)],
   [171.2, G(72, 18, 98), 'cr'], [172.3, G(80, 26, 80), 'cr'],
   [174.0, G(74, 40, 44), 'io'], [175.25, G(60, 46, 28), 'io'],
   [175.45, G(57, 39, 25), 'out'],                       // drop-hop
   [176.5, G(46, 50, 14), 'io'],
-  // ---- RANGED DUEL (Unicorn): he charges straight at the cannon and flash-steps out of every shot
-  [176.85, F1(4, 0, 0), 'io'],                           // charging
-  [176.95, F1(7, 0, 0), 'io'], [177.12, F1(10, 16, 3), 'out'],        // shot 1 — flash-step left
-  [177.35, F1(14, 14, 3), 'io'],
-  [177.5, F1(16.5, 13, 3), 'io'], [177.66, F1(19, -4, -3), 'out'],    // shot 2 — flash-step right and down
-  [177.8, F1(22, -5, -2.5), 'io'],
-  [177.92, F1(24, -5, -2), 'io'], [178.15, F1(27, 1, 13), 'out'],     // shot 3 — already rolling up over the beam as it fires
-  [178.6, F1(33, 4, 12), 'io'],
-  [179.12, F1(38.5, 6, 16), 'io'], [179.36, F1(41, 4, 28), 'out'],    // shot 4 — pops up over it, answers at 179.5
-  [179.7, F1(42, 5, 26), 'io'],
-  [180.3, F1(44, 7, 24), 'io'], [180.9, F1(44, 7, 24), 'io'],         // watching it climb away
-  // ---- it dives back firing: he climbs to meet it, jinking, answering
-  [182.0, C(20, 45, 30), 'io'], [182.55, C(28, 42, 24), 'out'],       // jink
-  [183.2, C(14, 44, 16), 'io'], [183.9, C(22, 42, 8), 'out'],         // jink
-  [184.5, C(8, 40, 0), 'io'],                                          // THE PASS
-  // ---- it gets on his tail: he runs, jinking, then flips round (reversal) and shoots back
-  [185.1, C(18, 30, 6), 'io'], [185.75, C(30, 22, 10), 'out'],
-  [186.2, C(30, 14, 16), 'io'], [186.6, C(26, 10, 20), 'io'],
-  [186.95, C(22, 8, 22), 'io'], [187.4, C(18, 6, 22), 'out'],
-  [188.0, C(12, 4, 18), 'io'], [188.6, C(10, 2, 14), 'io'], [189.2, C(8, 0, 10), 'io'],
-  [189.9, C(6, -1, 7), 'io'], [190.4, C(6, -2, 5), 'io'], [190.72, C(6, -2, 5), 'io'],
-  [191.05, C(18, -2, 4), 'out'],                                       // slips the full-power beam (he felt it coming)
-  [191.9, C(19, -2, 3), 'io'], [192.35, C(19, -2, 3), 'io'],          // the charged shot
-  [192.6, C(20, -2, 5), 'out'], [193.6, C(16, -3, -8), 'out'], [194.6, C(10, -4, -20), 'out'],
+  // ---- the exchange at range (the ring): quick-boosts out of each shot, answers from the hold
+  [176.95, ringH(0.3, 34, 0.5), 'out'],                  // out of its first shot (176.75)
+  [177.35, ringH(0.42, 33, 1), 'io'],                    // fires 177.2
+  [177.65, ringH(0.64, 31, -3.5), 'out'],                // down, out of the second (177.5)
+  [177.95, ringH(0.76, 32, -3.5), 'io'],                 // fires 177.85
+  [178.25, ringH(0.88, 34, 0), 'io'],
+  [178.55, ringH(1.08, 36, 5), 'out'],                   // up over the third (178.35)
+  [178.9, ringH(1.18, 36, 4.5), 'io'],                   // fires 178.7 — the shield takes it
+  [179.4, ringH(1.28, 35, 2), 'io'],
+  [179.85, ringH(1.4, 36, 0), 'io'],                     // it jumps: he tracks it
+  [180.3, ringH(1.62, 38, -5), 'out'],                   // rolls out from under its inverted shot (179.95)
+  [180.75, ringH(1.66, 38, -4), 'io'],                   // fires 180.55
+  // ---- it comes at him in a zig-zag: he gives ground, answering
+  [181.3, ringH(1.8, 40, -6), 'out'],                    // side-step (its 181.4 shot)
+  [181.75, ringH(1.82, 41, -6), 'io'],                   // fires 181.7
+  [182.05, ringH(1.62, 43, -1), 'out'],                  // (182.1)
+  [182.45, ringH(1.6, 44, -1), 'io'],                    // fires 182.4
+  [182.75, ringH(1.76, 45, -5), 'out'],                  // (182.8)
+  [183.3, ringH(1.78, 45, -5), 'io'],                    // fires 183.25: the shield is torn off its arm
+  [183.8, runH(183.8), 'io'],
+  ...RUN_KEYS(runH),                                     // ---- the circling run
+  [RUN1, ringH(PHH, 40, -2), 'io'],
+  // ---- it breaks away to charge a full-power shot; he stops, turns, and slips it at the last instant
+  [189.2, ringH(PHH + 0.04, 36, -3), 'io'],
+  [190.72, ringH(PHH + 0.05, 36, -3), 'io'],
+  [191.0, ringH(PHH + 0.33, 35, -3.5), 'out'],           // the slip: ~10 m sideways as it fires (190.85)
+  [191.5, ringH(PHH + 0.35, 35, -3.5), 'io'],
+  [192.35, ringH(PHH + 0.35, 35, -3.5), 'io'],           // the charged shot
+  [192.6, ringH(PHH + 0.35, 36.5, -3.2), 'out'],         // the recoil shoves him back
+  [193.6, C(16, -3, -8), 'io'], [194.6, C(10, -4, -20), 'io'],
 ]);
 const heroPose = poseTrack([
-  [169.3, L.flight], [170.4, L.idle, 'io'],                  // 170–175.35: at ease, arms in an A, mace hanging (scenes 32–36)
+  [169.3, L.flight], [170.4, L.idle, 'io'],                  // 170–175.35: at ease, arms in an A, the rifle hanging
   [175.35, L.idle, 'io'],
   [176.2, L.aimReady, 'io'],                                  // the rifle comes up during the visor close-up
-  [176.85, L.flyAim, 'io'], [177.05, L.dodgeAimL, 'out'], [177.3, L.flyAim, 'io'],
-  [177.6, L.dodgeAimR, 'out'], [177.9, L.flyAim, 'io'], [178.3, L.flyAim, 'out'], [178.6, L.flyAim, 'io'],
-  [179.3, L.dodgeUpAim, 'out'], [179.6, L.flyAim, 'io'],
-  [180.3, L.lookUp, 'io'], [180.95, L.lookUp], [181.6, L.aimUp, 'io'], [184.2, L.aimUp], [184.5, L.flyAim, 'io'],
-  [185.0, L.flee, 'io'], [186.55, L.flee], [186.85, L.aimRifle, 'io'],   // runs, then turns and shoots back
-  [190.4, L.aimRifle], [190.8, L.dodgeAimR, 'out'], [191.3, L.brace, 'io'], [192.3, L.brace],
+  [176.55, L.flyAim, 'io'], [176.95, L.dodgeAimL, 'out'], [177.3, L.flyAim, 'io'],
+  [177.65, L.dodgeAimR, 'out'], [177.95, L.flyAim, 'io'], [178.25, L.flyAim, 'io'],
+  [178.55, L.dodgeUpAim, 'out'], [178.9, L.aimRifle, 'io'], [179.4, L.flyAim, 'io'],
+  [179.85, L.aimUp, 'io'], [180.1, L.dodgeAimR, 'io'], [180.4, L.aimUp, 'io'], [180.75, L.aimRifle, 'io'],
+  [181.3, L.dodgeAimL, 'out'], [181.75, L.aimRifle, 'io'], [182.05, L.dodgeAimR, 'out'], [182.45, L.aimRifle, 'io'],
+  [182.75, L.dodgeAimL, 'out'], [183.3, L.aimRifle, 'io'],
+  [183.9, L.flyAim, 'io'], [185.3, L.flyAim], [185.55, L.dodgeUpAim, 'out'], [185.9, L.flyAim, 'io'],
+  [186.4, L.dodgeAimR, 'out'], [186.8, L.flyAim, 'io'], [188.3, L.flyAim],
+  [189.2, L.aimRifle, 'io'], [190.72, L.aimRifle], [191.0, L.dodgeAimL, 'out'], [191.4, L.brace, 'io'], [192.3, L.brace],
   [192.45, L.recoilShot, 'out'], [193.6, L.aimLow, 'io'],
-  [194.6, L.finish, 'io'],
+  [194.6, W(L.aimLow, { torso: [8, 10, 0], arm_R_upper: [-20, 0, -20], arm_R_lower: [-35, 0, 0], hand_R: [70, 0, 0] }), 'io'],
 ]);
 const heroImp = impulses([
   // beam-rifle recoil: hand kicks up and back, torso rocks, a damped settle
   ...HERO_SHOTS.map((t) => [t + 0.001, P({ arm_R_upper: [10, 0, 0], arm_R_lower: [-14, 0, 0], hand_R: [-16, 0, 0], torso: [-6, 5, 0], head: [-4, 0, 0], _body: [-4, 0, 0] }), 0.035, 0.5, 16]),
   [KILL_SHOT_T + 0.001, P({ arm_R_upper: [22, 0, 0], torso: [-14, 8, 0], _body: [-10, 0, 0] }), 0.04, 0.7],   // the charged shot kicks hard
 ]);
-// two hands on the shaft (scene 48): left fist on the grip, right fist 42 % up the haft, the mace flat over the head
-const STAFF = () => 0;   // (no mace any more)
-function staffHold(s, k, tw) {
-  const piv = PIV.gundam, fk = duelFK(s, 'gundam'), W0 = fk.root;
-  const h = 8.8 + 1.4 * smooth(184.62, 184.9, tw);
-  const base = M.transformPoint([0, 0, 0], W0, add(piv.torso, [4.4, h, 2.4]));
-  const dir = nrm(M.transformDir([0, 0, 0], W0, [-1, 0.06, 0.1])), upv = nrm(M.transformDir([0, 0, 0], W0, [0, 1, 0]));
-  const yL = nrm(sub(scl(dir, V.dot(upv, dir)), upv)), xL = V.cross([0, 0, 0], yL, dir);
-  const Hw = [...xL, ...yL, ...dir], G = [0, -1.2, 0.6];
-  const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
-  s.pose = { ...s.pose };
-  armIK(s, fk, 'gundam', 'L', sub(base, r3v(Hw, G)), Hw);
-  armIK(s, duelFK(s, 'gundam'), 'gundam', 'R', sub(add(base, scl(dir, 0.42 * s.saberLen)), r3v(Hw, G)), Hw);
-  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
-}
-// THE CHARGE before the last blow: as he coils back (191.3 →) the mace drinks power — its emissive panels go from calm
-// to blinding — and it all goes into the hit at 192.4
 // the finale: the rifle charges (190.95 → the shot at 192.35) — its glow and the muzzle gather light, then all of it goes
 export const rifleCharge = (t) => smooth(190.95, 192.25, t) * (1 - smooth(KILL_SHOT_T + 0.01, KILL_SHOT_T + 0.25, t));
 export const maceCharge = () => 0;
-const heroSaber = scalarTrack([[160, 0], [200, 0]]);        // the duel is a gunfight: no blade out (the rifle is in hand)
-const heroBoost = scalarTrack([[170, 0.8], [171.0, 0.5], [175.25, 0.5], [175.3, 1, 'lin'], [175.6, 0.5], [176.4, 0.6],
-  [176.5, 1, 'lin'], [176.9, 0.8], [176.95, 1, 'lin'], [177.2, 0.7], [177.5, 1, 'lin'], [177.75, 0.7], [178.02, 1, 'lin'], [178.4, 0.8],
-  [179.15, 0.8], [179.2, 1, 'lin'], [179.6, 0.5], [180.9, 0.4], [181.3, 1, 'lin'], [182.3, 0.8], [182.4, 1, 'lin'], [182.7, 0.8],
-  [183.6, 0.8], [183.7, 1, 'lin'], [184.2, 0.8], [184.9, 1, 'lin'], [186.4, 1], [186.6, 0.5], [186.9, 1, 'lin'], [187.3, 0.6],
-  [190.7, 0.6], [190.75, 1, 'lin'], [191.1, 0.6], [192.3, 0.5], [192.4, 1, 'lin'], [192.8, 0.6], [194.6, 0.3]]);
+const heroBoost = scalarTrack([[170, 0.8], [171.0, 0.5], [175.25, 0.5], [175.3, 1, 'lin'], [175.6, 0.5], [176.5, 0.6],
+  ...[176.75, 177.5, 178.35, 180.0, 181.05, 181.85, 182.55, 185.3, 186.35, 190.72].flatMap((t) => [[t - 0.02, 0.6], [t + 0.03, 1, 'lin'], [t + 0.3, 0.6]]),
+  [183.8, 0.7], [184.3, 1], [187.8, 1], [188.4, 0.7], [189.2, 0.5], [192.3, 0.5], [192.4, 1, 'lin'], [192.8, 0.6], [194.6, 0.3]]);
+// barrel rolls: out from under the inverted shot (179.95), and the end of the zig-zag
+const heroRoll = (tw) => { let r = 0; for (const [t0, d, s] of [[179.98, 0.36, -1]]) { const u = sat((tw - t0) / d); r += s * 2 * Math.PI * u * u * (3 - 2 * u); } return r; };
 
-// ---------------- SERAPH / 03, first half (the E1 slot, 160–180.9): the standoff, then the ranged duel — it fires the
-// heavy cannon four times while Sigma closes, kicks off backward firing over its shoulder, and climbs away to come back
-// in a dive (the E2 slot takes over on the cut at 180.9)
+// ---------------- VANGUARD
 const e1Pos = posTrack([
   [170.0, G(-30, 40, -40)],
   [172.6, G(-14, 46, -26), 'io'],                     // closes in, then hangs there sizing Sigma up
   [175.0, G(-9, 48, -27), 'io'], [176.45, G(-6, 49.5, -27), 'io'],
-  [177.0, F1(61.5, 2.5, -2), 'out'],                  // each shot shoves it back a little
-  [177.2, F1(61.8, 2.5, -2), 'io'], [177.36, F1(62.3, -5, 0.5), 'out'],      // flicks aside from his answer
-  [177.55, F1(62.5, -4, 0), 'io'], [177.78, F1(62.8, -4, 0), 'io'], [177.93, F1(63.2, 4, 3), 'out'],   // and again
-  [178.1, F1(63.5, 4, 3), 'io'], [178.38, F1(63.8, 4, 2.5), 'io'], [178.5, F1(64, -2, 5), 'out'],
-  [178.6, F1(64, -1, 5), 'io'],                        // kick off: backward and up
-  [179.3, F1(80, 10, 25), 'io'],                      // firing back over its shoulder
-  [180.2, F1(120, 30, 80), 'out'], [180.9, F1(200, 60, 160), 'out'],   // climbing away
+  [176.75, ringE(0.02, 33, -2.5), 'io'],              // fires first
+  [177.1, ringE(0.16, 33, -1), 'io'],
+  [177.35, ringE(0.36, 30, 2.5), 'out'],              // flicks aside from his answer (177.2)
+  [177.6, ringE(0.44, 30, 2.5), 'io'],                // fires 177.5
+  [177.85, ringE(0.56, 32, 0), 'io'],
+  [178.1, ringE(0.76, 35, -4), 'out'],                // and again (177.85)
+  [178.4, ringE(0.84, 35, -4), 'io'],                 // fires 178.35
+  [178.72, ringE(0.96, 34, -2.5), 'io'],              // takes his 178.7 on the shield
+  [179.0, ringE(1.02, 34.5, -2), 'out'],              // (pushed back a little)
+  [179.3, ringE(1.1, 34, -3), 'io'],                  // crouches …
+  [179.62, ringE(1.2, 37, 8), 'out'],                 // … and boost-jumps
+  [179.95, ringE(1.26, 41, 16), 'io'],                // inverted at the top of its flip: fires
+  [180.4, ringE(1.3, 46, 21), 'io'],
+  [180.9, ringE(1.36, 50, 23), 'io'],
 ]);
-const e1Pose = poseTrack([
-  [170, R.gunReady], [172.3, R.gunReady, 'io'], [172.75, R.taunt, 'io'], [173.6, R.taunt], [174.25, R.gunReady, 'io'],   // the taunt: cannon shouldered, wings flared, the free hand beckoning
-  [176.45, R.gunReady, 'io'],
-  [176.8, R.aimGun, 'io'], [178.3, R.aimGun],          // levels the cannon; three shots
-  [178.6, R.kickOff, 'io'], [179.1, R.fireBack, 'io'], [179.4, R.fireBack],
-  [179.8, R.flyAway, 'io'], [180.9, R.flyAway],
+const e2Pos = posTrack([
+  [180.8, ringE(1.35, 49.6, 23)], [180.9, ringE(1.36, 50, 23), 'io'],
+  // ---- the zig-zag advance: quick-boost, fire, quick-boost …
+  [181.15, ringE(1.52, 47, 19), 'out'],               // out of his 180.55 line
+  [181.4, ringE(1.55, 46, 18), 'io'],                 // fires
+  [181.75, ringE(1.36, 42, 14), 'out'],               // (his 181.7)
+  [182.1, ringE(1.34, 40, 12), 'io'],                 // fires
+  [182.45, ringE(1.58, 36, 9), 'out'],                // (his 182.4)
+  [182.8, ringE(1.6, 34, 8), 'io'],                   // fires
+  [183.27, ringE(1.66, 31, 6.5), 'io'],               // his 183.25 tears the shield off
+  [183.55, ringE(1.7, 34, 8), 'out'],                 // knocked back, spinning
+  [183.8, runE(183.8), 'io'],
+  ...RUN_KEYS(runE),                                  // ---- the circling run
+  [RUN1, ringE(PHE, 40, 4), 'io'],
+  // ---- breaks away, turns, braces and charges the full-power shot
+  [189.2, ringE(PHE + 0.06, 58, 3), 'out'],
+  [189.75, ringE(PHE + 0.07, 62, 2), 'io'],
+  [190.85, ringE(PHE + 0.07, 62, 2), 'io'],           // fires at full power
+  [191.3, ringE(PHE + 0.07, 63.5, 2.2), 'out'],       // (the recoil)
+  [191.9, ringE(PHE + 0.07, 63, 2), 'io'],
+  [192.4, ringE(PHE + 0.09, 62.5, 3), 'io'],          // too late: his charged shot goes through it
+  [193.2, ringE(PHE + 0.1, 64, 1), 'out'], [194.0, ringE(PHE + 0.11, 65, -1), 'io'],
 ]);
-const e1Imp = impulses([
-  ...SERAPH_SHOTS.map((ts) => [ts + 0.001, P({ arm_R_upper: [18, 0, 0], arm_R_lower: [-10, 0, 0], torso: [-8, 0, 0], _body: [-6, 0, 0] }), 0.03, 0.45]),   // recoil
+const enemyPose = poseTrack([
+  [169.5, VG.idle], [172.3, VG.idle, 'io'], [176.3, VG.idle, 'io'],
+  [176.62, VG.aim, 'io'], [177.1, VG.guardAim, 'io'],   // levels the rifle; fires first
+  [177.35, VG.stepL, 'out'], [177.6, VG.guardAim, 'io'], [178.1, VG.stepR, 'out'], [178.4, VG.guardAim, 'io'],
+  [178.6, VG.guard, 'io'], [178.9, VG.guard], [179.1, VG.guardAim, 'io'],   // the shield up for his 178.7
+  [179.3, VG.crouch, 'io'], [179.55, VG.boost, 'out'],
+  [180.45, VG.boost, 'io'], [180.9, VG.fly, 'io'],
+  [181.15, VG.stepR, 'out'], [181.4, VG.guardAim, 'io'], [181.75, VG.stepL, 'out'], [182.1, VG.guardAim, 'io'],
+  [182.45, VG.stepR, 'out'], [182.8, VG.guardAim, 'io'], [183.2, VG.guardAim],
+  [183.4, VG.hit, 'out'], [183.8, VG.aim, 'io'],       // the shield gone, it fights on one-handed
+  [184.2, VG.fly, 'io'], [188.4, VG.fly],
+  [189.2, VG.aim, 'io'], [189.75, VG.brace, 'io'], [190.85, VG.brace], [191.1, VG.recoil, 'out'], [191.9, VG.brace, 'io'],
+  [192.3, VG.brace], [192.5, W(VG.hit, { torso: [-35, 10, 20] }), 'in'], [193.2, VG.limp, 'out'],
 ]);
-const e1Saber = scalarTrack([[169.5, 0], [200, 0]]);   // (no beam blade in the ranged duel)
-// the cannon is laid on its aim point: [t0, t1, aim(t)] windows
-export const SERAPH_HANDOFF = 180.9;
-// SERAPH's wings (Blender-checked, engine Euler): spread = rest; FOLD swept back behind the shoulders (streamlined);
-// FLARE raised high in a V (the taunt, the kick-off, the full-power shot). Right wing = mirrored.
-const WING_FOLD = [20, 60, -40], WING_FLARE = [10, -25, 20];
-function wingK(tw) {   // [fold, flare] amounts
-  const fold = tw < SERAPH_HANDOFF ? 1 - smooth(172.45, 172.65, tw)                                   // floats folded until the taunt
-    : smooth(180.9, 181.3, tw) * (1 - smooth(184.2, 184.45, tw)) + smooth(186.95, 187.1, tw) * (1 - smooth(187.8, 188.1, tw));   // the dive; the spin-out
-  const flare = smooth(172.6, 172.85, tw) * (1 - smooth(173.6, 173.9, tw)) + smooth(178.5, 178.7, tw) * (1 - smooth(180.9, 181.0, tw))
-    + smooth(190.25, 190.5, tw) * (1 - smooth(192.35, 192.5, tw)) + smooth(188.5, 188.7, tw) * (1 - smooth(189.8, 190.0, tw));
-  return [Math.min(1, fold), Math.min(1, flare)];
+const enemyImp = impulses([
+  ...SERAPH_SHOTS.map((ts) => [ts + 0.001, P({ arm_R_upper: [-12, 0, 0], torso: [-6, 0, 0], _body: [-4, 0, 0] }), 0.03, 0.45, 14]),   // recoil
+  [BLOCK_T + 0.03, P({ arm_L_upper: [18, 0, 0], torso: [-10, 0, 0], _body: [-6, 0, 0] }), 0.03, 0.5, 12],             // the shield takes it
+  [FINALE_T, P({ arm_R_upper: [-18, 0, 0], torso: [-10, 0, 0], _body: [-8, 0, 0] }), 0.05, 0.6],                       // full-power recoil
+]);
+// the backflip (179.62–180.4): the body turns over backwards; limbs from VANGUARD's own Backflip clip (1.0 → 2.7 s)
+const FLIP0 = 179.6, FLIP1 = 180.42;
+const flipK = (tw) => { const u = sat((tw - FLIP0) / (FLIP1 - FLIP0)); return u; };
+function flipLayer(tw, out) {
+  const u = flipK(tw); if (u <= 0 || u >= 1) return 0;
+  const w = smooth(0, 0.12, u) * (1 - smooth(0.88, 1, u));
+  const cp = clipPose('vanguard.Backflip', 1.0 + 1.7 * u);
+  for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L', 'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R', 'head']) {
+    const i = PIDX[p], v = cp[p]; if (!v) continue;
+    for (let c = 0; c < 3; c++) out[i + c] = lerp(out[i + c], v[c], w);
+  }
+  const e = u * u * (3 - 2 * u);
+  return -2 * Math.PI * e;                              // body pitch (backwards)
 }
-function setWings(s, tw) {
-  const [f, l] = wingK(tw);
-  const a = [0, 1, 2].map((c) => (WING_FOLD[c] * f + WING_FLARE[c] * l) * DEG);
-  s.pose.wing_L = a; s.pose.wing_R = [a[0], -a[1], -a[2]];
-  return s;
-}                   // E1 → E2 slot (a cut)
-// where SERAPH aims: Sigma's chest, led by his velocity (he flash-steps out of it); the 4th shot and the finale hit
-function seraphAim(tw) {
-  // round each shot the aim is LOCKED on where he was heading 0.15 s before it (it can't know he'll flash-step out)
-  if (tw > 190.3 && tw < FINALE_END + 0.3) return add(heroRawPos(FINALE_T - 0.12), [0, 9, 0]);   // the full-power shot: locked on him — he slips it
+// the shield-hit spin (183.28 →): knocked half round, then back to face him
+const shieldSpin = (tw) => { const x = tw - SHIELD_HIT_T - 0.03; return x <= 0 || x > 0.9 ? 0 : 1.3 * Math.sin(Math.PI * Math.min(1, x / 0.9)) * Math.exp(-x * 1.2); };
+const enemyRoll = (tw) => { const u = sat((tw - 186.86) / 0.4); return u > 0 && u < 1 ? 2 * Math.PI * u * u * (3 - 2 * u) : 0; };   // barrel-rolls out of his 186.85
+// where it aims (its rifle laid on him, the lead locked a quarter second before each shot — he quick-boosts out of it)
+function enemyAim(tw) {
+  if (tw > 190.2 && tw < FINALE_END + 0.3) return add(heroRawPos(FINALE_T - 0.12), [0, 9, 0]);   // full power: locked on — he slips it
   const ts = SERAPH_SHOTS.find((x) => tw > x - 0.45 && tw < x + 0.3), ta = ts !== undefined ? ts - 0.25 : tw - 0.1;
   const p = heroRawPos(ta), q = heroRawPos(ta - 0.1), lead = ts !== undefined ? (ts - ta) / 0.1 : 1.2;
   return add(add(p, scl(sub(p, q), lead)), [0, 9, 0]);
 }
-// lay the cannon: swing the gun arm about the shoulder so the barrel points at the target (k = how much)
-function aimGun(s, target, k) {
-  s.pose = { ...s.pose };
-  for (let it = 0; it < 3; it++) {
-    const fk = duelFK(s, 'enemy_ms'), d0 = fk.saber[2], d1 = nrm(sub(target, fk.gunBreech));
-    const A = r3between(d0, lrp(d0, d1, k));
-    s.pose.arm_R_upper = euler3(r3mul(r3T(r3(fk.torso)), r3mul(A, r3(fk.arm_R_upper))));
-  }
-  return s;
-}
-// ---- Sigma's rifle: laid on the target round each shot. Misses go just past (it flicks aside); the reversal shot is
-// laid on its left wing root, the charged shot on its chest
-const HERO_AIM = (tw) => { let k = 0;
-  for (const ts of HERO_SHOTS) k = Math.max(k, smooth(ts - 0.4, ts - 0.2, tw) * (1 - smooth(ts + 0.12, ts + 0.3, tw)));
-  k = Math.max(k, smooth(191.1, 191.35, tw) * (1 - smooth(KILL_SHOT_T + 0.12, KILL_SHOT_T + 0.35, tw)));
+const ENEMY_AIM = (tw) => { let k = smooth(176.5, 176.7, tw) * (1 - smooth(178.45, 178.6, tw)) + smooth(179.1, 179.3, tw) * (1 - smooth(179.45, 179.6, tw))
+    + smooth(180.5, 180.9, tw) * (1 - smooth(183.25, 183.35, tw)) + smooth(183.8, 184.1, tw) * (1 - smooth(192.4, 192.45, tw));
+  for (const ts of SERAPH_SHOTS) k = Math.max(k, smooth(ts - 0.35, ts - 0.2, tw) * (1 - smooth(ts + 0.12, ts + 0.3, tw)));
   return Math.min(1, k); };
-const MISS = [[0, 6, 0], [5, 0, 0], [0, -5, 3], [-6, 3, 0], [0, 7, 0], [6, 0, 2], [0, -6, 0], null, [-5, 4, 0], [5, -3, 0], null];
+const enemyBoost = scalarTrack([[170, 0.5], [172.2, 0.5], [172.3, 0.9, 'lin'], [172.8, 0.4], [176.5, 0.5],
+  ...[177.2, 177.85, 179.5, 180.9, 181.55, 182.25, 183.3, 184.85, 185.85, 186.86, 188.5].flatMap((t) => [[t - 0.02, 0.5], [t + 0.03, 1, 'lin'], [t + 0.35, 0.55]]),
+  [183.8, 0.7], [184.3, 1], [187.8, 1], [189.5, 0.6], [190.85, 0.6], [192.4, 0.1], [200, 0.1]]);
+
+// ---------------- Sigma's aim: laid on the target round each shot. Misses go just past (it quick-boosts); 178.7 lands on
+// the shield (it blocks), 183.25 on the shield (torn off), the charged shot on its chest
+const HERO_AIM = (tw) => { let k = smooth(176.4, 176.6, tw) * (1 - smooth(192.5, 192.8, tw));
+  for (const ts of HERO_SHOTS) k = Math.max(k, smooth(ts - 0.4, ts - 0.2, tw) * (1 - smooth(ts + 0.12, ts + 0.3, tw)));
+  return Math.min(1, k); };
+const MISS = [[0, 6], [6, 1], null, [-6, 4], [2, -6], [6, 3], null, [1, 7], [-7, 0], [5, -5], [-5, 5], null];   // [side, up] (m) across the line of fire
+const SHIELD_C = [2.0, -1.88, 0.5];   // the shield's centre in its part frame (assets/enemy_ms.glb)
 function heroAimPoint(tw) {
   let bi = 0; for (let i = 0; i < HERO_SHOTS.length; i++) if (Math.abs(tw - HERO_SHOTS[i]) < Math.abs(tw - HERO_SHOTS[bi])) bi = i;
-  const ts = HERO_SHOTS[bi], who = ts < SERAPH_HANDOFF ? 'e1' : 'e2', raw = who === 'e1' ? e1RawPos : e2RawPos;
-  if (ts === WING_HIT_T) { const es = duelEnemy2_(ts + 0.02); return es ? partPoint(duelFK({ ...es, saber: 1 }, 'enemy_ms'), 'torso', [1.28, 2.76, -1.14]) : add(raw(ts), [0, 12, 0]); }
-  if (ts === KILL_SHOT_T) { const es = duelEnemy2_(ts + 0.05); return es ? partPoint(duelFK({ ...es, saber: 1 }, 'enemy_ms'), 'torso', [0, 1, 0]) : add(raw(ts), [0, 10, 0]); }
-  return add(add(raw(Math.min(ts, who === 'e1' ? 180.8 : 200)), [0, 10, 0]), MISS[bi] || [0, 0, 0]);
+  const ts = HERO_SHOTS[bi], es = enemyRaw_(ts + 0.02), fk = es ? duelFK(es, 'enemy_ms') : null;
+  if (!fk) return add(enemyRawPos(ts), [0, 10, 0]);
+  if (ts === BLOCK_T || ts === SHIELD_HIT_T) return partPoint(fk, 'shield', SHIELD_C);
+  if (ts === KILL_SHOT_T) return partPoint(fk, 'torso', [0, 2.5, 0.5]);
+  const c = partPoint(fk, 'torso', [0, 2.5, 0]), d = nrm(sub(c, heroRawPos(ts))), sd = nrm([d[2], 0, -d[0]]), upv = nrm(V.cross([0, 0, 0], sd, d)), m = MISS[bi] || [0, 0];
+  return add(c, add(scl(sd, m[0]), scl(upv, m[1])));
 }
-function aimRifle(s, target, k) {
-  s.pose = { ...s.pose };
-  for (let it = 0; it < 3; it++) {
-    const fk = duelFK(s, 'gundam'), d0 = fk.muzzleDir, d1 = nrm(sub(target, fk.muzzle));
-    const A = r3between(d0, lrp(d0, d1, k));
-    s.pose.arm_R_upper = euler3(r3mul(r3T(r3(fk.torso)), r3mul(A, r3(fk.arm_R_upper))));
-  }
-  return s;
-}
-/** SERAPH's cannon muzzle + barrel direction at story time t (for the beam shots) */
-export function seraphMuzzle(t) {
-  const st = t < SERAPH_HANDOFF ? duelEnemy1(t) : duelEnemy2(t);
-  if (!st || !st.vis) return null;
-  const fk = duelFK({ ...st, saber: 1 }, 'enemy_ms');
-  return { pos: fk.saber[0], dir: fk.saber[2] };
-}
-// the cannon is laid on its aim point round every shot (and held on him for the finale charge)
-const SERAPH_AIM = (tw) => { let k = smooth(176.6, 176.85, tw) * (1 - smooth(178.25, 178.5, tw));
-  for (const ts of SERAPH_SHOTS) k = Math.max(k, smooth(ts - 0.45, ts - 0.25, tw) * (1 - smooth(ts + 0.12, ts + 0.3, tw)));
-  k = Math.max(k, smooth(190.3, 190.55, tw) * (1 - smooth(FINALE_END, FINALE_END + 0.25, tw)));
-  return Math.min(1, k); };
-
-// ---------------- SERAPH / 03, second half (the E2 slot, 180.9 →): it dives back firing, streaks past him, gets on his
-// tail — he flips round and his shot takes its left wing — it spins out, recovers, backs off and fires at full power;
-// he slips the beam and his charged shot goes through its chest
-const e2Pos = posTrack([
-  [180.8, C(60, 240, -200)],
-  [182.0, C(40, 150, -120), 'cr'], [182.9, C(20, 95, -60), 'cr'], [183.7, C(4, 62, -20), 'cr'],   // the dive, firing down
-  [184.5, C(-8, 46, -8), 'io'],                        // THE PASS — they streak past each other ~19 m apart
-  [185.1, C(-18, 30, -2), 'out'],
-  [185.6, C(-10, 20, 4), 'io'],                        // wheels round onto his tail
-  [186.1, C(0, 16, 6), 'io'], [186.6, C(4, 13, 8), 'io'],
-  [186.95, C(4, 11, 8), 'io'],                         // his reversal shot takes the left wing
-  [187.4, C(0, 9, 4), 'out'], [187.9, C(-6, 8, -4), 'out'],      // spinning out
-  [188.4, C(-10, 8, -12), 'io'],                       // recovers
-  [188.85, C(-10, 8, -14), 'io'], [189.0, C(-4, 11, -18), 'out'], // fires, flicks aside from his reply
-  [189.2, C(-6, 10, -24), 'io'], [189.38, C(-14, 7, -30), 'out'],
-  [190.0, C(-12, 6, -48), 'io'],
-  [190.4, C(-10, 6, -55), 'io'],                       // braced, wings flared, charging
-  [191.4, C(-10.5, 6, -56.5), 'out'],                  // (the full-power recoil)
-  [192.4, C(-10, 6, -56), 'io'],                       // his charged shot goes through it
-  [193.2, C(-11, 4, -58), 'out'], [194.0, C(-12, 2, -60), 'io'],
-]);
-const e2Pose = poseTrack([
-  [180.8, R.flyAway], [183.0, W(R.flyAway, { _body: [70, 0, 0] })], [183.5, R.aimGun, 'io'], [184.6, R.aimGun],
-  [185.2, R.kickOff, 'io'], [185.7, R.aimGun, 'io'], [186.9, R.aimGun],
-  [187.1, W(R.hitTorso, { _body: [-20, 0, 40] }), 'in'], [187.8, R.tumble, 'out'], [188.4, R.aimGun, 'io'],
-  [190.3, R.kickOff, 'io'], [190.55, R.aimGun, 'io'], [192.3, W(R.aimGun, { _body: [-8, 0, 0] })],
-  [192.5, R.hitCut, 'in'], [193.2, W(R.doubled, { _body: [35, 10, 25] }), 'out'], [194.0, W(R.limp, { _body: [40, 20, 35] }), 'io'],
-]);
-const e2Imp = impulses([
-  ...SERAPH_SHOTS.filter((ts) => ts > SERAPH_HANDOFF).map((ts) => [ts + 0.001, P({ arm_R_upper: [18, 0, 0], arm_R_lower: [-10, 0, 0], torso: [-8, 0, 0], _body: [-6, 0, 0] }), 0.03, 0.45]),
-  [FINALE_T, P({ arm_R_upper: [15, 0, 0], torso: [-6, 0, 0], _body: [-5, 0, 0] }), 0.05, 0.6],   // full-power recoil
-]);
-const e2Flip = () => 0, E2_FLIP = () => 0;   // (no somersault any more)
-// the spin-out after the wing is shot away (yaw + roll, radians)
-const e2Spin = (tw) => { const u = sat((tw - 187.0) / 0.9); return u <= 0 || u >= 1 ? [0, 0] : [2 * Math.PI * 1.25 * (u - u * u * 0.5) * 1.33, 0.9 * Math.sin(u * Math.PI)]; };
-const e2Saber = scalarTrack([[160, 0], [200, 0]]);   // (no beam blade: SERAPH fights with the cannon)
 
 // ============================================================================ state assembly
 const _pose = new Float64Array(NCH);
@@ -850,72 +665,61 @@ function softLimit(x, lo, hi) {
   if (x < lo + SOFT) return lo + SOFT - SOFT * Math.tanh((lo + SOFT - x) / SOFT);
   return x;
 }
-function poseObj(arr) {   // also enforces the joint limits (snap overshoot / additive impulses can't break a joint)
+function poseObj(arr, limits = true) {   // hero: joint limits (ATLAS convention); VANGUARD's A-pose rig: none
   const o = {};
   for (const p of PARTS) {
     if (p === '_body') continue;
-    const i = PIDX[p], L = JOINT_LIMITS[p];
-    o[p] = L ? [softLimit(arr[i], L[0][0], L[0][1]), softLimit(arr[i + 1], L[1][0], L[1][1]), softLimit(arr[i + 2], L[2][0], L[2][1])] : [arr[i], arr[i + 1], arr[i + 2]];
+    const i = PIDX[p], Lm = limits ? JOINT_LIMITS[p] : null;
+    o[p] = Lm ? [softLimit(arr[i], Lm[0][0], Lm[0][1]), softLimit(arr[i + 1], Lm[1][0], Lm[1][1]), softLimit(arr[i + 2], Lm[2][0], Lm[2][1])] : [arr[i], arr[i + 1], arr[i + 2]];
   }
   return o;
 }
 const flat = (d, k = 0.35) => nrm([d[0], d[1] * k, d[2]]);
-// rough heading: toward where the other machine is AROUND now (its offset averaged over ±0.5 s) — before the melee the
-// fighters size each other up and turn cleanly, instead of servoing onto every little hover wobble of the other
+// rough heading: toward where the other machine is AROUND now (its offset averaged over ±0.5 s) — in the standoff the
+// two size each other up and turn cleanly instead of servoing onto every little hover wobble of the other
 const _RW = [[-0.5, 1], [-0.25, 2], [0, 3], [0.25, 2], [0.5, 1]];
 function roughDir(from, to, tw) { let d = [0, 0, 0]; for (const [o, w] of _RW) d = add(d, scl(sub(to(tw + o), from(tw + o)), w)); return flat(d); }
-let _hhd = null, _ehd = null;
-const HERO_HOLD_DIR = () => _hhd || (_hhd = roughDir(heroRawPos, e1RawPos, 170.3));   // looked at RONIN once, at 170.3
-const E1_HOLD_DIR = () => _ehd || (_ehd = roughDir(e1RawPos, heroRawPos, 170.3));
-const ROUGH = (tw) => 1 - smooth(176.6, 176.95, tw);          // 1 while sizing each other up, 0 from the charge on (exact contacts)
+const ROUGH = (tw) => 1 - smooth(176.3, 176.6, tw);          // 1 while sizing each other up
 function yawRot(f, a) { const c = Math.cos(a), s = Math.sin(a); return [f[0] * c + f[2] * s, f[1], -f[0] * s + f[2] * c]; }
-let STATE_CACHE = false;  // state memo per t — enabled only after the contact solver has finished (see end of module)
-let SOLVING = false;   // the contact solver skips velocity estimation
-function velOf(fn, t) { if (SOLVING) return [0, 0, 0]; const h = 1 / 48; const a = fn(t - h), b = fn(t + h); return scl(sub(b, a), 1 / (2 * h)); }
+let STATE_CACHE = false;
+function velOf(fn, t) { const h = 1 / 48; const a = fn(t - h), b = fn(t + h); return scl(sub(b, a), 1 / (2 * h)); }
 function base(vis) { return { vis, pos: [0, 0, 0], fwd: [0, 0, 1], roll: 0, pitch: 0, pose: {}, saber: 0, saberLen: 12.9, thr: 0.4, damage: 0, eye: 1, vel: [0, 0, 0], speed: 0, smear: 0, boost: 0 }; }
-// inertia: lean into accelerations (pitch forward when thrusting, rock back when braking, bank into lateral pulls);
-// faded out around contact frames so solved contacts stay exact
+// inertia: lean into accelerations that last (pitch forward when thrusting, rock back when braking, bank into lateral pulls)
 function inertiaLean(s, fwdBase) {
-  if (SOLVING || !s._pf) return [0, 0];
-  // acceleration of the SUSTAINED motion: velocities over ±0.1 s, differenced across ±0.18 s and averaged over a
-  // ±0.2 s window — the body leans into a thrust or a brake that lasts, not into every closely spaced key (the old
-  // ±1/24 s estimate flipped sign between the keys round each clash and rocked the whole machine back and forth)
+  if (!s._pf) return [0, 0];
   const t = s._t, vh = 0.1, vel = (x) => scl(sub(s._pf(x + vh), s._pf(x - vh)), 1 / (2 * vh));
   let acc = [0, 0, 0], wsum = 0;
   for (const [o, w] of [[-0.2, 1], [-0.1, 2], [0, 3], [0.1, 2], [0.2, 1]]) { acc = add(acc, scl(sub(vel(t + o + 0.18), vel(t + o - 0.18)), w / 0.36)); wsum += w; }
   acc = scl(acc, 1 / wsum);
   const f = nrm([fwdBase[0], 0, fwdBase[2]]), r = [f[2], 0, -f[0]];
-  let near = 1; for (const ti of IMPACTS) near = Math.min(near, smooth(0.1, 0.5, Math.abs(t - ti)));
-  const k = near * (1 - (s._idle || 0));
+  const k = 1 - (s._idle || 0);
   return [clamp((acc[0] * f[0] + acc[2] * f[2]) * 0.0016, -0.22, 0.22) * k, clamp(-(acc[0] * r[0] + acc[2] * r[2]) * 0.0013, -0.2, 0.2) * k];
 }
-function finish(s, arr, fwdBase) {
+function finish(s, arr, fwdBase, limits = true) {
   const b = PIDX._body;
   const [lp, lr] = inertiaLean(s, fwdBase);
   s.pitch = arr[b] + lp; s.roll = arr[b + 2] + lr;
   s.fwd = yawRot(fwdBase, arr[b + 1]);
-  s.pose = poseObj(arr);
+  s.pose = poseObj(arr, limits);
   s.speed = Math.hypot(s.vel[0], s.vel[1], s.vel[2]);
   s.smear = sat((s.speed - 35) / 110);
   return s;
 }
 
-// CIRCLING (170.8–176.6): the two machines drift sideways round each other, opposite ways, sizing each other up —
-// then settle back on their marks just before the charge (so every solved contact after 177 is untouched)
-const CIRC_AX = (() => { const a = [-4 - 60, 0, -26 - 28]; const l = Math.hypot(a[0], a[2]); return [a[2] / l, 0, -a[0] / l]; })();   // ⟂ to the hero→E1 line
+// CIRCLING in the standoff (170.8–176.6): the two machines drift sideways round each other, opposite ways, sizing each
+// other up — then settle back on their marks just before the first shot
+const CIRC_AX = (() => { const a = [-4 - 60, 0, -26 - 28]; const l = Math.hypot(a[0], a[2]); return [a[2] / l, 0, -a[0] / l]; })();
 const circ = (tw) => easeInOut(sat((tw - 170.8) / 4.2)) * (1 - easeInOut(sat((tw - 175.9) / 0.7)));
 function heroRawPos(tw) {
   if (tw < 170) return gundamLaunchPath(tw);
   const c = circ(tw);
-  return add(add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), smooth(170, 171, tw))), [CIRC_AX[0] * -6 * c, 1.2 * c, CIRC_AX[2] * -6 * c]);
+  return add(add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), smooth(170, 171, tw) * (1 - smooth(176.4, 176.7, tw)))), [CIRC_AX[0] * -6 * c, 1.2 * c, CIRC_AX[2] * -6 * c]);
 }
-function e1RawPos(tw) { const c = circ(tw); return add(add(springPos(e1Pos, tw), hover(tw, 7.1, lerp(0.45, 0.3, smooth(176.3, 176.9, tw)))), [CIRC_AX[0] * 6 * c, -0.8 * c, CIRC_AX[2] * 6 * c]); }   // (1.2 m of hover read as wobble)
-function e2RawPos(tw) { return add(springPos(e2Pos, tw), hover(tw, 3.7, 0.3 * (1 - E2_DIVE(tw)))); }
-// the dive from above (180.6–184.25, scenes 43–46): one clean committed plunge — no hover, jitter, squash, weight-shift,
-// inertia lean or re-aiming at Sigma's every wobble
-const E2_DIVE = (tw) => smooth(180.6, 180.9, tw) * (1 - smooth(183.9, 184.25, tw));
+function enemyRawPos(tw) {
+  if (tw < SERAPH_HANDOFF) { const c = circ(tw); return add(add(e1Pos(tw), hover(tw, 7.1, 0.35 * (1 - smooth(176.4, 176.7, tw)))), [CIRC_AX[0] * 6 * c, -0.8 * c, CIRC_AX[2] * 6 * c]); }
+  return e2Pos(tw);
+}
 const heroSquash = squashFrom(heroPos), e1Squash = squashFrom(e1Pos), e2Squash = squashFrom(e2Pos);
-const HIP = 0;   // pos is the hip (msMatrix puts model [0,9,0] at pos)
 
 // aftermath formula of the old gundamState (194–226) for a seamless hand-over at 200
 function oldAftermath(t) {
@@ -923,45 +727,6 @@ function oldAftermath(t) {
   blendPose('saberSlash', 'stand', sat((t - 194) / 2.5), s.pose);
   breathe(s.pose, t, 1);
   return s;
-}
-
-// ---- physical response to contacts: the struck body is shoved along the blow and staggers, the striker recoils a
-// little; clashes throw both apart. Zero at the contact frame (so solved contacts stay exact), peaks ~0.15 s later,
-// settles by ~0.9 s. Returns a world offset + a body pitch/roll jolt (radians).
-let _COLL = null;
-function collisions() {
-  if (_COLL) return _COLL;
-  const raw = { hero: heroRawPos, e1: e1RawPos, e2: e2RawPos };
-  const foe = (t) => (t < 181 ? 'e1' : 'e2');
-  _COLL = [];
-  for (const [t, type, st, sp] of EV) {
-    if (type !== 'hit' && type !== 'block' && type !== 'clash') continue;
-    let att, vic;
-    if (sp.kind === 'blade-blade') { att = 'hero'; vic = foe(t); }
-    else if (sp.kind === 'blade-part') { att = sp.blade; vic = sp.part[0]; }
-    else if (sp.kind === 'part-part') { att = sp.a[0]; vic = sp.b[0]; }
-    else continue;
-    if (sp.cut) continue;                                          // the kills are handled by the breakup
-    const d = nrm(sub(raw[vic](t), raw[att](t)));
-    _COLL.push({ t, att, vic, d, str: st, clash: type === 'clash' });
-  }
-  return _COLL;
-}
-const pulse = (lt, w) => (lt <= 0 ? 0 : lt * w * Math.exp(1 - lt * w));   // 0 → peak 1 at 1/w → decays
-function collisionOffset(who, tw) {
-  const off = [0, 0, 0]; let jolt = 0;
-  for (const c of collisions()) {
-    const lt = tw - c.t;
-    if (lt <= 0 || lt > 0.8) continue;
-    let a = 0;
-    if (c.vic === who) a = (c.clash ? 0.6 : 3.2) * c.str;
-    else if (c.att === who) a = -(c.clash ? 0.6 : 0.9) * c.str;
-    if (!a) continue;
-    const p = pulse(lt, 9) * (1 - lt / 0.8);
-    if (!c.clash) { off[0] += c.d[0] * a * p; off[1] += c.d[1] * a * p; off[2] += c.d[2] * a * p; }   // blades: jolt only (keeps binds exact)
-    if (!c.clash) jolt += (a > 0 ? -0.22 : 0.08) * c.str * pulse(lt, 8);
-  }
-  return { off, jolt };
 }
 const _c_duelHero = new Map();
 // the launch run's evasive manoeuvre: an enemy ion bolt aimed at where Sigma WOULD be at DODGE.t; he rolls and jinks
@@ -1024,7 +789,7 @@ function dodgeOffset(tw) {
 export function duelHero(t) {
   if (!STATE_CACHE) return duelHero_(t);
   let r = _c_duelHero.get(t);
-  if (r === undefined) { r = duelHero_(t); if (AUTO_READY && r) r = applyImpulses('hero', t, r); if (_c_duelHero.size > 64) _c_duelHero.clear(); _c_duelHero.set(t, r); }
+  if (r === undefined) { r = duelHero_(t); if (_c_duelHero.size > 64) _c_duelHero.clear(); _c_duelHero.set(t, r); }
   return r;
 }
 function duelHero_(t) {
@@ -1032,57 +797,44 @@ function duelHero_(t) {
   const s = base(true);
   const tw = warp(t);
   s.pos = heroRawPos(tw);
-  const co = collisionOffset('hero', tw); s.pos = add(s.pos, co.off);
   s.vel = velOf((x) => heroRawPos(warp(x)), t); s._pf = (x) => heroRawPos(warp(x)); s._t = t;
-  springPose(heroPose, tw, _pose); heroImp(tw, _pose); volleyParry(tw, _pose);
-  // IDLE (173.4–175.1, scene 35): the body is held still — no squash / weight-shift / jitter / inertia lean / turning
-  // after RONIN; only a slow float (below: the whole machine drifts up and down a little) and breathing
-  const idleK = smooth(169.8, 170.3, tw) * (1 - smooth(175.3, 175.8, tw));   // scenes 32–36 (at ease until the visor lights)
+  springPose(heroPose, tw, _pose); heroImp(tw, _pose);
+  // IDLE (170–175.8, scenes 32–36): the body is held still — no squash / weight-shift / jitter / inertia lean; only a
+  // slow float and breathing
+  const idleK = smooth(169.8, 170.3, tw) * (1 - smooth(175.3, 175.8, tw));
   if (tw >= 170) {
     const pre = idleK > 0 ? Float64Array.from(_pose) : null;
-    heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_L_upper');
+    heroSquash(tw, _pose); weightShift(heroPose, tw, _pose, 'arm_R_upper');
     if (pre) for (let i = 0; i < _pose.length; i++) _pose[i] = lerp(_pose[i], pre[i], idleK);
   }
   micro(t, _pose, 1.3, (1 - idleK) * (tw < 177 ? lerp(1, 0.35, ROUGH(tw)) : 1));
   if (idleK > 0) {
     _pose[PIDX.torso] += Math.sin(t * 1.05) * 0.03 * idleK; _pose[PIDX.head] += Math.sin(t * 1.05 - 0.6) * 0.02 * idleK;   // slow, heavy breaths
-    _pose[PIDX.arm_L_upper] += Math.sin(t * 1.05 - 1.2) * 0.025 * idleK;                                                   // the hanging mace lags them
+    _pose[PIDX.arm_R_upper] += Math.sin(t * 1.05 - 1.2) * 0.02 * idleK;                                                   // the hanging rifle lags them
   }
   s._idle = idleK;
   s.anchor = s.pos.slice();                                   // (the idle camera follows this, so the float shows on screen)
-  if (idleK > 0) s.pos = add(s.pos, [Math.sin(t * 0.6) * 0.06 * idleK, Math.sin(t * 0.75 + 0.4) * 0.22 * idleK, Math.sin(t * 0.5 + 1) * 0.06 * idleK]);   // a slow, heavy float
-  _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
-  _pose[PIDX.hand_L] = lerp(maceWrist(_pose[PIDX.hand_L]), _pose[PIDX.hand_L], idleK);   // at ease the fist is loose: the mace dangles
+  if (idleK > 0) s.pos = add(s.pos, [Math.sin(t * 0.6) * 0.06 * idleK, Math.sin(t * 0.75 + 0.4) * 0.22 * idleK, Math.sin(t * 0.5 + 1) * 0.06 * idleK]);
   // facing
   let f;
   if (tw < 170.3) {
     const p2 = gundamLaunchPath(tw + 0.05), p1 = gundamLaunchPath(tw);
     const path = nrm(sub(p2, p1));
-    const toE = flat(sub(e1RawPos(tw), s.pos));
+    const toE = flat(sub(enemyRawPos(tw), s.pos));
     f = nrm(lrp(path, toE, smooth(169.3, 170.3, tw)));
-    s.roll = 0;
-    // gentle banking; an enemy ion bolt comes straight at him and he simply bats it away with the right vambrace (DODGE)
     _pose[PIDX._body + 2] += Math.sin(tw * 0.8) * 0.1 * (1 - smooth(169, 170, tw));
     parryPose(tw, _pose);
-  } else if (tw < 180.25) {
-    f = flat(sub(e1RawPos(tw), s.pos));
-    if (ROUGH(tw) > 0) f = nrm(lrp(f, roughDir(heroRawPos, e1RawPos, tw), ROUGH(tw)));
-    // (sizing each other up: the rough, averaged heading above turns them slowly as they circle — no servoing)
   } else {
-    const toE1 = flat(sub(e1RawPos(Math.min(tw, 180.2)), s.pos));
-    const toE2 = flat(sub(e2RawPos(Math.max(tw, SERAPH_HANDOFF)), s.pos), tw < 184 ? 0.8 : 0.35);
-    f = nrm(lrp(toE1, toE2, smooth(180.95, 181.3, tw)));
-    // on the run (184.6–186.6) he faces where he is going; the REVERSAL flips him round onto it (186.6–186.85)
-    const flee = smooth(184.55, 184.85, tw) * (1 - smooth(186.55, 186.85, tw));
-    if (flee > 0) f = nrm(lrp(f, flat(sub(heroRawPos(tw + 0.1), heroRawPos(tw)), 0.5), flee));
+    f = flat(sub(enemyRawPos(tw), s.pos), 0.6);               // always squared up to it (strafing sideways round the ring)
+    if (ROUGH(tw) > 0) f = nrm(lrp(f, roughDir(heroRawPos, enemyRawPos, tw), ROUGH(tw)));
   }
-  { const u = sat((tw - 178.0) / 0.32); if (u > 0 && u < 1) _pose[PIDX._body + 2] += 2 * Math.PI * u * u * (3 - 2 * u); }   // barrel-rolls over shot 3
-  s.saber = heroSaber(tw);
+  _pose[PIDX._body + 2] += heroRoll(tw);
+  s.saber = 0;
   s.weapon = 'rifle';
   s.boost = heroBoost(tw);
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
-  { const ak = HERO_AIM(tw); if (ak > 0) aimRifle(s, heroAimPoint(tw), ak); }   // the rifle laid on its target
+  { const ak = HERO_AIM(tw); if (ak > 0) aimRifle(s, heroAimPoint(tw), ak); }   // the rifle laid on its target, held upright
   hitReact('hero', tw, s, 'gundam');
   // hand-over to the old aftermath formula (identical at t = 200)
   if (t > 194.0) {
@@ -1095,503 +847,68 @@ function duelHero_(t) {
     for (const p in s.pose) if (!o.pose[p]) s.pose[p] = s.pose[p].map((v) => v * (1 - k));
     s.thr = lerp(s.thr, 0.3, k);
   }
-  s.damage = 0.02 * smooth(189.4, 189.6, t);
   return s;
 }
 
-const _c_duelEnemy1 = new Map();
-function spinYaw(t) {       // degrees, relative to facing RONIN #2 (270 = facing the dash line, mace arm on the enemy)
-  if (t < 191.95) return 0;
-  if (t < 192.1) return 70 * easeInOut((t - 191.95) / 0.15);                      // coil (bursting out of the beam)
-  if (t < 192.4) { const u = (t - 192.1) / 0.3; return 70 + 200 * u * u; }        // whip round, fastest at contact
-  if (t < 193.1) { const u = (t - 192.4) / 0.7; return 270 + 35 * (1 - (1 - u) * (1 - u)); }   // follow-through
-  return 305 - 5 * easeInOut(sat((t - 193.1) / 0.8));
-}
-export function duelEnemy1(t) {
-  if (!STATE_CACHE) return duelEnemy1_(t);
-  let r = _c_duelEnemy1.get(t);
-  if (r === undefined) { r = solid('e1', t, enemyFree('e1', t)); if (_c_duelEnemy1.size > 64) _c_duelEnemy1.clear(); _c_duelEnemy1.set(t, r); }
+// ---------------- VANGUARD state (one machine; duelEnemy1 draws it until the 180.9 cut, duelEnemy2 after)
+const _c_en = new Map();
+function enemyRaw_(t) {
+  if (!STATE_CACHE) return enemyState_(t);
+  let r = _c_en.get(t);
+  if (r === undefined) { r = enemyState_(t); if (_c_en.size > 96) _c_en.clear(); _c_en.set(t, r); }
   return r;
 }
-// ---------------------------------------------------------------- weapons are solid: katana vs mace
-// Per frame, the katana (capsule r 0.3) may not sink into the mace (shaft r 0.45, head r 2.1). The side it must stay
-// on is the side it came from (looked up in the last frames where the two were apart), so a blade can never tunnel
-// through the other weapon between frames — a blow that would pass through is stopped on the surface. The katana is
-// pushed out by swinging the sword arm about its shoulder; the left fist re-closes on the hilt.
-const _c_free = { e1: new Map(), e2: new Map() };
-export function enemyFree(who, t) {
-  const c = _c_free[who];
-  let r = c.get(t);
-  if (r === undefined) { r = who === 'e1' ? duelEnemy1_(t) : duelEnemy2_(t); if (AUTO_READY && r) r = applyImpulses(who, t, r); if (c.size > 256) c.clear(); c.set(t, r); }
-  return r;
-}
-const maceCaps = (hs) => maceCapsOf(duelFK({ ...hs, saber: Math.max(hs.saber, 1e-3) }, 'gundam'));
-const bodyCaps = (model, fk) => HITBOX[model].map(([part, a, b, r]) => [M.transformPoint([0, 0, 0], fk[part], a), M.transformPoint([0, 0, 0], fk[part], b), r]);
-function closestPair(A, B) {   // deepest-penetrating pair of capsule lists → { q, depth, i, j }
-  let best = null;
-  for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++) {
-    const q = segSeg(A[i][0], A[i][1], B[j][0], B[j][1]), depth = A[i][2] + B[j][2] - q.d;
-    if (!best || depth > best.depth) best = { q, depth, i, j };
-  }
-  return best;
-}
-// the mace is one rigid body: one side for the katana to stay on, taken (mace → katana) from the last frame where the
-// katana was clearly clear of it
-function approachNormal(who, t, offAt = null) {   // offAt(tt): the hold already applied at an earlier time
-  for (let k = 1; k <= 12; k++) {
-    const tt = t - k / 24, hs = duelHero_(tt), es = enemyFree(who, tt);
-    if (!hs || !es || !es.vis || !(es.saber > 0.5)) break;
-    const c = closestPair(maceCaps(hs), katanaCapsOf(duelFK(offAt ? { ...es, pos: add(es.pos, offAt(tt)) } : es, 'enemy_ms')));
-    if (c.depth < -0.4) return nrm(sub(c.q.c2, c.q.c1));
-  }
-  return null;
-}
-/** debug: deepest penetrations between two posed machines (weapon-weapon, body-body incl. mace→body, katana→Sigma) */
-export function solidReport(H, E, eArmed, hArmed) {
-  const mace = hArmed ? maceCapsOf(H) : [], kat = eArmed ? katanaCapsOf(E) : [], hb = bodyCaps('gundam', H), eb = bodyCaps('enemy_ms', E);
-  const ww = mace.length && kat.length ? closestPair(mace, kat).depth : -9, b = closestPair(hb, eb), kb = kat.length ? closestPair(hb, kat).depth : -9;
-  return { ww, bb: b.depth, bbParts: HITBOX.gundam[b.i][0] + '/' + HITBOX.enemy_ms[b.j][0], kb };
-}
-// ---- SOLIDITY as a continuous motion (not a per-frame projection, which popped: the blade stuck to the surface, then
-// teleported through once its side was lost). RONIN is simply HELD BACK — one world offset for the whole machine —
-// computed by a forward simulation on a 96 Hz grid: each frame starts from the last offset relaxing back to zero
-// (τ 0.12 s), any penetration (katana vs mace on the side it came from, katana vs Sigma, body vs body / mace) is resolved
-// from there, the change per frame is rate-limited, and the track is lightly blurred. At runtime: free motion + offset.
-const HOLD_MAX = 4;   // m — the hold stays a small correction; deeper overlaps are fixed in the choreography itself
-const SOLID_DT = 1 / 96, SOLID_T0 = 170.3, SOLID_T1 = 194.3, SOLID_N = Math.ceil((SOLID_T1 - SOLID_T0) / SOLID_DT) + 1;
-let SOLID = null;
-function resolveOffset(who, t, st, H, ctx) {   // translation that frees `st` (already offset) from Sigma and his mace
-  const killed = t >= KILL_T[who], armed = st.saber > 0.5;
-  const mace = H.mace, hb = H.body;
-  let off = [0, 0, 0];
-  for (let it = 0; it < 10; it++) {
-    const E = duelFK({ ...st, pos: add(st.pos, off) }, 'enemy_ms');
-    let best = null;
-    if (armed && mace.length) {
-      const kat = katanaCapsOf(E), c = closestPair(mace, kat);
-      if (c.depth > -0.05) {
-        if (!ctx.side) ctx.side = approachNormal(who, t, ctx.offAt) || (c.q.d > 1e-4 ? nrm(sub(c.q.c2, c.q.c1)) : null);
-        if (ctx.side) { const dp = mace[c.i][2] + kat[c.j][2] - V.dot(sub(c.q.c2, c.q.c1), ctx.side); if (dp > 0.005) best = { n: ctx.side, d: dp }; }
-        ctx.lastContact = t;
-      }
-    }
-    // (katana into Sigma's armour is not shoved out here — pushing the whole machine for a blade that passes too low read
-    // as a lurch; those passes are fixed in the choreography)
-    { const c = closestPair(killed ? hb : [...hb, ...mace], bodyCaps('enemy_ms', E));
-      if (c.depth > 0.005 && (!best || c.depth > best.d)) best = { n: c.q.d > 1e-4 ? nrm(sub(c.q.c2, c.q.c1)) : nrm(sub(st.pos, H.pos)), d: c.depth }; }
-    if (!best) break;
-    off = add(off, scl(best.n, best.d + 0.01));
-  }
-  return off;
-}
-function buildSolid() {
-  // reactive (causal) and smooth: the hold only ever answers a contact that is happening, relaxes back slowly enough
-  // (τ 0.3 s) to carry through a quick exchange instead of letting go and grabbing again, and never changes faster
-  // than 60 m/s of story time
-  const out = {}, relax = Math.exp(-SOLID_DT / 0.3), vmax = 120 * SOLID_DT;
-  for (const who of ['e1', 'e2']) {
-    const raw = new Float64Array(SOLID_N * 3), ctx = {};
-    ctx.offAt = (tt) => { const j = Math.max(0, Math.min(SOLID_N - 1, Math.round((tt - SOLID_T0) / SOLID_DT))); return [raw[j * 3], raw[j * 3 + 1], raw[j * 3 + 2]]; };
-    let prev = [0, 0, 0];
-    for (let i = 0; i < SOLID_N; i++) {
-      const t = SOLID_T0 + i * SOLID_DT, fr = enemyFree(who, t), hs = duelHero(t);
-      if (!fr || !fr.vis || !hs || !hs.vis) { prev = scl(prev, relax); raw.set(prev, i * 3); continue; }
-      if (ctx.lastContact !== undefined && t - ctx.lastContact > 0.25) { ctx.side = null; ctx.lastContact = undefined; }   // contact episode over
-      const Hf = duelFK({ ...hs, saber: Math.max(hs.saber, 1e-3) }, 'gundam');
-      const H = { mace: hs.saber > 0.5 ? maceCapsOf(Hf) : [], body: bodyCaps('gundam', Hf), pos: hs.pos };
-      const base = scl(prev, relax);
-      let c = add(base, resolveOffset(who, t, { ...fr, pos: add(fr.pos, base) }, H, ctx));
-      const dc = sub(c, prev), L = Math.hypot(dc[0], dc[1], dc[2]);
-      if (L > vmax) c = add(prev, scl(dc, vmax / L));
-      const Lc = Math.hypot(c[0], c[1], c[2]); if (Lc > HOLD_MAX) c = scl(c, HOLD_MAX / Lc);   // never a big visible shove
-      raw.set(c, i * 3); prev = c;
-    }
-    const sg = 3, Rr = 9, G = []; let gs = 0; for (let j = -Rr; j <= Rr; j++) { const g = Math.exp(-(j * j) / (2 * sg * sg)); G.push(g); gs += g; }
-    const sm = new Float64Array(SOLID_N * 3);
-    for (let i = 0; i < SOLID_N; i++) for (let j = -Rr; j <= Rr; j++) { const q = Math.min(SOLID_N - 1, Math.max(0, i + j)), g = G[j + Rr] / gs; for (let k = 0; k < 3; k++) sm[i * 3 + k] += raw[q * 3 + k] * g; }
-    out[who] = sm;
-  }
-  return out;
-}
-function solid(who, t, fr) {
-  if (!SOLID || !fr || !fr.vis || t < SOLID_T0 || t > SOLID_T1 - SOLID_DT) return fr;
-  const x = (t - SOLID_T0) / SOLID_DT, i = Math.floor(x), f = x - i, T = SOLID[who];
-  const d = (k) => T[i * 3 + k] + (T[(i + 1) * 3 + k] - T[i * 3 + k]) * f;
-  const o = [d(0), d(1), d(2)];
-  if (Math.abs(o[0]) + Math.abs(o[1]) + Math.abs(o[2]) < 1e-5) return fr;
-  return { ...fr, pos: add(fr.pos, o), _held: Math.hypot(o[0], o[1], o[2]) };   // the whole machine moves: the grip is unchanged
-}
-// the killing blows: the mace goes THROUGH (the breakup takes over) — no body push from then on
-const KILL_T = { e1: 999, e2: 192.35 };
-/**
- * Everything is solid, every frame (hero = the reference, RONIN yields):
- *   katana vs mace   — the katana stays on the side it came from and is stopped on the surface (sword arm swung about
- *                      its shoulder, the rest shoves the machine back), so a blow can never pass through the other weapon;
- *   katana vs Sigma  — the blade is stopped on his armour the same way;
- *   RONIN's body vs Sigma's body / the mace — the machine is shoved out along the contact normal.
- * Capsules are fitted to the meshes (HITBOX, MACE_SEG, KATANA). The left fist re-closes on the hilt after every push.
- */
-function weaponConstrain(who, t, s) {
-  if (!s || !s.vis) return s;
-  const hs = duelHero(t);
-  if (!hs || !hs.vis) return s;
-  const H = duelFK({ ...hs, saber: Math.max(hs.saber, 1e-3) }, 'gundam');
-  const mace = hs.saber > 0.5 ? maceCapsOf(H) : [], heroBody = bodyCaps('gundam', H), piv = PIV.enemy_ms, armed = s.saber > 0.5;
-  const killed = t >= KILL_T[who];
-  let out = s, side;
-  const own = () => { if (out === s) out = { ...s, pose: { ...s.pose } }; return out; };
-  const pushBlade = (E, x, n, depth) => {   // move katana point x by depth·n: sword arm about its shoulder, remainder = body
-    const o = own(), SR = M.transformPoint([0, 0, 0], E.torso, sub(piv.arm_R_upper, piv.torso)), goal = add(x, scl(n, depth + 0.01));
-    const A = r3between(sub(x, SR), sub(goal, SR));
-    o.pose.arm_R_upper = euler3(r3mul(r3T(r3(E.torso)), r3mul(A, r3(E.arm_R_upper))));
-    o.pos = add(o.pos, sub(goal, add(SR, r3v(A, sub(x, SR)))));
-    o._pushed = (o._pushed || 0) + depth;
-    gripLock(o);
-  };
-  for (let it = 0; it < 40; it++) {
-    const E = duelFK(out, 'enemy_ms');
-    let done = true;
-    if (armed && mace.length) {                                   // katana vs mace
-      const kat = katanaCapsOf(E), c = closestPair(mace, kat);
-      if (c.depth > 0.002) {
-        if (side === undefined) side = approachNormal(who, t);
-        const n = side || (c.q.d > 1e-4 ? nrm(sub(c.q.c2, c.q.c1)) : null);
-        if (n) {
-          const depth = mace[c.i][2] + kat[c.j][2] - V.dot(sub(c.q.c2, c.q.c1), n);
-          if (depth > 0.002) { pushBlade(E, c.q.c2, n, depth); done = false; continue; }
-        }
-      }
-    }
-    if (armed) {                                                  // katana vs Sigma's armour
-      const c = closestPair(heroBody, katanaCapsOf(E));
-      if (c.depth > 0.02 && c.q.d > 1e-4) { pushBlade(E, c.q.c2, nrm(sub(c.q.c2, c.q.c1)), c.depth); done = false; continue; }
-    }
-    const eb = bodyCaps('enemy_ms', E);                           // bodies (and the mace into RONIN's body)
-    const c = closestPair(killed ? heroBody : [...heroBody, ...mace], eb);
-    if (c.depth > 0.02) {
-      const n = c.q.d > 1e-4 ? nrm(sub(c.q.c2, c.q.c1)) : nrm(sub(out.pos, hs.pos));
-      const o = own(); o.pos = add(o.pos, scl(n, c.depth + 0.01)); o._bodyPush = (o._bodyPush || 0) + c.depth;
-      done = false; continue;
-    }
-    if (done) break;
-  }
-  return out;
-}
-// SAMURAI GRIP: RONIN holds the katana in BOTH hands — the left hand is solved (FK coordinate descent, joint-limited)
-// onto the hilt just below the right fist, aligned with the blade. Only the left arm moves: the blade and every solved
-// contact stay exactly where the choreography put them.
-const TH_VARS = [['arm_L_upper', 0], ['arm_L_upper', 1], ['arm_L_upper', 2], ['arm_L_lower', 0], ['hand_L', 0], ['hand_L', 1], ['hand_L', 2],
-  ['arm_R_upper', 0], ['arm_R_upper', 1], ['arm_R_upper', 2], ['arm_R_lower', 0], ['hand_R', 0], ['hand_R', 1]];
-const EV_T = () => EV.filter((e) => e[1] !== 'shake').map((e) => e[0]);
-// per-frame GRIP LOCK on top of the baked keys: a small, local left-arm-only descent from the baked pose closes the
-// last gap so the left fist sits exactly on the hilt (starting from the smooth baked pose keeps it continuous)
-const LOCK_VARS = [['arm_L_upper', 0], ['arm_L_upper', 1], ['arm_L_upper', 2], ['arm_L_lower', 0], ['hand_L', 0], ['hand_L', 1], ['hand_L', 2]];
-function gripLock(s) {
-  if (SOLVING || !s || !s.vis || !(s.saber > 0.5)) return s;
-  const gw = s._grip ?? 1;
-  if (gw <= 0.001) return s;                                  // hand off the hilt (taunt)
-  // exact: the left fist is placed on the hilt just below the right one, turned the same way (analytic arm IK)
-  const pose = s.pose, free = Object.fromEntries(['arm_L_upper', 'arm_L_lower', 'hand_L'].map((p) => [p, (pose[p] || [0, 0, 0]).slice()]));
-  s.pose = { ...pose };
-  reachFix(s, gw);
-  const fk0 = duelFK(s, 'enemy_ms');
-  const Hr = r3(fk0.hand_R), tgt = M.transformPoint([0, 0, 0], fk0.hand_R, GRIP_R);
-  const P = sub(tgt, r3v(Hr, GRIP_L));
-  s.gripReach = armIK(s, fk0, 'enemy_ms', 'L', P, Hr);
-  if (gw < 1) for (const p in free) s.pose[p] = [0, 1, 2].map((c) => lerp(free[p][c], s.pose[p][c], gw));   // eases onto / off the hilt
-  const fk = duelFK(s, 'enemy_ms');
-  s.twoHandErr = V.dist(M.transformPoint([0, 0, 0], fk.hand_L, GRIP_L), M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R));
-  return s;
-}
-// ---------------------------------------------------------------- HIT REACTION (partial ragdoll)
-// Every blow physically shoves the part it lands on: the struck joint and the ones above it (weights 1 / 0.6 / 0.3)
-// swing about the lever from each joint to the contact point, along the blow — one critically damped hump (0 at the
-// contact frame, so solved contacts stay exact; peak ≈ 0.14 s; settled by 1 s), then back to the keyed pose.
-const REACT_CHAIN = (() => {
-  const c = { torso: ['torso'], head: ['head', 'torso'], pelvis: ['pelvis'] };
-  for (const S of ['L', 'R']) {
-    c['arm_' + S + '_upper'] = ['arm_' + S + '_upper', 'torso']; c['arm_' + S + '_lower'] = ['arm_' + S + '_lower', 'arm_' + S + '_upper', 'torso'];
-    c['hand_' + S] = ['hand_' + S, 'arm_' + S + '_lower', 'arm_' + S + '_upper'];
-    c['leg_' + S + '_upper'] = ['leg_' + S + '_upper', 'pelvis']; c['leg_' + S + '_lower'] = ['leg_' + S + '_lower', 'leg_' + S + '_upper', 'pelvis'];
-    c['foot_' + S] = ['foot_' + S, 'leg_' + S + '_lower', 'leg_' + S + '_upper'];
-  }
-  return c;
-})();
-const REACT_W = [1, 0.6, 0.3];
-let REACTS = [];   // { who, t, part, local (contact point in the part's frame), dir (world, the blow), amp (rad) } — built at the end
-function hitReact(who, tw, s, model) {
-  if (SOLVING || !REACTS.length || !s || !s.vis) return s;
-  for (const r of REACTS) {
-    if (r.who !== who) continue;
-    const lt = tw - r.t;
-    if (lt <= 0 || lt > 1) continue;
-    const env = (lt * 7) * Math.exp(1 - lt * 7) * (1 - lt);
-    if (env < 1e-3) continue;
-    (REACT_CHAIN[r.part] || [r.part]).forEach((j, i) => {
-      const fk = duelFK(s, model);
-      if (!fk[j] || !fk[r.part]) return;
-      const P = M.transformPoint([0, 0, 0], fk[r.part], r.local), pivot = M.transformPoint([0, 0, 0], fk[j], [0, 0, 0]);
-      const ax = V.cross([0, 0, 0], sub(P, pivot), r.dir), L = Math.hypot(ax[0], ax[1], ax[2]);
-      if (L < 1e-6) return;
-      const A = r3axis(scl(ax, 1 / L), r.amp * env * REACT_W[i]);
-      const par = PARENT[j], Wp = r3(par ? fk[par] : fk.root);
-      s.pose[j] = euler3(r3mul(r3T(Wp), r3mul(A, r3(fk[j]))));
-    });
-  }
-  return s;
-}
-function buildReacts() {
-  const out = [];
-  const add = (who, t, part, pos, dir, amp) => {
-    const st = stateOf(who, t);
-    if (!st || !st.vis || !pos) return;
-    const fk = duelFK({ ...st, saber: 1 }, MODEL[who]);
-    if (!fk[part]) return;
-    out.push({ who, t, part, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk[part]), pos), dir: nrm(dir), amp });
-  };
-  const hip = (w, t) => stateOf(w, t).pos;
-  for (const [t, type, st, sp] of EV) {
-    if (sp.cut || (type !== 'hit' && type !== 'block' && type !== 'clash')) continue;
-    const e = DUEL_EVENTS.find((x) => Math.abs(x.t - t) < 1e-6), foe = t < 180.25 ? 'e1' : 'e2';
-    if (!e || !e.pos) continue;
-    if (sp.kind === 'shot') { add(sp.part[0], t, sp.part[1], e.pos, e.shotDir || [0, 0, -1], 0.5 * st); continue; }
-    if (sp.kind === 'part-part') add(sp.b[0], t, sp.b[1], e.pos, sub(hip(sp.b[0], t), hip(sp.a[0], t)), (sp.b[1] === 'torso' ? 0.6 : 0.35) * st);   // a body blow folds the chest (short lever: more swing)
-    else if (sp.kind === 'blade-part') { const att = sp.blade === 'hero' ? 'hero' : foe; add(sp.part[0], t, sp.part[1], e.pos, sub(hip(sp.part[0], t), hip(att, t)), (type === 'block' ? 0.22 : 0.35) * st); }
-    else if (sp.kind === 'blade-blade') {           // a clash knocks both weapon hands back
-      add('hero', t, 'hand_L', e.pos, sub(hip('hero', t), hip(foe, t)), 0.12 * st);
-      add(foe, t, 'hand_R', e.pos, sub(hip(foe, t), hip('hero', t)), 0.16 * st);
-    }
-  }
-  for (const c of AUTO_CONTACTS) {                   // hitbox-detected contacts: n points hero → foe
-    if (c.kind === 'weapon-body') { if (c.partA === 'weapon') add(c.b, c.t, c.partB, c.pos, c.n, 0.25 * c.strength); else add('hero', c.t, c.partA, c.pos, scl(c.n, -1), 0.25 * c.strength); }
-    else if (c.kind === 'body-body') { add(c.b, c.t, c.partB, c.pos, c.n, 0.15 * c.strength); add('hero', c.t, c.partA, c.pos, scl(c.n, -1), 0.12 * c.strength); }
-  }
-  return out;
-}
-
-// ---------------------------------------------------------------- analytic arm IK (exact, per frame)
-// Rotations are 3×3 column-major arrays; the FK's Euler order is R = Ry(y)·Rx(x)·Rz(z).
-const r3 = (m) => [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]];
-const r3mul = (a, b) => { const o = new Array(9); for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) o[c * 3 + r] = a[r] * b[c * 3] + a[3 + r] * b[c * 3 + 1] + a[6 + r] * b[c * 3 + 2]; return o; };
-const r3T = (a) => [a[0], a[3], a[6], a[1], a[4], a[7], a[2], a[5], a[8]];
-const r3v = (a, v) => [a[0] * v[0] + a[3] * v[1] + a[6] * v[2], a[1] * v[0] + a[4] * v[1] + a[7] * v[2], a[2] * v[0] + a[5] * v[1] + a[8] * v[2]];
-const r3x = (t) => { const c = Math.cos(t), s = Math.sin(t); return [1, 0, 0, 0, c, s, 0, -s, c]; };
-function r3axis(ax, ang) {   // rotation about unit axis
-  const [x, y, z] = ax, c = Math.cos(ang), s = Math.sin(ang), k = 1 - c;
-  return [c + x * x * k, y * x * k + z * s, z * x * k - y * s, x * y * k - z * s, c + y * y * k, z * y * k + x * s, x * z * k + y * s, y * z * k - x * s, c + z * z * k];
-}
-function r3between(a, b) {   // minimal rotation taking direction a onto direction b
-  const u = nrm(a), v = nrm(b), ax = V.cross([0, 0, 0], u, v), sn = Math.hypot(ax[0], ax[1], ax[2]), cs = V.dot(u, v);
-  if (sn < 1e-9) return cs > 0 ? [1, 0, 0, 0, 1, 0, 0, 0, 1] : r3axis(nrm(Math.abs(u[0]) < 0.9 ? V.cross([0, 0, 0], u, [1, 0, 0]) : V.cross([0, 0, 0], u, [0, 1, 0])), Math.PI);
-  return r3axis(scl(ax, 1 / sn), Math.atan2(sn, cs));
-}
-const euler3 = (m) => [Math.asin(clamp(-m[7], -1, 1)), Math.atan2(m[6], m[8]), Math.atan2(m[1], m[4])];   // → [x, y, z]
-/**
- * Place the wrist pivot of one arm at world point `P` with world hand rotation `Hw` (3×3), shoulder → elbow → wrist:
- * the elbow hinge (lower rx) is solved from the reach distance, the upper arm is swung by the minimal rotation from
- * its current pose (keeps the elbow's swivel), the wrist takes whatever rotation is left. Writes s.pose, returns the
- * residual (m) — > 0 only when P is out of reach (the arm then points straight at it).
- */
-function armIK(s, fk, model, side, P, Hw) {
-  const piv = PIV[model], up = 'arm_' + side + '_upper', lo = 'arm_' + side + '_lower', hd = 'hand_' + side;
-  const eOff = sub(piv[lo], piv[up]), wOff = sub(piv[hd], piv[lo]);
-  const S = M.transformPoint([0, 0, 0], fk.torso, sub(piv[up], piv.torso));
-  const T = r3(fk.torso), U0 = r3(fk[up]);
-  const reach = (th) => Math.hypot(...add(eOff, r3v(r3x(th), wOff)));
-  const d = V.dist(P, S), lim = JOINT_LIMITS[lo][0];
-  let th;
-  const hi = Math.min(0, lim[1]), lowTh = Math.max(-150 * DEG, lim[0]);
-  if (d >= reach(hi)) th = hi;
-  else if (d <= reach(lowTh)) th = lowTh;
-  else { let a = lowTh, b = hi; for (let i = 0; i < 40; i++) { const m = (a + b) / 2; if (reach(m) < d) a = m; else b = m; } th = (a + b) / 2; }
-  const vLoc = add(eOff, r3v(r3x(th), wOff));
-  const U = r3mul(r3between(r3v(U0, vLoc), sub(P, S)), U0);
-  const upL = euler3(r3mul(r3T(T), U));
-  const handL = euler3(r3mul(r3T(r3mul(U, r3x(th))), Hw));
-  s.pose[up] = upL; s.pose[lo] = [th, 0, 0]; s.pose[hd] = handL;
-  return Math.max(0, d - reach(hi));
-}
-// how far (m) the hilt sits beyond the left arm's reach (0 = the left fist can close on it)
-let _armReach = null;   // [min (elbow folded to 150°), max (straight)] shoulder → wrist distance, with a small margin
-const ARM_REACH_ = () => _armReach || (_armReach = (() => {
-  const piv = PIV.enemy_ms, e = sub(piv.arm_L_lower, piv.arm_L_upper), w = sub(piv.hand_L, piv.arm_L_lower);
-  return [Math.hypot(...add(e, r3v(r3x(-150 * DEG), w))) + 0.08, Math.hypot(...add(e, w)) - 0.05];
-})());
-function gripDeficit(fk) {
-  const Hr = r3(fk.hand_R), P = sub(M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R), r3v(Hr, GRIP_L));
-  const S = M.transformPoint([0, 0, 0], fk.torso, sub(PIV.enemy_ms.arm_L_upper, PIV.enemy_ms.torso));
-  const [lo, hi] = ARM_REACH_(), dist = V.dist(P, S);
-  return { d: dist > hi ? dist - hi : dist < lo ? lo - dist : 0, far: dist > lo, P, S };   // d: how far out of range (either way)
-}
-// a two-handed grip keeps the hilt near the centre line: if the sword arm has the hilt out of the left hand's reach,
-// the sword arm draws in (swung about its shoulder) until the left fist can close on it
-// Around its own sword contacts the blade must not leave the solved contact: there the whole machine shifts so the
-// blade pivots about the contact point instead (keep → 1 at the contact frame).
-const E_BLADE_T = { e1: [], e2: [] };
-function reachFix(s, w = 1) {
-  const upR = 'arm_R_upper', piv = PIV.enemy_ms, t = s._t ?? 0, who = t < 180.25 ? 'e1' : 'e2';
-  let keep = 0; for (const te of E_BLADE_T[who]) keep = Math.max(keep, 1 - smooth(0.04, 0.4, Math.abs(t - te)));
-  let hw = null;
-  if (keep > 0) { const hs = duelHero(t); if (hs) { const H = duelFK({ ...hs, saber: Math.max(hs.saber, 1e-3) }, 'gundam'); hw = H.saber; } }
-  for (let it = 0; it < 4; it++) {
-    const fk = duelFK(s, 'enemy_ms'), g = gripDeficit(fk);
-    if (g.d <= 0.01) return;
-    const SR = M.transformPoint([0, 0, 0], fk.torso, sub(piv[upR], piv.torso));
-    const X = g.P, X2 = add(X, scl(nrm(sub(g.S, X)), (g.d + 0.06) * w * (g.far ? 1 : -1)));   // too far: draw in; jammed: push out
-    const A = r3between(sub(X, SR), sub(X2, SR));
-    s.pose[upR] = euler3(r3mul(r3T(r3(fk.torso)), r3mul(A, r3(fk[upR]))));
-    if (hw) {   // the contact point on the blade (nearest the hero's weapon) goes back where it was
-      const Xa = segSeg(hw[0], hw[1], fk.saber[0], fk.saber[1]).c2, Xb = add(SR, r3v(A, sub(Xa, SR)));
-      s.pos = add(s.pos, scl(sub(Xa, Xb), keep));
-    }
-  }
-}
-function twoHand(s) {
-  return s;                       // SERAPH has no two-handed grip (its right hand is inside the cannon)
-  return gripLock(s);
-  if (SOLVING || !s || !s.vis || !(s.saber > 0.5)) return s;
-  // SAMURAI GRIP: both fists on the hilt. The katana is modelled into RONIN's right fist (hand_R mesh): hilt axis in
-  // hand_R space from the pommel (−0.2, −2.0, −2.0) up through the fist, direction ≈ (−0.02, 0.31, 0.95). The left fist
-  // closes on it 1.5 m lower. Both arms may move (the stance draws in to the centre line), but the blade is held where
-  // the choreography put it — rigidly at contact frames, loosely in between.
-  const fk0 = duelFK(s, 'enemy_ms');
-  const B0 = fk0.saber[0].slice(), B1 = fk0.saber[1].slice();
-  let near = 0; for (const te of EV_T()) near = Math.max(near, 1 - smooth(0.05, 0.3, Math.abs((s._t ?? 0) - te)));
-  const wBlade = 0.15 + 40 * near;
-  const pose = s.pose;
-  for (const [p] of TH_VARS) pose[p] = (pose[p] || [0, 0, 0]).slice();
-  const cost = () => {
-    const fk = duelFK(s, 'enemy_ms');
-    const tgt = M.transformPoint([0, 0, 0], fk.hand_R, [-0.2, -1.88, -1.45]);
-    const dir = nrm(M.transformDir([0, 0, 0], fk.hand_R, [-0.02, 0.31, 0.95]));
-    const g = M.transformPoint([0, 0, 0], fk.hand_L, [0.2, -1.4, 0]);
-    const hd = nrm(M.transformDir([0, 0, 0], fk.hand_L, [0.02, 0.31, 0.95]));
-    return V.dist(g, tgt) ** 2 + 6 * (1 - V.dot(hd, dir)) + wBlade * (V.dist(fk.saber[0], B0) ** 2 + 0.3 * V.dist(fk.saber[1], B1) ** 2);
-  };
-  const cur = TH_VARS.map(([p, k]) => pose[p][k]);
-  let best = cost(), bestV = cur.slice();
-  const mir = { arm_L_upper: 'arm_R_upper', arm_L_lower: 'arm_R_lower', hand_L: 'hand_R' };
-  TH_VARS.forEach(([p, k]) => { if (mir[p]) { const r = pose[mir[p]] || [0, 0, 0]; pose[p][k] = k === 0 ? r[0] : -r[k]; } });
-  const cm = cost(); if (cm < best) { best = cm; bestV = TH_VARS.map(([p, k]) => pose[p][k]); }
-  TH_VARS.forEach(([p, k], i) => { pose[p][k] = bestV[i]; });
-  for (let step = 0.5; step > 0.008; step *= 0.6) {
-    for (let it = 0; it < 5; it++) {
-      let imp = false;
-      for (const [p, k] of TH_VARS) {
-        const L = JOINT_LIMITS[p]?.[k] || [-3.5, 3.5];
-        for (const sg of [1, -1]) {
-          const v0 = pose[p][k]; pose[p][k] = clamp(v0 + sg * step, L[0], L[1]);
-          const c = cost(); if (c < best - 1e-6) { best = c; imp = true; break; } pose[p][k] = v0;
-        }
-      }
-      if (!imp) break;
-    }
-  }
-  const fk = duelFK(s, 'enemy_ms');
-  const tg = M.transformPoint([0, 0, 0], fk.hand_R, [-0.2, -1.88, -1.45]), g = M.transformPoint([0, 0, 0], fk.hand_L, [0.2, -1.4, 0]);
-  s.twoHandErr = V.dist(g, tg); s.bladeShift = V.dist(fk.saber[0], B0);
-  return s;
-}
-function duelEnemy1_(t) {
-  if (t < DUEL_T0 || t >= DUEL_T1) return null;
-  const s = base(t > 160 && t < SERAPH_HANDOFF);            // SERAPH, first half (the E2 slot takes over on the cut)
-  if (!s.vis) return s;
+export function duelEnemy1(t) { if (t < DUEL_T0 || t >= DUEL_T1) return null; const s = enemyRaw_(t); return t < SERAPH_HANDOFF && t > 160 ? s : { ...s, vis: false }; }
+export function duelEnemy2(t) { if (t < DUEL_T0 || t >= DUEL_T1) return null; const s = enemyRaw_(t); return t >= SERAPH_HANDOFF && t < 194.2 ? s : { ...s, vis: false }; }
+const _epose = new Float64Array(NCH);
+function enemyState_(t) {
+  const s = base(true);
   const tw = warp(t);
-  if (tw < 170) {   // pre-duel: old erratic pattern, continuous into the keyed track at 170
+  if (tw < 170) {   // before the duel: an erratic pattern out in the fleet, continuous into the keyed track at 170
     const old = (x) => G(-60 + 50 * Math.sin(1.3 * x), 20 + 30 * Math.sin(0.9 * x), -120 + 30 * Math.cos(1.1 * x));
     const k = smooth(166, 170, tw);
     s.pos = lrp(old(tw), e1Pos(170), k);
     s.vel = velOf((x) => lrp(old(x), e1Pos(170), smooth(166, 170, x)), t);
-    const f = flat(sub(gundamLaunchPath(tw), s.pos));
-    s.fwd = f;
-    s.pose = poseObj(micro(t, Float64Array.from(R.aim), 7.1));
+    s.fwd = flat(sub(gundamLaunchPath(tw), s.pos));
+    s.pose = poseObj(micro(t, Float64Array.from(VG.fly), 7.1), false);
     s.speed = Math.hypot(...s.vel); s.smear = sat((s.speed - 35) / 110);
-    return setWings(s, tw);
+    s.muzzleOff = true;
+    return s;
   }
-  s.pos = e1RawPos(tw);
-  const co = collisionOffset('e1', tw); s.pos = add(s.pos, co.off);
-  s.vel = velOf((x) => e1RawPos(warp(x)), t); s._pf = (x) => e1RawPos(warp(x)); s._t = t;
-  springPose(e1Pose, tw, _pose); e1Imp(tw, _pose);
-  // 170–176.45 (scenes 32–35): holds still — heading set once, no squash / weight-shift / jitter / lean, only a float
-  const e1K = smooth(169.8, 170.3, tw) * (1 - smooth(176.3, 176.6, tw));
-  { const pre = e1K > 0 ? Float64Array.from(_pose) : null;
-    e1Squash(tw, _pose); weightShift(e1Pose, tw, _pose, 'arm_R_upper');
-    if (pre) for (let i = 0; i < _pose.length; i++) _pose[i] = lerp(_pose[i], pre[i], e1K); }
-  micro(t, _pose, 7.1, 1 - e1K);
-  if (e1K > 0) {   // zero-g float: every joint drifts on its own slow phase, the limbs lagging the body like in water
-    const F = [['torso', 0, 0.022, 1.3, 0], ['torso', 2, 0.012, 0.9, 1.1], ['head', 0, 0.03, 1.3, -0.7], ['head', 1, 0.025, 0.7, 2],
-      ['arm_R_upper', 0, 0.02, 1.3, -0.5], ['arm_R_lower', 0, 0.018, 1.3, -1.0], ['hand_R', 0, 0.02, 1.3, -1.4],
-      ['leg_L_upper', 0, 0.04, 1.1, 0.3], ['leg_L_lower', 0, 0.05, 1.1, -0.4], ['foot_L', 0, 0.07, 1.1, -1.1],
-      ['leg_R_upper', 0, 0.05, 0.95, 1.9], ['leg_R_lower', 0, 0.06, 0.95, 1.2], ['foot_R', 0, 0.08, 0.95, 0.5],
-      ['leg_L_upper', 2, 0.02, 0.7, 2.5], ['leg_R_upper', 2, 0.02, 0.8, 0.9]];
-    for (const [p, c, a, w, ph] of F) _pose[PIDX[p] + c] += Math.sin(t * w + ph) * a * e1K;
+  s.pos = enemyRawPos(tw);
+  s.vel = velOf((x) => enemyRawPos(warp(x)), t); s._pf = (x) => enemyRawPos(warp(x)); s._t = t;
+  enemyPose(tw, _epose); enemyImp(tw, _epose);
+  const idleK = smooth(169.8, 170.3, tw) * (1 - smooth(176.3, 176.6, tw));
+  { const pre = idleK > 0 ? Float64Array.from(_epose) : null;
+    (tw < SERAPH_HANDOFF ? e1Squash : e2Squash)(tw, _epose);
+    if (pre) for (let i = 0; i < _epose.length; i++) _epose[i] = lerp(_epose[i], pre[i], idleK); }
+  micro(t, _epose, 7.1, (1 - idleK) * (tw > 192.4 ? 0.3 : 1));
+  if (idleK > 0) {   // zero-g float: every joint drifts on its own slow phase, the limbs lagging the body
+    const F = [['torso', 0, 0.02, 1.3, 0], ['torso', 2, 0.012, 0.9, 1.1], ['head', 0, 0.03, 1.3, -0.7], ['head', 1, 0.025, 0.7, 2],
+      ['arm_R_upper', 0, 0.02, 1.3, -0.5], ['arm_R_lower', 0, 0.018, 1.3, -1.0], ['arm_L_upper', 0, 0.02, 1.2, 0.4],
+      ['leg_L_upper', 0, 0.04, 1.1, 0.3], ['leg_L_lower', 0, 0.05, 1.1, -0.4], ['leg_R_upper', 0, 0.05, 0.95, 1.9], ['leg_R_lower', 0, 0.06, 0.95, 1.2]];
+    for (const [p, c, a, w, ph] of F) _epose[PIDX[p] + c] += Math.sin(t * w + ph) * a * idleK;
   }
-  // the beckon: the held-out free hand curls up twice ("come on"), the forearm following a little
-  const bk = smooth(172.8, 172.95, tw) * (1 - smooth(173.45, 173.6, tw));
-  if (bk > 0) { const c = Math.pow(Math.max(0, Math.sin((tw - 172.85) * Math.PI * 2 * 1.45)), 2);
-    _pose[PIDX.hand_L] += 0.75 * c * bk; _pose[PIDX.arm_L_lower] += 0.22 * c * bk; }
-  s._grip = (1 - smooth(172.35, 172.6, tw) * (1 - smooth(173.7, 174.2, tw))) * (1 - smooth(179.02, 179.12, tw));   // left hand off the hilt for the taunt / when smashed
-  s._idle = e1K;
+  s._idle = idleK;
   s.anchor = s.pos.slice();
-  if (e1K > 0) s.pos = add(s.pos, [Math.sin(t * 0.8 + 2) * 0.12 * e1K, Math.sin(t * 1.1 + 1.3) * 0.4 * e1K, Math.sin(t * 0.6) * 0.12 * e1K]);
-  _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
-  let f = flat(sub(heroRawPos(tw), s.pos));            // faces Sigma …
-  if (ROUGH(tw) > 0) f = nrm(lrp(f, roughDir(e1RawPos, heroRawPos, tw), ROUGH(tw)));
-  const away = smooth(179.45, 179.8, tw);              // … until it turns to fly off (after the shot over its shoulder)
-  if (away > 0) f = nrm(lrp(f, flat(sub(e1RawPos(tw + 0.1), e1RawPos(tw)), 0.6), away));
-  s.saber = e1Saber(tw);
-  s.boost = Math.max(sat((Math.hypot(...s.vel) - 20) / 60), smooth(178.5, 178.65, tw),
-    0.9 * smooth(172.2, 172.32, tw) * (1 - smooth(172.5, 172.85, tw)));   // brakes onto its mark: one thruster burst; kicks off at 178.6
-  s.thr = clamp(0.4 + s.boost * 0.6, 0, 1);
-  s.eye = 1;
-  finish(s, _pose, f);
-  const ak = SERAPH_AIM(tw); if (ak > 0) aimGun(s, seraphAim(tw), ak);   // the cannon laid on where Sigma is going
-  return setWings(hitReact('e1', tw, s, 'enemy_ms'), tw);
-}
-
-const _c_duelEnemy2 = new Map();
-export function duelEnemy2(t) {
-  if (!STATE_CACHE) return duelEnemy2_(t);
-  let r = _c_duelEnemy2.get(t);
-  if (r === undefined) { r = solid('e2', t, enemyFree('e2', t)); if (_c_duelEnemy2.size > 64) _c_duelEnemy2.clear(); _c_duelEnemy2.set(t, r); }
-  return r;
-}
-function duelEnemy2_(t) {
-  if (t < DUEL_T0 || t >= DUEL_T1) return null;
-  const s = base(t >= SERAPH_HANDOFF && t < 194.2);        // SERAPH, second half (the return dive → the end)
-  if (!s.vis) return s;
-  const tw = warp(t);
-  s.pos = e2RawPos(tw);
-  const co = collisionOffset('e2', tw); s.pos = add(s.pos, co.off);
-  s.vel = velOf((x) => e2RawPos(warp(x)), t); s._pf = (x) => e2RawPos(warp(x)); s._t = t;
-  springPose(e2Pose, tw, _pose); e2Imp(tw, _pose);
-  const dk = Math.max(E2_DIVE(tw), E2_FLIP(tw));
-  { const pre = dk > 0 ? Float64Array.from(_pose) : null;
-    e2Squash(tw, _pose); weightShift(e2Pose, tw, _pose, 'arm_R_upper');
-    if (pre) for (let i = 0; i < _pose.length; i++) _pose[i] = lerp(_pose[i], pre[i], dk); }
-  micro(t, _pose, 3.7, (tw > 192.4 ? 0.3 : 1) * (1 - dk));
-  s._idle = dk;
-  _pose[PIDX._body] += co.jolt; _pose[PIDX.torso] += co.jolt * 0.8; _pose[PIDX.head] += co.jolt * 0.6;   // impact jolt
-  const h = heroRawPos(Math.min(tw, 192.4));
-  let f = flat(sub(h, s.pos), tw < 184.0 ? 0.8 : 0.35);                 // faces him (nose-down in the dive)
-  const [spY, spR] = e2Spin(tw);                                        // spinning out after the wing is shot away
-  if (spY) { f = yawRot(f, spY); _pose[PIDX._body + 2] += spR; }
-  s.wingLost = tw >= WING_HIT_T + 0.03;
-  if (tw > 192.4) {
-    const u = tw - 192.4;
-    f = yawRot(f, -u * 0.35);
-    _pose[PIDX._body] += -u * 0.12; _pose[PIDX._body + 2] += u * 0.25;
-  }
-  s.saber = e2Saber(tw);
-  s.boost = sat((Math.hypot(...s.vel) - 15) / 50);
-  s.thr = tw > 192.4 ? 0.1 : clamp(0.45 + s.boost * 0.55, 0, 1);
-  s.damage = 0.18 * smooth(186.98, 187.1, t) + 0.6 * smooth(192.4, 193.2, t);
+  if (idleK > 0) s.pos = add(s.pos, [Math.sin(t * 0.8 + 2) * 0.12 * idleK, Math.sin(t * 1.1 + 1.3) * 0.4 * idleK, Math.sin(t * 0.6) * 0.12 * idleK]);
+  const flip = flipLayer(tw, _epose);
+  _epose[PIDX._body] += flip;
+  _epose[PIDX._body + 2] += enemyRoll(tw);
+  let f = flat(sub(heroRawPos(Math.min(tw, 192.4)), s.pos), 0.6);   // squared up to him …
+  if (ROUGH(tw) > 0) f = nrm(lrp(f, roughDir(enemyRawPos, heroRawPos, tw), ROUGH(tw)));
+  f = yawRot(f, shieldSpin(tw));                                   // … knocked half round by the shield hit
+  if (tw > 192.4) { const u = tw - 192.4; f = yawRot(f, -u * 0.35); _epose[PIDX._body] += -u * 0.12; _epose[PIDX._body + 2] += u * 0.25; }
+  s.shieldLost = tw >= SHIELD_HIT_T + 0.03;
+  s.boost = enemyBoost(tw);
+  s.thr = tw > 192.4 ? 0.1 : clamp(0.4 + s.boost * 0.6, 0, 1);
+  s.damage = 0.12 * smooth(SHIELD_HIT_T, SHIELD_HIT_T + 0.1, t) + 0.6 * smooth(192.4, 193.2, t);
   s.eye = tw > 192.5 ? Math.max(0, 1 - (tw - 192.5) / 1.2) * (Math.sin(t * 50) > -0.2 ? 1 : 0.2) : 1;
-  finish(s, _pose, f);
-  const ak = SERAPH_AIM(tw); if (ak > 0) aimGun(s, seraphAim(tw), ak);   // every shot laid on where he is going
-  return setWings(hitReact('e2', tw, s, 'enemy_ms'), tw);
+  finish(s, _epose, f, false);
+  const ak = ENEMY_AIM(tw);
+  if (ak > 0 && !(tw > 192.4)) aimEnemy(s, enemyAim(tw), ak);        // the rifle laid on where he is going
+  return hitReact(tw < SERAPH_HANDOFF ? 'e1' : 'e2', tw, s, 'enemy_ms');
 }
-
 // ============================================================================ forward kinematics (same math as renderer + msMatrix)
 // pivots in model space (glTF, +Z forward, +X = model's left) from assets/*.glb
 const PIV = {
@@ -1602,12 +919,13 @@ const PIV = {
     leg_L_upper: [2.2, 9.35, 0], leg_L_lower: [3.0, 6.65, 0.2], foot_L: [3.65, 1.7, 0],
     leg_R_upper: [-2.2, 9.35, 0], leg_R_lower: [-3.0, 6.65, 0.2], foot_R: [-3.65, 1.7, 0],
   },
-  enemy_ms: {   // SERAPH / 03 (assets/enemy_ms.glb; RONIN / 04 kept in assets/v14_backup)
-    ms_root: [0, 8.5, -0.76], pelvis: [0, 8.5, -0.76], torso: [0, 9.5, -0.81], head: [0, 12.45, -1.24],
-    arm_L_upper: [2.19, 11.64, -1.05], arm_L_lower: [2.99, 9.83, -0.76], hand_L: [3.56, 7.6, -0.19],
-    arm_R_upper: [-2.19, 11.64, -1.05], arm_R_lower: [-2.99, 9.83, -0.76], hand_R: [-3.56, 7.6, -0.19],
-    leg_L_upper: [1.0, 8.5, -0.76], leg_L_lower: [1.76, 6.22, -0.86], foot_L: [2.38, 1.76, -1.28],
-    leg_R_upper: [-1.0, 8.5, -0.76], leg_R_lower: [-1.76, 6.22, -0.86], foot_R: [-2.38, 1.76, -1.28],
+  enemy_ms: {   // VANGUARD / 07 (assets/enemy_ms.glb, repainted crimson; SERAPH / 03 kept in assets/v15_backup)
+    ms_root: [0, 8.942, 0], pelvis: [0, 8.942, 0], torso: [0, 10.894, 0], head: [0, 15.776, -0.206],
+    arm_L_upper: [3.392, 15.314, -0.36], arm_L_lower: [5.139, 13.413, -0.308], hand_L: [6.783, 11.665, 0.719],
+    arm_R_upper: [-3.392, 15.314, -0.36], arm_R_lower: [-5.139, 13.413, -0.308], hand_R: [-6.783, 11.665, 0.719],
+    leg_L_upper: [1.953, 8.942, 0], leg_L_lower: [2.518, 6.629, -0.308], foot_L: [3.083, 2.056, -0.514],
+    leg_R_upper: [-1.953, 8.942, 0], leg_R_lower: [-2.518, 6.629, -0.308], foot_R: [-3.083, 2.056, -0.514],
+    rifle: [-7.811, 11.1, 2.981],
   },
 };
 const PARENT = { ms_root: null, pelvis: 'ms_root', torso: 'ms_root', head: 'torso', arm_L_upper: 'torso', arm_L_lower: 'arm_L_upper', hand_L: 'arm_L_lower',
@@ -1618,6 +936,9 @@ const FK_ORDER = Object.keys(PARENT);
 // (re-check with: python3 -c "…" in blender/DUEL_NOTES.md if the rifle is re-modelled; sanity check compares them)
 export const RIFLE_T = [-0.10266, -1.69395, 0.25666];
 export const MUZZLE_T = [0, 0.55, 8.4];
+// VANGUARD's rifle (assets/enemy_ms.glb): rifle_muzzle in the rifle part's frame; the barrel runs from the grip pivot to it
+export const VAN_MUZZLE = [-2.98552, -4.29353, 1.72814];
+const VAN_BARREL = nrm(VAN_MUZZLE);
 export function msMatrixOf(s, out = M.new()) {
   const f = nrm(s.fwd);
   const yaw = Math.atan2(f[0], f[2]);
@@ -1628,19 +949,9 @@ export function msMatrixOf(s, out = M.new()) {
   out[12] = s.pos[0] - hip[0]; out[13] = s.pos[1] - hip[1]; out[14] = s.pos[2] - hip[2];
   return out;
 }
-// the weapons as modelled (measured from assets/mace.glb and the ronin_blade faces of enemy_ms.glb hand_R):
-//   mace — grip point at hand_L (0,−1.2,0.6), haft along hand +Z: pommel −1, haft r 0.42 to 7.4, flanged head r ≈1.9
-//          7.6–10.2, spike to 12.9;   katana — hand_R local guard → mid → tip, blade half-width ≈ 0.28
+// Sigma's blade line (hand_L grip point, along hand +Z) — the beam saber of the well assault (shots.js ramBase)
 export const MACE_LEN = 12.9;
-const MACE_SEG = [[-1.0, 7.4, 0.42], [7.6, 10.2, 1.9], [10.4, 12.5, 0.55]];
-// SERAPH's weapon: the heavy beam cannon along its right forearm (arm_R_lower local: breech at the elbow → muzzle), and a
-// beam blade it can ignite out of the muzzle along the barrel axis (the melee weapon). Measured from enemy_ms.glb.
-export const SERAPH_GUN = { breech: [0.02, 0.01, -0.42], muzzle: [-2.97, -7.97, 3.07], r: 1.13, blade: 12, bladeR: 0.35 };
-const GUN_AX = nrm(sub(SERAPH_GUN.muzzle, SERAPH_GUN.breech));
-export const KATANA = { r: SERAPH_GUN.bladeR };   // (name kept: the enemy's cutting line)
-const maceCapsOf = (fk) => { const [a, , d] = fk.saber; return MACE_SEG.map(([z0, z1, r]) => [add(a, scl(d, z0)), add(a, scl(d, z1)), r]); };
-// the enemy's weapon for contacts / solidity: the beam blade and the armoured cannon barrel (it can block with it)
-const katanaCapsOf = (fk) => [[fk.saber[0], fk.saber[1], KATANA.r], [fk.gunBreech, fk.saber[0], SERAPH_GUN.r]];
+export const SERAPH_GUN = null;   // (SERAPH's arm cannon is gone: VANGUARD holds a rifle part)
 /** world matrices of every part + saber segment. model: 'gundam' | 'enemy_ms' */
 export function duelFK(s, model) {
   const piv = PIV[model];
@@ -1661,14 +972,16 @@ export function duelFK(s, model) {
     out.muzzle = M.transformPoint([0, 0, 0], out.rifle, MUZZLE_T);
     out.muzzleDir = nrm(M.transformDir([0, 0, 0], out.rifle, [0, 0, 1]));
   }
-  if (model === 'enemy_ms') {   // SERAPH: cannon muzzle → beam blade tip, along the barrel (forearm frame)
-    const g = M.transformPoint([0, 0, 0], out.arm_R_lower, SERAPH_GUN.muzzle), d = nrm(M.transformDir([0, 0, 0], out.arm_R_lower, GUN_AX));
-    out.saber = [g, add(g, scl(d, SERAPH_GUN.blade)), d];
-    out.gunBreech = M.transformPoint([0, 0, 0], out.arm_R_lower, SERAPH_GUN.breech);
-    out.katMid = lrp(out.saber[0], out.saber[1], 0.5);
+  if (model === 'enemy_ms') {   // VANGUARD: its rifle is a posed part on hand_R; muzzle + barrel direction from the rifle frame
+    const r = s.pose.rifle || [0, 0, 0], pr = piv.rifle, ph = piv.hand_R;
+    Q.fromEuler(q, r[0], r[1], r[2]);
+    out.rifle = M.mul(M.new(), out.hand_R, M.fromTRS(M.new(), [pr[0] - ph[0], pr[1] - ph[1], pr[2] - ph[2]], q, 1));
+    out.muzzle = M.transformPoint([0, 0, 0], out.rifle, VAN_MUZZLE);
+    out.muzzleDir = nrm(M.transformDir([0, 0, 0], out.rifle, VAN_BARREL));
+    out.shield = out.arm_L_lower;                                   // the shield part rides the forearm (pivot at the elbow)
     return out;
   }
-  const a = M.transformPoint([0, 0, 0], out.hand_L, [0, -1.2, 0.6]);   // the mace grip point; the haft runs along hand +Z
+  const a = M.transformPoint([0, 0, 0], out.hand_L, [0, -1.2, 0.6]);   // the hilt; the blade runs along hand +Z
   const dir = nrm(M.transformDir([0, 0, 0], out.hand_L, [0, 0, 1]));
   out.saber = [a, add(a, scl(dir, MACE_LEN * (s.saber > 0 ? s.saber : 1))), dir];
   return out;
@@ -1688,232 +1001,147 @@ export function segSeg(p1, q1, p2, q2) {
 }
 function segPoint(p, q, x) { const d = sub(q, p); const u = clamp(V.dot(sub(x, p), d) / V.dot(d, d), 0, 1); const c = add(p, scl(d, u)); return { d: V.dist(c, x), c, u }; }
 
-// ============================================================================ events (contact points solved with FK)
-// who: attacker; pos: exact world contact point (also 'hero' | 'enemy' tags kept in `on`)
-const EV = [
-  // t, type, strength, spec — the GUNFIGHT (no melee): shots are drawn by shots.js; these carry shake / sound / hits
-  // the ranged duel: SERAPH's cannon shots (he flash-steps out of them)
-  ...[176.95, 177.5, 178.05].map((t) => [t, 'shake', 0.35, { on: 'e1', note: 'SERAPH fires the heavy cannon' }]),
-  [179.3, 'shake', 0.35, { on: 'e1', note: 'fires back over its shoulder' }],
-  ...[182.35, 183.05, 183.75].map((t) => [t, 'shake', 0.4, { on: 'e2', note: 'fires down out of the dive' }]),
-  [184.5, 'shake', 0.7, { on: 'hero', note: 'THE PASS — they streak past each other, both firing' }],
-  [186.95, 'hit', 0.9, { kind: 'shot', part: ['e2', 'torso', [1.28, 2.76, -1.14]], note: 'the reversal shot takes its left wing' }],
-  [190.85, 'shake', 0.6, { on: 'e2', note: 'SERAPH fires at full power' }],
-  [190.95, 'shake', 0.9, { on: 'hero', note: 'the beam tears past him' }],
-  [192.4, 'hit', 1.0, { kind: 'shot', part: ['e2', 'torso', [0, 1, 0]], cut: true, note: 'the charged shot goes through its chest' }],
-  [194.0, 'shake', 1.2, { on: 'e2', note: 'SERAPH explodes' }],
-];
-const MODEL = { hero: 'gundam', e1: 'enemy_ms', e2: 'enemy_ms' };
-export const stateOf = (who, t) => (who === 'hero' ? duelHero(t) : who === 'e1' ? duelEnemy1(t) : duelEnemy2(t));
-function fkAt(who, t) { const s = stateOf(who, t); return duelFK({ ...s, saber: 1 }, MODEL[who]); }
-// ---------------------------------------------------------------- contact solver
-// Hand-authored key poses are refined at module load so blades really meet at every clash and limbs really land
-// on every hit: coordinate descent on a few channels of the keys that sit exactly at the contact time.
-const TRACKS = { hero: { pose: heroPose, pos: heroPos }, e1: { pose: e1Pose, pos: e1Pos }, e2: { pose: e2Pose, pos: e2Pos } };
-const keyAt = (track, t) => { const k = track.keys.find((q) => Math.abs(q[0] - t) < 1e-6); if (!k) throw new Error('duel: no key at ' + t); return k; };
-const band = (x, lo, hi) => (x < lo ? lo - x : x > hi ? x - hi : 0);
-// body volumes (part, local point, radius m) — lit blades must stay out of the opponent except at intended hits
-export const BODY_VOL = {
-  gundam: [['torso', [0, 2, 0], 3.2], ['head', [0, 1, 0], 1.8], ['pelvis', [0, 0, 0], 2.6], ['leg_L_lower', [0, -2, 0], 1.5], ['leg_R_lower', [0, -2, 0], 1.5], ['arm_L_upper', [0, -1, 0], 1.6], ['arm_R_upper', [0, -1, 0], 1.6]],
-  enemy_ms: [['torso', [0, 1.5, 0], 2.4], ['head', [0, 1, 0], 1.5], ['pelvis', [0, 0, 0], 2.0], ['leg_L_lower', [0, -2, 0], 1.1], ['leg_R_lower', [0, -2, 0], 1.1], ['arm_L_upper', [0, -1, 0], 1.2], ['arm_R_upper', [0, -1, 0], 1.2]],
-};
-function bladeIntrusion(blade, fk, model, margin = 0.6) {
-  let pen = 0;
-  for (const [p, l, r] of BODY_VOL[model]) { const d = segPoint(blade[0], blade[1], partPoint(fk, p, l)).d; pen += Math.max(0, r + margin - d); }
-  return pen;
+// ---------------------------------------------------------------- analytic helpers (3×3 column-major; FK Euler R = Ry·Rx·Rz)
+const r3 = (m) => [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]];
+const r3mul = (a, b) => { const o = new Array(9); for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) o[c * 3 + r] = a[r] * b[c * 3] + a[3 + r] * b[c * 3 + 1] + a[6 + r] * b[c * 3 + 2]; return o; };
+const r3T = (a) => [a[0], a[3], a[6], a[1], a[4], a[7], a[2], a[5], a[8]];
+const r3v = (a, v) => [a[0] * v[0] + a[3] * v[1] + a[6] * v[2], a[1] * v[0] + a[4] * v[1] + a[7] * v[2], a[2] * v[0] + a[5] * v[1] + a[8] * v[2]];
+function r3axis(ax, ang) {   // rotation about unit axis
+  const [x, y, z] = ax, c = Math.cos(ang), s = Math.sin(ang), k = 1 - c;
+  return [c + x * x * k, y * x * k + z * s, z * x * k - y * s, x * y * k - z * s, c + y * y * k, z * y * k + x * s, x * z * k + y * s, y * z * k - x * s, c + z * z * k];
 }
-let REACH_W = 1;   // contact solve pass 1: contact only (0); pass 2: contact + two-hand reach (1)
-function contactCost(ev, t) {
-  const foe = t < 180.25 ? 'e1' : 'e2';
-  const H = fkAt('hero', t), E = fkAt(foe, t);
-  const F = { hero: H, e1: E, e2: E };
-  const own = ev.kind === 'blade-blade' || (ev.kind === 'blade-part' && ev.blade !== 'hero');   // RONIN's sword is in play
-  return contactCost_(ev, t, H, E, F) + REACH_W * (own && GRIP_ON[foe](t) ? 4 * Math.max(0, gripDeficit(E).d) : 0);   // two hands stay on the hilt
+function r3between(a, b) {   // minimal rotation taking direction a onto direction b
+  const u = nrm(a), v = nrm(b), ax = V.cross([0, 0, 0], u, v), sn = Math.hypot(ax[0], ax[1], ax[2]), cs = V.dot(u, v);
+  if (sn < 1e-9) return cs > 0 ? [1, 0, 0, 0, 1, 0, 0, 0, 1] : r3axis(nrm(Math.abs(u[0]) < 0.9 ? V.cross([0, 0, 0], u, [1, 0, 0]) : V.cross([0, 0, 0], u, [0, 1, 0])), Math.PI);
+  return r3axis(scl(ax, 1 / sn), Math.atan2(sn, cs));
 }
-const hipGap = (H, E) => V.dist(M.transformPoint([0, 0, 0], H.pelvis, [0, 0, 0]), M.transformPoint([0, 0, 0], E.pelvis, [0, 0, 0]));
-function contactCost_(ev, t, H, E, F) {
-  if (ev.kind === 'blade-blade') {
-    const r = segSeg(H.saber[0], H.saber[1], E.saber[0], E.saber[1]);
-    return r.d + 8 * (band(r.s, ev.hs?.[0] ?? 0.3, ev.hs?.[1] ?? 0.85) + band(r.t, ev.es?.[0] ?? 0.3, ev.es?.[1] ?? 0.85))
-      + 2 * Math.max(0, (ev.minGap ?? 0) - hipGap(H, E))   // blades meet at weapon length, not with the machines jammed together
-      + 4 * (bladeIntrusion(H.saber, E, 'enemy_ms') + bladeIntrusion(E.saber, H, 'gundam'));
+const euler3 = (m) => [Math.asin(clamp(-m[7], -1, 1)), Math.atan2(m[6], m[8]), Math.atan2(m[1], m[4])];   // → [x, y, z]
+
+// ---------------------------------------------------------------- laying a rifle on a target
+// 1) swing the gun arm about the shoulder so the barrel points at the target (minimal rotation), 2) TWIST the forearm
+// about the barrel so the rifle is held upright — its top toward the chest's up. (The minimal swing alone left the
+// rifle rolled on its side or upside down whenever the arm came up from a hanging pose.)
+// rifle "top" in the rifle part's frame: ATLAS's rifle is modelled bore-above-grip along +Y; VANGUARD's measured from
+// its mesh (the barrel sits on the grip's +up side)
+const GUN_UP = { gundam: [0, 1, 0], enemy_ms: [0.502, -0.598, -0.62] };
+function layRifle(s, model, target, k, twist = 1) {
+  s.pose = { ...s.pose };
+  for (let it = 0; it < 3; it++) {
+    let fk = duelFK(s, model);
+    const d0 = fk.muzzleDir, d1 = nrm(sub(target, fk.muzzle));
+    const A = r3between(d0, lrp(d0, d1, k));
+    s.pose.arm_R_upper = euler3(r3mul(r3T(r3(fk.torso)), r3mul(A, r3(fk.arm_R_upper))));
+    if (twist <= 0) continue;
+    fk = duelFK(s, model);
+    const d = fk.muzzleDir, upW = nrm(M.transformDir([0, 0, 0], fk.rifle, GUN_UP[model]));
+    const want0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
+    const want = nrm(sub(want0, scl(d, V.dot(want0, d)))), cur = nrm(sub(upW, scl(d, V.dot(upW, d))));
+    const ang = Math.atan2(V.dot(V.cross([0, 0, 0], cur, want), d), V.dot(cur, want)) * k * twist;
+    const B = r3axis(d, ang);
+    s.pose.arm_R_lower = euler3(r3mul(r3T(r3(fk.arm_R_upper)), r3mul(B, r3(fk.arm_R_lower))));
   }
-  if (ev.kind === 'part-part') {
-    const pa = partPoint(F[ev.a[0]], ev.a[1], ev.a[2]), pb = partPoint(F[ev.b[0]], ev.b[1], ev.b[2]);
-    const lit = t > 184 ? 4 * (bladeIntrusion(H.saber, E, 'enemy_ms') + bladeIntrusion(E.saber, H, 'gundam')) : 0;
-    return Math.abs(V.dist(pa, pb) - (ev.gap ?? 1.0)) + lit;
-  }
-  if (ev.kind === 'aim') {   // rifle barrel onto the target line
-    const tgt = aimTarget(ev.t), to = nrm(sub(tgt, H.muzzle));
-    const ang = Math.acos(clamp(V.dot(to, H.muzzleDir), -1, 1));
-    const fk = F.hero, sh = partPoint(fk, 'arm_R_upper'), hd = partPoint(fk, 'hand_R');
-    return ang * 20 + 0.2 * Math.max(0, sh[1] - hd[1] - 2.5);   // keep the hand up near shoulder height
-  }
-  const bl = F[ev.blade].saber, x = partPoint(F[ev.part[0]], ev.part[1], ev.part[2]);
-  const r = segPoint(bl[0], bl[1], x);
-  return r.d + 8 * band(r.u, ev.u?.[0] ?? 0.3, ev.u?.[1] ?? 0.85);
+  return s;
 }
-function solveContact(ev) {
-  const t = ev.t;
-  const offs = new Map();   // several position params may share one key: key = base + Σ dir·acc
-  const params = ev.adj.map(([who, kind, a, b]) => {
-    const tr = TRACKS[who][kind], key = keyAt(tr, t);
-    if (kind === 'pose') { const i = PIDX[a] + b; const lim = JOINT_LIMITS[a]?.[b] || [-9, 9]; return { get: () => key[1][i], set: (v) => { key[1][i] = clamp(v, lim[0], lim[1]); tr.dirty = true; }, step: 0.18, w: 0.03 }; }
-    if (!offs.has(key)) offs.set(key, { base: key[1].slice(), list: [] });
-    const o = offs.get(key), me = { dir: nrm(a), acc: 0 };
-    o.list.push(me);
-    const apply = () => { for (let k = 0; k < 3; k++) key[1][k] = o.base[k] + o.list.reduce((sum, q) => sum + q.dir[k] * q.acc, 0); tr.dirty = true; };
-    return { get: () => me.acc, set: (v) => { me.acc = clamp(v, -(b ?? 6), b ?? 6); apply(); }, step: 1.5, w: 0.004 };
-  });
-  const init = params.map((p) => p.get());
-  const cost = () => contactCost(ev, t) + params.reduce((s, p, i) => s + p.w * (p.get() - init[i]) ** 2, 0);
-  SOLVING = true;
-  const steps0 = params.map((p) => p.step);
-  const descend = (iters) => {
-    let best = cost();
-    params.forEach((p, i) => { p.step = steps0[i]; });
-    for (let it = 0; it < iters; it++) {
-      let improved = false;
-      for (const p of params) {
-        for (const sgn of [1, -1]) {
-          const v0 = p.get(); p.set(v0 + sgn * p.step);
-          const c = cost();
-          if (c < best - 1e-6) { best = c; improved = true; } else p.set(v0);
-        }
-      }
-      if (!improved) { for (const p of params) p.step *= 0.5; if (params[0].step < 0.002) break; }
-    }
-    return best;
-  };
-  let best = descend(80);
-  // stuck in a local minimum (the blades still apart)? a few deterministic random restarts around the start
-  if (contactCost(ev, t) > 0.08) {
-    const keep = params.map((p) => p.get()); let bestV = keep.slice();
-    let seed = Math.round(t * 1000) >>> 0; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296) * 2 - 1;
-    for (let r = 0; r < 8 && contactCost(ev, t) > 0.02; r++) {
-      params.forEach((p, i) => p.set(init[i] + rnd() * steps0[i] * 2.5));
-      const c = descend(60);
-      if (c < best - 1e-6) { best = c; bestV = params.map((p) => p.get()); }
-    }
-    params.forEach((p, i) => p.set(bestV[i]));
-  }
-  SOLVING = false;
-  return contactCost(ev, t);
+const aimRifle = (s, target, k) => layRifle(s, 'gundam', target, k);
+const aimEnemy = (s, target, k) => layRifle(s, 'enemy_ms', target, k);
+/** VANGUARD's rifle muzzle + barrel direction at story time t (name kept from SERAPH) */
+export function seraphMuzzle(t) {
+  const st = enemyRaw_(t);
+  if (!st || !st.vis || st.muzzleOff) return null;
+  const fk = duelFK(st, 'enemy_ms');
+  return { pos: fk.muzzle, dir: fk.muzzleDir };
 }
-const TO_E2 = [0, 0, -1];
-// shot targets: where E1's chest is just before it quick-boosts (misses) / at the shot (179 hits)
-function aimTarget(t) { const tt = t === 179 ? 179 : t - 0.1; return partPoint(duelFK({ ...duelEnemy1(tt), saber: 1 }, 'enemy_ms'), 'torso', [0, 1, 0.5]); }
-const AIM_ADJ = [['hero', 'pose', 'arm_R_upper', 0], ['hero', 'pose', 'arm_R_upper', 1], ['hero', 'pose', 'arm_R_lower', 0], ['hero', 'pose', 'hand_R', 0], ['hero', 'pose', 'hand_R', 1], ['hero', 'pose', 'torso', 1]];
-const SOLVE = [];   // (the gunfight has no solved contacts: every shot is laid by aimRifle / aimGun per frame)
-// ---------------------------------------------------------------- SAMURAI GRIP bake (two hands on the katana)
-// Solved on the POSE KEYS (so the motion between keys stays smooth): both arms may move to bring the left fist onto
-// the hilt just below the right, keeping the blade near where it was; after the contact solver, the keys at contact
-// times get a left-arm-only pass so the blade stays exactly on its solved contact.
-const GRIP_R = [-0.2, -1.88, -1.45], GRIP_DIR_R = [-0.02, 0.31, 0.95], GRIP_L = [0.2, -1.4, 0], GRIP_DIR_L = [0.02, 0.31, 0.95];
-function gripErr(fk) {
-  const tgt = M.transformPoint([0, 0, 0], fk.hand_R, GRIP_R), dir = nrm(M.transformDir([0, 0, 0], fk.hand_R, GRIP_DIR_R));
-  const g = M.transformPoint([0, 0, 0], fk.hand_L, GRIP_L), hd = nrm(M.transformDir([0, 0, 0], fk.hand_L, GRIP_DIR_L));
-  // roll about the hilt: two fists stacked on one hilt face the same way (knuckles/fingers wrap the same side) —
-  // the mirrored hand_L's local −Y (fingers) must match hand_R's local −Y
-  const yl = nrm(M.transformDir([0, 0, 0], fk.hand_L, [0, -1, 0])), yr = nrm(M.transformDir([0, 0, 0], fk.hand_R, [0, -1, 0]));
-  return V.dist(g, tgt) ** 2 + 6 * (1 - V.dot(hd, dir)) + 3 * (1 - V.dot(yl, yr));
-}
-function gripBake(who, t, parts, wBlade) {
-  const tr = TRACKS[who].pose, key = keyAt(tr, t);
-  const vars = [];
-  for (const p of parts) for (const k of (p.includes('lower') ? [0] : [0, 1, 2])) vars.push([PIDX[p] + k, JOINT_LIMITS[p]?.[k] || [-3.5, 3.5]]);
-  SOLVING = true;
-  const fk0 = fkAt(who, t), B0 = fk0.saber[0].slice(), B1 = fk0.saber[1].slice();
-  const cost = () => { const fk = fkAt(who, t); return gripErr(fk) + wBlade * (V.dist(fk.saber[0], B0) ** 2 + 0.3 * V.dist(fk.saber[1], B1) ** 2); };
-  let best = cost();
-  for (let step = 0.45; step > 0.01; step *= 0.55) {
-    for (let it = 0; it < 4; it++) {
-      let imp = false;
-      for (const [i, L] of vars) for (const sg of [1, -1]) {
-        const v0 = key[1][i]; key[1][i] = clamp(v0 + sg * step, L[0], L[1]); tr.dirty = true;
-        const c = cost(); if (c < best - 1e-6) { best = c; imp = true; break; } key[1][i] = v0; tr.dirty = true;
-      }
-      if (!imp) break;
-    }
-  }
-  SOLVING = false;
-  return Math.sqrt(gripErr(fkAt(who, t)));
-}
-const ARMS_BOTH = ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R'], ARM_L = ['arm_L_upper', 'arm_L_lower', 'hand_L'];
-const GRIP_ON = { e1: () => false, e2: () => false };   // (SERAPH: no two-handed grip)
-export const GRIP_REPORT = [];
-for (const who of ['e1', 'e2']) for (const k of TRACKS[who].pose.keys) if (GRIP_ON[who](k[0])) GRIP_REPORT.push([who, k[0], +gripBake(who, k[0], [...ARMS_BOTH, 'torso'], 0.04).toFixed(2)]);
-export const SOLVE_REPORT = SOLVE.map((ev) => {
-  REACH_W = 0; const pass1 = solveContact(ev); ev._pass1 = pass1;
-  REACH_W = 1; const residual = solveContact(ev);
-  for (const tc of ev.copyTo || []) {   // hold the solved aim steady from the end of the raise to the shot
-    const src = keyAt(TRACKS.hero.pose, ev.t), dst = keyAt(TRACKS.hero.pose, tc);
-    for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R', 'torso']) for (let c = 0; c < 3; c++) dst[1][PIDX[p] + c] = src[1][PIDX[p] + c];
-    TRACKS.hero.pose.dirty = true;
-  }
-  const foe = ev.t < 180.25 ? 'e1' : 'e2';
-  SOLVING = true; const H = fkAt('hero', ev.t), E = fkAt(foe, ev.t); const contact = contactCost_(ev, ev.t, H, E, { hero: H, e1: E, e2: E }), reach = gripDeficit(E).d; SOLVING = false;
-  return { t: ev.t, kind: ev.kind, residual, contact, reach, pass1: ev._pass1 };
-});
-// contact keys: the right arm now holds the solved blade — close the left fist on the hilt with the left arm only
-for (const ev of SOLVE) for (const who of ['e1', 'e2']) {
-  if (!GRIP_ON[who](ev.t)) continue;
-  if (!TRACKS[who].pose.keys.some((q) => Math.abs(q[0] - ev.t) < 1e-6)) continue;
-  GRIP_REPORT.push([who + '*', ev.t, +gripBake(who, ev.t, ARM_L, 0).toFixed(2)]);
-}
-/** world position + unit direction of the hero's rifle muzzle at film time t */
+/** world position + unit direction of the hero's rifle muzzle at story time t */
 export function duelMuzzle(t) {
   const s = duelHero(t);
   if (!s) return null;
   const fk = duelFK(s, 'gundam');
   return { pos: fk.muzzle, dir: fk.muzzleDir };
 }
-/** the four rifle shots: fire a bolt from `from` along `dir` (aimed at `to`; misses because E1 quick-boosts away) */
-// Sigma's shots: fired along the barrel at the moment of firing, out to the aim point (and on, for the misses)
-export const DUEL_SHOTS = HERO_SHOTS.map((t) => { const m = duelMuzzle(t); const tgt = heroAimPoint(t), hit = t === WING_HIT_T || t === KILL_SHOT_T;
-  const L = hit ? V.dist(tgt, m.pos) : 1500; return { t, from: m.pos, dir: m.dir, to: add(m.pos, scl(m.dir, L)), hit, kill: t === KILL_SHOT_T }; });
 
+// ---------------------------------------------------------------- HIT REACTION (partial ragdoll)
+// A beam hit physically shoves the part it lands on: the struck joint and the ones above it (weights 1 / 0.6 / 0.3)
+// swing about the lever from each joint to the hit point, along the shot — one critically damped hump (0 at the hit
+// frame; peak ≈ 0.14 s; settled by 1 s).
+const REACT_CHAIN = (() => {
+  const c = { torso: ['torso'], head: ['head', 'torso'], pelvis: ['pelvis'], shield: ['arm_L_lower', 'arm_L_upper', 'torso'] };
+  for (const S of ['L', 'R']) {
+    c['arm_' + S + '_upper'] = ['arm_' + S + '_upper', 'torso']; c['arm_' + S + '_lower'] = ['arm_' + S + '_lower', 'arm_' + S + '_upper', 'torso'];
+    c['hand_' + S] = ['hand_' + S, 'arm_' + S + '_lower', 'arm_' + S + '_upper'];
+  }
+  return c;
+})();
+const REACT_W = [1, 0.6, 0.3];
+let REACTS = [];
+function hitReact(who, tw, s, model) {
+  if (!REACTS.length || !s || !s.vis) return s;
+  for (const r of REACTS) {
+    if (r.who !== who && !(r.who.startsWith('e') && who.startsWith('e'))) continue;
+    const lt = tw - r.t;
+    if (lt <= 0 || lt > 1) continue;
+    const env = (lt * 7) * Math.exp(1 - lt * 7) * (1 - lt);
+    if (env < 1e-3) continue;
+    s.pose = { ...s.pose };
+    (REACT_CHAIN[r.part] || [r.part]).forEach((j, i) => {
+      const fk = duelFK(s, model);
+      if (!fk[j] || !fk[r.part]) return;
+      const Pp = M.transformPoint([0, 0, 0], fk[r.part], r.local), pivot = M.transformPoint([0, 0, 0], fk[j], [0, 0, 0]);
+      const ax = V.cross([0, 0, 0], sub(Pp, pivot), r.dir), Ln = Math.hypot(ax[0], ax[1], ax[2]);
+      if (Ln < 1e-6) return;
+      const A = r3axis(scl(ax, 1 / Ln), r.amp * env * REACT_W[i]);
+      const par = PARENT[j], Wp = r3(par ? fk[par] : fk.root);
+      s.pose[j] = euler3(r3mul(r3T(Wp), r3mul(A, r3(fk[j]))));
+    });
+  }
+  return s;
+}
+
+// ============================================================================ events
+// [t, type, strength, spec]: the shots themselves are drawn by shots.js; these carry shake / sound / hits
+const EV = [
+  ...SERAPH_SHOTS.map((t) => [t, 'shake', 0.28, { on: t < SERAPH_HANDOFF ? 'e1' : 'e2', note: 'VANGUARD fires' }]),
+  [BLOCK_T + 0.03, 'hit', 0.6, { kind: 'shot', part: ['e1', 'shield', SHIELD_C], block: true, note: 'the shield takes his shot' }],
+  [SHIELD_HIT_T + 0.03, 'hit', 0.9, { kind: 'shot', part: ['e2', 'shield', SHIELD_C], note: 'his shot tears the shield off its arm' }],
+  [FINALE_T, 'shake', 0.6, { on: 'e2', note: 'VANGUARD fires at full power' }],
+  [FINALE_T + 0.1, 'shake', 0.9, { on: 'hero', note: 'the beam tears past him' }],
+  [192.4, 'hit', 1.0, { kind: 'shot', part: ['e2', 'torso', [0, 2.5, 0.5]], cut: true, note: 'the charged shot goes through its chest' }],
+  [194.0, 'shake', 1.2, { on: 'e2', note: 'VANGUARD explodes' }],
+];
+const MODEL = { hero: 'gundam', e1: 'enemy_ms', e2: 'enemy_ms' };
+export const stateOf = (who, t) => (who === 'hero' ? duelHero(t) : who === 'e1' ? duelEnemy1(t) : duelEnemy2(t));
 function solveEvent([t, type, strength, spec]) {
-  const foe = t < 180.25 ? 'e1' : 'e2';
   const ev = { t, type, strength, on: spec.on || 'enemy', note: spec.note, hitstop: (HITSTOPS.find((h) => Math.abs(h[0] - t) < 1e-6) || [0, 0])[1] };
-  const H = fkAt('hero', t), E = fkAt(foe, t);
-  if (spec.kind === 'blade-blade') {
-    const r = segSeg(H.saber[0], H.saber[1], E.saber[0], E.saber[1]);
-    ev.pos = r.mid; ev.gap = r.d; ev.on = 'both';
-  } else if (spec.kind === 'part-part') {
-    const A = spec.a[0] === 'hero' ? H : E, B = spec.b[0] === 'hero' ? H : E;
-    const pa = partPoint(A, spec.a[1], spec.a[2]), pb = partPoint(B, spec.b[1], spec.b[2]);
-    ev.pos = lrp(pa, pb, 0.5); ev.gap = V.dist(pa, pb); ev.on = spec.b[0] === 'hero' ? 'hero' : 'enemy';
-  } else if (spec.kind === 'shot') {                   // a beam hit: the point on the struck part, along the shot
-    const P = partPoint(E, spec.part[1], spec.part[2]), m = duelMuzzle(t - 0.05), d = m ? nrm(sub(P, m.pos)) : [0, 0, -1];
-    ev.pos = P; ev.gap = 0; ev.on = 'enemy'; ev.shotDir = d;
-    if (spec.cut) ev.cut = [add(P, scl(d, -6)), add(P, scl(d, 6))];
-  } else if (spec.kind === 'blade-part') {
-    const Bl = spec.blade === 'hero' ? H : E, Pt = spec.part[0] === 'hero' ? H : E;
-    const x = partPoint(Pt, spec.part[1], spec.part[2]);
-    const r = segPoint(Bl.saber[0], Bl.saber[1], x);
-    ev.pos = r.c; ev.gap = r.d; ev.on = spec.part[0] === 'hero' ? 'hero' : 'enemy';
-    if (spec.cut) {
-      const Bp = fkAt('hero', t - 0.08), Bn = fkAt('hero', t + 0.08);
-      const a = segPoint(Bp.saber[0], Bp.saber[1], x).c, b = segPoint(Bn.saber[0], Bn.saber[1], x).c;
-      ev.cut = [add(r.c, scl(sub(a, r.c), 1.6)), add(r.c, scl(sub(b, r.c), 1.6))];
-    }
+  if (spec.kind === 'shot') {                   // a beam hit: the point on the struck part, along the shot
+    const E = duelFK(enemyRaw_(t), 'enemy_ms');
+    const Pp = partPoint(E, spec.part[1], spec.part[2]), m = duelMuzzle(t - 0.05), d = m ? nrm(sub(Pp, m.pos)) : [0, 0, -1];
+    ev.pos = Pp; ev.gap = 0; ev.on = 'enemy'; ev.shotDir = d; ev.block = !!spec.block; ev.part = spec.part[1];
+    if (spec.cut) ev.cut = [add(Pp, scl(d, -6)), add(Pp, scl(d, 6))];
   } else {
-    const who = spec.on === 'hero' ? 'hero' : spec.on === 'e1' ? 'e1' : spec.on === 'e2' ? 'e2' : foe;
-    ev.pos = stateOf(who, t).pos.slice(); ev.on = who === 'hero' ? 'hero' : 'enemy';
+    const who = spec.on === 'hero' ? 'hero' : 'e2';
+    ev.pos = (who === 'hero' ? duelHero(t) : enemyRaw_(t)).pos.slice(); ev.on = who === 'hero' ? 'hero' : 'enemy';
   }
   return ev;
 }
-/** [{t, type, pos:[x,y,z] (exact contact), on:'hero'|'enemy'|'both', strength, hitstop, note, gap, cut?}] */
+/** [{t, type, pos, on, strength, hitstop, note, shotDir?, cut?}] */
 export const DUEL_EVENTS = EV.map(solveEvent);
-
+// Sigma's shots: fired along the barrel at the moment of firing, out to the aim point (and on, for the misses)
+export const DUEL_SHOTS = HERO_SHOTS.map((t) => { const m = duelMuzzle(t); const tgt = heroAimPoint(t), hit = t === BLOCK_T || t === SHIELD_HIT_T || t === KILL_SHOT_T;
+  const Ln = hit ? V.dist(tgt, m.pos) : 1500; return { t, from: m.pos, dir: m.dir, to: add(m.pos, scl(m.dir, Ln)), hit, kill: t === KILL_SHOT_T, block: t === BLOCK_T, shield: t === SHIELD_HIT_T }; });
+// the reactions to the hits (the shield arm knocked back; the kill is the breakup)
+REACTS = DUEL_EVENTS.filter((e) => e.shotDir && !e.cut).map((e) => {
+  const st = enemyRaw_(e.t), fk = duelFK(st, 'enemy_ms'), part = e.part === 'shield' ? 'arm_L_lower' : e.part;
+  return { who: 'e2', t: e.t, part, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk[part]), e.pos), dir: e.shotDir, amp: e.block ? 0.35 : 0.6 };
+});
+_c_en.clear(); _c_duelHero.clear();
+export const AUTO_CONTACTS = [], AUTO_FX = [];
+export const applyImpulses = (who, t, s) => s;
 // ============================================================================ camera
 // Fast cuts (0.6–2.5 s). fn(t, u) returns {pos, target, fov, roll, shake, ...}.
-const hp = (t) => duelHero(t).pos, e1p = (t) => duelEnemy1(Math.min(t, SERAPH_HANDOFF - 0.02)).pos, e2p = (t) => duelEnemy2(Math.max(t, SERAPH_HANDOFF)).pos;
+const hp = (t) => duelHero(t).pos, ep = (t) => enemyRaw_(t).pos, e1p = ep, e2p = ep;
 // un-floated positions: the calm opening cameras (scenes 32–35) follow these, so the idle float reads on screen
-const hpA = (t) => duelHero(t).anchor || hp(t), e1A = (t) => duelEnemy1(Math.min(t, SERAPH_HANDOFF - 0.02)).anchor || e1p(t);
+const hpA = (t) => duelHero(t).anchor || hp(t), e1A = (t) => enemyRaw_(t).anchor || ep(t);
 const up = (p, h) => [p[0], p[1] + h, p[2]];
-const evShake = (t, list, decay = 5) => { let s = 0; for (const e of [...DUEL_EVENTS, ...(AUTO_READY ? AUTO_FX : [])]) { if (list && !list.includes(e.type)) continue; if (t >= e.t && t < e.t + 1.2) s = Math.max(s, e.strength * Math.exp(-(t - e.t) * decay)); } return s; };
+const evShake = (t, list, decay = 5) => { let s = 0; for (const e of DUEL_EVENTS) { if (list && !list.includes(e.type)) continue; if (t >= e.t && t < e.t + 1.2) s = Math.max(s, e.strength * Math.exp(-(t - e.t) * decay)); } return s; };
 const evFlash = (t) => { let f = 0; for (const e of DUEL_EVENTS) { if (e.type === 'shake' || e.type === 'spark' || (e.shotDir && !e.cut)) continue; const d = t - e.t; if (d >= 0 && d < 0.09) f = Math.max(f, 0.35 * e.strength); } return f; };   // (no white-out on the wing hit)
 const evPos = (te) => DUEL_EVENTS.find((e) => Math.abs(e.t - te) < 1e-6).pos;
 // side vector of a two-shot line (perpendicular, horizontal)
@@ -1932,7 +1160,7 @@ export const DUEL_CAMS = [
   { t0: 170.0, t1: 171.6, name: 'D01 wide establish', fn: (t, u) => { const h = hpA(t), e = e1A(t); const d = nrm(sub(e1A(170), hpA(170))), sd = [d[2], 0, -d[0]]; return { pos: add(add(h, scl(d, -48 + u * 6)), add(scl(sd, 24), [0, 14, 0])), target: lrp(h, e, 0.45), fov: 50, handheld: 0.1, baseShake: 0 }; } },   // steady: axis fixed at the cut
   // STANDOFF (Leone): each cut tighter than the last — over the shoulder, the taunt, his hand answering, its eye, his
   // visor — slow push-ins, no shake; then the charge explodes out of the stillness
-  { t0: 171.6, t1: 172.7, name: 'D02 OTS hero — RONIN brakes in', fn: (t, u) => { const h = hpA(t), e = e1A(t), d = nrm(sub(e1A(171.6), hpA(171.6))), sd = [d[2], 0, -d[0]];
+  { t0: 171.6, t1: 172.7, name: 'D02 OTS hero — VANGUARD brakes in', fn: (t, u) => { const h = hpA(t), e = e1A(t), d = nrm(sub(e1A(171.6), hpA(171.6))), sd = [d[2], 0, -d[0]];
     return { pos: add(add(h, scl(d, -26 + u * 6)), add(scl(sd, 11), [0, 10, 0])), target: up(e, 2), fov: 38 - u * 4, handheld: 0.05, baseShake: 0 }; } },
   { t0: 172.7, t1: 173.9, name: 'D03 the taunt', fn: (t, u) => { const e = e1A(t), d0 = nrm(sub(hpA(172.7), e1A(172.7))), a = 0.18 * easeInOut(u);
     const d = [d0[0] * Math.cos(a) + d0[2] * Math.sin(a), 0, -d0[0] * Math.sin(a) + d0[2] * Math.cos(a)], sd = [d[2], 0, -d[0]];
@@ -1947,46 +1175,43 @@ export const DUEL_CAMS = [
   { t0: 175.5, t1: 176.4, name: 'D05b his visor', fn: (t, u) => { const s = duelHero(t), fk = duelFK({ ...s, saber: 1 }, 'gundam'), hd = partPoint(fk, 'head', [0, 0.6, 0]);
     const d = nrm(sub(e1A(175.5), hpA(175.5))), sd = [d[2], 0, -d[0]];
     return { pos: add(add(hd, scl(d, 10 - u * 2.5)), add(scl(sd, -3.5), [0, 0.6, 0])), target: hd, fov: 30 - u * 3, handheld: 0.02, baseShake: 0 }; } },
-  { t0: 176.4, t1: 177.25, name: 'D06 profile — the charge, the first shot', fn: (t, u) => { const c = two(hpA(t), e1A(t), { side: -1, dist: 0.9, lift: 5, fov: 46, bias: 0.55 }); return { ...c, handheld: 0.15 }; } },
-  // ---- the RANGED DUEL (Unicorn): he flash-steps out of the cannon shots and closes; it kicks off and climbs away
-  { t0: 177.25, t1: 177.85, name: 'D07 chase cam: the second shot whips past', fn: (t, u) => { const h = hp(t), e = e1p(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(h, scl(d, -28)), add(scl(sd, 7), [0, 8, 0])), target: lrp(h, e, 0.7), fov: 46, handheld: 0.35 }; } },
-  { t0: 177.85, t1: 178.55, name: 'D08 down its beam: he rolls over the third', fn: (t, u) => { const h = hp(t), e = e1p(t), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(e, scl(d, -10 + 3 * u)), add(scl(sd, 14), [0, 4, 0])), target: lrp(e, h, 0.55), fov: 46, handheld: 0.2 }; } },
-  { t0: 178.55, t1: 179.65, name: 'D09 wide: it kicks off, he returns fire', fn: (t, u) => { const c = two(hp(t), e1p(t), { side: 1, dist: 1.2, lift: 10, fov: 48, bias: 0.45 }); return { ...c, handheld: 0.25 }; } },
-  { t0: 179.65, t1: 180.9, name: 'D10 it climbs away', fn: (t, u) => { const h = hp(t), e = e1p(t), df = nrm([e[0] - h[0], 0, e[2] - h[2]]), sd = [df[2], 0, -df[0]];
-    // low beside him, looking up past his shoulder at the shrinking silhouette (his back no longer fills the frame)
-    return { pos: add(add(h, scl(sd, 22)), add(scl(df, -6), [0, -12, 0])), target: lrp(up(h, 10), e, 0.9), fov: 44, handheld: 0.25 }; } },
-  // ---- E2 arrives
-  { t0: 180.9, t1: 181.6, name: 'D11a sensor spike', fn: (t, u) => { const s = duelHero(t); const fk = duelFK({ ...s, saber: 1 }, 'gundam'); const hd = partPoint(fk, 'head', [0, 0.5, 0]); const f = nrm(s.fwd); const sd = nrm([f[2], 0, -f[0]]); return { pos: add(add(hd, scl(f, 10 - u * 2)), add(scl(sd, 3.5), [0, 2.2, 0])), target: add(hd, [0, 0.6 + u * 1.2, 0]), fov: 26, handheld: 0.25 }; } },
-  { t0: 181.6, t1: 182.6, name: 'D11b the shadow', fn: (t, u) => { const h = hp(t); const e = e2p(t); const f = nrm(duelHero(t).fwd); const sd = nrm([f[2], 0, -f[0]]); return { pos: add(add(h, scl(f, -16)), add(scl(sd, 12), [0, -3, 0])), target: lrp(up(h, 30), e, 0.97), fov: 24 - u * 5, roll: 0.05, handheld: 0.2 }; } },
-  { t0: 182.6, t1: 183.6, name: 'D12 the dive', fn: (t, u) => { const h = hp(t); const e = e2p(t); const d = nrm(sub(h, e)); const sd = nrm([d[2], 0, -d[0]]); return { pos: add(add(e, scl(d, -18)), add(scl(sd, 7), [0, 4, 0])), target: lrp(e, up(h, 6), 0.6), fov: 58 + u * 10, roll: 0.35 * Math.sin(u * 2), handheld: 0.6 }; } },
-  // ---- the GUNFIGHT (Unicorn): it dives through his fire, they pass, it rides his tail; he turns and takes a wing, it
-  // comes back at him at full power, he slips the beam and puts one charged shot through it
-  { t0: 183.6, t1: 184.45, name: 'D13 rifle up: tracking the dive', fn: (t, u) => { const c = ots(hp(t), e2p(t), { right: 1, back: 18, lift: -2, fov: 46, side: 8 }); return { ...c, target: lrp(up(hp(t), 6), e2p(t), 0.8), handheld: 0.3 }; } },
-  // THE PASS: side-on, the heading fixed at the cut, both machines crossing the frame in slow motion
-  { t0: 184.45, t1: 185.1, name: 'D14 the pass', slowmo: true, fn: (t, u) => { const a = hp(184.5), b = e2p(184.5), m = lrp(a, b, 0.5), sd = sideOf(a, b);
-    return { pos: add(add(m, scl(sd, 62)), [0, 4, 0]), target: lrp(m, lrp(hp(t), e2p(t), 0.5), 0.6), fov: 44, handheld: 0.1 }; } },
-  // it rides his tail: over its shoulder, him ahead running, its shots going past him
-  { t0: 185.1, t1: 186.05, name: 'D15 on his tail', fn: (t, u) => { const e = e2p(t), h = hp(t), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(e, scl(d, -30)), add(scl(sd, 26), [0, 10, 0])), target: lrp(e, h, 0.55), fov: 46, handheld: 0.35 }; } },   // high behind + wide of it (clear of the wings), both in frame
-  { t0: 186.05, t1: 186.9, name: 'D16 the reversal', fn: (t, u) => { const h = hp(t), e = e2p(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(h, scl(d, -6 + 3 * u)), add(scl(sd, 30 - 5 * easeInOut(u)), [0, 4, 0])), target: lrp(up(h, 4), e, 0.4), fov: 46, handheld: 0.2 }; } },
-  { t0: 186.9, t1: 187.75, name: 'D17 the wing shot', fn: (t, u) => { const e = e2p(Math.max(t, 186.9)), e0 = e2p(186.9), h = hp(186.9), d = nrm(sub(e0, h)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(e0, scl(d, 14)), add(scl(sd, -44), [0, 8, 0])), target: up(lrp(e, h, 0.2), 3), fov: 42, handheld: 0.25 }; } },   // wide off its side (beyond it, away from him): the wing flies off in frame
-  { t0: 187.75, t1: 188.7, name: 'D18 it recovers', fn: (t, u) => { const c = two(hp(t), e2p(t), { side: 1, dist: 1.3, lift: 8, fov: 44, bias: 0.6 }); return { ...c, handheld: 0.2 }; } },
-  { t0: 188.7, t1: 189.6, name: 'D19 exchange', fn: (t, u) => { const c = ots(hp(t), e2p(t), { right: -1, back: 18, lift: 5, fov: 42, side: 8 }); return { ...c, handheld: 0.2 }; } },
-  { t0: 189.6, t1: 190.7, name: 'D20 it comes back at full power', fn: (t, u) => { const e = e2p(t), h = hp(t), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(e, scl(d, 40 - 8 * u)), add(scl(sd, 14), [0, 3, 0])), target: up(e, 2), fov: 34 - 4 * u, handheld: 0.1, baseShake: 0.05 }; } },   // head-on at its charging cannon, the whole machine and wings in frame
-  { t0: 190.7, t1: 191.4, name: 'D21 full power — he slips it', slowmo: true, fn: (t, u) => { const c = two(hp(t), e2p(t), { side: -1, dist: 1.1, lift: 6, fov: 46, bias: 0.4 }); return { ...c, handheld: 0.15 }; } },
+  // ---- THE GUNFIGHT. Long lenses on machines 60–90 m apart; the camera rides with them, never between them.
+  { t0: 176.4, t1: 177.05, name: 'D06 profile — it fires first', fn: (t, u) => { const c = two(hpA(t), e1A(t), { side: -1, dist: 0.85, lift: 5, fov: 44, bias: 0.55 }); return { ...c, handheld: 0.12 }; } },
+  { t0: 177.05, t1: 177.8, name: 'D07 over his shoulder: the exchange', fn: (t) => { const c = ots(hp(t), ep(t), { right: 1, back: 34, lift: 8, fov: 30, side: 16 }); return { ...c, target: lrp(hp(t), up(ep(t), 3), 0.72), handheld: 0.3 }; } },
+  { t0: 177.8, t1: 178.55, name: 'D08 over its shoulder: he boosts up over its shot', fn: (t) => { const c = ots(ep(t), hp(t), { right: -1, back: 30, lift: 7, fov: 32, side: 14 }); return { ...c, target: lrp(ep(t), up(hp(t), 3), 0.72), handheld: 0.3 }; } },
+  { t0: 178.55, t1: 179.25, name: 'D09 the shield takes it', slowmo: true, fn: (t, u) => { const e = ep(t), h = hp(178.6), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(e, scl(sd, 26)), add(scl(d, 7), [0, 4, 0])), target: lrp(up(e, 3), h, 0.12), fov: 38, handheld: 0.12 }; } },   // beside it, his bolt coming in across the frame
+  { t0: 179.25, t1: 180.45, name: 'D10 it boost-jumps and flips — fires upside down', fn: (t, u) => { const h = hp(t), e = ep(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(h, scl(d, 8)), add(scl(sd, 52), [0, -10, 0])), target: lrp(up(h, 4), e, 0.62), fov: 46, handheld: 0.25 }; } },   // wide off his side, looking up: him low, it turning over high
+  { t0: 180.45, t1: 181.4, name: 'D11 he rolls out and answers', fn: (t, u) => { const h = hp(t), e = ep(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(h, scl(sd, -32)), add(scl(d, -8), [0, 4, 0])), target: lrp(up(h, 4), e, 0.3), fov: 42, handheld: 0.25 }; } },
+  // the zig-zag: a long lens from behind him down the line — it jinks left, right, left, growing
+  { t0: 181.4, t1: 182.45, name: 'D12 the zig-zag, down the line', fn: (t, u) => { const h = hp(t), e = ep(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(h, scl(d, -34)), add(scl(sd, 11), [0, 7, 0])), target: up(e, 2), fov: 22, handheld: 0.2 }; } },
+  { t0: 182.45, t1: 183.15, name: 'D13 side: it closes, he gives ground', fn: (t) => { const c = two(hp(t), ep(t), { side: 1, dist: 0.9, lift: 6, fov: 46, bias: 0.55 }); return { ...c, handheld: 0.2 }; } },
+  { t0: 183.15, t1: 183.9, name: 'D14 the shield torn off', slowmo: true, fn: (t, u) => { const e = ep(t), h = hp(183.2), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(e, scl(sd, -34)), add(scl(d, 10), [0, 5, 0])), target: lrp(up(e, 4), h, 0.1), fov: 40, handheld: 0.15 }; } },
+  // ---- the circling run: riding alongside each in turn (outside the ring), then high and wide over it
+  { t0: 183.9, t1: 185.2, name: 'D15 the run — alongside him', fn: (t, u) => { const h = hp(t), e = ep(t), r = nrm(flat(sub(h, MID), 0)), tg = nrm(flat(sub(hp(t + 0.1), h), 0));
+    return { pos: add(add(h, scl(r, 30)), add(scl(tg, -14), [0, 6, 0])), target: lrp(up(h, 3), e, 0.45), fov: 44, handheld: 0.3 }; } },
+  { t0: 185.2, t1: 186.4, name: 'D16 the ring from above', fn: (t, u) => { const c = lrp(hp(t), ep(t), 0.5), o = nrm(sub(hp(185.2), ep(185.2)));
+    return { pos: add(c, add(scl([o[2], 0, -o[0]], 55), [0, 95 - 10 * u, 0])), target: c, fov: 50, handheld: 0.15 }; } },
+  { t0: 186.4, t1: 187.45, name: 'D17 the run — alongside it (a barrel roll out of his shot)', fn: (t, u) => { const e = ep(t), h = hp(t), r = nrm(flat(sub(e, MID), 0)), tg = nrm(flat(sub(ep(t + 0.1), e), 0));
+    return { pos: add(add(e, scl(r, 30)), add(scl(tg, -14), [0, 5, 0])), target: lrp(up(e, 3), h, 0.4), fov: 44, handheld: 0.3 }; } },
+  { t0: 187.45, t1: 188.4, name: 'D18 over his shoulder: the last exchange of the run', fn: (t) => { const c = ots(hp(t), ep(t), { right: -1, back: 34, lift: 8, fov: 30, side: 16 }); return { ...c, target: lrp(hp(t), up(ep(t), 3), 0.72), handheld: 0.3 }; } },
+  // ---- the full-power shot
+  { t0: 188.4, t1: 189.6, name: 'D19 it breaks away', fn: (t, u) => { const c = two(hp(t), ep(t), { side: -1, dist: 1.1, lift: 8, fov: 44, bias: 0.6 }); return { ...c, handheld: 0.15 }; } },
+  { t0: 189.6, t1: 190.7, name: 'D20 braced, charging', fn: (t, u) => { const e = ep(t), h = hp(t), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(e, scl(d, 44 - 6 * u)), add(scl(sd, 14), [0, 3, 0])), target: up(e, 3), fov: 32 - 4 * u, handheld: 0.08, baseShake: 0.04 }; } },
+  { t0: 190.7, t1: 191.4, name: 'D21 full power — he slips it', slowmo: true, fn: (t, u) => { const c = two(hp(t), ep(t), { side: -1, dist: 0.8, lift: 6, fov: 48, bias: 0.3 }); return { ...c, handheld: 0.15 }; } },
   // the rifle charges: close beside the muzzle as it gathers light (slow push-in)
   { t0: 191.4, t1: 192.3, name: 'D22 the rifle charges', slowmo: true, fn: (t, u) => { const m = duelMuzzle(t), d = m.dir, sd = nrm(V.cross([0, 0, 0], d, [0, 1, 0]));
-    const toE = sub(e2p(t), m.pos), side = V.dot(sd, toE) < 0 ? sd : scl(sd, -1);
+    const toE = sub(ep(t), m.pos), side = V.dot(sd, toE) < 0 ? sd : scl(sd, -1);
     return { pos: add(add(m.pos, scl(side, 11 - 3 * easeInOut(u))), add(scl(d, -7), [0, 2.5, 0])), target: add(m.pos, scl(d, -3)), fov: 38 - 4 * u, roll: 0.04, handheld: 0.06, baseShake: 0.02 + 0.05 * u }; } },
-  // the shot: side-on to the line, SERAPH in frame as the magnum goes through it
-  { t0: 192.3, t1: 193.0, name: 'D23 the kill shot', slowmo: true, fn: (t, u) => { const ev = DUEL_EVENTS.find((e) => e.t === 192.4), X = ev.pos, d = ev.shotDir, sd = nrm(V.cross([0, 0, 0], d, [0, 1, 0]));
-    return { pos: add(add(X, scl(sd, 34)), add(scl(d, -16), [0, 5, 0])), target: lrp(X, up(hp(t), 4), 0.3), fov: 44 }; } },
-  { t0: 193.0, t1: 194.6, name: 'D24 slow-mo walk-away explosion', slowmo: true, fn: (t, u) => { const h = hp(t), e = e2p(Math.min(t, 194.1)); return { pos: add(h, [-18 + u * 2, 3, -24 + u * 3]), target: up(lrp(h, e, 0.3), 5), fov: 46 }; } },
+  { t0: 192.3, t1: 193.0, name: 'D23 the magnum goes through it', slowmo: true, fn: (t, u) => { const ev = DUEL_EVENTS.find((e) => e.t === 192.4), X = ev.pos, d = ev.shotDir, sd = nrm(V.cross([0, 0, 0], d, [0, 1, 0]));
+    return { pos: add(add(X, scl(sd, 34)), add(scl(d, -14), [0, 5, 0])), target: lrp(X, up(hp(t), 4), 0.25), fov: 44 }; } },
+  { t0: 193.0, t1: 194.6, name: 'D24 he lowers the rifle — it goes up behind him', slowmo: true, fn: (t, u) => { const h = hp(t), e = ep(Math.min(t, 194.1)), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
+    return { pos: add(add(h, scl(d, -24 + 2 * u)), add(scl(sd, 9), [0, 3, 0])), target: lrp(up(h, 5), e, 0.55), fov: 40 }; } },
   { t0: 194.6, t1: 197.2, name: 'D25 aftermath', fn: (t, u) => { const h = hp(t); return { pos: add(h, [-16 - u * 12, 6 + u * 3, -30 - u * 10]), target: up(h, 6), fov: 40, handheld: 0.3 }; } },
   { t0: 197.2, t1: 200.0, name: 'D26 aftermath wide', fn: (t, u) => { const h = hp(t); return { pos: add(h, [-40 - u * 10, 12 + u * 4, -48 - u * 8]), target: up(h, 6), fov: 38, handheld: 0.3 }; } },
 ];
@@ -1999,163 +1224,9 @@ export function duelCamera(t) {
   const focus = k.target;
   return {
     name: c.name, pos: k.pos, target: k.target, fov: k.fov ?? 40, roll: k.roll ?? 0,
-    shake, shakeFreq: 9, handheld: k.handheld ?? 0.25, flash: evFlash(t), blur: 0.0015 * evShake(t, ['clash', 'hit'], 8),
+    shake, shakeFreq: 9, handheld: k.handheld ?? 0.25, flash: evFlash(t), blur: 0.0015 * evShake(t, ['hit'], 8),
     slowmo: !!c.slowmo, focus, shadowRadius: 70,
   };
 }
 
-STATE_CACHE = true;   // all solving done: states are now fixed functions of t
-
-// ============================================================================ hitboxes + automatic contacts
-// Every mech part and weapon carries a capsule hitbox (part-local segment + radius, from the model pivots). The whole
-// fight is swept at 96 Hz after solving; wherever two capsules START to interpenetrate with a real closing speed —
-// scripted or not — a contact is recorded with its exact world point, normal and closing speed. The contacts drive
-// sparks / flashes (shots.js), impact sounds (audio.js) and a physical response: both bodies receive an impulse
-// (Newton's third law) that shoves them along the normal and twists them about their hips by the lever arm, through a
-// damped spring (zero at the contact frame, so solved contacts stay exact).
-const mx = (a) => [-a[0], a[1], a[2]];
-const capsL = (part, a, b, r) => [[part, a, b, r], [part.replace('_L', '_R'), mx(a), mx(b), r]];
-// fitted to the real meshes (blender/ → assets/*.glb): per part, the principal axis of its vertices (2–98 %) and the
-// 85th-percentile radius — part-local, same frames as duelFK. The backpack rides on the torso.
-const HITBOX = {
-  gundam: [
-    ['foot_L', [-0.25, -0.78, -1.07], [0.67, -1.03, 1.72], 1.33],
-    ['leg_L_lower', [-0.02, -0.64, 0.05], [0.51, -3.64, -0.37], 1.66],
-    ['leg_L_upper', [0.83, -1.76, 0.81], [-0.14, -0.61, 0.06], 1.58],
-    ['foot_R', [-0.67, -0.98, 1.69], [0.26, -0.79, -1.05], 1.33],
-    ['leg_R_lower', [0.02, -0.63, 0.06], [-0.53, -3.65, -0.4], 1.64],
-    ['leg_R_upper', [-0.84, -1.8, 0.8], [0.14, -0.57, 0.04], 1.54],
-    ['pelvis', [-1.4, 0.43, 0.52], [1.59, 0.45, 0.27], 1.48],
-    ['hand_L', [-0.28, -1.29, 1.26], [0.09, -0.15, 0.25], 0.88],
-    ['arm_L_lower', [0.87, -2.69, 0.91], [0.31, -0.58, -0.34], 1.37],
-    ['arm_L_upper', [0.91, -1.0, -0.45], [0.08, 1.96, 0.06], 1.7],
-    ['hand_R', [0.29, -1.32, 1.3], [-0.11, -0.15, 0.27], 0.88],
-    ['arm_R_lower', [-1.18, -3.17, 0.66], [-0.27, -0.53, -0.26], 1.37],
-    ['arm_R_upper', [0.03, 1.89, 0.1], [-0.89, -1.05, -0.52], 1.68],
-    ['torso', [-0.54, 1.05, -3.53], [0.53, 1.02, -3.53], 1.98],
-    ['head', [-0.02, 0.76, 1.12], [-0.05, 1.23, -1.77], 1.06],
-    ['torso', [-0.26, 4.62, 0.12], [0.11, 2.03, 0.54], 3.02],
-  ],
-  enemy_ms: [   // SERAPH / 03 (the wings are left out: thin feathers, they never shove anything)
-    ['foot_L', [-0.16, -0.58, -0.52], [0.28, -0.78, 1.07], 0.83],
-    ['leg_L_lower', [-0.14, -0.42, 0.02], [0.43, -3.76, -0.57], 0.84],
-    ['leg_L_upper', [0.44, -1.7, 0.01], [0.33, -0.17, 0.03], 0.75],
-    ['foot_R', [0.14, -0.6, -0.51], [-0.28, -0.8, 1.07], 0.85],
-    ['leg_R_lower', [-0.41, -3.77, -0.56], [0.15, -0.41, 0.01], 0.83],
-    ['leg_R_upper', [-0.44, -1.72, -0.01], [-0.33, -0.16, 0.02], 0.75],
-    ['pelvis', [-0.74, 0.15, -0.03], [0.74, 0.15, -0.03], 1.24],
-    ['hand_L', [-0.14, -0.41, 0.35], [-0.11, -0.73, 0.17], 0.46],
-    ['arm_L_lower', [0.54, -1.84, 0.5], [0.02, -0.21, -0.14], 0.56],
-    ['arm_L_upper', [-0.07, 0.34, -0.04], [0.67, -1.15, -0.12], 0.88],
-    ['arm_R_lower', [-2.8, -6.98, 3], [-0.26, -0.63, -0.03], 1.13],
-    ['arm_R_upper', [0.08, 0.29, -0.06], [-0.71, -1.04, -0.02], 0.9],
-    ['torso', [-0.38, -0.1, -2.13], [0.38, -0.1, -2.13], 1.99],
-    ['head', [0.1, 0.55, 0.22], [-0.43, 0.24, -0.02], 0.91],
-    ['torso', [0, 0.96, 0.06], [0.01, 1.83, -0.28], 1.52],
-  ],
-
-};
-function capsules(who, s) {
-  const model = MODEL[who], fk = duelFK({ ...s, saber: Math.max(s.saber, 1e-3) }, model), out = [];
-  for (const [part, a, b, r] of HITBOX[model]) out.push({ who, part, kind: 'body', a: M.transformPoint([0, 0, 0], fk[part], a), b: M.transformPoint([0, 0, 0], fk[part], b), r });
-  if (s.saber > 0.5) for (const [a, b, r] of who === 'hero' ? maceCapsOf(fk) : katanaCapsOf(fk)) out.push({ who, part: 'weapon', kind: 'weapon', a, b, r });
-  return out;
-}
-let AUTO_READY = false;
-export const AUTO_CONTACTS = (() => {
-  const list = [], dt = 1 / 96, last = new Map(), prevIn = new Map();
-  const scripted = DUEL_EVENTS.filter((e) => e.type !== 'shake').map((e) => e.t);
-  let prev = null;
-  for (let t = 170.3; t < 194.0; t += dt) {
-    const foe = t < 180.15 ? 'e1' : t > 181.0 && t < 192.35 ? 'e2' : null;
-    if (!foe) { prev = null; continue; }
-    const hs = duelHero(t), fs = stateOf(foe, t);
-    if (!hs || !fs || !fs.vis) { prev = null; continue; }
-    const A = capsules('hero', hs), B = capsules(foe, fs);
-    const cur = { A, B, foe };
-    if (prev && prev.foe === foe) {
-      for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++) {
-        const ca = A[i], cb = B[j];
-        if (ca.kind === 'body' && cb.kind === 'body' && (ca.part === 'pelvis' || cb.part === 'pelvis')) continue;
-        const q = segSeg(ca.a, ca.b, cb.a, cb.b), key = i * 64 + j;
-        const depth = ca.r + cb.r - q.d + 0.08;   // solid bodies / weapons only ever touch (the constraint keeps them apart)
-        const was = prevIn.get(key) || false, now = depth > 0;
-        prevIn.set(key, now);
-        if (!now || was) continue;
-        // closing speed of the two touching points (same segment parameters one step earlier)
-        const pa = prev.A[i], pb = prev.B[j];
-        if (!pa || !pb) continue;
-        const va = scl(sub(q.c1, lrp(pa.a, pa.b, q.s)), 1 / dt), vb = scl(sub(q.c2, lrp(pb.a, pb.b, q.t)), 1 / dt);
-        const n = q.d > 1e-4 ? nrm(sub(q.c2, q.c1)) : nrm(sub(vb, va));
-        const vn = V.dot(sub(va, vb), n);
-        if (vn < 4) continue;
-        if (scripted.some((x) => Math.abs(x - t) < 0.12)) continue;          // the choreographed contact already covers it
-        const kind = ca.kind === 'weapon' && cb.kind === 'weapon' ? 'weapon-weapon' : ca.kind === 'weapon' || cb.kind === 'weapon' ? 'weapon-body' : 'body-body';
-        const pk = ca.part + '|' + cb.part;
-        if (t - (last.get(pk) ?? -9) < 0.25) continue;
-        last.set(pk, t);
-        const pos = lrp(add(q.c1, scl(n, ca.r)), sub(q.c2, scl(n, cb.r)), 0.5);
-        list.push({ t: +t.toFixed(4), pos, n, vn, kind, a: 'hero', b: foe, partA: ca.part, partB: cb.part, strength: clamp(vn / 60, 0.15, 1) });
-      }
-    }
-    prev = cur;
-  }
-  // one physical event per exchange: contacts closer than 0.2 s merge into the hardest one (weapons outrank bodies);
-  // body-on-body brushes right around a choreographed hit belong to that hit
-  const score = (c) => c.vn * (c.kind === 'body-body' ? 0.5 : 1);
-  const kept = [];
-  for (const c of list) {
-    if (c.kind === 'body-body' && scripted.some((x) => Math.abs(x - c.t) < 0.3)) continue;
-    const k = kept[kept.length - 1];
-    if (k && c.t - k.t < 0.2) { if (score(c) > score(k)) kept[kept.length - 1] = c; continue; }
-    kept.push(c);
-  }
-  return kept;
-})();
-AUTO_READY = true;
-// the same contacts in DUEL_EVENTS form, for the effect / shake code (sparks + flash-free glow, no cut)
-export const AUTO_FX = AUTO_CONTACTS.map((c) => ({ t: c.t, pos: c.pos, type: c.kind === 'weapon-weapon' ? 'clash' : c.kind === 'weapon-body' ? 'hit' : 'spark', strength: c.strength, auto: true }));
-// physical response of `who` to every contact (auto + scripted hits/clashes/blocks): shove along the normal and a twist
-// from the lever arm about the hip, through a damped spring (0 at contact, peak ~0.12 s, settled by ~0.9 s)
-const IMPULSES = [
-  ...AUTO_CONTACTS.map((c) => ({ t: c.t, pos: c.pos, n: c.n, vn: c.vn, a: c.a, b: c.b, kind: c.kind })),
-  ...DUEL_EVENTS.filter((e) => e.pos && ['clash', 'block'].includes(e.type))   /* hits: collisionOffset */.map((e) => ({ t: e.t, pos: e.pos, n: null, vn: 25 * (e.strength ?? 1), a: 'hero', b: e.t < 180.5 ? 'e1' : 'e2', kind: 'weapon-weapon' })),
-];
-const MASS = { hero: 1.25, e1: 1, e2: 1 };   // Sigma is the heavier machine
-function impulseResponse(who, tw, s) {
-  if (!AUTO_READY) return null;
-  const off = [0, 0, 0], ang = [0, 0, 0];
-  let near = 1; for (const ti of IMPACTS) near = Math.min(near, smooth(0.03, 0.2, Math.abs(tw - ti)));
-  if (near <= 0) return null;
-  const f = nrm([s.fwd[0], 0, s.fwd[2]]), r = [f[2], 0, -f[0]];
-  for (const c of IMPULSES) {
-    const lt = tw - c.t;
-    if (lt <= 0 || lt > 0.9 || (c.a !== who && c.b !== who)) continue;
-    const other = c.a === who ? c.b : c.a;
-    const raw = (w, x) => (w === 'hero' ? duelHero_(x) : w === 'e1' ? duelEnemy1_(x) : duelEnemy2_(x));
-    let n = c.n || nrm(sub(raw(other, c.t).pos, raw(who, c.t).pos));
-    const sign = c.a === who ? -1 : 1;                                    // impulse on `who` points away from the other
-    const J = clamp(c.vn, 0, 80) * (c.kind === 'weapon-weapon' ? 0.02 : c.kind === 'weapon-body' ? 0.05 : 0.035) * (MASS[other] / MASS[who]);
-    const env = pulse(lt, 8) * (1 - lt / 0.9) * near;
-    for (let k = 0; k < 3; k++) off[k] += n[k] * sign * J * env;
-    const lever = sub(c.pos, s.pos), tq = V.cross([0, 0, 0], lever, scl(n, sign * J));      // twist about the hip
-    ang[0] += clamp(V.dot(tq, r), -8, 8) * 0.012 * env; ang[1] += clamp(tq[1], -8, 8) * 0.01 * env; ang[2] += clamp(V.dot(tq, f), -8, 8) * 0.012 * env;
-  }
-  return { off, ang };
-}
-export function applyImpulses(who, t, s) {
-  if (!s) return s;
-  const res = impulseResponse(who, warp(t), s);
-  if (!res) return s;
-  const o = { ...s, pos: add(s.pos, res.off), pitch: (s.pitch || 0) + res.ang[0], roll: (s.roll || 0) + res.ang[2] };
-  o.fwd = yawRot(s.fwd, res.ang[1]);
-  return o;
-}
-
-// the solidity corrections, smoothed in time (needs the impulse-driven free motion, so after AUTO_READY)
-SOLID = buildSolid();
-_c_duelEnemy1.clear(); _c_duelEnemy2.clear();
-
-// the hit reactions (from the final contacts), then drop every cached state so they are applied
-REACTS = buildReacts();
-_c_duelHero.clear(); _c_duelEnemy1.clear(); _c_duelEnemy2.clear(); _c_free.e1.clear(); _c_free.e2.clear();
+STATE_CACHE = true;   // all states are now fixed functions of t (memoised per t)

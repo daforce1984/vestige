@@ -33,7 +33,9 @@ for _s in ('L', 'R'):
     for _b in ['wing_root', 'wing_outer'] + ['feather_0%d' % _k for _k in range(1, 6)]:
         BASE_MAP['%s.%s' % (_b, _s)] = 'wing_' + _s
 EXTRA_PARENT = {'wing_L': 'torso', 'wing_R': 'torso'}
-PIVOT_BONE = {'wing_L': 'wing_root.L', 'wing_R': 'wing_root.R', 'pelvis': 'pelvis', 'torso': 'chest', 'head': 'head', 'arm_L_upper': 'upper_arm.L',
+# VANGUARD / 07's beam rifle is its own bone (child of hand.R): it becomes the `rifle` part (hinged at the grip)
+BASE_MAP['rifle.R'] = 'rifle'
+PIVOT_BONE = {'rifle': 'rifle.R', 'shield': 'forearm.L', 'wing_L': 'wing_root.L', 'wing_R': 'wing_root.R', 'pelvis': 'pelvis', 'torso': 'chest', 'head': 'head', 'arm_L_upper': 'upper_arm.L',
               'arm_L_lower': 'forearm.L', 'hand_L': 'hand.L', 'arm_R_upper': 'upper_arm.R', 'arm_R_lower': 'forearm.R',
               'hand_R': 'hand.R', 'leg_L_upper': 'thigh.L', 'leg_L_lower': 'shin.L', 'foot_L': 'foot.L',
               'leg_R_upper': 'thigh.R', 'leg_R_lower': 'shin.R', 'foot_R': 'foot.R'}
@@ -46,10 +48,37 @@ SPECS = {
     'enemy_seraph': dict(src='seraph-03.glb', height=19.0, prefix='seraph', eye_rgb=(1.0, 0.42, 0.12),
                          glow_name='core', engine_rgb=(1.0, 0.45, 0.15), muzzle_empty=None, hilt=False,
                          core_rgb=(1.0, 0.45, 0.15), K=5, smooth_iter=10, em_thresh=0.12),   # its small orange panel lights
+    # VANGUARD / 07 (CC0): the enemy from 2026-09-28 (2) — a hand-held beam rifle + shield, repainted crimson / black / gold
+    'enemy_vanguard': dict(src='vanguard-07.glb', height=18.5, prefix='vanguard', eye_rgb=(1.0, 0.3, 0.4),
+                           glow_name='core', engine_rgb=(1.0, 0.4, 0.3), muzzle_empty='Muzzle_Rifle', hilt=False,
+                           core_rgb=(1.0, 0.35, 0.3), K=6, smooth_iter=10, em_thresh=0.2, palette='crimson',
+                           split_shield=1.15),
     'enemy_ms': dict(src='ronin-04.glb', height=18.0, prefix='ronin', eye_rgb=(1.0, 0.25, 0.6),
                      glow_name='core', engine_rgb=(1.0, 0.4, 0.12), muzzle_empty=None, hilt=False,
                      sword_forward=True, add_eyes=True, core_rgb=(1.0, 0.4, 0.12), K=5, smooth_iter=12),
 }
+
+
+def crimson(c):
+    """repaint an sRGB armour colour into a crimson / black / gold scheme: pale armour -> crimson, blue -> near-black,
+    red trim -> gold, darks stay dark (a little warmer)"""
+    r, g, b = (float(x) for x in c)
+    lum = 0.3 * r + 0.55 * g + 0.15 * b
+    mx, mn = max(r, g, b), min(r, g, b)
+    sat = (mx - mn) / (mx + 1e-6)
+    if b > r + 0.08 and b > g:                     # blue chest / panels
+        out = (0.09, 0.075, 0.08)
+    elif r > g + 0.15 and r > b + 0.15:            # red trim
+        out = (0.78, 0.58, 0.24)
+    elif lum > 0.42 and sat < 0.3:                 # pale armour
+        k = min(1.0, lum / 0.8)
+        out = (0.62 * k + 0.06, 0.06 * k + 0.02, 0.07 * k + 0.02)
+    elif g > 0.45 and r > 0.45 and b < 0.3:        # yellow antenna / vents
+        out = (0.8, 0.6, 0.22)
+    else:                                          # frame / joints: dark, a little warm
+        out = (lum * 0.55 + 0.03, lum * 0.45 + 0.025, lum * 0.45 + 0.03)
+    print('  repaint %s -> %s' % (tuple(round(x, 2) for x in c), tuple(round(x, 2) for x in out)))
+    return np.array(out)
 
 
 def srgb_to_lin(c):
@@ -200,6 +229,16 @@ def convert(name):
         vals = vals[vals >= 0]
         fb[f] = np.bincount(vals).argmax() if len(vals) else nidx.get('chest', 0)
     face_node = np.array([BASE_MAP.get(names[b], 'torso') for b in fb])
+    if sp.get('split_shield') and 'forearm.L' in nidx:
+        # VANGUARD's shield is skinned to forearm.L: faces farther than 1.15 m from the forearm's axis are the shield
+        h0, t0 = np.array(bone_heads['forearm.L']), np.array(bone_tails['forearm.L'])
+        ax = (t0 - h0) / np.linalg.norm(t0 - h0)
+        cent = np.array([co[list(p.vertices)].mean(0) for p in me.polygons])
+        d = cent - h0
+        rad = np.linalg.norm(d - np.outer(d @ ax, ax), axis=1)
+        sh = (fb == nidx['forearm.L']) & (rad > sp['split_shield'])
+        face_node[sh] = 'shield'
+        print('  shield split: %d faces' % sh.sum())
     # ---- per-face colour / orm / emission from textures
     tex = find_textures(src)
     uv = np.empty(nl * 2, np.float32)
@@ -257,7 +296,10 @@ def convert(name):
     for rank, k in enumerate(order):
         sel = cluster == k
         wgt = area[sel][:, None]
-        col = srgb_to_lin((base_srgb[sel] * wgt).sum(0) / wgt.sum())
+        col = (base_srgb[sel] * wgt).sum(0) / wgt.sum()
+        if sp.get('palette') == 'crimson':
+            col = crimson(col)
+        col = srgb_to_lin(col)
         rough = float((orm[sel, 1] * wgt[:, 0]).sum() / wgt.sum())
         metal = float((orm[sel, 2] * wgt[:, 0]).sum() / wgt.sum())
         mname = '%s_%d' % (sp['prefix'], rank)
@@ -333,6 +375,8 @@ def convert(name):
     src_muzzle = None
     if sp.get('muzzle_empty') and bpy.data.objects.get(sp['muzzle_empty']):
         src_muzzle = Vector(T(np.array(bpy.data.objects[sp['muzzle_empty']].matrix_world.translation)))
+    elif sp.get('muzzle_empty') in bone_heads:            # a bone in the rig (VANGUARD's Muzzle_Rifle)
+        src_muzzle = bone_heads[sp['muzzle_empty']].copy()
     polys_v = [tuple(p.vertices) for p in me.polygons]
     # remove imported source objects
     for o in list(bpy.data.objects):
@@ -425,6 +469,9 @@ def convert(name):
     grip_R = bone_heads['hand.R'] + (bone_tails['hand.R'] - bone_heads['hand.R']) * 0.45
     if sp.get('hand_rifle'):
         rifle, mz = build_rifle(grip_R, names_c, order, sp['glow_name'])
+    elif 'rifle' in objs:                                   # the model's own rifle part (VANGUARD)
+        rifle = objs['rifle']
+        grip_R = piv['rifle'].copy()
     else:
         rifle = bpy.data.objects.new('rifle', None)
         rifle.location = grip_R
@@ -432,6 +479,8 @@ def convert(name):
     objs['rifle'], piv['rifle'] = rifle, grip_R.copy()
     if sp.get('hand_rifle'):
         pass
+    elif src_muzzle is not None and name != 'gundam':
+        mz = src_muzzle
     elif name == 'gundam':
         mz = src_muzzle if src_muzzle is not None else grip_R + Vector((0, -1.5, 0))  # forearm pulse cannon
     else:

@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, rifleCharge, SERAPH_GUN, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, WING_HIT_T, KILL_SHOT_T, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, KILL_SHOT_T, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -713,18 +713,18 @@ function drawBreakup(R, t, idx) {
   const fin = _fin[idx], fan = idx === 2 && fin.imp ? { dir: fin.imp, side: V.norm([0, 0, 0], V.cross([0, 0, 0], fin.imp, [0, 1, 0])), spread: 55 * Math.PI / 180 } : null;
   shatter(R, 'enemy_ms', fin.m, tt, t0, idx === 2 ? 88 : 77, [3, 4, 3], idx === 2 ? 2.6 : 3.2, { tint: [2, 0.4, 0.3], pose: fin.pose, texSet: R.texLoaded & 4 ? 2 : 0, impulse: fan ? null : fin.imp, impulseK: 2.6, fan });
 }
-// SERAPH's left wing, shot off at the reversal (WING_HIT_T): the same model with only wing_L shown, frozen in the pose
-// it had at the hit, tumbling about the wing root and drifting off along the shot (the machine's own velocity + a kick)
+// VANGUARD's shield, torn off its forearm by Sigma's shot (SHIELD_HIT_T): the same model with only the shield part shown,
+// frozen in the pose it had at the hit, tumbling about the hit point and drifting off along the shot
 const _wing = {}, _wT = new Float32Array(16), _wA = new Float32Array(16), _wB = new Float32Array(16), _wQ = [0, 0, 0, 1];
-function drawLostWing(R, t) {
-  const t0 = WING_HIT_T + 0.03;
+function drawLostShield(R, t) {
+  const t0 = SHIELD_HIT_T + 0.03;
   if (!_wing.m) {
-    const s0 = enemyMS2(t0), s1 = enemyMS2(t0 + 0.05), ev = DUEL_EVENTS.find((e) => Math.abs(e.t - WING_HIT_T) < 1e-6);
+    const s0 = enemyMS2(t0), s1 = enemyMS2(t0 + 0.05), ev = DUEL_EVENTS.find((e) => Math.abs(e.t - t0) < 1e-6);
     _wing.m = msMatrix(new Float32Array(16), s0); _wing.pose = JSON.parse(JSON.stringify(s0.pose));
     _wing.pivot = ev ? ev.pos : s0.pos;
     const vs = V.scale([0, 0, 0], V.sub([0, 0, 0], s1.pos, s0.pos), 1 / 0.05), sd = ev && ev.shotDir ? ev.shotDir : [0, 0, 1];
-    _wing.v = V.madd([0, 0, 0], V.madd([0, 0, 0], vs, sd, 16), [0, 1, 0], 3);
-    _wing.hide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'wing_L') _wing.hide[p.name] = 1;
+    _wing.v = V.madd([0, 0, 0], V.madd([0, 0, 0], vs, sd, 22), [0, 1, 0], 4);
+    _wing.hide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'shield') _wing.hide[p.name] = 1;
   }
   const lt = t - t0; if (lt < 0 || lt > 8) return;
   const P = _wing.pivot, d = V.madd([0, 0, 0], P, _wing.v, lt);
@@ -736,7 +736,7 @@ function drawLostWing(R, t) {
   if (!w) return;
   w.pose = _wing.pose; w.hidden = _wing.hide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
   w.damage = 0.6;
-  if (lt < 3) R.light(P, 30, [1, 0.5, 0.2], 4 * Math.exp(-lt * 2));   // the torn root glowing hot for a moment
+  if (lt < 3) R.light(V.madd([0, 0, 0], P, _wing.v, lt), 30, [1, 0.5, 0.2], 4 * Math.exp(-lt * 2));   // the burnt mount glowing hot for a moment
 }
 function drawEnemyMS(R, t, s, idx) {
   if (idx === 2 && t > E2_FIN + 0.03 && t < 200) { drawBreakup(R, t, 2); return null; }
@@ -745,7 +745,7 @@ function drawEnemyMS(R, t, s, idx) {
   const e = R.add('enemy_ms', msMatrix(tmpM, s));
   if (!e) return null;
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
-  if (idx === 2 && s.wingLost) { e.hidden = { ...(e.hidden || {}), wing_L: 1 }; drawLostWing(R, t); }
+  if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
   const fn = idx === 1 ? enemyMS1 : enemyMS2;
   engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE, 0.9, 0.8, 1.2, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
   const BL = BLOWS[idx];
@@ -761,19 +761,10 @@ function drawEnemyMS(R, t, s, idx) {
   heavyDamage(R, t, e, idx);
   const eye = emitWorld(R, 'enemy_ms', e, 'eye');
   const eyeFl = idx === 1 ? 1 + 1.6 * smooth(174.75, 174.9, t) * (1 - smooth(175.15, 175.6, t)) : 1;   // the standoff: its eye flares
-  if (eye) {   // SERAPH's eye lights: a small glint on each (no big round glow), flaring in the standoff
+  if (eye) {   // VANGUARD's eyes: a small glint on each (no big round glow), flaring in the standoff
     const pts = R.models.enemy_ms.emitPoints.eye || [];
-    for (let i = 0; i < pts.length; i++) { const p = emitWorld(R, 'enemy_ms', e, 'eye', i); if (p) R.glow(p, 0.3 * (0.8 + 0.2 * eyeFl), [2.6 * eyeFl, 0.9 * eyeFl, 0.25 * eyeFl], 0.2); }
-    e.matOverride = { ...(e.matOverride || {}), eye: { base: [0.3, 0.12, 0.05], metal: 0, rough: 0.3, emissive: [5 * eyeFl, 1.8 * eyeFl, 0.5 * eyeFl] } };
-  }
-  // the beam blade out of the cannon muzzle (lit for the melee)
-  if (s.saber > 0.03) {
-    const fm = R.partWorld('enemy_ms', e, 'arm_R_lower'), mz = M.transformPoint([0, 0, 0], fm, SERAPH_GUN.muzzle);
-    const bd = V.norm([0, 0, 0], M.transformDir([0, 0, 0], fm, V.sub([0, 0, 0], SERAPH_GUN.muzzle, SERAPH_GUN.breech)));
-    const k = s.saber, tip = madd(mz, bd, SERAPH_GUN.blade * easeOut(sat(k)));
-    R.beam(mz, tip, 0.55, [3.2 * k, 1.1 * k, 0.35 * k], 0.45, 26, 1.5, 1.2);                 // core (white ∝ intensity: kept low)
-    R.beam(mz, tip, 1.6, [3.2 * k, 1.1 * k, 0.35 * k], 0.04, 3, 2, 0.8);                    // soft orange halo
-    R.light(lerpv(mz, tip, 0.5), 30, [1, 0.45, 0.15], 3 * k);
+    for (let i = 0; i < pts.length; i++) { const p = emitWorld(R, 'enemy_ms', e, 'eye', i); if (p) R.glow(p, 0.3 * (0.8 + 0.2 * eyeFl), [2.6 * eyeFl, 0.5 * eyeFl, 0.7 * eyeFl], 0.2); }
+    e.matOverride = { ...(e.matOverride || {}), eye: { base: [0.3, 0.08, 0.1], metal: 0, rough: 0.3, emissive: [5 * eyeFl, 1.0 * eyeFl, 1.4 * eyeFl] } };
   }
   return e;
 }
@@ -914,11 +905,11 @@ function drawMSBattle(R, t) {
   return g;
 }
 
-// SERAPH's heavy cannon. Four shots in the ranged duel (a fixed line from the muzzle at the moment of firing, racing out
-// at 3 km/s, held 0.3 s, fading; charge glow before, shock ring + flash at the muzzle, light spilling on Sigma as it
-// passes him; every one misses), and the finale: a sustained full-power beam along the line it laid on him, which he
-// slips a moment before it fires (FINALE_T–FINALE_END). Orange like its lights; the white core kept low (intensity).
-const SER_COL = [3.2, 1.15, 0.35];
+// VANGUARD's beam rifle: bolts (a 70 m streak racing out at 2.2 km/s along the line fixed at the moment of firing), a
+// short charge glint and a muzzle flash; light spills on Sigma as one goes past him — every one misses. The finale: a
+// sustained full-power beam along the line it laid on him, which he slips a moment before it fires (FINALE_T–END).
+// Crimson-pink (its paint); the white core kept low (intensity).
+const SER_COL = [3.0, 0.55, 0.9];
 function serBeam(R, a, b, k, r = 1.3) {
   // seen from close up (the finale close-up sits in the beam) it is dimmed with camera distance, or it whites the frame out
   const cp = ctx.cam && ctx.cam.pos; let nk = 1;
@@ -930,61 +921,41 @@ function serBeam(R, a, b, k, r = 1.3) {
 const _shotLine = new Map();
 function shotLine(ts) {
   let L = _shotLine.get(ts);
-  if (!L) {
-    const m = seraphMuzzle(ts);
-    if (!m) return null;
-    L = { from: m.pos, dir: m.dir };
-    if (false) {   // (no shot is struck off a weapon any more)
-      const h = duelHero(ts + 0.05), fk = h && duelFK({ ...h, saber: 1 }, 'gundam');
-      if (fk) { const head = madd(fk.saber[0], fk.saber[2], 9); L.stop = V.dist(head, m.pos); L.hit = head;
-        const sw = V.norm([0, 0, 0], V.sub([0, 0, 0], duelFK({ ...duelHero(ts + 0.1), saber: 1 }, 'gundam').saber[1], fk.saber[1]));
-        L.out = V.norm([0, 0, 0], V.madd([0, 0, 0], sw, m.dir, 0.4)); }
-    }
-    _shotLine.set(ts, L);
-  }
+  if (!L) { const m = seraphMuzzle(ts); if (!m) return null; L = { from: m.pos, dir: m.dir }; _shotLine.set(ts, L); }
   return L;
 }
 function drawSeraphFire(R, t) {
   for (const ts of SERAPH_SHOTS) {
-    if (t < ts - 0.3 || t > ts + 0.7) continue;
+    if (t < ts - 0.15 || t > ts + 0.8) continue;
     const L = shotLine(ts); if (!L) continue;
-    if (t < ts) {                                              // charging: the muzzle gathers light
-      const m = seraphMuzzle(t), c = sat((t - (ts - 0.3)) / 0.3);
-      if (m) { R.glow(m.pos, 0.8 + 2.2 * c * c, [3 * c, 1.1 * c, 0.3 * c], 0.35); R.light(m.pos, 40, [1, 0.45, 0.15], 3 * c); }
+    if (t < ts) {                                              // a charge glint at the muzzle
+      const m = seraphMuzzle(t), c = sat((t - (ts - 0.15)) / 0.15);
+      if (m) { R.glow(m.pos, 0.5 + 1.2 * c * c, [3 * c, 0.6 * c, 0.9 * c], 0.3); R.light(m.pos, 30, [1, 0.3, 0.45], 2 * c); }
       continue;
     }
-    const lt = t - ts, k = lt < 0.3 ? 1 : Math.max(0, 1 - (lt - 0.3) / 0.25);
-    const len = Math.min(L.stop ?? 2500, 3000 * lt + 5), end = madd(L.from, L.dir, len);
-    if (k > 0) serBeam(R, L.from, end, k);
-    const kf = Math.exp(-lt * 9);
-    R.glow(L.from, 1.5 + 3 * kf, [3 * kf, 1.2 * kf, 0.35 * kf], 0.4); R.light(L.from, 90, [1, 0.45, 0.15], 12 * kf);
-    if (lt < 0.3) R.ripple(L.from, 6 + 40 * easeOut(lt / 0.3), [0.4, 0.4, 0.4], (1 - lt / 0.3) * 1.1);
-    const g = gundamState(t); if (g && g.vis && k > 0) {        // light spilling on him as it goes past
-      const d = V.sub([0, 0, 0], g.pos, L.from), u = clamp(V.dot(d, L.dir), 0, len), cp = madd(L.from, L.dir, u);
-      R.light(cp, 70, [1, 0.45, 0.15], 6 * k);
+    const lt = t - ts, head = 2200 * lt + 3, tail = Math.max(0, head - 70);
+    if (head < 2500) {
+      const a = madd(L.from, L.dir, tail), b = madd(L.from, L.dir, head);
+      R.beam(a, b, 0.8, [SER_COL[0], SER_COL[1], SER_COL[2]], 1, 20, 0.6, 0.8);
+      R.beam(a, b, 2.4, [SER_COL[0] * 0.8, SER_COL[1] * 0.8, SER_COL[2] * 0.8], 0.04, 3, 2, 0.6);
     }
-    if (L.hit && lt >= 0.05) {                                // struck off the mace: sparks + the deflected shot
-      const ld = lt - 0.05, kd = Math.max(0, 1 - ld / 0.4);
-      if (kd > 0) serBeam(R, L.hit, madd(L.hit, L.out, 60 + 2500 * Math.min(1, ld / 0.25)), kd, 1.0);
-      R.light(L.hit, 80, [1, 0.5, 0.2], 10 * kd);
-      for (let i = 0; i < 30; i++) {
-        const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.7 + 5), L.out, 0.9));
-        const life = 0.25 + hash(i + 3) * 0.4; if (ld > life) continue;
-        const a = ld / life, b = 4 * (1 - a) * (1 - a);
-        spark(R, madd(L.hit, sd, (4 + 26 * hash(i + 9)) * easeOut(a)), 0.5 + 0.4 * (1 - a), [b, b * 0.55, b * 0.2]);
-      }
+    const kf = Math.exp(-lt * 12);
+    if (lt < 0.25) { R.glow(L.from, 1 + 2.5 * kf, [3 * kf, 0.6 * kf, 0.9 * kf], 0.35); R.light(L.from, 60, [1, 0.3, 0.45], 6 * kf); }
+    const g = gundamState(t); if (g && g.vis && head < 2500) {   // light spilling on him as it goes past
+      const d = V.sub([0, 0, 0], g.pos, L.from), u = V.dot(d, L.dir);
+      if (u > tail - 20 && u < head + 20) R.light(madd(L.from, L.dir, clamp(u, tail, head)), 50, [1, 0.3, 0.45], 5);
     }
   }
   // ---- the finale: full power, a sustained beam along the line it had laid on him — he has already slipped aside
   if (t > FINALE_T - 0.4 && t < FINALE_END + 0.35) {
     const L = shotLine(FINALE_T);
-    if (L && t < FINALE_T) { const m = seraphMuzzle(t), c = sat((t - (FINALE_T - 0.4)) / 0.4); if (m) { R.glow(m.pos, 1 + 4 * c * c, [3.2 * c, 1.2 * c, 0.3 * c], 0.35); R.light(m.pos, 60, [1, 0.45, 0.15], 6 * c); } }
+    if (L && t < FINALE_T) { const m = seraphMuzzle(t), c = sat((t - (FINALE_T - 0.4)) / 0.4); if (m) { R.glow(m.pos, 1 + 4 * c * c, [3 * c, 0.6 * c, 0.9 * c], 0.35); R.light(m.pos, 60, [1, 0.3, 0.45], 6 * c); } }
     else if (L) {
       const lt = t - FINALE_T, k = t < FINALE_END ? 1.1 + 0.12 * Math.sin(t * 43) : Math.max(0, 1 - (t - FINALE_END) / 0.3);
       serBeam(R, L.from, madd(L.from, L.dir, Math.min(4000, 3000 * lt + 5)), k, 2.4);
       if (lt < 0.35) R.ripple(L.from, 10 + 60 * easeOut(lt / 0.35), [0.5, 0.5, 0.5], (1 - lt / 0.35) * 1.3);
-      R.light(L.from, 110, [1, 0.45, 0.15], 16 * k);
-      const g = gundamState(t); if (g && g.vis) { const d = V.sub([0, 0, 0], g.pos, L.from), u = Math.max(0, V.dot(d, L.dir)); R.light(madd(L.from, L.dir, u), 90, [1, 0.45, 0.15], 10 * k); }   // it lights him as it tears past
+      R.light(L.from, 110, [1, 0.3, 0.45], 16 * k);
+      const g = gundamState(t); if (g && g.vis) { const d = V.sub([0, 0, 0], g.pos, L.from), u = Math.max(0, V.dot(d, L.dir)); R.light(madd(L.from, L.dir, u), 90, [1, 0.3, 0.45], 10 * k); }   // it lights him as it tears past
     }
   }
 }

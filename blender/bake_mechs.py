@@ -16,8 +16,8 @@ TEX = os.path.join(ASSETS, 'tex')
 EMISSIVE = {'eye', 'core', 'engine'}
 RES = 4096
 DETAIL_BOOST = {'head': 1.7, 'torso': 1.35}   # extra texel density for close-up parts
-# per model: SERAPH / 03 is gloss-black armour — keep the paint dark (no lift to mid grey), less and darker edge wear
-MODEL_OPTS = {'enemy_ms': dict(paint_floor=0.03, wear=0.45, bare=(0.3, 0.3, 0.32), paint_rough=0.32, paint_metal=0.3)}
+# per model options (enemy_ms = VANGUARD / 07 repainted crimson)
+MODEL_OPTS = {'enemy_ms': dict(paint_floor=0.05, wear=0.5, bare=(0.45, 0.44, 0.46), paint_rough=0.38, paint_metal=0.25)}   # VANGUARD in crimson: satin paint, light wear
 OPT = {}
 
 

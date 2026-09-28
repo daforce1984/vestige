@@ -9,7 +9,7 @@ export const TEAR_S0 = 267.2, TEAR_S1 = 268.0;          // story window
 const TEAR_LEN = 10.8;                                  // film length of the tear window
 
 // every blow of the fight (story time): the swatted bolt (duel.js DODGE.t), then the DUEL_EVENTS clash/block/hit
-export const SLOW_HITS = [166.65, 178.05, 184.5, 186.95, 190.95, 192.4];   // the gunfight: the barrel roll over shot 3, THE PASS, the reversal shot, slipping the full-power beam, the kill shot
+export const SLOW_HITS = [166.65, 178.73, 179.95, 183.28, 190.95, 192.4];   // the gunfight: the shield block, its inverted shot, the shield torn off, slipping the full-power beam, the kill shot
 export const SLOW_V = 0.2;                              // picture speed while slowed
 const SLOW_POST = 0.5 * SLOW_V;                         // story seconds held slow after the contact = 0.5 s on screen
 // per-blow window (story s): full slow on [h − pre, h + post], smooth ramps rin / rout either side.
