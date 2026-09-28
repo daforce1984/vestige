@@ -1615,9 +1615,7 @@ fn h12(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(12.9898, 78.233))) * 437
   // vignette
   let v = 1.0 - dot(cc * vec2f(1.0, 1.25), cc * vec2f(1.0, 1.25)) * P.b.w;
   col *= v;
-  // grain
-  let g = h12(uv * P.screen.xy + fract(P.c.z * 7.13) * 100.0) - 0.5;
-  col += g * P.a.w * (0.4 + 0.6 * (1.0 - l2));
+  // (no film grain)
   if (bz > 0.0) {
     let lum0 = dot(col, vec3f(0.3, 0.55, 0.15));
     col = mix(col, vec3f(lum0 * 1.35, lum0 * 0.25, lum0 * 0.18) + col * vec3f(0.35, 0.05, 0.05), min(bz * 0.55, 0.75) * P.intf.z);   // intf.z = red-flood amount

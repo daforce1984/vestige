@@ -718,7 +718,7 @@ export class Renderer {
       const s = this._proj3(vp, post.godray.pos);
       if (s) { P[16] = s[0]; P[17] = s[1]; P[18] = post.godray.intensity; P[19] = post.godray.decay ?? 0.96; }
     }
-    P[20] = post.exposure ?? 1; P[21] = post.bloom ?? 0.08; P[22] = post.ca ?? 0.002; P[23] = post.grain ?? 0.04;
+    P[20] = post.exposure ?? 1; P[21] = post.bloom ?? 0.08; P[22] = post.ca ?? 0.002; P[23] = 0;   // (film grain removed)
     P[24] = post.fade ?? 1; P[25] = post.flash ?? 0; P[26] = post.letterbox ?? 1; P[27] = post.vignette ?? 0.9;
     P[28] = post.distort ?? 1; P[29] = post.streak ?? 0.5; P[30] = env.time; P[31] = post.saturation ?? 1;
     const gs = post.gradeShadows || [0.92, 1.0, 1.1], gh = post.gradeHighlights || [1.08, 1.0, 0.92];

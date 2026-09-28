@@ -54,7 +54,7 @@ function spaceEnv(t) {
 }
 function basePost() {
   return {
-    exposure: 0.9, bloom: 0.3, ca: 0.0006, grain: 0.008, fade: 1, flash: 0, letterbox: 1, vignette: 0.8,
+    exposure: 0.9, bloom: 0.3, ca: 0.0006, grain: 0, fade: 1, flash: 0, letterbox: 1, vignette: 0.8,
     distort: 1, streak: 0.22, saturation: 0.9, contrast: 1.08, gradeShadows: [0.92, 0.98, 1.06], gradeHighlights: [1.08, 1.0, 0.9],
     shakeBlur: 0, lensA: null, lensB: null, godray: null,
   };
