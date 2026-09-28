@@ -431,20 +431,10 @@ function drawWound(R, t, me) {
       rim.revealDir = me.revealDir; rim.revealZ = (me.revealZ - LANCE_HIT[2]) / r; rim.revealWidth = me.revealWidth; rim.tint = me.tint;
     }
   }
-  // molten drips peeling off the lower rim (streaks that cool from white to red)
-  for (let i = 0; i < 26; i++) {
-    const per = 1.4 + hash(i) * 1.6, ph = ((t - LANCE_FIRE) / per + hash(i + 3)) % 1;
-    if (t - LANCE_FIRE < ph * per) continue;
-    const a = -Math.PI / 2 + (hash(i + 7) - 0.5) * 2.4;
-    const p0 = [LANCE_HIT[0] + 1.5, LANCE_HIT[1] + Math.sin(a) * r, LANCE_HIT[2] + Math.cos(a) * r];
-    const p1 = [p0[0] + ph * 14, p0[1] - ph * 22 - 3, p0[2] + (hash(i + 9) - 0.5) * ph * 8];
-    const c = 1 - ph, w = M.transformPoint([0, 0, 0], mm, p0), w1 = M.transformPoint([0, 0, 0], mm, p1);
-    // a glob with a short tapering tail, wobbling as it drifts off the rim
-    const wob = Math.sin(t * 6 + i) * 0.8;
-    w1[0] += wob; w1[2] += Math.cos(t * 5 + i) * 0.8;
-    R.glow(w1, 1.2 + 1.4 * c, [4 * c + 0.5, 1.5 * c * c + 0.1, 0.35 * c * c], 0.8);
-    R.beam(V.lerp([0, 0, 0], w, w1, 0.55 + 0.25 * hash(i + 5)), w1, 0.35 + 0.5 * c, [2.6 * c + 0.3, 0.9 * c * c + 0.06, 0.2 * c * c], 1, 8);
-  }
+  // MOLTEN METAL: rivulets start ON the melt boundary (the same outline the mesh shader cuts: an ellipse 1/0.62 wider along
+  // the hull, with molten fingers hanging off its lower half), run DOWN the flat wall (x = 62) as glowing streams, and
+  // at the wall's lower edge (y = −30) hang off as strands whose tip swells into a glob, drops away slowly and cools
+  if (!gone && r > 4) drawMolten(R, t, mm, r);
   // decompression spill: objects and people tumbling out of the bay
   const pm = R.models.bay_props;
   for (const sp of SPILL) {
@@ -462,6 +452,66 @@ function drawWound(R, t, me) {
       M.fromTRS(_wm, wp, _wq, sp.person ? 0.02 : 0.06);
       const e = R.add('debris', _wm);
       if (e) { e.hidden = debrisOnly(R, 'hull' + (Math.floor(sp.t0 * 10) % 4)); e.damage = 0.4; }
+    }
+  }
+}
+// the melt boundary (mesh shader cutAway, MELT): |v| = r·B(θ), v = (Δz·0.62, Δy)
+function meltB(th) {
+  const drip = 0.28 * Math.pow(Math.max(0, Math.sin(7 * th + 1.1)), 3) * Math.max(0, -Math.sin(th));
+  return 1 + 0.10 * Math.sin(3 * th + 1) + 0.06 * Math.sin(5 * th + 2.3) + 0.035 * Math.sin(9 * th + 0.7) + 0.02 * Math.sin(14 * th + 4.1) + drip;
+}
+const RIV = (() => {   // rivulet roots: the finger tips of the lower half, plus a few between them
+  const out = [];
+  for (let k = -4; k <= 0; k++) { const th = (Math.PI / 2 - 1.1 + 2 * Math.PI * k) / 7; if (th < -0.35 && th > -Math.PI + 0.35) out.push({ th, w: 1 }); }
+  for (const th of [-0.55, -1.2, -1.9, -2.55]) out.push({ th, w: 0.6 });
+  return out.map((q, i) => ({ ...q, seed: i * 3.7 + 1 }));
+})();
+const WALL_X = 64.2, WALL_BOT = -30;   // (1.6 m proud of the wall: over the armour plates)
+function drawMolten(R, t, mm, r) {
+  const T = t - LANCE_FIRE - 1.2;                          // the rim has to be molten first
+  if (T <= 0) return;
+  const P = (x, y, z) => M.transformPoint([0, 0, 0], mm, [x, y, z]);
+  for (const q of RIV) {
+    const B = meltB(q.th), y0 = LANCE_HIT[1] + Math.sin(q.th) * r * B, z0 = LANCE_HIT[2] + Math.cos(q.th) * r * B / 0.62;
+    const heat = Math.max(0.25, 1 - T / 40) * q.w;          // the melt cools slowly
+    const col = (k) => [3.2 * k + 0.35, 1.3 * k * k + 0.08, 0.3 * k * k];   // white-hot → orange → dull red
+    // 1) the stream down the wall (only where there is wall below the rim)
+    let yb = y0;
+    if (y0 > WALL_BOT + 1) {
+      const L = Math.min(y0 - WALL_BOT, (2.5 + 1.5 * hash(q.seed)) * T);   // it creeps down (m/s)
+      yb = y0 - L;
+      const N = 9; let a = P(WALL_X, y0, z0);
+      const zAt = (f) => z0 + (Math.sin(f * 4.1 + q.seed) * 2.6 + Math.sin(f * 9.3 + q.seed * 2) * 0.9) * f;   // it meanders round the plates
+      // the stream as a chain of overlapping blobs (a beam sprite read as a laser line): thick and white-hot at the rim,
+      // thinning and reddening as it runs down
+      const n = Math.max(3, Math.ceil(L / 3));
+      for (let i = 1; i <= n; i++) {
+        const f = i / n, b = P(WALL_X, y0 - L * f, zAt(f));
+        R.beam(a, b, (1.6 - 0.8 * f) * (0.6 + 0.4 * q.w), col(heat * (1 - 0.55 * f)).map((c) => c * 1.25), 0.5, 2.2, 0, 0.2);   // soft, wide, orange (less white core)
+        a = b;
+      }
+      for (let j = 0; j < 2; j++) {                                              // gobbets sliding down it: the flow reads
+        const f = (T * 0.35 + hash(q.seed + j * 5)) % 1;
+        if (f * (y0 - WALL_BOT) > L) continue;
+        R.glow(P(WALL_X + 0.3, y0 - (y0 - WALL_BOT) * f, zAt(f * (y0 - WALL_BOT) / Math.max(L, 1e-3))), 1.3 + 0.6 * q.w, col(heat * (1 - 0.4 * f)), 0.4);
+      }
+      if (yb > WALL_BOT + 0.5) { R.glow(a, 1.6 + 1.0 * q.w, col(heat * 0.8), 0.5); continue; }   // still creeping down
+    }
+    // 2) off the edge: a strand hanging from the lip, its tip swelling into a glob that drops away and cools
+    const x0 = y0 > WALL_BOT + 1 ? WALL_X + 0.3 : WALL_X - 1.5 + (1 - Math.sin(-q.th)) * 1.5;   // (under the hole: the melted lip itself)
+    const zb = y0 > WALL_BOT + 1 ? z0 + Math.sin(3 + q.seed) * 0.8 : z0, ya = Math.min(yb, y0);
+    const per = 2.2 + 1.6 * hash(q.seed + 2), ph = ((T / per) + hash(q.seed + 4)) % 1;
+    const grow = Math.min(1, ph / 0.7), drop = Math.max(0, (ph - 0.7) / 0.3);
+    const len = (3 + 5 * hash(q.seed + 5)) * grow * q.w + 1;
+    const root = P(x0, ya, zb), tip = P(x0 + 0.4 * grow, ya - len, zb);
+    { const n = Math.max(2, Math.ceil(len / 0.8));                                               // the strand, necking in the middle
+      let pa = root;
+      for (let i = 1; i <= n; i++) { const f = i / n, rad = (1.1 * (1 - f) + 0.35 + 0.45 * f * f) * (0.6 + 0.4 * q.w), pb = V.lerp([0, 0, 0], root, tip, f);
+        R.beam(pa, pb, rad, col(heat * (0.9 - 0.35 * f)).map((c) => c * 1.25), 0.5, 2.2, 0, 0.2); pa = pb; } }
+    if (drop <= 0) R.glow(tip, 1.2 + 1.6 * grow * q.w, col(heat * 0.85), 0.5);                   // the glob swelling at its tip
+    else {                                                                                       // …let go: falls slowly, cools
+      const g = P(x0 + 0.6 + drop * 1.5, ya - len - drop * drop * 14 - drop * 4, zb + (hash(q.seed + 6) - 0.5) * drop * 3);
+      R.glow(g, (1.2 + 1.6 * q.w) * (1 - 0.4 * drop), col(heat * (0.85 - 0.6 * drop)), 0.5);
     }
   }
 }
