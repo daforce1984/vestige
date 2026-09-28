@@ -436,7 +436,7 @@ VG.guardAim = withArm(VG.aim, VG.guard, 'L');                                   
 VG.crouch = fromClip('vanguard.BoostJump', 0.6, {}, ['arm_R_upper', 'arm_R_lower', 'hand_R']);   // loading the jump
 VG.boost = withArm(fromClip('vanguard.BoostJump', 1.4), VG.aim, 'R');           // launching up, rifle still on him
 VG.tuck = fromClip('vanguard.Backflip', 1.8, { pelvis: [0, 0, 0], torso: [20, 0, 0] });   // (flip layer drives the limbs)
-VG.fly = W(VG.guardAim, { leg_L_upper: [-20, 0, 4], leg_L_lower: [45, 0, 0], leg_R_upper: [12, 0, -4], leg_R_lower: [55, 0, 0], foot_L: [20, 0, 0], foot_R: [30, 0, 0], _body: [14, 0, 0] });
+VG.fly = W(VG.guardAim, { pelvis: [8, 0, 0], leg_L_upper: [-38, 0, 6], leg_L_lower: [62, 0, 0], leg_R_upper: [8, 0, -6], leg_R_lower: [72, 0, 0], foot_L: [28, 0, 0], foot_R: [38, 0, 0], _body: [12, 0, 0] });   // on thrusters: knees drawn, one leg trailing
 VG.stepL = W(VG.fly, { torso: [5, 18, -12], head: [0, -14, 8], _body: [0, 12, 20] });
 VG.stepR = W(VG.fly, { torso: [5, -18, 12], head: [0, 14, -8], _body: [0, -12, -20] });
 VG.hit = W(VG.aim, { torso: [-22, 25, 12], head: [-18, 12, 0], arm_L_upper: [10, -25, 40], arm_L_lower: [-10, 0, 0], _body: [-18, 30, 18] });
@@ -590,13 +590,13 @@ const e2Pos = posTrack([
 ]);
 const enemyPose = poseTrack([
   [169.5, VG.idle], [172.3, VG.idle, 'io'], [176.3, VG.idle, 'io'],
-  [176.62, VG.aim, 'io'], [177.1, VG.guardAim, 'io'],   // levels the rifle; fires first
-  [177.35, VG.stepL, 'out'], [177.6, VG.guardAim, 'io'], [178.1, VG.stepR, 'out'], [178.4, VG.guardAim, 'io'],
-  [178.6, VG.guard, 'io'], [178.9, VG.guard], [179.1, VG.guardAim, 'io'],   // the shield up for his 178.7
+  [176.62, VG.aim, 'io'], [177.1, VG.fly, 'io'],   // levels the rifle; fires first
+  [177.35, VG.stepL, 'out'], [177.6, VG.fly, 'io'], [178.1, VG.stepR, 'out'], [178.4, VG.fly, 'io'],
+  [178.6, VG.guard, 'io'], [178.9, VG.guard], [179.1, VG.fly, 'io'],   // the shield up for his 178.7
   [179.3, VG.crouch, 'io'], [179.55, VG.boost, 'out'],
   [180.45, VG.boost, 'io'], [180.9, VG.fly, 'io'],
-  [181.15, VG.stepR, 'out'], [181.4, VG.guardAim, 'io'], [181.75, VG.stepL, 'out'], [182.1, VG.guardAim, 'io'],
-  [182.45, VG.stepR, 'out'], [182.8, VG.guardAim, 'io'], [183.2, VG.guardAim],
+  [181.15, VG.stepR, 'out'], [181.4, VG.fly, 'io'], [181.75, VG.stepL, 'out'], [182.1, VG.fly, 'io'],
+  [182.45, VG.stepR, 'out'], [182.8, VG.fly, 'io'], [183.2, VG.fly],
   [183.4, VG.hit, 'out'], [183.8, VG.aim, 'io'],       // the shield gone, it fights on one-handed
   [184.2, VG.fly, 'io'], [188.4, VG.fly],
   [189.2, VG.aim, 'io'], [189.75, VG.brace, 'io'], [190.85, VG.brace], [191.1, VG.recoil, 'out'], [191.9, VG.brace, 'io'],
@@ -1187,7 +1187,7 @@ export const DUEL_CAMS = [
     return { pos: add(add(h, scl(sd, -32)), add(scl(d, -8), [0, 4, 0])), target: lrp(up(h, 4), e, 0.3), fov: 42, handheld: 0.25 }; } },
   // the zig-zag: a long lens from behind him down the line — it jinks left, right, left, growing
   { t0: 181.4, t1: 182.45, name: 'D12 the zig-zag, down the line', fn: (t, u) => { const h = hp(t), e = ep(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(h, scl(d, -34)), add(scl(sd, 11), [0, 7, 0])), target: up(e, 2), fov: 22, handheld: 0.2 }; } },
+    return { pos: add(add(h, scl(d, -30)), add(scl(sd, 24), [0, 9, 0])), target: lrp(up(h, 4), up(e, 2), 0.7), fov: 30, handheld: 0.2 }; } },
   { t0: 182.45, t1: 183.15, name: 'D13 side: it closes, he gives ground', fn: (t) => { const c = two(hp(t), ep(t), { side: 1, dist: 0.9, lift: 6, fov: 46, bias: 0.55 }); return { ...c, handheld: 0.2 }; } },
   { t0: 183.15, t1: 183.9, name: 'D14 the shield torn off', slowmo: true, fn: (t, u) => { const e = ep(t), h = hp(183.2), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
     return { pos: add(add(e, scl(sd, -34)), add(scl(d, 10), [0, 5, 0])), target: lrp(up(e, 4), h, 0.1), fov: 40, handheld: 0.15 }; } },
@@ -1211,7 +1211,7 @@ export const DUEL_CAMS = [
   { t0: 192.3, t1: 193.0, name: 'D23 the magnum goes through it', slowmo: true, fn: (t, u) => { const ev = DUEL_EVENTS.find((e) => e.t === 192.4), X = ev.pos, d = ev.shotDir, sd = nrm(V.cross([0, 0, 0], d, [0, 1, 0]));
     return { pos: add(add(X, scl(sd, 34)), add(scl(d, -14), [0, 5, 0])), target: lrp(X, up(hp(t), 4), 0.25), fov: 44 }; } },
   { t0: 193.0, t1: 194.6, name: 'D24 he lowers the rifle — it goes up behind him', slowmo: true, fn: (t, u) => { const h = hp(t), e = ep(Math.min(t, 194.1)), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(h, scl(d, -24 + 2 * u)), add(scl(sd, 9), [0, 3, 0])), target: lrp(up(h, 5), e, 0.55), fov: 40 }; } },
+    return { pos: add(add(h, scl(d, -36 + 3 * u)), add(scl(sd, 34), [0, 6, 0])), target: lrp(up(h, 5), e, 0.82), fov: 40 }; } },   // him small in the foreground, its breakup / reactor filling the frame beyond
   { t0: 194.6, t1: 197.2, name: 'D25 aftermath', fn: (t, u) => { const h = hp(t); return { pos: add(h, [-16 - u * 12, 6 + u * 3, -30 - u * 10]), target: up(h, 6), fov: 40, handheld: 0.3 }; } },
   { t0: 197.2, t1: 200.0, name: 'D26 aftermath wide', fn: (t, u) => { const h = hp(t); return { pos: add(h, [-40 - u * 10, 12 + u * 4, -48 - u * 8]), target: up(h, 6), fov: 38, handheld: 0.3 }; } },
 ];

@@ -663,7 +663,8 @@ export function drawGundam(R, t, s, opts = {}) {
   // exhaust history never reaches back across a scene cut where his path jumps (340: the drift → the bay approach)
   const pastHero = opts.pastState || ((tau) => { const q = gundamState(t >= 340 && t - tau < 340 ? 340 : t - tau); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
-  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.7, 0.9, 2.0], 0.9 * (1 + 0.9 * (s.boostK || 0)), s.thr, 1.2 + 1.5 * (s.boostK || 0), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
+  const bk = s.boostK ?? (inDuel ? sat((s.boost - 0.62) / 0.38) : 0);   // duel quick-boosts: the nozzles flare
+  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.7, 0.9, 2.0], 0.9 * (1 + 0.9 * bk), s.thr, 1.2 + 1.5 * bk, s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
   const eye = emitWorld(R, 'gundam', e, 'eye');
   if (!s.fpv && eye && eyeK > 0.05) R.glow(eye, (s.visorFlare !== undefined ? 0.4 : 0.55 + bz * 2.4) * Math.min(eyeK, 1.2), [lerp(0.5, 5, bz) * eyeK, lerp(1.6, 0.3, bz) * eyeK, lerp(1.0, 0.2, bz) * eyeK], 0.35);   // visor: a small glint (a big ball read as a stray light next to him)
   if (!s.fpv && eyeK > 0.05 && (s.visorFlare !== undefined)) {        // visor band glow: every emitter point + a light spill
@@ -747,7 +748,8 @@ function drawEnemyMS(R, t, s, idx) {
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
   if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
   const fn = idx === 1 ? enemyMS1 : enemyMS2;
-  engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE, 0.9, 0.8, 1.2, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
+  const ebk = sat(((s.boost ?? 0.5) - 0.6) / 0.4);   // quick-boosts: the nozzles flare
+  engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE, 0.9 * (1 + 0.9 * ebk), s.thr ?? 0.8, 1.2 + 1.5 * ebk, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
   const BL = BLOWS[idx];
   if (BL && t > BL.ev.t) {
     const tm = R.partWorld('enemy_ms', e, 'torso');
@@ -796,10 +798,12 @@ function rifleShot(R, t, t0, from, to, hit = false) {
   const lt = t - t0;
   if (lt < 0 || lt > 0.7) return;
   const L = V.dist(from, to);
-  const speed = 2200;
-  const head = Math.min(1, (lt * speed) / L), tail = Math.max(0, (lt * speed - 70) / L);
-  const a = lerpv(from, to, tail), b = lerpv(from, to, head);
-  if (head > tail) R.beam(a, b, 0.9, [0.9, 2.0, 2.9], 1, 20, 0.6, 0.8);   // cyan like his core and the magnum (white core kept low)
+  // a beam-rifle LINE (the Unicorn look): the head races out at 5 km/s, the tail leaves the muzzle 0.12 s later — at
+  // 60–90 m a bolt would cross in under a frame; a line reads for several frames and thins as it goes
+  const speed = 5000;
+  const head = Math.min(1, (lt * speed) / L), tail = Math.min(1, Math.max(0, ((lt - 0.12) * speed) / L));
+  const a = lerpv(from, to, tail), b = lerpv(from, to, head), kk = 1 - 0.6 * sat((lt - 0.05) / 0.25);
+  if (head > tail) { R.beam(a, b, 0.75 * kk + 0.2, [0.9 * kk, 2.0 * kk, 2.9 * kk], 1, 20, 0.6, 0.8); R.beam(a, b, 2.2, [0.5 * kk, 1.1 * kk, 1.6 * kk], 0.04, 3, 2, 0.6); }   // cyan like his core and the magnum (white core kept low)
   if (lt < 0.12) { R.glow(from, 4 * (1 - lt / 0.12), [0.9, 2.0, 2.9], 0.5); R.light(from, 50, [0.4, 0.8, 1], 3); }
   if (hit && head >= 1) hitFlash(R, t, t0 + L / speed, to, 6, [1, 0.6, 0.8]);
 }
@@ -933,15 +937,15 @@ function drawSeraphFire(R, t) {
       if (m) { R.glow(m.pos, 0.5 + 1.2 * c * c, [3 * c, 0.6 * c, 0.9 * c], 0.3); R.light(m.pos, 30, [1, 0.3, 0.45], 2 * c); }
       continue;
     }
-    const lt = t - ts, head = 2200 * lt + 3, tail = Math.max(0, head - 70);
-    if (head < 2500) {
+    const lt = t - ts, head = Math.min(1500, 5000 * lt + 3), tail = Math.max(0, 5000 * (lt - 0.12)), kk = 1 - 0.6 * sat((lt - 0.05) / 0.25);
+    if (head > tail) {                                          // a beam line, like his (see rifleShot)
       const a = madd(L.from, L.dir, tail), b = madd(L.from, L.dir, head);
-      R.beam(a, b, 0.8, [SER_COL[0], SER_COL[1], SER_COL[2]], 1, 20, 0.6, 0.8);
-      R.beam(a, b, 2.4, [SER_COL[0] * 0.8, SER_COL[1] * 0.8, SER_COL[2] * 0.8], 0.04, 3, 2, 0.6);
+      R.beam(a, b, 0.75 * kk + 0.2, [SER_COL[0] * kk, SER_COL[1] * kk, SER_COL[2] * kk], 1, 20, 0.6, 0.8);
+      R.beam(a, b, 2.4, [SER_COL[0] * 0.6 * kk, SER_COL[1] * 0.6 * kk, SER_COL[2] * 0.6 * kk], 0.04, 3, 2, 0.6);
     }
     const kf = Math.exp(-lt * 12);
     if (lt < 0.25) { R.glow(L.from, 1 + 2.5 * kf, [3 * kf, 0.6 * kf, 0.9 * kf], 0.35); R.light(L.from, 60, [1, 0.3, 0.45], 6 * kf); }
-    const g = gundamState(t); if (g && g.vis && head < 2500) {   // light spilling on him as it goes past
+    const g = gundamState(t); if (g && g.vis && head > tail) {   // light spilling on him as it goes past
       const d = V.sub([0, 0, 0], g.pos, L.from), u = V.dot(d, L.dir);
       if (u > tail - 20 && u < head + 20) R.light(madd(L.from, L.dir, clamp(u, tail, head)), 50, [1, 0.3, 0.45], 5);
     }
