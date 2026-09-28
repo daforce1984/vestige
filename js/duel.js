@@ -741,9 +741,36 @@ function inertiaLean(s, fwdBase) {
   const k = 1 - (s._idle || 0);
   return [clamp((acc[0] * f[0] + acc[2] * f[2]) * 0.0016, -0.22, 0.22) * k, clamp(-(acc[0] * r[0] + acc[2] * r[2]) * 0.0013, -0.2, 0.2) * k];
 }
+// AMBAC — the whole machine answers its thrusters (Gundam UC mobile suits swing their limbs to steer and balance):
+// the body pitches / banks INTO an acceleration (a thruster burst tips it), the legs trail BEHIND the motion (thighs
+// swing back when it drives forward, sideways away from a lateral boost, knees fold with speed), the free arm is flung
+// against the acceleration. Velocity from the position track (±0.06 s), acceleration over ±0.08 s, soft-saturated.
+const sat1 = (x, s0) => Math.tanh(x / s0);
+function ambac(s, arr, fwdBase) {
+  if (!s._pf) return [0, 0];
+  const t = s._t, vh = 0.06, vel = (x) => scl(sub(s._pf(x + vh), s._pf(x - vh)), 1 / (2 * vh));
+  const v = vel(t);
+  let a = [0, 0, 0];
+  for (const [o, w] of [[-0.08, 1], [0, 2], [0.08, 1]]) a = add(a, scl(sub(vel(t + o + 0.08), vel(t + o - 0.08)), w / 0.16 / 4));
+  const f = nrm([fwdBase[0], 0, fwdBase[2]]), l = [f[2], 0, -f[0]];               // forward, own left (horizontal)
+  const vf = V.dot(v, f), vl = V.dot(v, l), af = V.dot(a, f), al = V.dot(a, l), au = a[1];
+  const k = 1 - (s._idle || 0);
+  if (k <= 0) return [0, 0];
+  const sf = sat1(vf, 45), sl = sat1(vl, 45), sa = sat1(af, 160), sal = sat1(al, 160), sau = sat1(au, 160), spd = sat1(Math.hypot(vf, vl, v[1]), 60);
+  // legs trail the motion
+  arr[PIDX.leg_L_upper] += (0.55 * sf + 0.25 * sau) * k; arr[PIDX.leg_R_upper] += (0.45 * sf + 0.25 * sau) * k;
+  arr[PIDX.leg_L_upper + 2] -= 0.45 * sl * k; arr[PIDX.leg_R_upper + 2] -= 0.45 * sl * k;
+  arr[PIDX.leg_L_lower] += 0.35 * spd * k; arr[PIDX.leg_R_lower] += 0.45 * spd * k;
+  arr[PIDX.foot_L] += 0.3 * spd * k; arr[PIDX.foot_R] += 0.3 * spd * k;
+  // the free (left) arm flung against the acceleration, the chest twisting a little with it
+  arr[PIDX.arm_L_upper] += 0.5 * sa * k; arr[PIDX.arm_L_upper + 2] -= 0.55 * sal * k;
+  arr[PIDX.torso + 1] += 0.18 * sal * k; arr[PIDX.head + 1] -= 0.12 * sal * k;   // (the head holds the target)
+  // the body tips into the burst: pitch with forward accel, bank (own side down) into a lateral one
+  return [(0.38 * sa - 0.2 * sau) * k, -0.55 * sal * k];
+}
 function finish(s, arr, fwdBase, limits = true) {
   const b = PIDX._body;
-  const [lp, lr] = inertiaLean(s, fwdBase);
+  const [lp, lr] = ambac(s, arr, fwdBase);
   s.pitch = arr[b] + lp; s.roll = arr[b + 2] + lr;
   s.fwd = yawRot(fwdBase, arr[b + 1]);
   s.pose = poseObj(arr, limits);
@@ -1154,6 +1181,11 @@ function slashIK(s, tw) {
   armIK(s, fk, 'gundam', 'L', sub(hilt, r3v(Hw, [0, -1.2, 0.6])), Hw);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
+/** cheap per-time sample for the thruster trails: hip position + boost amount (no pose / IK) */
+export function trailSample(who, t) {
+  const tw = warp(t);
+  return who === 'hero' ? { pos: heroRawPos(tw), boost: heroBoost(tw) } : { pos: enemyRawPos(tw), boost: enemyBoost(tw) };
+}
 /** VANGUARD's rifle muzzle + barrel direction at story time t (name kept from SERAPH) */
 export function seraphMuzzle(t) {
   const st = enemyRaw_(t);
@@ -1299,35 +1331,35 @@ export const DUEL_CAMS = [
   // cut to cut: extreme wides, long-lens compression, low and high angles, close-ups, fly-bys past the lens.
   { t0: 176.4, t1: 177.05, name: 'D06 EWS — the line of fire', fn: (t, u) => { const T = 176.4, M = mid(T);
     return { pos: at(M, 0, 480, 60, T), target: M, fov: 24, handheld: 0.04, baseShake: 0.02 }; } },
-  { t0: 177.05, t1: 177.8, name: 'D07 low angle on him', fn: (t, u) => { const T = 177.05, H = hp(T);
-    return { pos: at(H, 14, -22, -14, T), target: pan(up(H, 4), up(hp(t), 4), 0.8), fov: 40, handheld: 0.1 }; } },
-  { t0: 177.8, t1: 178.55, name: 'D08 long lens on it', fn: (t, u) => { const T = 177.8, E = ep(T);
+  { t0: 177.05, t1: 177.8, snap: 1.7, roll: 0.12, name: 'D07 low angle on him', fn: (t, u) => { const T = 177.05, H = hp(T);
+    return { pos: at(H, 30, -48, -26, T), target: pan(up(H, 4), up(hp(t), 4), 0.8), fov: 36, handheld: 0.1 }; } },
+  { t0: 177.8, t1: 178.55, snap: 2.2, roll: -0.06, name: 'D08 long lens on it', fn: (t, u) => { const T = 177.8, E = ep(T);
     return { pos: at(E, -150, -40, 6, T), target: pan(up(E, 2), up(ep(t), 2), 0.9), fov: 12, handheld: 0.06 }; } },
-  { t0: 178.55, t1: 179.25, name: 'D09 CU — the shield takes it', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T);
+  { t0: 178.55, t1: 179.25, snap: 1.8, name: 'D09 CU — the shield takes it', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T);
     return { pos: at(E, -16, -14, 3, T), target: pan(up(E, 3), up(ep(t), 3), 0.8), fov: 38, handheld: 0.05 }; } },
   { t0: 179.25, t1: 180.45, name: 'D10 from far below — it jumps and turns over', fn: (t, u) => { const T = 179.25, E = ep(T);
     return { pos: at(lrp(hp(T), E, 0.75), 0, 70, -60, T), target: pan(up(E, 8), ep(t), 0.85), fov: 38, handheld: 0.06 }; } },
-  { t0: 180.45, t1: 181.4, name: 'D11 profile — he rolls out and answers', fn: (t, u) => { const T = 180.45, H = hp(T);
+  { t0: 180.45, t1: 181.4, roll: -0.1, name: 'D11 profile — he rolls out and answers', fn: (t, u) => { const T = 180.45, H = hp(T);
     return { pos: add(at(H, 0, 38, 2, T), scl(sub(hp(t), H), 0.4)), target: up(hp(t), 3), fov: 38, handheld: 0.08 }; } },   // a slow dolly, half his speed
-  { t0: 181.4, t1: 182.45, name: 'D12 long lens down the line — the zig-zag', fn: (t, u) => { const T = 181.4, H = hp(T);
+  { t0: 181.4, t1: 182.45, snap: 2.4, name: 'D12 long lens down the line — the zig-zag', fn: (t, u) => { const T = 181.4, H = hp(T);
     return { pos: at(H, -120, -10, 8, T), target: pan(up(ep(T), 2), up(ep(t), 2), 0.75), fov: 11, handheld: 0.05 }; } },
   { t0: 182.45, t1: 183.15, name: 'D13 high angle over the exchange', fn: (t, u) => { const T = 182.45, M = mid(T);
     return { pos: at(M, -30, 70, 230, T), target: pan(M, mid(t), 0.6), fov: 34, handheld: 0.05 }; } },
-  { t0: 183.15, t1: 183.9, name: 'D14 low CU — the shield torn off', slowmo: true, fn: (t, u) => { const T = 183.2, E = ep(T);
+  { t0: 183.15, t1: 183.9, snap: 1.8, roll: 0.1, name: 'D14 low CU — the shield torn off', slowmo: true, fn: (t, u) => { const T = 183.2, E = ep(T);
     return { pos: at(E, -12, 16, -8, T), target: pan(up(E, 2), up(ep(t), 2), 0.7), fov: 40, handheld: 0.05 }; } },
   { t0: 183.9, t1: 185.2, name: 'D15 EWS — the circling run', fn: (t, u) => { const T = 183.9;
     return { pos: at(MID, 0, -680, 150, T), target: pan(MID, mid(t), 0.3), fov: 22, handheld: 0.04 }; } },
-  { t0: 185.2, t1: 186.4, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
+  { t0: 185.2, t1: 186.4, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
-  { t0: 186.4, t1: 187.45, name: 'D17 fly-by — it quick-boosts aside', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));
+  { t0: 186.4, t1: 187.45, roll: -0.16, name: 'D17 fly-by — it quick-boosts aside', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 17)), [0, -3, 0]), target: up(ep(t), 2), fov: 48, handheld: 0.08 }; } },
   { t0: 187.45, t1: 188.4, name: 'D18 over his shoulder, locked off', fn: (t, u) => { const T = 187.45, c0 = ots(hp(T), ep(T), { right: -1, back: 34, lift: 8, fov: 30, side: 16 });
     return { pos: c0.pos, target: pan(lrp(hp(T), ep(T), 0.7), lrp(hp(t), ep(t), 0.7), 0.6), fov: 30, handheld: 0.06 }; } },
   { t0: 188.4, t1: 189.6, name: 'D19 EWS — it breaks away', fn: (t, u) => { const T = 188.4, M = mid(T);
     return { pos: at(M, -60, -400, -70, T), target: pan(M, mid(t), 0.5), fov: 36, handheld: 0.04 }; } },
-  { t0: 189.6, t1: 190.7, name: 'D20 push in on the charging rifle', fn: (t, u) => { const T = 189.6, E = ep(T);
+  { t0: 189.6, t1: 190.7, snap: 1.6, roll: 0.06, name: 'D20 push in on the charging rifle', fn: (t, u) => { const T = 189.6, E = ep(T);
     return { pos: lrp(at(E, -50, 16, 4, T), at(E, -28, 10, 3, T), easeInOut(u)), target: up(ep(t), 3), fov: 30, handheld: 0.04, baseShake: 0.03 }; } },
-  { t0: 190.7, t1: 191.25, name: 'D21 the full-power beam goes past him', slowmo: true, fn: (t, u) => { const T = 190.7, H = hp(T);
+  { t0: 190.7, t1: 191.25, roll: 0.1, name: 'D21 the full-power beam goes past him', slowmo: true, fn: (t, u) => { const T = 190.7, H = hp(T);
     return { pos: at(H, -26, 30, 6, T), target: pan(up(H, 3), up(hp(t), 3), 0.8), fov: 42, handheld: 0.06 }; } },
   // SANDEVISTAN: a locked-off camera well to the side of his line — he streaks across the frozen frame, afterimages behind
   { t0: 191.25, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
@@ -1352,6 +1384,9 @@ export function duelCamera(t) {
   if (!c) return null;
   const u = sat((t - c.t0) / (c.t1 - c.t0));
   const k = c.fn(t, u);
+  // Unicorn-style snap zoom: the cut opens wide and punches in on its subject in ~0.18 s
+  if (c.snap) k.fov = lerp(k.fov * c.snap, k.fov, easeOut(sat((t - c.t0) / 0.18)));
+  if (c.roll) k.roll = (k.roll ?? 0) + c.roll;                     // dutch angle on the action cuts
   const shake = (k.baseShake ?? 0.12) + evShake(t, null, 4.5) * 1.1;   // baseShake 0: a locked-off camera
   const focus = k.target;
   return {

@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -879,6 +879,22 @@ function drawSlash(R, c, t) {
     if (lt < 0.3) R.ripple(P, 6 + 40 * easeOut(lt / 0.3), [0.4, 0.4, 0.4], (1 - lt / 0.3) * 1.2);
   }
 }
+// THRUSTER TRAILS (the Unicorn look): while a machine is boosting, a thin glowing line traces the path its backpack took
+// over the last ~0.7 s — bright and tight at the machine, fading and thinning behind; nothing when it drifts
+function boostTrail(R, t, who) {
+  const col = arguments[3];
+  const N = 14, span = 0.7;
+  const pt = (x) => { const q = trailSample(who, x); return [q.pos[0], q.pos[1] + 4, q.pos[2]]; };
+  let a = pt(t);
+  for (let i = 1; i <= N; i++) {
+    const x = t - (i / N) * span, q = trailSample(who, x);
+    const b = pt(x);
+    const boost = sat(((q.boost ?? 0) - 0.55) / 0.4) * sat((V.dist(a, b) / (span / N) - 25) / 40);   // only real boosts, not drift
+    const f = 1 - (i - 0.5) / N, k = boost * f * f;
+    if (k > 0.02) R.beam(a, b, 0.35 + 0.5 * f, [col[0] * k, col[1] * k, col[2] * k], 0.9, 10, 0, 0.3);
+    a = b;
+  }
+}
 function drawEnemyMS(R, t, s, idx) {
   if (idx === 2 && t > E2_FIN + 0.03 && t < 200) { drawBreakup(R, t, 2); return null; }
   if (idx === 1 && t > E1_FIN + 0.05 && t < 195) { drawBreakup(R, t, 1); return null; }
@@ -962,6 +978,7 @@ function drawMSBattle(R, t) {
   const e1 = enemyMS1(t), e2 = enemyMS2(t);
   const ee1 = drawEnemyMS(R, t, e1, 1);
   drawEnemyMS(R, t, e2, 2);
+  if (t > 176.3 && t < 192.2) { boostTrail(R, t, 'hero', [0.5, 1.2, 2.2]); boostTrail(R, t, 'enemy', [2.2, 0.45, 1.1]); }
   // (his rifle shots: drawHeroFire)
   // E1 machine gun
   if (false && e1.vis && t > 172 && t < 178.5 && g.vis) {   // (RONIN #1 no longer fires on the approach)
