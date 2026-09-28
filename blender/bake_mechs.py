@@ -17,7 +17,7 @@ EMISSIVE = {'eye', 'core', 'engine'}
 RES = 4096
 DETAIL_BOOST = {'head': 1.7, 'torso': 1.35}   # extra texel density for close-up parts
 # per model options (enemy_ms = VANGUARD / 07 repainted crimson)
-MODEL_OPTS = {'enemy_ms': dict(paint_floor=0.05, wear=0.5, bare=(0.45, 0.44, 0.46), paint_rough=0.38, paint_metal=0.25)}   # VANGUARD in crimson: satin paint, light wear
+MODEL_OPTS = {'enemy_ms': dict(wear=0.45, bare=(0.4, 0.4, 0.42), paint_rough=0.4, paint_metal=0.15)}   # VANGUARD in white: satin paint, light wear
 OPT = {}
 
 

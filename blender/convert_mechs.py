@@ -48,10 +48,10 @@ SPECS = {
     'enemy_seraph': dict(src='seraph-03.glb', height=19.0, prefix='seraph', eye_rgb=(1.0, 0.42, 0.12),
                          glow_name='core', engine_rgb=(1.0, 0.45, 0.15), muzzle_empty=None, hilt=False,
                          core_rgb=(1.0, 0.45, 0.15), K=5, smooth_iter=10, em_thresh=0.12),   # its small orange panel lights
-    # VANGUARD / 07 (CC0): the enemy from 2026-09-28 (2) — a hand-held beam rifle + shield, repainted crimson / black / gold
+    # VANGUARD / 07 (CC0): the enemy from 2026-09-28 (2) — a hand-held beam rifle + shield, painted white / gunmetal / red
     'enemy_vanguard': dict(src='vanguard-07.glb', height=18.5, prefix='vanguard', eye_rgb=(1.0, 0.3, 0.4),
                            glow_name='core', engine_rgb=(1.0, 0.4, 0.3), muzzle_empty='Muzzle_Rifle', hilt=False,
-                           core_rgb=(1.0, 0.35, 0.3), K=6, smooth_iter=10, em_thresh=0.2, palette='crimson',
+                           core_rgb=(1.0, 0.35, 0.3), K=6, smooth_iter=10, em_thresh=0.2, palette='white',
                            split_shield=1.15),
     'enemy_ms': dict(src='ronin-04.glb', height=18.0, prefix='ronin', eye_rgb=(1.0, 0.25, 0.6),
                      glow_name='core', engine_rgb=(1.0, 0.4, 0.12), muzzle_empty=None, hilt=False,
@@ -77,6 +77,28 @@ def crimson(c):
         out = (0.8, 0.6, 0.22)
     else:                                          # frame / joints: dark, a little warm
         out = (lum * 0.55 + 0.03, lum * 0.45 + 0.025, lum * 0.45 + 0.03)
+    print('  repaint %s -> %s' % (tuple(round(x, 2) for x in c), tuple(round(x, 2) for x in out)))
+    return np.array(out)
+
+
+def white(c):
+    """repaint into a white / gunmetal / red scheme: pale armour -> clean white, blue -> dark gunmetal, red trim stays red,
+    yellow -> gold, darks stay dark"""
+    r, g, b = (float(x) for x in c)
+    lum = 0.3 * r + 0.55 * g + 0.15 * b
+    mx, mn = max(r, g, b), min(r, g, b)
+    sat = (mx - mn) / (mx + 1e-6)
+    if b > r + 0.08 and b > g:
+        out = (0.2, 0.21, 0.23)
+    elif r > g + 0.15 and r > b + 0.15:
+        out = (0.62, 0.07, 0.08)
+    elif lum > 0.42 and sat < 0.3:
+        k = min(1.0, lum / 0.7)
+        out = (0.64 * k + 0.06, 0.65 * k + 0.06, 0.68 * k + 0.06)   # (a brighter white bloomed out under the key light)
+    elif g > 0.45 and r > 0.45 and b < 0.3:
+        out = (0.8, 0.6, 0.22)
+    else:
+        out = (lum * 0.55 + 0.04, lum * 0.55 + 0.045, lum * 0.6 + 0.05)
     print('  repaint %s -> %s' % (tuple(round(x, 2) for x in c), tuple(round(x, 2) for x in out)))
     return np.array(out)
 
@@ -299,6 +321,8 @@ def convert(name):
         col = (base_srgb[sel] * wgt).sum(0) / wgt.sum()
         if sp.get('palette') == 'crimson':
             col = crimson(col)
+        elif sp.get('palette') == 'white':
+            col = white(col)
         col = srgb_to_lin(col)
         rough = float((orm[sel, 1] * wgt[:, 0]).sum() / wgt.sum())
         metal = float((orm[sel, 2] * wgt[:, 0]).sum() / wgt.sum())

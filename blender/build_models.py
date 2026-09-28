@@ -19,7 +19,7 @@ BUILDERS = {
     'interceptor': ('fighters_ours', 'interceptor_a'),
     'interceptor_b': ('fighters_ours', 'interceptor_b'),
     'interceptor_c': ('fighters_ours', 'interceptor_c'),
-    'enemy_frigate': ('ships_enemy_v5', 'enemy_frigate'),
+    'enemy_frigate': ('ships_enemy_frigate', 'enemy_frigate'),   # v15 redesign (own class: blade keel + outrigger nacelles); v5 builder kept in ships_enemy_v5
     'enemy_dreadnought': ('ships_enemy_v5', 'enemy_dreadnought'),
     'enemy_fighter': ('fighters_enemy', 'enemy_fighter_a'),
     'enemy_fighter_b': ('fighters_enemy', 'enemy_fighter_b'),

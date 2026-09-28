@@ -971,7 +971,7 @@ const PIV = {
     leg_L_upper: [2.2, 9.35, 0], leg_L_lower: [3.0, 6.65, 0.2], foot_L: [3.65, 1.7, 0],
     leg_R_upper: [-2.2, 9.35, 0], leg_R_lower: [-3.0, 6.65, 0.2], foot_R: [-3.65, 1.7, 0],
   },
-  enemy_ms: {   // VANGUARD / 07 (assets/enemy_ms.glb, repainted crimson; SERAPH / 03 kept in assets/v15_backup)
+  enemy_ms: {   // VANGUARD / 07 (assets/enemy_ms.glb, painted white; SERAPH / 03 kept in assets/v15_backup)
     ms_root: [0, 8.942, 0], pelvis: [0, 8.942, 0], torso: [0, 10.894, 0], head: [0, 15.776, -0.206],
     arm_L_upper: [3.392, 15.314, -0.36], arm_L_lower: [5.139, 13.413, -0.308], hand_L: [6.783, 11.665, 0.719],
     arm_R_upper: [-3.392, 15.314, -0.36], arm_R_lower: [-5.139, 13.413, -0.308], hand_R: [-6.783, 11.665, 0.719],
