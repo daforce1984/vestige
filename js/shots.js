@@ -2563,7 +2563,7 @@ function deathCam(c, i, dist, ang, fov) {
   camLook(c, addv(p, [Math.sin(ang) * dist, dist * 0.3, Math.cos(ang) * dist]), p, fov, 0.08);
   c.env.shadowCenter = p; c.env.shadowRadius = 90;
 }
-cut(121.8, 123.6, 'X enemy fire over the line', (c) => { lineRide(c, 4, 0.2, 30, 18, 48, -0.1); shake(c, 0.5, 9); });
+cut(121.8, 123.6, 'X enemy fire over the line', (c) => { lineRide(c, 4, 0.2, -30, 18, 48, 0.1); shake(c, 0.5, 9); });   // outboard: the flagship's turned flank (motherYaw) filled the inboard side
 cut(80.0, 88.5, 'X the enemy arrives (wide)', (c) => {
   // high over our fleet's shoulder, looking down the gap: the whole enemy force rips in — frigates, the line, the dreadnought
   const { t, u } = c;
