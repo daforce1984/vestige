@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, WING_HIT_T, KILL_SHOT_T, FINALE_T, FINALE_END } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -62,7 +62,7 @@ export const BATTLE_TEXTURE = [
 // mech duel (160–200) — driven by duel.js (DUEL_EVENTS + per-mech states)
 export const DUEL_GAIN = 1.0;                   // master trim of the duel layer
 export const DUEL_DUCK_DB = -6;                 // music duck on clashes / hits
-export const DUEL_RIFLE = [];   // Sigma carries no rifle any more (mace only)
+export const DUEL_RIFLE = HERO_SHOTS;   // Sigma's beam-rifle shots (the last one is the charged kill shot)
 
 // ship-to-ship ion fire: ONE deliberate sound per visible bolt, from the shared schedule in ionfire.js
 export const ION_GAIN = 0.8;                    // overall level of the bolt shots
@@ -577,18 +577,22 @@ function duelCues() {
     }
     if (e.hitstop > 0) out.push([e.t + 0.005, '@freezeSting', { dur: e.hitstop, vel: G * (0.4 + 0.4 * st) }]);
   }
-  // ---- hero's mace: deploys with a hydraulic lock + ring (184.0), stowed at 195
-  out.push([184.0, 'servo', { rate: 0.8, dur: 0.6, fadeOut: 0.2, gain: G * 0.8, pan: -0.2, prio: 8, norand: true }]);
-  out.push([184.3, '@metalRing', { vel: G * 0.9, f0: 520, dec: 1.2, pan: -0.2 }]);
-  out.push([184.3, 'hit_heavy', { dur: 0.5, fadeOut: 0.3, rate: 1.5, gain: G * 0.4, pan: -0.2, prio: 7, norand: true }]);
-  out.push([195.1, 'servo', { rate: 0.9, dur: 0.6, fadeOut: 0.2, gain: G * 0.5, pan: -0.2, prio: 6, norand: true }]);
-  // ---- hero beam rifle: heavy report + low boom; the last shot hits point-blank (sizzle)
+  // ---- hero beam rifle: heavy report + low boom; the reversal shot tears off its wing, the charged last shot is a magnum
   DUEL_RIFLE.forEach((t, i) => {
-    out.push([t, 'beam_blast1', { at: 2.15, dur: 0.8, fadeOut: 0.3, rate: 1.1, gain: G * 1.0, pan: -0.15, prio: 9, duck: 0.6, duckDb: DUEL_DUCK_DB, norand: true }]);
-    out.push([t, 'laser_shot', { gain: G * 0.8, rate: R(0.9, 1.0), pan: -0.15, prio: 8, norand: true }]);
-    out.push([t, '@boom', { bus: 'sfx', f: 55, vel: G * 0.55, dur: 1.0, verb: 0.3 }]);
-    if (i === DUEL_RIFLE.length - 1) out.push([t + 0.06, '@sizzle', { vel: G * 0.8, pan: 0.3 }]);
+    const kill = t === KILL_SHOT_T;
+    out.push([t, 'beam_blast1', { at: 2.15, dur: 0.8, fadeOut: 0.3, rate: kill ? 0.8 : 1.1, gain: G * (kill ? 1.3 : 0.9), pan: -0.15, prio: 9, duck: kill ? 2 : 0.6, duckDb: DUEL_DUCK_DB, norand: true }]);
+    out.push([t, 'laser_shot', { gain: G * (kill ? 0.9 : 0.75), rate: kill ? 0.7 : R(0.9, 1.0), pan: -0.15, prio: 8, norand: true }]);
+    out.push([t, '@boom', { bus: 'sfx', f: kill ? 34 : 55, vel: G * (kill ? 0.95 : 0.5), dur: kill ? 1.6 : 1.0, verb: 0.3 }]);
   });
+  // the wing torn off: a crunch of metal, sparks, a ring
+  out.push([WING_HIT_T + 0.02, 'metal_knock', { at: 'hit', rate: 0.75, gain: G * 1.0, pan: 0.3, prio: 9, duck: 0.8, duckDb: DUEL_DUCK_DB, norand: true }]);
+  out.push([WING_HIT_T + 0.02, '@sparkBurst', { vel: G * 0.8, pan: 0.3 }]);
+  out.push([WING_HIT_T + 0.02, '@metalRing', { vel: G * 0.6, f0: 300, dec: 1.2, pan: 0.3 }]);
+  // the rifle charges for the last shot (a rising whine under the slow motion)
+  out.push([FINALE_T + 0.1, 'charge_up', { at: 0, dur: KILL_SHOT_T - FINALE_T - 0.1, fadeOut: 0.05, rate: 0.75, gain: G * 0.8, pan: -0.15, prio: 8, norand: true }]);
+  // the magnum goes through its chest
+  out.push([KILL_SHOT_T + 0.05, 'metal_knock', { at: 'hit', rate: 0.6, gain: G * 1.1, pan: 0.2, prio: 9, norand: true }]);
+  out.push([KILL_SHOT_T + 0.05, '@sizzle', { vel: G * 0.8, pan: 0.2 }]);
   // ---- per-mech states
   const DT = 0.02, T0 = 150, T1 = 200;
   const mechs = [['hero', duelHero, -0.2], ['e1', duelEnemy1, 0.35], ['e2', duelEnemy2, 0.25]];
@@ -654,7 +658,7 @@ function duelCues() {
   out.push([157.3, 'servo', { rate: 0.6, gain: G * 0.6, prio: 7, norand: true }]);
   out.push([157.35, '@steam', { dur: 1.2, vel: 0.5 }]);
   // ---- SERAPH's heavy cannon (the ranged duel): charge whine, the blast + a low boom, the shot tearing past him;
-  //      his flash-steps (thruster bursts), the 4th shot struck off the mace, the kick-off and climb away
+  //      his flash-steps (thruster bursts), the kick-off and climb away
   for (const ts of SERAPH_SHOTS) {
     out.push([ts - 0.3, 'charge_up', { at: 0, dur: 0.34, fadeOut: 0.05, rate: 2.2, gain: G * 0.45, pan: 0.3, prio: 7, norand: true }]);
     out.push([ts, 'heavy_beam', { rate: 1.15, dur: 0.9, fadeOut: 0.35, gain: G * 0.95, pan: 0.25, prio: 9, duck: 1.2, norand: true }]);
@@ -666,19 +670,13 @@ function duelCues() {
     out.push([tf, 'hl_thruster', { dur: 0.35, fadeOut: 0.2, rate: 1.4, gain: G * 0.6, pan: -0.2, prio: 7, norand: true }]);
     out.push([tf, 'whoosh:a', { at: 0.55, dur: 0.5, fadeOut: 0.2, rate: 1.3, gain: G * 0.5, pan: -0.2, prio: 7, norand: true }]);
   }
-  out.push([179.35, 'metal_knock', { at: 'hit', rate: 0.8, gain: G * 1.0, pan: -0.2, prio: 9, duck: 0.8, duckDb: DUEL_DUCK_DB, norand: true }]);
-  out.push([179.35, '@sparkBurst', { vel: G * 0.8, pan: -0.2 }]);
-  out.push([179.37, 'beam_blast4', { at: 1.7, dur: 0.7, fadeOut: 0.3, rate: 1.3, gain: G * 0.55, pan: 0.5, prio: 8, norand: true }]);
-  out.push([179.35, '@metalRing', { vel: G * 0.7, f0: 380, dec: 1.0, pan: -0.2 }]);
   out.push([178.6, 'hl_thruster', { dur: 1.6, fadeOut: 0.8, rate: 0.9, gain: G * 0.7, pan0: 0.3, pan1: 0.6, prio: 7, norand: true }]);
-  // ---- the finale: full power held on the mace — it grinds there — then cut off as he bursts out of it
-  out.push([190.5, 'charge_up', { at: 0, dur: 0.4, fadeOut: 0.05, rate: 1.3, gain: G * 0.8, pan: 0.2, prio: 8, norand: true }]);
-  out.push([190.85, 'beam', { at: 'hit', gain: G * 1.2, rate: 1.05, prio: 9, duck: 3, norand: true }]);
-  out.push([190.85, 'heavy_beam', { rate: 0.85, dur: 1.4, fadeOut: 0.3, gain: G * 1.1, prio: 9, norand: true }]);
-  for (let tt = 190.9; tt < 191.9; tt += 0.11) out.push([tt, '@sparkBurst', { vel: G * 0.55, pan: -0.1 }]);
-  out.push([190.9, '@metalRing', { vel: G * 0.8, f0: 140, dec: 1.4, pan: -0.1 }]);
-  out.push([191.95, 'beam_blast4', { at: 1.7, dur: 0.6, fadeOut: 0.25, rate: 0.9, gain: G * 0.8, prio: 8, norand: true }]);
-  out.push([191.95, '@boom', { bus: 'sfx', f: 36, vel: G * 0.8, dur: 1.2, verb: 0.3 }]);
+  // ---- the finale: full power along the line it laid on him — he has slipped it; it roars past him
+  out.push([FINALE_T - 0.35, 'charge_up', { at: 0, dur: 0.4, fadeOut: 0.05, rate: 1.3, gain: G * 0.8, pan: 0.2, prio: 8, norand: true }]);
+  out.push([FINALE_T, 'beam', { at: 'hit', gain: G * 1.2, rate: 1.05, prio: 9, duck: 3, norand: true }]);
+  out.push([FINALE_T, 'heavy_beam', { rate: 0.85, dur: FINALE_END - FINALE_T + 0.6, fadeOut: 0.3, gain: G * 1.1, prio: 9, norand: true }]);
+  out.push([FINALE_T + 0.05, 'flyby_fast', { rate: 0.8, gain: G * 0.7, pan0: 0.5, pan1: -0.5, dur: 0.6, fadeOut: 0.25, prio: 8, norand: true }]);
+  out.push([FINALE_T, '@boom', { bus: 'sfx', f: 38, vel: G * 0.7, dur: 1.2, verb: 0.3 }]);
   return out;
 }
 

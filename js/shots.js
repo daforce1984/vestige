@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, SERAPH_GUN, SERAPH_SHOTS, seraphMuzzle, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, rifleCharge, SERAPH_GUN, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, WING_HIT_T, KILL_SHOT_T, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -185,9 +185,9 @@ function berserkStrike(t, pose) {
     }
   }
 }
-// ---- the ram: both fists on the mace haft, weapon levelled at the core like a battering ram, body behind it.
-// Solved once with the duel FK (same kinematics as the renderer): mace axis → straight ahead, left fist at the chest,
-// right fist on the haft 3 m further along.
+// ---- the ram: both fists on the beam-saber hilt, the blade levelled at the core, body behind it.
+// Solved once with the duel FK (same kinematics as the renderer): blade axis → straight ahead, left fist at the chest,
+// right fist on the hilt just below it.
 let _RAM = null;
 export function ramBase() {
   if (_RAM) return _RAM;
@@ -199,7 +199,7 @@ export function ramBase() {
   const cost = () => {
     const fk = duelFK(s0, 'gundam');
     const d = fk.saber[2], hl = M.transformPoint([0, 0, 0], fk.hand_L, [0, 0, 0]), hr = M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]);
-    const tl = [0.6, 4.2, 4.2], tr = V.madd([0, 0, 0], hl, want, 3.0);
+    const tl = [0.6, 4.2, 4.2], tr = V.madd([0, 0, 0], hl, want, 1.3);   // both fists on the saber hilt
     return 40 * V.dist(d, want) ** 2 + V.dist(hl, tl) ** 2 + V.dist(hr, tr) ** 2;
   };
   const vars = [['arm_L_upper', 0], ['arm_L_upper', 1], ['arm_L_upper', 2], ['arm_L_lower', 0], ['hand_L', 0], ['hand_L', 1], ['hand_L', 2],
@@ -300,7 +300,10 @@ export function gundamState(t) {
   if (t < 159.5 || (t > 280.25 && t < 320) || t > 346) { s.vis = false; return s; }   // swallowed by the blast at 280
   { const d = duelHero(t); if (d) return d; }
   const r = gundamStateRaw(t, s);
-  if (t < 262) r.saber = 1;                                    // mace in hand from launch to the well assault
+  // the beam RIFLE from the launch to the dive; he puts it away on his back at 257.6–258.3 (over the shoulder) and
+  // draws the beam SABER at 270.2 for the ram into the core
+  r.weapon = t < 258.3 ? 'rifle' : t < 270.2 ? 'none' : 'saber';
+  if (t < 262) r.saber = 0;
   return r;
 }
 function gundamStateRaw(t, s) {
@@ -369,6 +372,9 @@ function gundamStateRaw(t, s) {
     blendPose('flight', 'flight', 0, s.pose);
     s.pitch = 0.9 * smooth(240.9, 241.5, t) * (1 - smooth(258, 262, t)); s.thr = t < 241.3 ? 0.4 : 1; s.boostK = smooth(241.2, 241.45, t);
     s.roll = Math.sin(t * 0.5) * 0.05;
+    const st = smooth(257.6, 258.0, t) * (1 - smooth(258.3, 258.8, t));   // puts the rifle away over his shoulder onto the pack
+    if (st > 0) { s.pose.arm_R_upper = [lerp(s.pose.arm_R_upper[0], -2.7, st), lerp(s.pose.arm_R_upper[1], -0.4, st), lerp(s.pose.arm_R_upper[2], -0.3, st)];
+      s.pose.arm_R_lower = [lerp(s.pose.arm_R_lower[0], -1.6, st), 0, 0]; }
   } else if (t < 278) {
     // BERSERK: feral lunges into the shield (263.4 / 265.0 / 266.6), shatter 268, rush 270–272.8, slash 273
     const z = berserkZ(t);
@@ -533,8 +539,6 @@ const E2_BLOW = BLOWS[2] && BLOWS[2].ev;
 // off — the hole keeps a hot torn edge, the slab tumbles away along the blow. Contact points are the solved duel events,
 // kept in torso-local coordinates so the damage rides with the part.
 const HEAVY = [
-  { t: 188.2, who: 2, r: 6, k: 0.65, tear: 2.3 },      // shoulder charge into RONIN #2: chest plate torn off
-  { t: 189.45, who: 0, r: 5, k: 0.45 },                // RONIN #2's kick caves in Sigma's chest plate
 ];
 for (const h of HEAVY) {
   const ev = DUEL_EVENTS.find((e) => Math.abs(e.t - h.t) < 1e-6);
@@ -638,7 +642,8 @@ export function drawGundam(R, t, s, opts = {}) {
   const e = R.add('gundam', msMatrix(tmpM, s));
   if (!e) return null;
   e.pose = s.pose; e.damage = s.damage; e.seed = 5.5; e.wear = 1; e.texSet = R.texLoaded & 1 ? 1 : 0;
-  e.hidden = { rifle: 1, saber_hilt: 1 };                    // Sigma carries only the mace (the old beam-saber hilt is not drawn)
+  const weapon = s.weapon || (t < 258.3 ? 'rifle' : t < 270.2 ? 'none' : 'saber');
+  e.hidden = { rifle: weapon === 'rifle' ? 0 : 1, saber_hilt: weapon === 'saber' ? 0 : 1 };   // one weapon in hand at a time
   if (s.fpv) {
     e.hidden = { rifle: 1, head: 1, torso: 1, backpack: 1, pelvis: 1, arm_L_upper: 1, arm_R_upper: 1, hand_L: 1, hand_R: 1 };   // POV: forearms + articulated hands
     drawPovHands(R, t, e, s);
@@ -669,44 +674,30 @@ export function drawGundam(R, t, s, opts = {}) {
     }
     if (eye) { R.light(eye, 10, [0.4, 1, 0.7], 2 * eyeK); if (s.visorFlare > 0.02) R.glow(eye, 1.4 * s.visorFlare, [0.3 * s.visorFlare, 1.2 * s.visorFlare, 0.7 * s.visorFlare], 0.35); }
   }
-  if (s.saber > 0 && (t < 160 || t >= 200) && !(t > 270 && t < 281) && s.pose.hand_L && !s._wrist) {   // (the ram grip is solved exactly)
-  s.pose.hand_L = [maceWrist(s.pose.hand_L[0]), s.pose.hand_L[1], s.pose.hand_L[2]]; s._wrist = 1; e.pose = s.pose; }
-  if (s.saber > 0) {
-    // war mace (replaces the beam saber): materialises in the left hand, energised red while berserk
-    const hm = R.partWorld('gundam', e, 'hand_L');
+  // the BEAM SABER (left hand, from the well assault on): cyan blade out of the hilt, red while berserk
+  if (weapon === 'saber' && s.saber > 0) {
     const [a, , dir] = saberSegment(R, 'gundam', e, 'hand_L', 1);
-    const side = V.norm([0, 0, 0], M.transformDir([0, 0, 0], hm, [1, 0, 0]));
-    const up = V.norm([0, 0, 0], V.cross([0, 0, 0], dir, side));
-    const x = V.cross([0, 0, 0], up, dir);
-    const k = easeOut(sat(s.saber)), sc = 0.25 + 0.75 * k;
-    const mm = _maceM;
-    mm[0] = x[0] * sc; mm[1] = x[1] * sc; mm[2] = x[2] * sc; mm[4] = up[0] * sc; mm[5] = up[1] * sc; mm[6] = up[2] * sc;
-    mm[8] = dir[0] * sc; mm[9] = dir[1] * sc; mm[10] = dir[2] * sc; mm[12] = a[0]; mm[13] = a[1]; mm[14] = a[2]; mm[15] = 1;
-    const me = R.add('mace', mm);
-    const head = madd(a, dir, 9.6 * sc);
-    const hot = Math.max(bz, (1 - k) * 2);                       // deploy flash / berserk charge
-    if (me) {
-      me.seed = 3.3; me.wear = 1;
-      // calm glow (bright emissive panels shimmered through the bloom as the camera moved); dimmer still in the hangar
-      const gk = t < 163 ? 0.35 : 1;
-      let gc = bz > 0.05 ? [6 * bz + 0.3, 0.6, 0.35] : [(0.08 + 2 * (1 - k)) * gk, (0.45 + 2 * (1 - k)) * gk, (0.7 + 2 * (1 - k)) * gk];
-      const ch = maceCharge(t);                                  // the last blow: the panels flood with power
-      if (ch > 0) { const q = ch * ch * (1 + 0.08 * Math.sin(t * 37)), m = 1 + 30 * q; gc = [gc[0] * m + 3 * q, gc[1] * m, gc[2] * m]; R.light(head, 70, [0.45, 0.8, 1], 16 * q); }
-      me.matOverride = { mace_glow: { base: [0.2, 0.8, 1], metal: 0, rough: 0.3, emissive: gc } };
-    }
-    if (hot > 0.05) {
-      const col = bz > 0.05 ? [3.5, 0.5, 0.25] : [0.8, 2.2, 3.2];
-      R.glow(head, (3 + 3 * bz) * hot, [col[0] * hot, col[1] * hot, col[2] * hot], 0.5);
-      R.light(head, 50, bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 5 * hot);
-    }
-    GUN.saber = [a, madd(a, dir, 12.9 * sc)];
-    if (!s.fpv && k > 0.5) gripHand(R, e, 'L', 0);   // a real closed fist round the haft (replaces the open model hand)
+    const k = easeOut(sat(s.saber)), tip = madd(a, dir, 13 * k);
+    const col = bz > 0.05 ? [3.4, 0.5, 0.3] : [0.8, 2.2, 3.2];
+    R.beam(a, tip, 0.5, [col[0] * k, col[1] * k, col[2] * k], 0.5, 26, 1.5, 1.2);
+    R.beam(a, tip, 1.5, [col[0] * k, col[1] * k, col[2] * k], 0.04, 3, 2, 0.8);
+    R.light(lerpv(a, tip, 0.5), 40, bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 4 * k);
+    GUN.saber = [a, tip];
+    if (!s.fpv && k > 0.5) gripHand(R, e, 'L', 0);   // a closed fist round the hilt
   } else GUN.saber = null;
+  // the rifle charges for the last shot: the muzzle gathers light, the glow strips (and his core) flood with power
+  const rc = weapon === 'rifle' ? rifleCharge(t) : 0;
+  if (rc > 0 && !s.fpv) {
+    const mz = R.models.gundam.empties.rifle_muzzle ? R.emptyWorld([0, 0, 0], 'gundam', e, 'rifle_muzzle') : null;
+    const q = rc * rc * (1 + 0.1 * Math.sin(t * 41));
+    if (mz) { R.glow(mz, 0.6 + 3.2 * q, [0.8 * q, 2.2 * q, 3.2 * q], 0.35); R.light(mz, 60, [0.4, 0.8, 1], 12 * q); }
+    e.matOverride.core = { ...e.matOverride.core, emissive: e.matOverride.core.emissive.map((v) => v * (1 + 6 * q)) };
+  }
   if (t >= 170 && t < 200 && !s.fpv) heavyDamage(R, t, e, 0);
   GUN.gundam = e;
   return e;
 }
-// the finisher: from the moment the mace connects (192.4) RONIN #2 comes apart — the mace punches through, the body
+// the finisher: from the moment the magnum shot goes through (192.4) SERAPH comes apart — the beam punches through, the body
 // splits into armour chunks that drift outward in slow motion, then the reactor goes at 194 and everything is flung
 const E2_FIN = 192.4, E1_FIN = 1e9;   // (one enemy now: SERAPH comes apart only at the finisher)
 const _fin = {};
@@ -715,12 +706,37 @@ function drawBreakup(R, t, idx) {
   if (!_fin[idx]) { const s0 = idx === 2 ? enemyMS2(t0) : enemyMS1(t0); _fin[idx] = { m: msMatrix(new Float32Array(16), s0), pose: JSON.parse(JSON.stringify(s0.pose)) }; }
   // RONIN #2 (the finisher) comes apart in slow motion until its reactor blows at 194; RONIN #1 in real time
   const tt = idx === 2 ? E2_FIN + Math.min(1.6, t - E2_FIN) * 0.6 + Math.max(0, t - 194) * 1.1 : t;   // the fan opens up in the slow beat before the reactor goes
-  // the pieces are thrown along the killing blow (the mace swing direction), in the dead machine's model space
+  // the pieces are thrown along the killing blow (the shot direction), in the dead machine's model space
   if (!_fin[idx].imp && BLOWS[idx]) { const ev = BLOWS[idx].ev; const inv = M.invert(M.new(), _fin[idx].m); _fin[idx].imp = V.norm([0, 0, 0], M.transformDir([0, 0, 0], inv, V.sub([0, 0, 0], ev.cut[1], ev.cut[0]))); }
   // RONIN #2 (the finisher): its own armour thrown out BEHIND it in a flat fan along the blow (no energy spray);
   // RONIN #1: chunks thrown along the smash as before
   const fin = _fin[idx], fan = idx === 2 && fin.imp ? { dir: fin.imp, side: V.norm([0, 0, 0], V.cross([0, 0, 0], fin.imp, [0, 1, 0])), spread: 55 * Math.PI / 180 } : null;
   shatter(R, 'enemy_ms', fin.m, tt, t0, idx === 2 ? 88 : 77, [3, 4, 3], idx === 2 ? 2.6 : 3.2, { tint: [2, 0.4, 0.3], pose: fin.pose, texSet: R.texLoaded & 4 ? 2 : 0, impulse: fan ? null : fin.imp, impulseK: 2.6, fan });
+}
+// SERAPH's left wing, shot off at the reversal (WING_HIT_T): the same model with only wing_L shown, frozen in the pose
+// it had at the hit, tumbling about the wing root and drifting off along the shot (the machine's own velocity + a kick)
+const _wing = {}, _wT = new Float32Array(16), _wA = new Float32Array(16), _wB = new Float32Array(16), _wQ = [0, 0, 0, 1];
+function drawLostWing(R, t) {
+  const t0 = WING_HIT_T + 0.03;
+  if (!_wing.m) {
+    const s0 = enemyMS2(t0), s1 = enemyMS2(t0 + 0.05), ev = DUEL_EVENTS.find((e) => Math.abs(e.t - WING_HIT_T) < 1e-6);
+    _wing.m = msMatrix(new Float32Array(16), s0); _wing.pose = JSON.parse(JSON.stringify(s0.pose));
+    _wing.pivot = ev ? ev.pos : s0.pos;
+    const vs = V.scale([0, 0, 0], V.sub([0, 0, 0], s1.pos, s0.pos), 1 / 0.05), sd = ev && ev.shotDir ? ev.shotDir : [0, 0, 1];
+    _wing.v = V.madd([0, 0, 0], V.madd([0, 0, 0], vs, sd, 16), [0, 1, 0], 3);
+    _wing.hide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'wing_L') _wing.hide[p.name] = 1;
+  }
+  const lt = t - t0; if (lt < 0 || lt > 8) return;
+  const P = _wing.pivot, d = V.madd([0, 0, 0], P, _wing.v, lt);
+  M.fromTRS(_wT, [-P[0], -P[1], -P[2]], [0, 0, 0, 1], 1);
+  M.mul(_wA, _wT, _wing.m);
+  Q.fromEuler(_wQ, lt * 2.6, lt * 1.1, lt * 3.4);
+  M.fromTRS(_wB, d, _wQ, 1);
+  const w = R.add('enemy_ms', M.mul(new Float32Array(16), _wB, _wA));
+  if (!w) return;
+  w.pose = _wing.pose; w.hidden = _wing.hide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
+  w.damage = 0.6;
+  if (lt < 3) R.light(P, 30, [1, 0.5, 0.2], 4 * Math.exp(-lt * 2));   // the torn root glowing hot for a moment
 }
 function drawEnemyMS(R, t, s, idx) {
   if (idx === 2 && t > E2_FIN + 0.03 && t < 200) { drawBreakup(R, t, 2); return null; }
@@ -729,6 +745,7 @@ function drawEnemyMS(R, t, s, idx) {
   const e = R.add('enemy_ms', msMatrix(tmpM, s));
   if (!e) return null;
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
+  if (idx === 2 && s.wingLost) { e.hidden = { ...(e.hidden || {}), wing_L: 1 }; drawLostWing(R, t); }
   const fn = idx === 1 ? enemyMS1 : enemyMS2;
   engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE, 0.9, 0.8, 1.2, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
   const BL = BLOWS[idx];
@@ -791,8 +808,8 @@ function rifleShot(R, t, t0, from, to, hit = false) {
   const speed = 2200;
   const head = Math.min(1, (lt * speed) / L), tail = Math.max(0, (lt * speed - 70) / L);
   const a = lerpv(from, to, tail), b = lerpv(from, to, head);
-  if (head > tail) R.beam(a, b, 0.9, [2.4, 1.1, 1.6], 2, 20, 0.6, 1);
-  if (lt < 0.12) { R.glow(from, 6 * (1 - lt / 0.12), [3, 2, 2.5], 0.7); R.light(from, 60, [1, 0.6, 0.8], 8); }
+  if (head > tail) R.beam(a, b, 0.9, [0.9, 2.0, 2.9], 1, 20, 0.6, 0.8);   // cyan like his core and the magnum (white core kept low)
+  if (lt < 0.12) { R.glow(from, 4 * (1 - lt / 0.12), [0.9, 2.0, 2.9], 0.5); R.light(from, 50, [0.4, 0.8, 1], 3); }
   if (hit && head >= 1) hitFlash(R, t, t0 + L / speed, to, 6, [1, 0.6, 0.8]);
 }
 
@@ -809,13 +826,7 @@ function drawMSBattle(R, t) {
   const e1 = enemyMS1(t), e2 = enemyMS2(t);
   const ee1 = drawEnemyMS(R, t, e1, 1);
   drawEnemyMS(R, t, e2, 2);
-  // rifle shots: fired from the rifle muzzle along the line fixed at the moment of the shot (duel.js DUEL_SHOTS)
-  if (ge) {
-    for (const sh of DUEL_SHOTS) {
-      if (t < sh.t - 0.01 || t > sh.t + 0.8) continue;
-      rifleShot(R, t, sh.t, sh.from, sh.to, sh.hit);
-    }
-  }
+  // (his rifle shots: drawHeroFire)
   // E1 machine gun
   if (false && e1.vis && t > 172 && t < 178.5 && g.vis) {   // (RONIN #1 no longer fires on the approach)
     for (let k = 0; k < 24; k++) {
@@ -847,6 +858,7 @@ function drawMSBattle(R, t) {
     }
   }
   drawSeraphFire(R, t);                                             // the cannon shots + the finale beam
+  drawHeroFire(R, t);                                               // his rifle
   // contact effects from the choreography (exact world contact points)
   for (const ev of [...DUEL_EVENTS, ...AUTO_FX]) {                  // choreographed + hitbox-detected contacts
     const lt = t - ev.t;
@@ -869,7 +881,7 @@ function drawMSBattle(R, t) {
       }
       if (ev.type !== 'spark' && lt < 0.25) R.ripple(ev.pos, (6 + 10 * st) * (0.2 + easeOut(lt / 0.25)), [0.2, 0.2, 0.2], (1 - lt / 0.25) * 1.2);
     }
-    if (ev.cut && lt < (ev.t > 190 ? 3.2 : 1.6)) {       // mace blow: metal crumples, armour shards + sparks spray out along the swing
+    if (ev.cut && lt < (ev.t > 190 ? 3.2 : 1.6)) {       // the kill shot: metal crumples, armour shards + sparks spray out along the swing
       const ls = ev.t > 190 ? lt * 0.35 : lt;            // the finisher plays out in slow motion
       const d = V.norm([0, 0, 0], V.sub([0, 0, 0], ev.cut[1], ev.cut[0]));
       const kc = Math.exp(-ls * 4);
@@ -904,8 +916,8 @@ function drawMSBattle(R, t) {
 
 // SERAPH's heavy cannon. Four shots in the ranged duel (a fixed line from the muzzle at the moment of firing, racing out
 // at 3 km/s, held 0.3 s, fading; charge glow before, shock ring + flash at the muzzle, light spilling on Sigma as it
-// passes him; the 4th is struck off his mace), and the finale: a sustained full-power beam laid on his mace head that
-// splits round it as he drives through (190.85–191.95). Orange like its lights; the white core kept low (intensity).
+// passes him; every one misses), and the finale: a sustained full-power beam along the line it laid on him, which he
+// slips a moment before it fires (FINALE_T–FINALE_END). Orange like its lights; the white core kept low (intensity).
 const SER_COL = [3.2, 1.15, 0.35];
 function serBeam(R, a, b, k, r = 1.3) {
   // seen from close up (the finale close-up sits in the beam) it is dimmed with camera distance, or it whites the frame out
@@ -922,7 +934,7 @@ function shotLine(ts) {
     const m = seraphMuzzle(ts);
     if (!m) return null;
     L = { from: m.pos, dir: m.dir };
-    if (ts === SERAPH_SHOTS[SERAPH_SHOTS.length - 1]) {   // struck off the mace: the line ends on the mace head
+    if (false) {   // (no shot is struck off a weapon any more)
       const h = duelHero(ts + 0.05), fk = h && duelFK({ ...h, saber: 1 }, 'gundam');
       if (fk) { const head = madd(fk.saber[0], fk.saber[2], 9); L.stop = V.dist(head, m.pos); L.hit = head;
         const sw = V.norm([0, 0, 0], V.sub([0, 0, 0], duelFK({ ...duelHero(ts + 0.1), saber: 1 }, 'gundam').saber[1], fk.saber[1]));
@@ -963,33 +975,44 @@ function drawSeraphFire(R, t) {
       }
     }
   }
-  // ---- the finale: full power, held on the mace; it splits round the head as he drives through
-  const F0 = 190.85, F1e = 191.95;
-  if (t > F0 - 0.35 && t < F1e + 0.4) {
-    const m = seraphMuzzle(Math.min(t, F1e));
-    if (m && t < F0) { const c = sat((t - (F0 - 0.35)) / 0.35); R.glow(m.pos, 1 + 4 * c * c, [3.2 * c, 1.2 * c, 0.3 * c], 0.35); R.light(m.pos, 60, [1, 0.45, 0.15], 6 * c); }
-    else if (m) {
-      const lt = t - F0, k = t < F1e ? 1 + 0.12 * Math.sin(t * 43) : Math.max(0, 1 - (t - F1e) / 0.2);
-      const hs = duelHero(t), fk = hs && duelFK({ ...hs, saber: 1 }, 'gundam');
-      if (fk && k > 0) {
-        const head = madd(fk.saber[0], fk.saber[2], 9), bd = V.norm([0, 0, 0], V.sub([0, 0, 0], head, m.pos));
-        const reach = Math.min(1, lt / 0.06);
-        serBeam(R, m.pos, lerpv(m.pos, head, reach), k, 2.2);
-        if (reach >= 1) {
-          const side = V.norm([0, 0, 0], V.cross([0, 0, 0], bd, [0, 1, 0])), up = V.cross([0, 0, 0], side, bd);
-          for (const [sx, sy] of [[1, 0.25], [-1, -0.2], [0.2, 1], [-0.25, -1]]) {   // split into four streams round him
-            const dd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], bd, side, 0.42 * sx), up, 0.42 * sy));
-            serBeam(R, head, madd(head, dd, 900), k * 0.55, 1.1);
-          }
-          R.light(head, 120, [1, 0.5, 0.2], 18 * k);
-          for (let i = 0; i < 24; i++) {                       // spray off the mace head
-            const ph = (t * 5 + hash(i)) % 1, sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 2.3 + Math.floor(t * 6)), bd, 0.8));
-            const b = 4 * (1 - ph); spark(R, madd(head, sd, 3 + 30 * ph), 0.45 + 0.4 * (1 - ph), [b, b * 0.55, b * 0.2]);
-          }
-        }
-      }
-      R.light(m.pos, 100, [1, 0.45, 0.15], 14 * k);
+  // ---- the finale: full power, a sustained beam along the line it had laid on him — he has already slipped aside
+  if (t > FINALE_T - 0.4 && t < FINALE_END + 0.35) {
+    const L = shotLine(FINALE_T);
+    if (L && t < FINALE_T) { const m = seraphMuzzle(t), c = sat((t - (FINALE_T - 0.4)) / 0.4); if (m) { R.glow(m.pos, 1 + 4 * c * c, [3.2 * c, 1.2 * c, 0.3 * c], 0.35); R.light(m.pos, 60, [1, 0.45, 0.15], 6 * c); } }
+    else if (L) {
+      const lt = t - FINALE_T, k = t < FINALE_END ? 1.1 + 0.12 * Math.sin(t * 43) : Math.max(0, 1 - (t - FINALE_END) / 0.3);
+      serBeam(R, L.from, madd(L.from, L.dir, Math.min(4000, 3000 * lt + 5)), k, 2.4);
+      if (lt < 0.35) R.ripple(L.from, 10 + 60 * easeOut(lt / 0.35), [0.5, 0.5, 0.5], (1 - lt / 0.35) * 1.3);
+      R.light(L.from, 110, [1, 0.45, 0.15], 16 * k);
+      const g = gundamState(t); if (g && g.vis) { const d = V.sub([0, 0, 0], g.pos, L.from), u = Math.max(0, V.dot(d, L.dir)); R.light(madd(L.from, L.dir, u), 90, [1, 0.45, 0.15], 10 * k); }   // it lights him as it tears past
     }
+  }
+}
+// ---- Sigma's beam rifle: fast cyan bolts; the reversal shot takes SERAPH's left wing; the charged shot is a magnum —
+// a thick beam that goes straight through its chest and on out into space
+const HERO_COL = [0.9, 2.3, 3.4];
+function drawHeroFire(R, t) {
+  for (const sh of DUEL_SHOTS) {
+    if (t < sh.t - 0.01 || t > sh.t + 0.9) continue;
+    const lt = t - sh.t;
+    if (!sh.kill) {
+      rifleShot(R, t, sh.t, sh.from, sh.to, false);   // (no flash ball on the wing hit: the sparks + light carry it)
+      if (sh.hit && lt > 0.01 && lt < 0.7) {                     // the wing torn off: a burst of sparks at its root
+        const la = lt - 0.01;
+        R.light(sh.to, 50, [1, 0.6, 0.3], 5 * Math.exp(-la * 6));
+        for (let i = 0; i < 40; i++) { const life = 0.3 + hash(i + 7) * 0.5; if (la > life) continue;
+          const a = la / life, sd = randDir([0, 0, 0], i * 4.1 + 3), b = 4.5 * (1 - a) * (1 - a);
+          spark(R, madd(sh.to, sd, (3 + 24 * hash(i + 2)) * easeOut(a)), 0.5 + 0.4 * (1 - a), [b, b * 0.6, b * 0.3]); }
+      }
+      continue;
+    }
+    // the magnum
+    const k = lt < 0.35 ? 1 : Math.max(0, 1 - (lt - 0.35) / 0.3), reach = Math.min(1, lt / 0.05);
+    const end = madd(sh.from, sh.dir, 2500 * reach);
+    if (k > 0) { R.beam(sh.from, end, 1.6, [HERO_COL[0] * k, HERO_COL[1] * k, HERO_COL[2] * k], 0.6, 30, 3, 1.5); R.beam(sh.from, end, 5, [HERO_COL[0] * k, HERO_COL[1] * k, HERO_COL[2] * k], 0.04, 2, 3, 0.6); }
+    const kf = Math.exp(-lt * 8);
+    R.glow(sh.from, 1.5 + 4 * kf, [0.9 * kf, 2.2 * kf, 3.2 * kf], 0.4); R.light(sh.from, 90, [0.4, 0.8, 1], 14 * kf);
+    if (lt < 0.35) R.ripple(sh.from, 8 + 50 * easeOut(lt / 0.35), [0.5, 0.5, 0.5], (1 - lt / 0.35) * 1.2);
   }
 }
 
@@ -1050,10 +1073,10 @@ function drawHangar(R, t, phase) {
 
 // ------------------------------------------------------------------ shots
 function gundamHangarState(t, phase) {
-  const s = { vis: true, pos: addv(HANGAR, [0, 9, 0]), fwd: [0, 0, 1], pose: {}, saber: 1, thr: 0, damage: 0, eye: 0, roll: 0, pitch: 0 };   // mace in hand
+  const s = { vis: true, pos: addv(HANGAR, [0, 9, 0]), fwd: [0, 0, 1], pose: {}, saber: 0, weapon: 'rifle', thr: 0, damage: 0, eye: 0, roll: 0, pitch: 0 };   // rifle in hand
   if (phase === 'standby') {
     blendPose('stand', 'stand', 0, s.pose);
-    s.saber = 0;                                   // mace racked while standing by (it swept past the lens and flashed)
+    s.weapon = 'none';                             // rifle racked while standing by
     return s;
   }
   // launch: crouch on catapult, eyes ignite 153, catapult 158
@@ -1894,7 +1917,7 @@ shot(270, 275, 'B4 the rush', (c) => {
   const { t, u } = c;
   const g = gundamState(t);
   // third-person chase, accelerating into the core; the last second before impact cuts to a side angle that shows the
-  // two-handed ram (mace levelled, body behind it) driving into the core
+  // two-handed ram (saber levelled, body behind it) driving into the core
   if (t < 272.2) {
     const back = lerp(34, 18, easeIn(sat((t - 270) / 2.2)));
     camLook(c, addv(g.pos, [3, 11, -back]), addv(WELL, [0, 0, 0]), lerp(52, 72, easeIn(sat((t - 270) / 2.2))), 0.05 * Math.sin(t * 3));
@@ -1906,7 +1929,7 @@ shot(270, 275, 'B4 the rush', (c) => {
   c.post.mbNear = 80;
   c.post.flash = t > 272.95 && t < 273.15 ? 0.12 * (1 - (t - 272.95) / 0.2) : 0;
   c.env.shadowCenter = g.pos; c.env.shadowRadius = 150;
-  // the mace lands on the core: crater flash, shock ring, sparks and plates thrown back at the camera
+  // the saber drives into the core: crater flash, shock ring, sparks and plates thrown back at the camera
   const R = c.R, lt = t - 273;
   if (lt > 0 && lt < 2) {
     const hp = addv(WELL, [0, -4, -24]);

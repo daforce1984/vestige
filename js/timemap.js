@@ -9,7 +9,7 @@ export const TEAR_S0 = 267.2, TEAR_S1 = 268.0;          // story window
 const TEAR_LEN = 10.8;                                  // film length of the tear window
 
 // every blow of the fight (story time): the swatted bolt (duel.js DODGE.t), then the DUEL_EVENTS clash/block/hit
-export const SLOW_HITS = [166.65, 178.05, 179.35, 184.5, 186.0, 186.45, 187.6, 188.2, 188.85, 189.45, 190.9, 192.4];   // + the closest beam near-miss (178.05), the swat (179.35), the beam on the mace (190.9)
+export const SLOW_HITS = [166.65, 178.05, 184.5, 186.95, 190.95, 192.4];   // the gunfight: the barrel roll over shot 3, THE PASS, the reversal shot, slipping the full-power beam, the kill shot
 export const SLOW_V = 0.2;                              // picture speed while slowed
 const SLOW_POST = 0.5 * SLOW_V;                         // story seconds held slow after the contact = 0.5 s on screen
 // per-blow window (story s): full slow on [h − pre, h + post], smooth ramps rin / rout either side.
@@ -19,7 +19,7 @@ export const SLOW_WIN = SLOW_HITS.map((h, i) => {
   return { h, pre: Math.min(0.05, 0.15 * gp), rin: Math.min(0.12, 0.2 * gp), post: Math.min(SLOW_POST, 0.35 * gn), rout: Math.min(0.14, 0.25 * gn) };
 });
 // the heavy clock: the whole melee (the charge → RONIN #2's death) at HEAVY_V, eased in / out over ~0.5 s
-export const HEAVY_V = 0.62, HEAVY_S0 = 184.0, HEAVY_S1 = 194.3;
+export const HEAVY_V = 0.62, HEAVY_S0 = 998, HEAVY_S1 = 999;   // (the gunfight runs at full speed — no heavy clock)
 const heavyK = (s) => ss((s - HEAVY_S0) / 0.5) * (1 - ss((s - HEAVY_S1) / 0.5));
 const ss = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 /** 0..1 slow-motion amount at story time s */
@@ -37,7 +37,7 @@ const vAt = (s) => { const b = 1 - (1 - HEAVY_V) * heavyK(s); return b + (SLOW_V
 // cumulative table: u(s) = s + ∫ (1/v − 1) ds over the duel range
 const D0 = SLOW_WIN[0].h - SLOW_WIN[0].pre - SLOW_WIN[0].rin - 0.01;
 const DL = SLOW_WIN[SLOW_WIN.length - 1];
-const D1 = Math.max(DL.h + DL.post + DL.rout, HEAVY_S1 + 0.5) + 0.01;
+const D1 = Math.max(DL.h + DL.post + DL.rout, HEAVY_S0 < 500 ? HEAVY_S1 + 0.5 : 0) + 0.01;
 const DS = 0.0005, DN = Math.ceil((D1 - D0) / DS);
 const EXTRA = new Float64Array(DN + 1);
 for (let i = 1; i <= DN; i++) { const s = D0 + (i - 0.5) * DS; EXTRA[i] = EXTRA[i - 1] + DS * (1 / vAt(s) - 1); }
