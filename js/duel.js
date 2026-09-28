@@ -1254,6 +1254,11 @@ const evFlash = (t) => { let f = 0; for (const e of DUEL_EVENTS) { if (e.type ==
 const evPos = (te) => DUEL_EVENTS.find((e) => Math.abs(e.t - te) < 1e-6).pos;
 // side vector of a two-shot line (perpendicular, horizontal)
 const sideOf = (a, b) => { const d = nrm(sub(b, a)); return nrm([d[2], 0, -d[0]]); };
+// cinematic placement helpers (frame of the line between them at time T: a toward the enemy, l to his left, h up)
+const mid = (T) => lrp(hp(T), ep(T), 0.5);
+const axisAt = (T) => nrm(flat(sub(ep(T), hp(T)), 0));
+const at = (p, a, l, h, T) => { const d = axisAt(T), sd = [d[2], 0, -d[0]]; return [p[0] + d[0] * a + sd[0] * l, p[1] + h, p[2] + d[2] * a + sd[2] * l]; };
+const pan = (fixed, subj, k) => lrp(fixed, subj, k);   // a partial pan: the operator lets the subject drift in the frame
 function two(a, b, { side = 1, dist = 1.6, lift = 4, along = 0.5, fov = 40, bias = 0.5 } = {}) {
   const mid = lrp(a, b, along), sd = sideOf(a, b), span = V.dist(a, b);
   const pos = add(add(mid, scl(sd, side * Math.max(28, span * dist))), [0, lift, 0]);
@@ -1283,46 +1288,50 @@ export const DUEL_CAMS = [
   { t0: 175.5, t1: 176.4, name: 'D05b his visor', fn: (t, u) => { const s = duelHero(t), fk = duelFK({ ...s, saber: 1 }, 'gundam'), hd = partPoint(fk, 'head', [0, 0.6, 0]);
     const d = nrm(sub(e1A(175.5), hpA(175.5))), sd = [d[2], 0, -d[0]];
     return { pos: add(add(hd, scl(d, 10 - u * 2.5)), add(scl(sd, -3.5), [0, 0.6, 0])), target: hd, fov: 30 - u * 3, handheld: 0.02, baseShake: 0 }; } },
-  // ---- THE GUNFIGHT. Long lenses on machines 60–90 m apart; the camera rides with them, never between them.
-  { t0: 176.4, t1: 177.05, name: 'D06 profile — it fires first', fn: (t, u) => { const c = two(hpA(t), e1A(t), { side: -1, dist: 0.85, lift: 5, fov: 44, bias: 0.55 }); return { ...c, handheld: 0.12 }; } },
-  { t0: 177.05, t1: 177.8, name: 'D07 over his shoulder: the exchange', fn: (t) => { const c = ots(hp(t), ep(t), { right: 1, back: 34, lift: 8, fov: 30, side: 16 }); return { ...c, target: lrp(hp(t), up(ep(t), 3), 0.72), handheld: 0.3 }; } },
-  { t0: 177.8, t1: 178.55, name: 'D08 over its shoulder: he boosts up over its shot', fn: (t) => { const c = ots(ep(t), hp(t), { right: -1, back: 30, lift: 7, fov: 32, side: 14 }); return { ...c, target: lrp(ep(t), up(hp(t), 3), 0.72), handheld: 0.3 }; } },
-  { t0: 178.55, t1: 179.25, name: 'D09 the shield takes it', slowmo: true, fn: (t, u) => { const e = ep(t), h = hp(178.6), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(e, scl(sd, 26)), add(scl(d, 7), [0, 4, 0])), target: lrp(up(e, 3), h, 0.12), fov: 38, handheld: 0.12 }; } },   // beside it, his bolt coming in across the frame
-  { t0: 179.25, t1: 180.45, name: 'D10 it boost-jumps and flips — fires upside down', fn: (t, u) => { const h = hp(t), e = ep(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(h, scl(d, 8)), add(scl(sd, 52), [0, -10, 0])), target: lrp(up(h, 4), e, 0.62), fov: 46, handheld: 0.25 }; } },   // wide off his side, looking up: him low, it turning over high
-  { t0: 180.45, t1: 181.4, name: 'D11 he rolls out and answers', fn: (t, u) => { const h = hp(t), e = ep(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(h, scl(sd, -32)), add(scl(d, -8), [0, 4, 0])), target: lrp(up(h, 4), e, 0.3), fov: 42, handheld: 0.25 }; } },
-  // the zig-zag: a long lens from behind him down the line — it jinks left, right, left, growing
-  { t0: 181.4, t1: 182.45, name: 'D12 the zig-zag, down the line', fn: (t, u) => { const h = hp(t), e = ep(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(h, scl(d, -30)), add(scl(sd, 24), [0, 9, 0])), target: lrp(up(h, 4), up(e, 2), 0.7), fov: 30, handheld: 0.2 }; } },
-  { t0: 182.45, t1: 183.15, name: 'D13 side: it closes, he gives ground', fn: (t) => { const c = two(hp(t), ep(t), { side: 1, dist: 0.9, lift: 6, fov: 46, bias: 0.55 }); return { ...c, handheld: 0.2 }; } },
-  { t0: 183.15, t1: 183.9, name: 'D14 the shield torn off', slowmo: true, fn: (t, u) => { const e = ep(t), h = hp(183.2), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(e, scl(sd, -34)), add(scl(d, 10), [0, 5, 0])), target: lrp(up(e, 4), h, 0.1), fov: 40, handheld: 0.15 }; } },
-  // ---- the circling run: riding alongside each in turn (outside the ring), then high and wide over it
-  { t0: 183.9, t1: 185.2, name: 'D15 the run — alongside him', fn: (t, u) => { const h = hp(t), e = ep(t), r = nrm(flat(sub(h, MID), 0)), tg = nrm(flat(sub(hp(t + 0.1), h), 0));
-    return { pos: add(add(h, scl(r, 30)), add(scl(tg, -14), [0, 6, 0])), target: lrp(up(h, 3), e, 0.45), fov: 44, handheld: 0.3 }; } },
-  { t0: 185.2, t1: 186.4, name: 'D16 the ring from above', fn: (t, u) => { const c = lrp(hp(t), ep(t), 0.5), o = nrm(sub(hp(185.2), ep(185.2)));
-    return { pos: add(c, add(scl([o[2], 0, -o[0]], 55), [0, 95 - 10 * u, 0])), target: c, fov: 50, handheld: 0.15 }; } },
-  { t0: 186.4, t1: 187.45, name: 'D17 the run — alongside it (a barrel roll out of his shot)', fn: (t, u) => { const e = ep(t), h = hp(t), r = nrm(flat(sub(e, MID), 0)), tg = nrm(flat(sub(ep(t + 0.1), e), 0));
-    return { pos: add(add(e, scl(r, 30)), add(scl(tg, -14), [0, 5, 0])), target: lrp(up(e, 3), h, 0.4), fov: 44, handheld: 0.3 }; } },
-  { t0: 187.45, t1: 188.4, name: 'D18 over his shoulder: the last exchange of the run', fn: (t) => { const c = ots(hp(t), ep(t), { right: -1, back: 34, lift: 8, fov: 30, side: 16 }); return { ...c, target: lrp(hp(t), up(ep(t), 3), 0.72), handheld: 0.3 }; } },
-  // ---- the full-power shot
-  { t0: 188.4, t1: 189.6, name: 'D19 it breaks away', fn: (t, u) => { const c = two(hp(t), ep(t), { side: -1, dist: 1.1, lift: 8, fov: 44, bias: 0.6 }); return { ...c, handheld: 0.15 }; } },
-  { t0: 189.6, t1: 190.7, name: 'D20 braced, charging', fn: (t, u) => { const e = ep(t), h = hp(t), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(e, scl(d, 44 - 6 * u)), add(scl(sd, 14), [0, 3, 0])), target: up(e, 3), fov: 32 - 4 * u, handheld: 0.08, baseShake: 0.04 }; } },
-  { t0: 190.7, t1: 191.25, name: 'D21 full power — he slips it', slowmo: true, fn: (t, u) => { const c = two(hp(t), ep(t), { side: -1, dist: 0.8, lift: 6, fov: 48, bias: 0.3 }); return { ...c, handheld: 0.15 }; } },
-  // SANDEVISTAN: riding beside him through the frozen world, his afterimages strung out behind
-  { t0: 191.25, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const h = hp(t);
-    return { pos: add(add(h, scl(D_L, -34)), add(scl(D_U, 2 - 6 * u), [0, 6, 0])), target: lrp(up(h, 3), E_CUT, 0.35), fov: 48, handheld: 0.08, baseShake: 0.02 }; } },
-  // the cut, from ahead of it: he comes out of the blur at its side and the blade goes through its waist
+  // ---- THE GUNFIGHT, shot like a film: every camera is PLACED once for its cut (from where the machines are when the
+  // cut starts) and then only pans after them, or dollies slowly — it never rides along. Shot size and angle change
+  // cut to cut: extreme wides, long-lens compression, low and high angles, close-ups, fly-bys past the lens.
+  { t0: 176.4, t1: 177.05, name: 'D06 EWS — the line of fire', fn: (t, u) => { const T = 176.4, M = mid(T);
+    return { pos: at(M, 0, 190, 25, T), target: M, fov: 34, handheld: 0.04, baseShake: 0.02 }; } },
+  { t0: 177.05, t1: 177.8, name: 'D07 low angle on him', fn: (t, u) => { const T = 177.05, H = hp(T);
+    return { pos: at(H, 14, -22, -14, T), target: pan(up(H, 4), up(hp(t), 4), 0.8), fov: 40, handheld: 0.1 }; } },
+  { t0: 177.8, t1: 178.55, name: 'D08 long lens on it', fn: (t, u) => { const T = 177.8, E = ep(T);
+    return { pos: at(E, -150, -40, 6, T), target: pan(up(E, 2), up(ep(t), 2), 0.9), fov: 12, handheld: 0.06 }; } },
+  { t0: 178.55, t1: 179.25, name: 'D09 CU — the shield takes it', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T);
+    return { pos: at(E, -16, -14, 3, T), target: pan(up(E, 3), up(ep(t), 3), 0.8), fov: 38, handheld: 0.05 }; } },
+  { t0: 179.25, t1: 180.45, name: 'D10 from far below — it jumps and turns over', fn: (t, u) => { const T = 179.25, E = ep(T);
+    return { pos: at(lrp(hp(T), E, 0.6), 0, 45, -45, T), target: pan(up(E, 8), ep(t), 0.85), fov: 42, handheld: 0.06 }; } },
+  { t0: 180.45, t1: 181.4, name: 'D11 profile — he rolls out and answers', fn: (t, u) => { const T = 180.45, H = hp(T);
+    return { pos: add(at(H, 0, 38, 2, T), scl(sub(hp(t), H), 0.4)), target: up(hp(t), 3), fov: 38, handheld: 0.08 }; } },   // a slow dolly, half his speed
+  { t0: 181.4, t1: 182.45, name: 'D12 long lens down the line — the zig-zag', fn: (t, u) => { const T = 181.4, H = hp(T);
+    return { pos: at(H, -120, -10, 8, T), target: pan(up(ep(T), 2), up(ep(t), 2), 0.75), fov: 11, handheld: 0.05 }; } },
+  { t0: 182.45, t1: 183.15, name: 'D13 high angle over the exchange', fn: (t, u) => { const T = 182.45, M = mid(T);
+    return { pos: at(M, -10, 25, 85, T), target: pan(M, mid(t), 0.6), fov: 50, handheld: 0.05 }; } },
+  { t0: 183.15, t1: 183.9, name: 'D14 low CU — the shield torn off', slowmo: true, fn: (t, u) => { const T = 183.2, E = ep(T);
+    return { pos: at(E, -12, 16, -8, T), target: pan(up(E, 2), up(ep(t), 2), 0.7), fov: 40, handheld: 0.05 }; } },
+  { t0: 183.9, t1: 185.2, name: 'D15 EWS — the circling run', fn: (t, u) => { const T = 183.9;
+    return { pos: at(MID, 0, -260, 60, T), target: pan(MID, mid(t), 0.3), fov: 30, handheld: 0.04 }; } },
+  { t0: 185.2, t1: 186.4, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
+    return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
+  { t0: 186.4, t1: 187.45, name: 'D17 fly-by — its barrel roll', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));
+    return { pos: add(add(P, scl(o, 17)), [0, -3, 0]), target: up(ep(t), 2), fov: 48, handheld: 0.08 }; } },
+  { t0: 187.45, t1: 188.4, name: 'D18 over his shoulder, locked off', fn: (t, u) => { const T = 187.45, c0 = ots(hp(T), ep(T), { right: -1, back: 34, lift: 8, fov: 30, side: 16 });
+    return { pos: c0.pos, target: pan(lrp(hp(T), ep(T), 0.7), lrp(hp(t), ep(t), 0.7), 0.6), fov: 30, handheld: 0.06 }; } },
+  { t0: 188.4, t1: 189.6, name: 'D19 EWS — it breaks away', fn: (t, u) => { const T = 188.4, M = mid(T);
+    return { pos: at(M, -30, -150, -30, T), target: pan(M, mid(t), 0.5), fov: 36, handheld: 0.04 }; } },
+  { t0: 189.6, t1: 190.7, name: 'D20 push in on the charging rifle', fn: (t, u) => { const T = 189.6, E = ep(T);
+    return { pos: lrp(at(E, -50, 16, 4, T), at(E, -28, 10, 3, T), easeInOut(u)), target: up(ep(t), 3), fov: 30, handheld: 0.04, baseShake: 0.03 }; } },
+  { t0: 190.7, t1: 191.25, name: 'D21 the full-power beam goes past him', slowmo: true, fn: (t, u) => { const T = 190.7, H = hp(T);
+    return { pos: at(H, -26, 30, 6, T), target: pan(up(H, 3), up(hp(t), 3), 0.8), fov: 42, handheld: 0.06 }; } },
+  // SANDEVISTAN: a locked-off camera well to the side of his line — he streaks across the frozen frame, afterimages behind
+  { t0: 191.25, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
+    return { pos: add(add(Pm, scl(D_L, -55)), [0, 6, 0]), target: pan(Pm, up(hp(t), 2), 0.85), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },
+  // the cut, from high over its shoulder, looking down across the line of the pass
   { t0: 191.95, t1: 192.55, name: 'D23 the cut', slowmo: true, sande: true, fn: (t, u) => { const c = add(E_CUT, [0, 2, 0]);
-    // high over its shoulder, looking down across the line of the pass: his streak along the bottom of the frame, the
-    // blade sweeping flat through its waist
-    return { pos: add(add(E_CUT, scl(D_U, 6)), add(scl(D_L, 10), [0, 46, 0])), target: add(add(c, scl(D_L, -5)), scl(D_U, 3)), fov: 46, handheld: 0.05, baseShake: 0.02 }; } },
-  // it comes apart behind him: the two halves drift, then the reactor goes (194)
-  { t0: 192.55, t1: 194.6, name: 'D24 it comes apart behind him', slowmo: true, fn: (t, u) => { const h = hp(t);
-    return { pos: add(add(h, scl(D_U, 20 - 2 * u)), add(scl(D_L, -20), [0, 4, 0])), target: lrp(up(h, 4), E_CUT, 0.7), fov: 42 }; } },
+    return { pos: add(add(E_CUT, scl(D_U, 6)), add(scl(D_L, 10), [0, 46, 0])), target: add(add(c, scl(D_L, -5)), scl(D_U, 3)), fov: 46, handheld: 0.03, baseShake: 0.02 }; } },
+  // ahead of where he comes out of it: he glides toward the lens, the halves drifting apart behind him, then the reactor
+  { t0: 192.55, t1: 194.6, name: 'D24 it comes apart behind him', slowmo: true, fn: (t, u) => {
+    return { pos: DP(46, -34, 6), target: pan(E_CUT, lrp(hp(t), ep(Math.min(t, 194)), 0.55), 0.6), fov: 40, handheld: 0.03 }; } },
   { t0: 194.6, t1: 197.2, name: 'D25 aftermath', fn: (t, u) => { const h = hp(t); return { pos: add(h, [-16 - u * 12, 6 + u * 3, -30 - u * 10]), target: up(h, 6), fov: 40, handheld: 0.3 }; } },
   { t0: 197.2, t1: 200.0, name: 'D26 aftermath wide', fn: (t, u) => { const h = hp(t); return { pos: add(h, [-40 - u * 10, 12 + u * 4, -48 - u * 8]), target: up(h, 6), fov: 38, handheld: 0.3 }; } },
 ];
