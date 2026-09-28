@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, KILL_SHOT_T, CUT_T, CUT_Y, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -781,9 +781,89 @@ function drawHalves(R, t, s) {
   R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));           // the molten cut glows
   return null;
 }
+// ---- THE CUT, frame by frame (extreme bullet time, CUT_T−0.04 → CUT_SPLIT): the torso's waist section is an ellipse
+// (torso-local, from the mesh bounds); the blade line crosses it as a chord that sweeps through. Where the chord meets the
+// armour, the cut edge glows white → orange and cools behind it, molten metal sprays off both ends, and crimson armour
+// plates cut loose are flung out along the swing. All motion in story seconds (the picture runs at 1/40 here).
+const CUT_E = { cx: 0, cz: -0.6, rx: 2.9, rz: 3.2 };   // waist section (torso local)
+let _cutPath = null;
+function cutPath() {   // sampled once: per story time, the chord's two ends as ellipse angles (NaN = not in contact)
+  if (_cutPath) return _cutPath;
+  const out = [];
+  for (let tt = CUT_T - 0.06; tt <= CUT_SPLIT + 0.004; tt += 0.002) {
+    const h = duelHero(tt), e = duelEnemy2(tt); if (!h || !e) continue;
+    const H = duelFK({ ...h, saber: 1 }, 'gundam'), E = duelFK(e, 'enemy_ms'), inv = M.invert(M.new(), E.torso);
+    const a = M.transformPoint([0, 0, 0], inv, H.saber[0]), b = M.transformPoint([0, 0, 0], inv, madd(H.saber[0], H.saber[2], 12.9));
+    // chord of the blade (projected onto the section plane) with the ellipse: solve |(p − c)/r| = 1 along a → b
+    const ax = (a[0] - CUT_E.cx) / CUT_E.rx, az = (a[2] - CUT_E.cz) / CUT_E.rz, dx = (b[0] - a[0]) / CUT_E.rx, dz = (b[2] - a[2]) / CUT_E.rz;
+    const A = dx * dx + dz * dz, B = 2 * (ax * dx + az * dz), Cc = ax * ax + az * az - 1, D = B * B - 4 * A * Cc;
+    let th = null;
+    if (D > 0) { const s1 = (-B - Math.sqrt(D)) / (2 * A), s2 = (-B + Math.sqrt(D)) / (2 * A);
+      if (s2 > 0 && s1 < 1) { const ang = (s) => Math.atan2(az + dz * s, ax + dx * s); th = [ang(Math.max(0, s1)), ang(Math.min(1, s2)), Math.max(0, s1) > 0, Math.min(1, s2) < 1]; } }
+    out.push({ t: tt, th });
+  }
+  const first = out.find((q) => q.th);
+  _cutPath = { out, first };
+  return _cutPath;
+}
+const _secP = (th, lift = 0) => [CUT_E.cx + Math.cos(th) * CUT_E.rx * 1.03, CUT_Y + lift, CUT_E.cz + Math.sin(th) * CUT_E.rz * 1.03];
+const CRIMSON = { hull: { base: [0.5, 0.04, 0.05], metal: 0.3, rough: 0.4, emissive: [0, 0, 0] } };
+function drawCutDetail(R, t) {
+  if (t < CUT_T - 0.06 || t > CUT_SPLIT + 1.2) return;
+  const P = cutPath(); if (!P.first) return;
+  const e = duelEnemy2(Math.min(t, CUT_SPLIT)); if (!e || !e.vis) return;
+  const E = duelFK(e, 'enemy_ms'), TW = (p) => M.transformPoint([0, 0, 0], E.torso, p);
+  const cur = [...P.out].reverse().find((q) => q.t <= t && q.th) || null;
+  const live = t < CUT_SPLIT && cur && t - cur.t < 0.004;
+  const th0 = P.first.th;
+  // the cut edges: arcs of the section from where the blade went in to where it is now, glowing hot at the front
+  if (cur) for (const side of [0, 1]) {
+    const a0 = th0[side], a1 = cur.th[side];
+    let da = a1 - a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
+    const n = Math.max(2, Math.ceil(Math.abs(da) / 0.12));
+    let pa = TW(_secP(a0));
+    for (let i = 1; i <= n; i++) {
+      const f = i / n, pb = TW(_secP(a0 + da * f)), age = (1 - f) * Math.min(0.05, t - P.first.t) + Math.max(0, t - CUT_SPLIT);
+      const k = Math.exp(-age * 25) * 0.85 + 0.25;                                // white at the front, cooling to orange-red
+      R.beam(pa, pb, 0.26, [1.8 * k + 0.45, 0.8 * k * k + 0.16, 0.22 * k * k], 0.8, 6);
+      pa = pb;
+    }
+  }
+  // at the two ends of the chord: the blade in the armour — molten spray, and plates cut loose
+  if (cur && live) for (const side of [0, 1]) {
+    const pw = TW(_secP(cur.th[side])), out = V.norm([0, 0, 0], V.sub([0, 0, 0], pw, TW([CUT_E.cx, CUT_Y, CUT_E.cz])));
+    R.glow(pw, 0.55, [2.2, 1.3, 0.6], 0.2); R.light(pw, 20, [1, 0.6, 0.3], 2.5);
+    for (let i = 0; i < 28; i++) {                                                  // a jet of molten droplets, story-fast
+      const life = 0.012 + hash(i + side * 50) * 0.03, ph = ((t / life) + hash(i + 3 + side * 50)) % 1;
+      const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.1 + side * 7 + Math.floor(t / life) * 0.37), out, 1.4), D_SWEEP(), 0.8));
+      const b = 2.6 * (1 - ph) * (1 - ph);
+      spark(R, madd(pw, sd, ph * life * (120 + 180 * hash(i + 9))), 0.1 + 0.14 * (1 - ph), [b, b * 0.6, b * 0.25]);
+    }
+  }
+  // plates cut loose: spawned along the cut front, flung out along the blade and the swing, tumbling, their edges hot
+  for (let i = 0; i < 18; i++) {
+    const ts = P.first.t + (CUT_SPLIT - P.first.t) * (i + 0.5) / 18, lt = t - ts;
+    if (lt < 0 || lt > 1.2) continue;
+    const q = P.out.find((x) => x.t >= ts && x.th); if (!q) continue;
+    const side = i % 2, p0 = TW(_secP(q.th[side], (hash(i + 4) - 0.5) * 0.6));
+    const out = V.norm([0, 0, 0], V.sub([0, 0, 0], p0, TW([CUT_E.cx, CUT_Y, CUT_E.cz])));
+    const v = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], out, D_SWEEP(), 0.9), randDir([0, 0, 0], i * 5.3), 0.5));
+    const pos = madd(p0, v, (40 + 90 * hash(i + 2)) * lt);
+    Q.fromEuler(_hQ, lt * (20 + 40 * hash(i)), lt * (30 + 30 * hash(i + 1)), lt * 25);
+    const sc = 0.045 + 0.05 * hash(i + 6);                                        // hand-sized plates (the debris pieces are ~5 m)
+    M.fromTRS(_hT, pos, _hQ, sc);
+    const d = R.add('debris', _hT); if (!d) continue;
+    d.hidden = debrisOnly(R, 'hull' + (i % 4)); d.seed = i * 1.7;
+    const hk = 0.35 * Math.exp(-lt * 8);
+    d.matOverride = { ...CRIMSON, scorch: { base: [0.12, 0.05, 0.04], metal: 0.4, rough: 0.6, emissive: [2.5 * hk, 0.8 * hk, 0.15 * hk] },
+      metal: { base: [0.4, 0.38, 0.4], metal: 1, rough: 0.3, emissive: [2 * hk, 0.6 * hk, 0.1 * hk] }, rust: CRIMSON.hull };
+  }
+}
+let _dsw = null; const D_SWEEP = () => _dsw || (_dsw = (() => { const ev = DUEL_EVENTS.find((x) => x.slash); return ev ? ev.dir : [0, 0, 1]; })());
 // the pass-cut itself: a flash along the blade's path through its waist, a spray of molten sparks along the swing
 function drawSlash(R, c, t) {
-  const lt = t - CUT_T; if (lt < -0.02 || lt > 1.2) return;
+  drawCutDetail(R, t);
+  const lt = t - CUT_SPLIT; if (lt < -0.02 || lt > 1.2) return;
   const ev = DUEL_EVENTS.find((x) => x.slash); if (!ev) return;
   const P = ev.pos, d = ev.dir;
   if (lt >= 0) {
@@ -2335,37 +2415,18 @@ export function frame(R, film) {
   return ctx;
 }
 
-// ---------------- the enemy ion bolt Sigma dodges on the launch run (duel.js DODGE): aimed at his undodged path point,
-// from far ahead-left, at ion-bolt speed; it reaches that point at DODGE.t and keeps going
+// ---------------- the enemy ion bolt Sigma dodges on the launch run (duel.js DODGE): aimed at where he WOULD have been
+// (his undodged path) from far ahead, at ion-bolt speed; he rolls out sideways and it tears through the empty space
 function drawDodgeBolt(R, t) {
   const T = DODGE.t;
-  if (t < T - 0.62 || t > T + 1.9) return;
-  // contact point: the right vambrace (between forearm and hand) at T, from the solved FK of the parry pose
-  const hs = duelHero(T);
-  const fk = duelFK({ ...hs, saber: 1 }, 'gundam');
-  const hit = V.lerp([0, 0, 0], M.transformPoint([0, 0, 0], fk.arm_R_lower, [0, 0, 0]), M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]), 0.9);   // back of the wrist / hand
-  const fwd = V.norm([0, 0, 0], hs.fwd);
-  const r = dodgeRight(T);
+  if (t < T - 0.62 || t > T + 0.9) return;
+  const hs = duelHero(T), fwd = V.norm([0, 0, 0], hs.fwd), r = dodgeRight(T);
+  const aim = V.add([0, 0, 0], gundamLaunchPath(T), [0, 3, 0]);                  // his chest on the undodged path
   const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], fwd, -0.9), V.scale([0, 0, 0], r, -0.35)));   // from ahead, a little right
-  const a = madd(hit, dir, -1300 * 0.62);
-  bolt(R, t, T - 0.62, T, a, hit, 70, 2.2, [3.4, 0.7, 0.4], 1.8);
-  if (t < T) { const hp = V.lerp([0, 0, 0], a, hit, (t - (T - 0.62)) / 0.62); R.glow(hp, 16, [2.2, 0.5, 0.25], 0.5); R.light(hp, 90, [1, 0.3, 0.15], 4); return; }
-  // swatted away: no blast — the back of the hand knocks the bolt off and a fan of sparks sprays out along the swing
-  // (up and to his right: dodgeRight() points to his LEFT, so his right is −r)
-  const out = V.norm([0, 0, 0], V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], r, -0.72), [0, 0.66, 0]), V.scale([0, 0, 0], fwd, 0.15)));
-  const lt = t - T;
-  const kh = Math.exp(-lt * 14);
-  R.glow(hit, 1.2 + 1.2 * kh, [8 * kh, 5 * kh, 2.5 * kh], 0.2);                    // the contact itself: a brief hot point
-  if (lt < 0.1) R.light(hit, 40, [1, 0.6, 0.3], 5 * (1 - lt / 0.1));
-  const side = V.norm([0, 0, 0], V.cross([0, 0, 0], out, [0, 1, 0])), up2 = V.cross([0, 0, 0], side, out);
-  for (let i = 0; i < 46; i++) {                                                   // radial fan along the swing
-    const a2 = hash(i + 71) * 6.283, sp = Math.pow(hash(i + 13), 0.7) * 0.62;      // within ~35° of the swing direction
-    const sd = V.norm([0, 0, 0], V.add([0, 0, 0], out, V.add([0, 0, 0], V.scale([0, 0, 0], side, Math.cos(a2) * sp), V.scale([0, 0, 0], up2, Math.sin(a2) * sp))));
-    const life = 0.25 + hash(i + 9) * 0.55; if (lt > life) continue;
-    const u = lt / life, dist = (8 + 34 * hash(i + 2)) * (1 - (1 - u) * (1 - u));
-    const hot = Math.exp(-lt * 6), b = (1.2 + 7 * hot) * (1 - u) * (1 - u);
-    spark(R, madd(hit, sd, dist), 0.35 + 0.9 * (1 - u), [b, b * (0.55 + 0.35 * hot), b * (0.15 + 0.45 * hot)]);
-  }
+  const a = madd(aim, dir, -1300 * 0.62), b = madd(aim, dir, 1300 * 1.5);
+  bolt(R, t, T - 0.62, T + 1.5, a, b, 70, 2.2, [3.4, 0.7, 0.4], 1.8);
+  const hp = V.lerp([0, 0, 0], a, b, (t - (T - 0.62)) / 2.12);
+  R.glow(hp, 16, [2.2, 0.5, 0.25], 0.5); R.light(hp, 90, [1, 0.3, 0.15], 4);   // it lights him as it goes past
 }
 // ---------------- energy shield around the well core (261–268), shatter 268–271
 function drawShield(R, t, c) {

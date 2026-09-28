@@ -415,14 +415,11 @@ export const SAMPLE_CUES = [
   ...HB.map((t, i) => [t - 0.1, 'heartbeat:s' + (i % 3), { gain: 0.6 + 0.4 * i / HB.length, prio: 8, norand: true }]),
   // ---- WELL ASSAULT 262–273: berserk mech tears through the core's energy shield (no dialogue)
   [181.0, 'braam2',    { at: 0.15, rate: 1.1, gain: 0.8, prio: 8, norand: true }],   // the zig-zag advance begins
-  // launch run: an enemy ion bolt screams in, Sigma rolls out of its way (duel.js DODGE 166.65)
+  // launch run: an enemy ion bolt screams in, Sigma rolls out of its way (duel.js DODGE 166.65) — no parry
   [166.03, 'laser_cannon:s2', { dur: 1.2, fadeOut: 0.5, rate: 0.7, gain: 0.5, far: 0.55, pan: 0.3, prio: 7, norand: true }],
   [166.35, 'flyby_fast', { rate: 0.8, gain: 0.8, pan0: 0.1, pan1: 0.5, dur: 0.5, fadeOut: 0.2, prio: 8, norand: true }],   // incoming
-  [166.65, 'metal_knock', { at: 'hit', rate: 0.72, gain: 1.2, pan: 0.3, prio: 10, norand: true }],                             // off the vambrace
-  [166.65, 'axe_metal1', { at: 'hit', rate: 0.85, gain: 0.8, pan: 0.3, prio: 9, norand: true }],
-  [166.66, '@sparkBurst', { vel: 0.8, pan: 0.35 }],
-  [166.67, 'flyby_fast', { rate: 1.5, gain: 0.45, pan0: 0.3, pan1: 0.8, dur: 0.22, fadeOut: 0.1, prio: 7, norand: true }],     // knocked away up-right (no blast)
-  [166.67, '@sparkBurst', { vel: 0.9, pan: 0.45 }],
+  [166.5, 'hl_thruster', { dur: 0.6, fadeOut: 0.3, rate: 1.3, gain: 0.8, pan: -0.3, prio: 8, norand: true }],             // he rolls out of it
+  [166.66, 'flyby_fast', { rate: 0.9, gain: 1.0, pan0: 0.4, pan1: -0.7, dur: 0.6, fadeOut: 0.25, prio: 9, norand: true }],     // it roars past the empty space
   [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar
   [262.05,'servo',     { rate: 0.5, gain: 0.9, prio: 8, norand: true }],
   [262,   'braam',     { rate: 0.85, gain: 1, prio: 9, duck: 2, norand: true }],

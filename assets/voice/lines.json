@@ -159,16 +159,6 @@
    "dur": 2.04
   },
   {
-   "id": "v6p03",
-   "t": 171.0,
-   "voice": "PILOT",
-   "radio": true,
-   "text": "[low, bored] Two hostiles.",
-   "ko": "적 둘.",
-   "stability": 0.5,
-   "dur": 1.72
-  },
-  {
    "id": "v6p04",
    "t": 179.4,
    "voice": "PILOT",

@@ -11,8 +11,9 @@ const TEAR_LEN = 10.8;                                  // film length of the te
 // every blow of the fight (story time): the swatted bolt (duel.js DODGE.t), then the DUEL_EVENTS clash/block/hit
 export const SLOW_HITS = [166.65, 178.73, 179.95, 183.28, 190.95, 192.05];   // the gunfight: the shield block, its inverted shot, the shield torn off, slipping the full-power beam, the saber cut
 // sustained bullet time: the SANDEVISTAN dash (duel.js SANDE0–SANDE1) — the world all but stops while he crosses it
-export const SLOW_RANGES = [[191.28, 192.2]];
-const RANGE_V = 0.4;   // (he still has to read FAST: 95 m in ~2.3 s on screen; the world round him barely moves anyway)
+// [from, to, picture speed]: the Sandevistan dash (he still has to read FAST), and inside it the blade going through its
+// waist in extreme bullet time (0.1 s of story → ~4 s on screen: the parts being cut and thrown off)
+export const SLOW_RANGES = [[191.28, 192.2, 0.4], [192.015, 192.1, 0.025]];
 export const SLOW_V = 0.2;                              // picture speed while slowed
 const SLOW_POST = 0.5 * SLOW_V;                         // story seconds held slow after the contact = 0.5 s on screen
 // per-blow window (story s): full slow on [h − pre, h + post], smooth ramps rin / rout either side.
@@ -36,8 +37,12 @@ export function slowK(s) {
   return k;
 }
 /** picture speed (story seconds per film second) at story time s, ignoring the tear */
-const rangeK = (s) => { let k = 0; for (const [a, b] of SLOW_RANGES) if (s > a - 0.1 && s < b + 0.12) k = Math.max(k, s < a ? ss((s - (a - 0.1)) / 0.1) : s > b ? 1 - ss((s - b) / 0.12) : 1); return k; };
-const vAt = (s) => { const b = 1 - (1 - HEAVY_V) * heavyK(s), r = b + (RANGE_V - b) * rangeK(s); return Math.min(r, b + (SLOW_V - b) * slowK(s)); };
+function rangeV(s, b) {   // the slowest range speed at s (eased in / out over ~0.1 s / 0.03 s for the short one)
+  let v = b;
+  for (const [a, e, rv] of SLOW_RANGES) { const w = Math.min(0.1, (e - a) * 0.4); if (s > a - w && s < e + w) { const k = s < a ? ss((s - (a - w)) / w) : s > e ? 1 - ss((s - e) / w) : 1; v = Math.min(v, b + (rv - b) * k); } }
+  return v;
+}
+const vAt = (s) => { const b = 1 - (1 - HEAVY_V) * heavyK(s); return Math.min(rangeV(s, b), b + (SLOW_V - b) * slowK(s)); };
 // cumulative table: u(s) = s + ∫ (1/v − 1) ds over the duel range
 const D0 = SLOW_WIN[0].h - SLOW_WIN[0].pre - SLOW_WIN[0].rin - 0.01;
 const DL = SLOW_WIN[SLOW_WIN.length - 1];
