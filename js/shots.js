@@ -2175,9 +2175,7 @@ shot(358, 393.5, 'S23 title', (c) => {
   c.env.stars = 0.6 + k2 * 0.3; c.env.sunDisc = 1 - smooth(359, 362, t);   // continuous with F2 at the cut, fades as we turn away
   c.post.exposure = lerp(0.9, 0.75, smooth(362, 366.5, t));             // (a hard 0.9 -> 0.75 at 358 read as a lighting jump)
   c.post.fade = 1 - smooth(391.5, 393.3, t);
-  const rise = smooth(358.5, 362, t);
-  // (no extra atmosphere glow sprite: it read as a fake disc of light round the sun, and lingered at the frame edge)
-  c.post.flare = { pos: madd(pos, S, 1000), intensity: 1.4 * rise };
+  // (no sun flare here: with the disc already faded it burst out of Earth's limb as a white glow with nothing behind it)
   c.post.streak = lerp(0.22, 0, smooth(362, 366.5, t));             // continuous with F2's default at the cut
   // (no god rays here: marched over bloom while the camera swings they left a hard-edged ghost disc round the sun)
   c.env.shadowCenter = motherPoint([0, 0, 0], 358, [0, 0, 0]); c.env.shadowRadius = 600;

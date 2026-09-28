@@ -435,7 +435,7 @@ def sponson(mb, R, sg):
     # trailing (aft) face lights + small engine
     s_le, s_te, zb, zt = sec(100)
     light_row(mb, (sg * 72, Y(-286.3), 30), (sg * 124, Y(-281.5), 20), (0, 1, 0), 5.0, (0.8, 2.2, 0.3), 'amber')
-    engine_bell(mb, Vector((sg * 100, Y(-283), 0)), 8.5, 12)
+    engine_bell(mb, Vector((sg * 100, Y(-283), 0)), 8.5, 12, disc=1.0)
 
 
 def strake(mb, R, sg):
@@ -480,8 +480,10 @@ def strake(mb, R, sg):
 
 
 # ------------------------------------------------------------------------------------------ engines / stern
-def engine_bell(mb, p, r, L, seg=32):
-    """Engine: armoured housing, deep flared bell, one flat aft-facing glow disc ('engine')."""
+def engine_bell(mb, p, r, L, seg=32, disc=0.0):
+    """Engine: armoured housing, deep flared bell, one flat aft-facing glow disc ('engine'). disc: 0 = the disc at the
+    throat; 1 = raised up the bell to 0.3 L (fills the bell's width there) — for small engines mostly seen at an angle,
+    where the bell wall hid half of a throat disc."""
     d = Vector((0, 1, 0))                      # aft (glTF -Z)
     q = d.to_track_quat('Z', 'X').to_matrix()
 
@@ -499,7 +501,9 @@ def engine_bell(mb, p, r, L, seg=32):
     mb.loft([ring(r * 1.1, L * 0.25), ring(r * 1.14, L * 0.5), ring(r * 1.0, L * 0.52), ring(r * 0.82, L * 0.1),
              ring(r * 0.74, -L * 0.1)], 'greeble', cap0=False, cap1=False)
     # glow disc (single n-gon facing aft) + faint inner ring
-    vs = [mb.bm.verts.new(v) for v in ring(r * 0.75, -L * 0.1 + 0.05)]
+    dz = -L * 0.1 + 0.05 + disc * L * 0.4                      # the inner wall runs r·0.74 (−0.1 L) → r·0.82 (0.1 L) → r·1.0 (0.52 L)
+    dr = 0.75 + disc * 0.14
+    vs = [mb.bm.verts.new(v) for v in ring(r * dr, dz)]
     f = mb.bm.faces.new(vs)
     f.material_index = mb._mi('engine')
     f.normal_update()
