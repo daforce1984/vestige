@@ -1970,8 +1970,9 @@ export const DUEL_CAMS = [
   { t0: 177.85, t1: 178.55, name: 'D08 down its beam: he rolls over the third', fn: (t, u) => { const h = hp(t), e = e1p(t), d = nrm(sub(h, e)), sd = [d[2], 0, -d[0]];
     return { pos: add(add(e, scl(d, -10 + 3 * u)), add(scl(sd, 14), [0, 4, 0])), target: lrp(e, h, 0.55), fov: 46, handheld: 0.2 }; } },
   { t0: 178.55, t1: 179.65, name: 'D09 wide: it kicks off — the last shot struck off the mace', fn: (t, u) => { const c = two(hp(t), e1p(t), { side: 1, dist: 1.2, lift: 10, fov: 48, bias: 0.45 }); return { ...c, handheld: 0.25 }; } },
-  { t0: 179.65, t1: 180.9, name: 'D10 it climbs away', fn: (t, u) => { const h = hp(t), e = e1p(t), d = nrm(sub(e, h)), sd = [d[2], 0, -d[0]];
-    return { pos: add(add(h, scl(nrm([d[0], 0, d[2]]), -20)), add(scl(sd, 8), [0, -6, 0])), target: lrp(up(h, 8), e, 0.8), fov: 40, handheld: 0.25 }; } },
+  { t0: 179.65, t1: 180.9, name: 'D10 it climbs away', fn: (t, u) => { const h = hp(t), e = e1p(t), df = nrm([e[0] - h[0], 0, e[2] - h[2]]), sd = [df[2], 0, -df[0]];
+    // low beside him, looking up past his shoulder at the shrinking silhouette (his back no longer fills the frame)
+    return { pos: add(add(h, scl(sd, 22)), add(scl(df, -6), [0, -12, 0])), target: lrp(up(h, 10), e, 0.9), fov: 44, handheld: 0.25 }; } },
   // ---- E2 arrives
   { t0: 180.9, t1: 181.6, name: 'D11a sensor spike', fn: (t, u) => { const s = duelHero(t); const fk = duelFK({ ...s, saber: 1 }, 'gundam'); const hd = partPoint(fk, 'head', [0, 0.5, 0]); const f = nrm(s.fwd); const sd = nrm([f[2], 0, -f[0]]); return { pos: add(add(hd, scl(f, 10 - u * 2)), add(scl(sd, 3.5), [0, 2.2, 0])), target: add(hd, [0, 0.6 + u * 1.2, 0]), fov: 26, handheld: 0.25 }; } },
   { t0: 181.6, t1: 182.6, name: 'D11b the shadow', fn: (t, u) => { const h = hp(t); const e = e2p(t); const f = nrm(duelHero(t).fwd); const sd = nrm([f[2], 0, -f[0]]); return { pos: add(add(h, scl(f, -16)), add(scl(sd, 12), [0, -3, 0])), target: lrp(up(h, 30), e, 0.97), fov: 24 - u * 5, roll: 0.05, handheld: 0.2 }; } },

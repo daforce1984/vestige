@@ -908,8 +908,12 @@ function drawMSBattle(R, t) {
 // splits round it as he drives through (190.85–191.95). Orange like its lights; the white core kept low (intensity).
 const SER_COL = [3.2, 1.15, 0.35];
 function serBeam(R, a, b, k, r = 1.3) {
-  R.beam(a, b, r, [SER_COL[0] * k, SER_COL[1] * k, SER_COL[2] * k], 0.55, 30, 3, 1.4);
-  R.beam(a, b, r * 3.4, [SER_COL[0] * k, SER_COL[1] * k, SER_COL[2] * k], 0.045, 2, 3, 0.6);
+  // seen from close up (the finale close-up sits in the beam) it is dimmed with camera distance, or it whites the frame out
+  const cp = ctx.cam && ctx.cam.pos; let nk = 1;
+  if (cp) { const d = V.sub([0, 0, 0], b, a), L2 = V.dot(d, d) || 1, u = clamp(V.dot(V.sub([0, 0, 0], cp, a), d) / L2, 0, 1); nk = clamp(V.dist(cp, madd(a, d, u)) / (60 * r), 0.2, 1); }
+  const q = k * nk;
+  R.beam(a, b, r, [SER_COL[0] * q, SER_COL[1] * q, SER_COL[2] * q], 0.55 * nk, 30, 3, 1.4);
+  R.beam(a, b, r * 3.4, [SER_COL[0] * q, SER_COL[1] * q, SER_COL[2] * q], 0.045, 2, 3, 0.6);
 }
 const _shotLine = new Map();
 function shotLine(ts) {

@@ -16,6 +16,9 @@ TEX = os.path.join(ASSETS, 'tex')
 EMISSIVE = {'eye', 'core', 'engine'}
 RES = 4096
 DETAIL_BOOST = {'head': 1.7, 'torso': 1.35}   # extra texel density for close-up parts
+# per model: SERAPH / 03 is gloss-black armour — keep the paint dark (no lift to mid grey), less and darker edge wear
+MODEL_OPTS = {'enemy_ms': dict(paint_floor=0.03, wear=0.45, bare=(0.3, 0.3, 0.32), paint_rough=0.32, paint_metal=0.3)}
+OPT = {}
 
 
 class G:
@@ -113,9 +116,9 @@ def build_bake_graph(m, scorches, seed):
     # engine-friendly values: painted albedo mid-range (lum >= ~0.12 linear ~ sRGB 0.38), low metalness;
     # dark mechanics lifted to a satin dark grey. Only worn edges become bare metal (metal 1).
     if painted:
-        k = min(max(0.12 / max(lum, 1e-4), 1.0), 4.5)
+        k = min(max(OPT.get('paint_floor', 0.12) / max(lum, 1e-4), 1.0), 4.5)
         base = tuple(min(0.75, c * k) for c in base)
-        paint_metal, paint_rough = 0.12, max(rough0, 0.55)
+        paint_metal, paint_rough = OPT.get('paint_metal', 0.12), OPT.get('paint_rough', max(rough0, 0.55))
     else:
         grey = max(lum, 1e-4)
         base = tuple(0.05 * (0.6 + 0.4 * c / grey) for c in base)   # ~0.05 linear, slight original tint
@@ -133,6 +136,9 @@ def build_bake_graph(m, scorches, seed):
     n2 = g.noise(posn, 16.0, 3.0, 0.5)
     small_chips = g.math('MULTIPLY', g.mr(n2, 0.79, 0.84), g.mr(n1, 0.55, 0.7, 0.0, 0.8))
     worn = g.math('MAXIMUM', worn, small_chips)
+    if OPT.get('wear', 1.0) < 1.0:
+        worn = g.math('MULTIPLY', worn, OPT['wear'])
+        chip = g.math('MULTIPLY', chip, OPT['wear'])
     if not painted:
         worn = g.math('MULTIPLY', worn, 0.0)
         chip = g.math('MULTIPLY', chip, 0.0)
@@ -161,7 +167,7 @@ def build_bake_graph(m, scorches, seed):
     # --- colour
     dark_paint = tuple(c * 0.45 for c in base)
     col = g.mix(chip, base, dark_paint)
-    col = g.mix(worn, col, (0.72, 0.72, 0.74))
+    col = g.mix(worn, col, OPT.get('bare', (0.72, 0.72, 0.74)))
     col = g.mix(g.math('MULTIPLY', scratch, 0.7), col, (0.55, 0.55, 0.57))
     col = g.mix(g.math('MULTIPLY', grime, 0.45), col, (0.06, 0.052, 0.042))
     col = g.mix(streak, col, (0.06, 0.055, 0.045))
@@ -182,6 +188,7 @@ def build_bake_graph(m, scorches, seed):
 
 
 def run(name):
+    OPT.clear(); OPT.update(MODEL_OPTS.get(name, {}))
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=os.path.join(ASSETS, name + '.glb'))
     meshes = [o for o in bpy.data.objects if o.type == 'MESH']
