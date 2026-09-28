@@ -18,7 +18,42 @@
   "t": 120.0,
   "gain": 1.318,
   "fadeIn": 0.05,
-  "fadeOut": 3.0
+  "fadeOut": 1.2,
+  "end": 169.8
+ },
+ {
+  "file": "G_duel.mp3",
+  "film": true,
+  "t": 170.186,
+  "end": 195.969,
+  "offset": 5.2,
+  "hitStory": 176.4,
+  "hitFile": 12.33,
+  "endStory": 191.3,
+  "gain": 1.0,
+  "fadeIn": 1.0,
+  "fadeOut": 0.35
+ },
+ {
+  "file": "H_duel_win.mp3",
+  "film": true,
+  "t": 203.395,
+  "end": 211.775,
+  "offset": 0,
+  "hitStory": 194.0,
+  "hitFile": 0.38,
+  "endStory": 202.0,
+  "gain": 1.4,
+  "fadeIn": 0.02,
+  "fadeOut": 2.0
+ },
+ {
+  "file": "C_battle.mp3",
+  "t": 200.0,
+  "gain": 1.318,
+  "fadeIn": 2.0,
+  "fadeOut": 3.0,
+  "offset": 80.0
  },
  {
   "file": "D_aftermath.mp3",

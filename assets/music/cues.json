@@ -26,6 +26,121 @@
   "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Build]\n[Instrumental]\n\n[Climax]\n[Instrumental]\n\n[Outro]\n[Instrumental]"
  },
  {
+  "id": "G_duel",
+  "film": true,
+  "t": 170.186,
+  "dur": 32,
+  "caption": "Global Metadata: Instrumental anime mecha battle score, hybrid orchestral rock, 148 BPM, D minor, driving and heroic, for a giant-robot duel in space. Dramatic key changes: the theme lifts up a whole step halfway through. Tense suspense opening, then an explosive full-power battle theme that never lets up.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: 0 to 6 seconds: quiet, tense intro, a low pulsing synth bass heartbeat, a ticking clock-like hi-hat, a soft high string tremolo, a short rising reverse swell into the downbeat. At about 6 seconds: an explosive full-band entrance on the downbeat with a huge crash: pounding rock drum kit with fast double kick, distorted electric guitar power chords and palm-muted riffs, a driving sixteenth-note synth bass ostinato, big heroic brass theme on horns and trombones, fast staccato string ostinatos, soaring wordless-choir-like synth pads, timpani and cymbal swells. Relentless, urgent, heroic mecha battle energy to the end, no breakdown, no slowing down, no fade out.",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]",
+  "chosen": "G_duel_t1",
+  "seed": 2026092811,
+  "takes": [
+   {
+    "take": "G_duel_t1",
+    "seed": 2026092811,
+    "lyrics": "[Intro]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]",
+    "dur": 31.997,
+    "flac": "minimax_music_00003.flac",
+    "sha256": "ad7549ea07483fcfd11c1f63bd752ffee1f104ced6481270c04f83d1ab20810a",
+    "note": "CHOSEN: quiet intro (-35..-40 dB) to 11.5 s, a breath, full-band entrance at 12.33 s (+26 dB step), loud (-16 dB RMS) to the end"
+   },
+   {
+    "take": "G_duel_t2",
+    "seed": 2026092812,
+    "lyrics": "[Intro]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]",
+    "dur": 31.997,
+    "flac": "minimax_music_00004.flac",
+    "sha256": "479f2e29761d3441ece70700a7ccd6b5f157c4bc8a9507e31dfa321a7afeba93",
+    "note": "rejected: no sustained full-band section (RMS 0.058)"
+   },
+   {
+    "take": "G_duel_t3",
+    "seed": 2026092813,
+    "lyrics": "[Intro]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]",
+    "dur": 31.997,
+    "flac": "minimax_music_00006.flac",
+    "sha256": "e0c331e2a570f4f7daab67efbf1f66c797daa797b5e65da0dfafb48aecfb8589",
+    "note": "rejected: quiet throughout, one late hit at 17.9 s"
+   },
+   {
+    "take": "G_duel_t4",
+    "seed": 2026092814,
+    "lyrics": "[Intro]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Chorus]\n[Instrumental]",
+    "dur": 31.997,
+    "flac": "minimax_music_00010.flac",
+    "sha256": "2b4dbd13f4492e545df5054f88c9ac84e9a1d970bf799d0f5d19e0999794798a",
+    "note": "rejected: loud from 3.3 s, drops out 8.5-10.5 s"
+   }
+  ],
+  "model": "MiniMax Music 3 via ComfyUI (minimax_music3_dit_fp16 / text encoder cfg 1.7 top-k 50 / KSampler 30 steps cfg 1.7 euler simple; skill minimax-music scripts/music.py)",
+  "sources": "assets/src/music/<take>/ (FLAC, workflow.json, receipt, history, downloads.json; local only, gitignored)",
+  "export": "x0.891 (-1 dB), libmp3lame 224k (imageio-ffmpeg); decoded mp3 lag vs FLAC = 0 samples",
+  "placement": "film: G_duel.mp3 12.33 s on filmT(176.4) (the standoff breaks), from file 5.2 s; ends at filmT(SANDE0) with a 0.35 s fade",
+  "end": 195.969
+ },
+ {
+  "id": "H_duel_win",
+  "film": true,
+  "t": 203.395,
+  "dur": 16,
+  "caption": "Global Metadata: Instrumental anime mecha battle score, hybrid orchestral rock, 140 BPM, D major, triumphant and heroic, the moment the enemy machine explodes and the hero wins.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no spoken words. Choir-like sounds are synthesizer pads only.\nArrangement: Starts immediately on the very first beat with an enormous impact hit: full orchestra tutti, crash cymbals, huge timpani and bass drum, a massive brass stab, distorted electric guitar power chord and deep synth bass drop, no intro, no silence. Then a short heroic triumphant fanfare: soaring horns and trumpets over driving rock drums, electric guitars, synth bass and bright string runs, big wordless-choir-like synth pads, a rising key change. Then it settles onto a long sustained major chord with a cymbal swell, strings and pads ringing out and decaying to a quiet end.",
+  "lyrics": "[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]",
+  "chosen": "H_win_t4",
+  "seed": 2026092824,
+  "takes": [
+   {
+    "take": "H_win_t1",
+    "seed": 2026092821,
+    "lyrics": "[Intro]\n[Instrumental]\n\n[Outro]\n[Instrumental]",
+    "dur": 15.999,
+    "flac": "minimax_music_00005.flac",
+    "sha256": "575bc881babe6b1bf7214dda531d3633effd81f64aa8226e6da730d887da58a0",
+    "note": "rejected: starts quiet, builds from 1.6 s"
+   },
+   {
+    "take": "H_win_t2",
+    "seed": 2026092822,
+    "lyrics": "[Intro]\n[Instrumental]\n\n[Outro]\n[Instrumental]",
+    "dur": 15.999,
+    "flac": "minimax_music_00007.flac",
+    "sha256": "3f7fc03a532e6afaa9215de233349d397ba9490c60c6a769a8dd627d1eb10773",
+    "note": "rejected: first hit at 1.9-2.4 s after a quiet start"
+   },
+   {
+    "take": "H_win_t3",
+    "seed": 2026092823,
+    "lyrics": "[Intro]\n[Instrumental]\n\n[Outro]\n[Instrumental]",
+    "dur": 15.999,
+    "flac": "minimax_music_00008.flac",
+    "sha256": "12426fc771f052ebd291d3b08e637e901921937d501a2d6b848a217e1a357b14",
+    "note": "rejected: soft start, main hit at 4.4 s"
+   },
+   {
+    "take": "H_win_t4",
+    "seed": 2026092824,
+    "lyrics": "[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]",
+    "dur": 15.999,
+    "flac": "minimax_music_00009.flac",
+    "sha256": "c28b167631d345fb56b78b11a636061885180619808ecc7579f2d2a3a4dfaa46",
+    "note": "CHOSEN: stray click at 0.00 s (muted in export), short swell, impact at 0.38 s (-28 -> -9 dB in 30 ms), second hit at 4.5 s, settles by 8-12 s"
+   },
+   {
+    "take": "H_win_t5",
+    "seed": 2026092825,
+    "lyrics": "[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]",
+    "dur": 15.999,
+    "flac": "minimax_music_00011.flac",
+    "sha256": "4d9f6f76735a2add6b8c9c68cbe65bf53476e00b5f4a1802b48bada98c9b0133",
+    "note": "rejected: build-up to 0.9 s, no single impact"
+   }
+  ],
+  "model": "MiniMax Music 3 via ComfyUI (minimax_music3_dit_fp16 / text encoder cfg 1.7 top-k 50 / KSampler 30 steps cfg 1.7 euler simple; skill minimax-music scripts/music.py)",
+  "sources": "assets/src/music/<take>/ (FLAC, workflow.json, receipt, history, downloads.json; local only, gitignored)",
+  "export": "x0.891 (-1 dB), libmp3lame 224k (imageio-ffmpeg); decoded mp3 lag vs FLAC = 0 samples",
+  "placement": "film: H_duel_win.mp3 0.38 s on filmT(194.0) (the reactor goes); fades 2 s under C_battle returning at story 200",
+  "end": 211.775
+ },
+ {
   "id": "D_aftermath",
   "t": 216.6,
   "dur": 48,

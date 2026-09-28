@@ -757,26 +757,32 @@ SAMPLE_CUES.push(...ionShotCues(), ...duelCues(), ...warpCues(), ...lossCues(), 
 
 // =====================================================================================
 // MASTER AUTOMATION — keyframes [filmTime, value], exponential interpolation.
-//   lowpass : master low-pass (Hz) → slow-mo 190–194, deafness 217–226, flash 280
+//   lowpass : master low-pass (Hz) → frozen time SANDE0–194 (duel), deafness 217–226, flash 280
 //   music   : music level          → near-silence 218–224
 //   master  : overall fade         → out by 381.8
-//   warp    : sample playbackRate multiplier → slow-motion pitch-down 190–194
+//   warp    : sample playbackRate multiplier → bullet-time pitch-down on blows outside the duel score
 // duckMusic / duckSfx are generated from the voice schedule and the `duck` sample cues.
 // =====================================================================================
-const DUEL_RESYNC = 194.0;   // story: E2 explodes — the music stem re-syncs here after the duel's bullet time
-// bullet time on every blow (timemap.js SLOW_WIN): samples pitch down, the score sinks back while the picture is slowed
-// (the 190–194 slow-motion section already has its own curves)
-const slowKeys = (lo, hi) => SLOW_WIN.filter((w) => w.h < 190 || w.h > 194.1).flatMap((w) => [
+// The mech duel (story DUEL_SCORE0 → DUEL_SCORE1) has its own film-time score (manifest `film: true` stems G_duel /
+// H_duel_win, played at normal speed against the stretched picture), so no pitch / level dips on its blows: only a
+// short music duck under the Sandevistan + the cut (the score is out there anyway), released for the reactor's hit.
+export const DUEL_SCORE0 = 169.8, DUEL_SCORE1 = 195.0;
+export const DUEL_ERUPT = 176.4;   // story: the standoff breaks — G_duel's full-band entrance lands here
+export const DUEL_BOOM = 194.0;    // story: VANGUARD's reactor goes — H_duel_win's first hit lands here
+// bullet time on every blow (timemap.js SLOW_WIN) outside the duel score: samples pitch down, the score sinks back
+const slowKeys = (lo, hi) => SLOW_WIN.filter((w) => w.h < DUEL_SCORE0 || w.h > DUEL_SCORE1).flatMap((w) => [
   [w.h - w.pre - w.rin, hi], [w.h - w.pre, lo], [w.h + w.post, lo], [w.h + w.post + w.rout, hi]]);
 const withSlow = (kf, lo, hi) => [...kf, ...slowKeys(lo, hi)].sort((x, y) => x[0] - y[0]);
 export const AUTOMATION = {
-  lowpass: [[0, 20000], [190.1, 20000], [190.6, 900], [193.6, 900], [194.05, 20000],
+  lowpass: [[0, 20000], [SANDE0 - 0.03, 20000], [SANDE0 + 0.12, 900], [DUEL_BOOM - 0.4, 900], [DUEL_BOOM + 0.05, 20000],   // frozen time
             [216.8, 20000], [217.5, 380], [223.5, 380], [226, 20000],
             [278.3, 20000], [279.95, 520], [280.0, 20000],            // engulfed: everything but the swell closes down
             [280.02, 20000], [280.15, 2200], [284, 20000]],
-  music:   withSlow([[0, 1], [69.3, 1], [69.6, 0.03], [70.02, 0.03], [70.4, 1], [217.2, 1], [218, 0.2], [223, 0.2], [226, 1], [277.9, 1], [279.95, 0.25], [280.02, 1]], 0.45, 1),
+  music:   withSlow([[0, 1], [69.3, 1], [69.6, 0.03], [70.02, 0.03], [70.4, 1],
+                     [SANDE0 - 0.03, 1], [SANDE0 + 0.03, 0.3], [DUEL_BOOM - 0.1, 0.3], [DUEL_BOOM - 0.02, 1],   // Sandevistan → cut: duck
+                     [217.2, 1], [218, 0.2], [223, 0.2], [226, 1], [277.9, 1], [279.95, 0.25], [280.02, 1]], 0.45, 1),
   master:  [[0, 1], [384.5, 1], [386.8, 0.0003]],
-  warp:    withSlow([[0, 1], [190.05, 1], [190.5, 0.62], [193.6, 0.62], [194.05, 1]], 0.62, 1),
+  warp:    withSlow([[0, 1]], 0.62, 1),
 };
 
 // =====================================================================================
@@ -929,8 +935,17 @@ export default class Score {
     }));
     const stems = loaded.filter(Boolean);
     if (!stems.length) { console.warn('[audio] manifest present but no stem loaded — using the synthesized score'); return; }
-    stems.forEach((s, i) => {
-      const next = stems[i + 1];
+    // `film: true` stems are placed in FILM seconds (t / end) and play at normal speed; `hitStory` + `hitFile` re-derive
+    // t so the file's hit point lands on filmT(hitStory), `endStory` re-derives end — both follow timing edits.
+    // They sit outside the story-time chain below (no crossfade tails, no HARD_CUTS).
+    for (const s of stems.filter((x) => x.film)) {
+      if (Number.isFinite(s.hitStory) && Number.isFinite(s.hitFile)) s.t = filmT(s.hitStory) - (s.hitFile - (s.offset || 0));
+      if (Number.isFinite(s.endStory)) s.end = filmT(s.endStory);
+      s.fadeOut = s.fadeOut ?? 0.5; s.dur = (s.end ?? s.t + 30) - s.t; s.gain = (s.gain ?? 1) * STEM_GAIN; s.windows = [];
+    }
+    const chain = stems.filter((x) => !x.film);
+    chain.forEach((s, i) => {
+      const next = chain[i + 1];
       let end = s.end ?? (next ? next.t : STORY_DURATION);
       let fadeOut = s.fadeOut ?? (next ? STEM_XFADE : 3);
       let tail = s.end === undefined && next ? fadeOut : 0;       // crossfade tail runs past next.t
@@ -1044,6 +1059,7 @@ export default class Score {
       if (!INSTR[e.type]) { console.warn('[audio] unknown instrument', e.type); continue; }
       if (stems) {
         if (!STEM_SYNC_LAYER) continue;
+        if (e.t > DUEL_SCORE0 && e.t < DUEL_ERUPT) continue;   // the duel's standoff stays quiet (G_duel's tense intro)
         const keep = SYNC_KEEP_ALWAYS.includes(e.type) || (SYNC_KEEP_NEAR_HITS.includes(e.type) && nearHit(e));
         if (keep) ev.push({ t: e.t, type: e.type, p: { ...e.p, vel: (e.p.vel ?? 1) * SYNC_GAIN } });
       } else ev.push(e);
@@ -1064,11 +1080,8 @@ export default class Score {
     if (stems) this.stems.forEach((s) => {
       const base = { ref: s, resume: true, offset: s.offset || 0, gain: s.gain, fadeIn: s.fadeIn || 0, fadeOut: s.fadeOut };
       const a = s.t, b = s.t + s.dur;
-      if (a < DUEL_RESYNC && b > DUEL_RESYNC && a < SLOW_WIN[0].h) {   // C_battle: the score plays straight on through the
-        // bullet-time blows (it never slows), so it runs ahead of the story; it jumps back into step under E2's explosion
-        ev.push({ film: true, t: filmT(a), type: 'stem', p: { ...base, dur: filmT(DUEL_RESYNC) - filmT(a) + 0.5, fadeOut: 0.5 } });
-        ev.push({ film: true, t: filmT(DUEL_RESYNC), type: 'stem', p: { ...base, offset: base.offset + (DUEL_RESYNC - a), dur: filmT(b) - filmT(DUEL_RESYNC), fadeIn: 0.35 } });
-      } else if (a < TEAR_S0 && b > TEAR_S0) {   // e.g. E_climax: play to TEAR_S0, hold through the insert, resume at TEAR_F1
+      if (s.film) ev.push({ film: true, t: a, type: 'stem', p: { ...base, dur: s.dur } });   // film-time stem (the duel score)
+      else if (a < TEAR_S0 && b > TEAR_S0) {   // e.g. E_climax: play to TEAR_S0, hold through the insert, resume at TEAR_F1
         ev.push({ film: true, t: filmT(a), type: 'stem', p: { ...base, dur: TEAR_F0 - filmT(a) + 0.45, fadeOut: 0.45 } });
         ev.push({ film: true, t: TEAR_F1, type: 'stem', p: { ...base, offset: base.offset + (TEAR_S0 - a), dur: b - TEAR_S0, fadeIn: 0.02 } });
       } else ev.push({ film: true, t: filmT(a), type: 'stem', p: { ...base, dur: filmT(b) - filmT(a) } });
@@ -1130,7 +1143,7 @@ export default class Score {
   // multiply a playbackRate param by AUTOMATION.warp over [t, end] (absolute ctx times)
   _warp(param, t, end, base) {
     const kf = this.auto.warp, T0 = this._t0, f0 = t - T0, f1 = end - T0;
-    if (!kf || f1 < kf[1][0] || f0 > kf[kf.length - 1][0]) return;
+    if (!kf || kf.length < 2 || f1 < kf[1][0] || f0 > kf[kf.length - 1][0]) return;
     param.setValueAtTime(base * valueAt(kf, f0), t);
     for (const [kt, kv] of kf) if (kt > f0 && kt < f1 + 3) param.linearRampToValueAtTime(base * kv, T0 + kt);
   }

@@ -12,6 +12,12 @@
 
 Download and conversion: `blender/convert_mechs.py`. The source GLBs are in `assets/src/`.
 
+## Music
+All score stems in `assets/music/` (`A_promise` … `F_homeward`, `G_duel`, `H_duel_win`) are original instrumentals **generated with MiniMax Music 3** (run locally in ComfyUI) for this project — not stock or licensed tracks. Captions, section-tag lyrics, seeds and takes are in `assets/music/cues.json`; placement is in `assets/music/manifest.json`.
+- `G_duel.mp3` (the mech duel, 2026-09-28): take `G_duel_t1`, seed 2026092811, 32.0 s; source FLAC sha256 `ad7549ea07483fcfd11c1f63bd752ffee1f104ced6481270c04f83d1ab20810a`. Exported at −1 dB, 224 kbps MP3.
+- `H_duel_win.mp3` (the reactor hit and the win, 2026-09-28): take `H_win_t4`, seed 2026092824, 16.0 s; source FLAC sha256 `c28b167631d345fb56b78b11a636061885180619808ecc7579f2d2a3a4dfaa46`. Exported at −1 dB with a stray click in the first 20 ms muted, 224 kbps MP3.
+- The source FLACs, graphs and ComfyUI receipts of these two cues (and their rejected takes) are kept locally in `assets/src/music/` (gitignored).
+
 ## Evaluated but not used (ships)
 No CC0/CC-BY spaceship that downloads without a login came close to the v2 procedural ships (60–90k-triangle hulls with layered armor). Everything found was low-poly or stylized, and most of its look came from textures, which the engine cannot use. So the seven ship GLBs stay procedural (`blender/ships_*.py`, see `blender/DESIGN_NOTES.md`). What was checked:
 - OpenGameArt "Spaceships" and "More spaceships" by UnnamedTuesday (CC-BY 3.0). About 3.5–7k triangles each, texture-dependent. Best case (with textures) rendered to `blender/previews/v3_candidate_*.png`.
