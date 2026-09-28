@@ -978,7 +978,7 @@ function drawMSBattle(R, t) {
   const e1 = enemyMS1(t), e2 = enemyMS2(t);
   const ee1 = drawEnemyMS(R, t, e1, 1);
   drawEnemyMS(R, t, e2, 2);
-  if (t > 176.3 && t < 192.2) { boostTrail(R, t, 'hero', [0.5, 1.2, 2.2]); boostTrail(R, t, 'enemy', [2.2, 0.45, 1.1]); }
+  // (no thruster trails: the lines left behind the machines read awkwardly)
   // (his rifle shots: drawHeroFire)
   // E1 machine gun
   if (false && e1.vis && t > 172 && t < 178.5 && g.vis) {   // (RONIN #1 no longer fires on the approach)
