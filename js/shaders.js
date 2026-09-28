@@ -612,14 +612,15 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   }
   if (abs(inst.clipMin.w) > 0.5 && inst.clipMin.w < 1.5) {
     let span = inst.clipMax.xyz - inst.clipMin.xyz;
-    let jag = (vnoise(i.lp * (3.0 / max(max(span.x, span.y), span.z)) + inst.p1.w) - 0.5) * 0.35 * min(min(span.x, span.y), span.z);
+    // clipMax.w < 0: a CLEAN cut (a beam blade through the hull): no jagged fracture edge, heat = |w|
+    let jag = select((vnoise(i.lp * (3.0 / max(max(span.x, span.y), span.z)) + inst.p1.w) - 0.5) * 0.35 * min(min(span.x, span.y), span.z), 0.0, inst.clipMax.w < 0.0);
     let dl = i.lp - inst.clipMin.xyz + jag;
     let dh = inst.clipMax.xyz - i.lp + jag;
     let inside = min(min(min(dl.x, dl.y), dl.z), min(min(dh.x, dh.y), dh.z));
     let sc = min(0.01 * min(min(span.x, span.y), span.z) + 0.12, 0.6);
     if (inst.clipMin.w > 0.5) {
       if (inside < 0.0) { discard; }
-      tornEdge = inst.clipMax.w * exp(-inside / sc);
+      tornEdge = abs(inst.clipMax.w) * exp(-inside / sc);
     } else {
       if (inside > 0.0) { discard; }                  // hole punched out of the hull
       tornEdge = inst.clipMax.w * exp(inside / (sc * 1.5));
@@ -868,6 +869,13 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     col += vec3f(1.1, 0.12, 0.03) * tornEdge * tornEdge * (0.8 + 0.2 * sin(F.camPos.w * 11.0 + i.lp.x * 0.3));
   }
   col += vec3f(inst.p0.x);
+  if (inst.p0.z < 0.0) {                                             // AFTERIMAGE (ghost = −p0.z): screen-door translucency,
+    let g = -inst.p0.z;                                              // a neon silhouette in the tint colour, rim-lit
+    let ign = fract(52.9829189 * fract(dot(i.pos.xy, vec2f(0.06711056, 0.00583715))));
+    if (ign > g) { discard; }
+    let fr = pow(1.0 - abs(dot(n, V)), 2.0);
+    return vec4f(sane(inst.tint.rgb * (0.25 + 2.2 * fr) + col * 0.12), 1.0);
+  }
   return vec4f(sane(col), 1.0);
 }
 `;

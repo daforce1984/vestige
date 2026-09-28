@@ -9,7 +9,10 @@ export const TEAR_S0 = 267.2, TEAR_S1 = 268.0;          // story window
 const TEAR_LEN = 10.8;                                  // film length of the tear window
 
 // every blow of the fight (story time): the swatted bolt (duel.js DODGE.t), then the DUEL_EVENTS clash/block/hit
-export const SLOW_HITS = [166.65, 178.73, 179.95, 183.28, 190.95, 192.4];   // the gunfight: the shield block, its inverted shot, the shield torn off, slipping the full-power beam, the kill shot
+export const SLOW_HITS = [166.65, 178.73, 179.95, 183.28, 190.95, 192.05];   // the gunfight: the shield block, its inverted shot, the shield torn off, slipping the full-power beam, the saber cut
+// sustained bullet time: the SANDEVISTAN dash (duel.js SANDE0–SANDE1) — the world all but stops while he crosses it
+export const SLOW_RANGES = [[191.28, 192.2]];
+const RANGE_V = 0.4;   // (he still has to read FAST: 95 m in ~2.3 s on screen; the world round him barely moves anyway)
 export const SLOW_V = 0.2;                              // picture speed while slowed
 const SLOW_POST = 0.5 * SLOW_V;                         // story seconds held slow after the contact = 0.5 s on screen
 // per-blow window (story s): full slow on [h − pre, h + post], smooth ramps rin / rout either side.
@@ -33,11 +36,12 @@ export function slowK(s) {
   return k;
 }
 /** picture speed (story seconds per film second) at story time s, ignoring the tear */
-const vAt = (s) => { const b = 1 - (1 - HEAVY_V) * heavyK(s); return b + (SLOW_V - b) * slowK(s); };
+const rangeK = (s) => { let k = 0; for (const [a, b] of SLOW_RANGES) if (s > a - 0.1 && s < b + 0.12) k = Math.max(k, s < a ? ss((s - (a - 0.1)) / 0.1) : s > b ? 1 - ss((s - b) / 0.12) : 1); return k; };
+const vAt = (s) => { const b = 1 - (1 - HEAVY_V) * heavyK(s), r = b + (RANGE_V - b) * rangeK(s); return Math.min(r, b + (SLOW_V - b) * slowK(s)); };
 // cumulative table: u(s) = s + ∫ (1/v − 1) ds over the duel range
 const D0 = SLOW_WIN[0].h - SLOW_WIN[0].pre - SLOW_WIN[0].rin - 0.01;
 const DL = SLOW_WIN[SLOW_WIN.length - 1];
-const D1 = Math.max(DL.h + DL.post + DL.rout, HEAVY_S0 < 500 ? HEAVY_S1 + 0.5 : 0) + 0.01;
+const D1 = Math.max(DL.h + DL.post + DL.rout, HEAVY_S0 < 500 ? HEAVY_S1 + 0.5 : 0, ...SLOW_RANGES.map((r) => r[1] + 0.15)) + 0.01;
 const DS = 0.0005, DN = Math.ceil((D1 - D0) / DS);
 const EXTRA = new Float64Array(DN + 1);
 for (let i = 1; i <= DN; i++) { const s = D0 + (i - 0.5) * DS; EXTRA[i] = EXTRA[i - 1] + DS * (1 / vAt(s) - 1); }

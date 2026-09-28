@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, KILL_SHOT_T, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, KILL_SHOT_T, CUT_T, CUT_Y, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -637,8 +637,24 @@ function drawPovHands(R, t, ge, s) {
   }
 }
 
+// SANDEVISTAN afterimages: the machine as it was a moment ago, every 45 ms, strung out behind him — neon silhouettes
+// cycling green → cyan → magenta, fading with age (renderer ghost mode: screen-door translucency, rim-lit tint)
+const SANDE_COL = [[0.3, 2.2, 1.0], [0.3, 1.6, 2.4], [2.2, 0.4, 1.9]];
+function drawAfterimages(R, t, s) {
+  const K = 8;
+  for (let k = 1; k <= K; k++) {
+    const tp = t - k * 0.045; if (tp < SANDE0 - 0.02) break;
+    const q = gundamState(tp); if (!q || !q.vis) continue;
+    const g = R.add('gundam', msMatrix(new Float32Array(16), q)); if (!g) continue;
+    g.pose = q.pose; g.seed = 5.5; g.texSet = 0;
+    g.hidden = { rifle: 1, saber_hilt: 1 };
+    g.ghost = s.sande * 0.62 * (1 - (k - 1) / K);
+    const c = SANDE_COL[k % 3]; g.tint[0] = c[0]; g.tint[1] = c[1]; g.tint[2] = c[2];
+  }
+}
 export function drawGundam(R, t, s, opts = {}) {
   if (!s.vis) return null;
+  if ((s.sande || 0) > 0.01 && !s.fpv) drawAfterimages(R, t, s);
   const e = R.add('gundam', msMatrix(tmpM, s));
   if (!e) return null;
   e.pose = s.pose; e.damage = s.damage; e.seed = 5.5; e.wear = 1; e.texSet = R.texLoaded & 1 ? 1 : 0;
@@ -700,7 +716,7 @@ export function drawGundam(R, t, s, opts = {}) {
 }
 // the finisher: from the moment the magnum shot goes through (192.4) SERAPH comes apart — the beam punches through, the body
 // splits into armour chunks that drift outward in slow motion, then the reactor goes at 194 and everything is flung
-const E2_FIN = 192.4, E1_FIN = 1e9;   // (one enemy now: SERAPH comes apart only at the finisher)
+const E2_FIN = 193.95, E1_FIN = 1e9;   // the two halves drift apart until the reactor goes (194)
 const _fin = {};
 function drawBreakup(R, t, idx) {
   const t0 = idx === 2 ? E2_FIN : E1_FIN;
@@ -739,10 +755,55 @@ function drawLostShield(R, t) {
   w.damage = 0.6;
   if (lt < 3) R.light(V.madd([0, 0, 0], P, _wing.v, lt), 30, [1, 0.5, 0.2], 4 * Math.exp(-lt * 2));   // the burnt mount glowing hot for a moment
 }
+// cut in half at the waist (CUT_T): two copies, the torso part clipped clean at the cut line (a glowing, molten edge);
+// the upper half is carried on along his swing and turns over, the lower drifts back and tumbles the other way
+const LOWER = { pelvis: 1, leg_L_upper: 1, leg_L_lower: 1, foot_L: 1, leg_R_upper: 1, leg_R_lower: 1, foot_R: 1 };
+const _hT = new Float32Array(16), _hA = new Float32Array(16), _hB = new Float32Array(16), _hQ = [0, 0, 0, 1], _hM = new Float32Array(16);
+function drawHalves(R, t, s) {
+  const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, d = ev.dir, lt = s.cutK;
+  msMatrix(_hM, s);
+  const up = R.models.enemy_ms.parts, hideUp = {}, hideLo = {};
+  for (const p of up) { if (LOWER[p.name]) hideUp[p.name] = 1; else if (p.name !== 'torso') hideLo[p.name] = 1; }
+  const sep = easeOut(sat(lt / 1.2)) * 1.0 + lt * 0.8;               // they part slowly (it all happens in the slow beat)
+  for (const half of [1, -1]) {
+    const off = V.madd([0, 0, 0], V.scale([0, 0, 0], d, half * 1.6 * sep), [0, 1, 0], half * 1.2 * sep);
+    M.fromTRS(_hT, [-P[0], -P[1], -P[2]], [0, 0, 0, 1], 1);
+    M.mul(_hA, _hT, _hM);
+    Q.fromEuler(_hQ, half * 0.35 * lt, half * 0.2 * lt, -half * 0.3 * lt);
+    M.fromTRS(_hB, V.add([0, 0, 0], P, off), _hQ, 1);
+    const e = R.add('enemy_ms', M.mul(new Float32Array(16), _hB, _hA));
+    if (!e) continue;
+    e.pose = s.pose; e.seed = 10; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0; e.damage = s.damage;
+    e.hidden = { ...(half > 0 ? hideUp : hideLo), shield: 1 };
+    e.clipPart = 'torso'; e.clipInv = false; e.clipHeat = -2.6;        // clean beam cut, glowing edge (shader: w < 0)
+    e.clip = half > 0 ? [-30, CUT_Y, -30, 30, 40, 30] : [-30, -40, -30, 30, CUT_Y, 30];
+  }
+  R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));           // the molten cut glows
+  return null;
+}
+// the pass-cut itself: a flash along the blade's path through its waist, a spray of molten sparks along the swing
+function drawSlash(R, c, t) {
+  const lt = t - CUT_T; if (lt < -0.02 || lt > 1.2) return;
+  const ev = DUEL_EVENTS.find((x) => x.slash); if (!ev) return;
+  const P = ev.pos, d = ev.dir;
+  if (lt >= 0) {
+    const k = Math.exp(-lt * 7);
+    R.glow(P, 1.5 + 4 * k, [2.2 * k, 3 * k, 3.2 * k], 0.35);
+    R.light(P, 70, [0.6, 0.9, 1], 18 * k);
+    for (let i = 0; i < 60; i++) {
+      const life = 0.35 + hash(i + 3) * 0.7; if (lt > life) continue;
+      const a = lt / life, sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.3 + 1), d, 1.3));
+      const b = 4.5 * (1 - a) * (1 - a);
+      spark(R, madd(P, sd, (2 + 22 * hash(i + 11)) * easeOut(a)), 0.4 + 0.4 * (1 - a), [b, b * 0.6, b * 0.25]);
+    }
+    if (lt < 0.3) R.ripple(P, 6 + 40 * easeOut(lt / 0.3), [0.4, 0.4, 0.4], (1 - lt / 0.3) * 1.2);
+  }
+}
 function drawEnemyMS(R, t, s, idx) {
   if (idx === 2 && t > E2_FIN + 0.03 && t < 200) { drawBreakup(R, t, 2); return null; }
   if (idx === 1 && t > E1_FIN + 0.05 && t < 195) { drawBreakup(R, t, 1); return null; }
   if (!s.vis) return null;
+  if (idx === 2 && s.cutKf === undefined && (s.cutK || 0) > 0) return drawHalves(R, t, s);
   const e = R.add('enemy_ms', msMatrix(tmpM, s));
   if (!e) return null;
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
@@ -1568,6 +1629,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
                                    // (the strong fill + rim were for the mechs, which no longer take either — on the
   c.post.lensA = { enable: 0 };   // distant ships they only washed the hulls out white)   the well is far away: no background lensing (it smeared the planet into grey)
   if (k.slowmo) { c.post.saturation = 0.75; c.post.streak = 0.45; c.post.gradeHighlights = [1.2, 1.0, 0.85]; }
+  if (k.sande) { c.post.gradeHighlights = [0.85, 1.15, 1.05]; c.post.gradeShadows = [0.95, 1.05, 1.12]; c.post.ca = 0.004; }   // SANDEVISTAN: a cold green-cyan cast, a touch of fringing
   { // bullet time: the picture drains a little and the edges fall away while time crawls
     const bs = slowHit(FILM_NOW);
     if (bs > 0) { c.post.saturation = lerp(c.post.saturation ?? 0.9, 0.62, bs); c.post.vignette = lerp(c.post.vignette ?? 0.8, 1.25, bs); c.post.contrast = lerp(c.post.contrast ?? 1.08, 1.16, bs); c.post.streak = Math.max(c.post.streak ?? 0, 0.4 * bs); }
@@ -1575,26 +1637,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   // ---- the second RONIN from above (180.9–184.4): sensor spike → a silhouette against the light → the dive
   {
     const t = c.t, R = c.R;
-    if (t > 180.9 && t < 181.6) {                              // visor spikes red, warning pulse
-      const hs = duelHero(t), fk = duelFK({ ...hs, saber: 1 }, 'gundam');
-      const hd = M.transformPoint([0, 0, 0], fk.head, [0, 0.6, 1.4]);
-      const pk = Math.pow(0.5 + 0.5 * Math.sin((t - 180.9) * 28), 3);
-      R.glow(hd, 0.35 + 0.4 * pk, [3 * pk + 0.4, 0.25, 0.12], 0.5);
-      c.post.streak = 0.6 + 0.6 * pk; c.post.ca = 0.004 + 0.006 * pk; c.post.exposure = 0.8;
-    }
-    // (the backlight glow disc + red thruster star behind RONIN #2's entrance were removed: they read as a glow bug)
-    if (t > 182.6 && t < 184.4) {                              // the dive: speed streaks and shock rings around RONIN
-      const e = duelEnemy2(t).pos, eN = duelEnemy2(t + 0.05).pos;
-      const dv = V.norm([0, 0, 0], V.sub([0, 0, 0], eN, e));
-      for (let i = 0; i < 26; i++) {
-        const o = V.norm([0, 0, 0], V.cross([0, 0, 0], dv, randDir([0, 0, 0], i * 2.9 + 1)));
-        const ph = ((t * 4 + hash(i)) % 1);
-        const p0 = madd(madd(e, o, 6 + 14 * hash(i + 2)), dv, 30 - ph * 60);
-        spark(R, p0, 0.6, [0.6, 0.65, 0.8]);                        // dust motes whipping past (no streak lines)
-      }
-      const slot = Math.floor((t - 182.6) / 0.16), age = (t - 182.6) - slot * 0.16;
-      if (t >= 183.6) R.ripple(madd(e, dv, 4), 6 + age * 40, [0.2, 0.2, 0.2], (1 - age / 0.16) * 0.9);   // (none in scene 45)
-    }
+    drawSlash(R, c, t);                                        // the pass-cut (CUT_T)
   }
   for (const bi of [1, 2]) {
     if (!BLOWS[bi]) continue;

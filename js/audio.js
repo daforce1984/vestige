@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, KILL_SHOT_T, FINALE_T, FINALE_END } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -575,7 +575,7 @@ function duelCues() {
   }
   // ---- hero beam rifle: heavy report + low boom; the reversal shot tears off its wing, the charged last shot is a magnum
   DUEL_RIFLE.forEach((t, i) => {
-    const kill = t === KILL_SHOT_T;
+    const kill = false;
     out.push([t, 'beam_blast1', { at: 2.15, dur: 0.8, fadeOut: 0.3, rate: kill ? 0.8 : 1.1, gain: G * (kill ? 1.3 : 0.9), pan: -0.15, prio: 9, duck: kill ? 2 : 0.6, duckDb: DUEL_DUCK_DB, norand: true }]);
     out.push([t, 'laser_shot', { gain: G * (kill ? 0.9 : 0.75), rate: kill ? 0.7 : R(0.9, 1.0), pan: -0.15, prio: 8, norand: true }]);
     out.push([t, '@boom', { bus: 'sfx', f: kill ? 34 : 55, vel: G * (kill ? 0.95 : 0.5), dur: kill ? 1.6 : 1.0, verb: 0.3 }]);
@@ -584,11 +584,22 @@ function duelCues() {
   out.push([SHIELD_HIT_T + 0.03, 'metal_knock', { at: 'hit', rate: 0.75, gain: G * 1.0, pan: 0.3, prio: 9, duck: 0.8, duckDb: DUEL_DUCK_DB, norand: true }]);
   out.push([SHIELD_HIT_T + 0.03, '@sparkBurst', { vel: G * 0.8, pan: 0.3 }]);
   out.push([SHIELD_HIT_T + 0.03, '@metalRing', { vel: G * 0.6, f0: 300, dec: 1.2, pan: 0.3 }]);
-  // the rifle charges for the last shot (a rising whine under the slow motion)
-  out.push([FINALE_T + 0.1, 'charge_up', { at: 0, dur: KILL_SHOT_T - FINALE_T - 0.1, fadeOut: 0.05, rate: 0.75, gain: G * 0.8, pan: -0.15, prio: 8, norand: true }]);
-  // the magnum goes through its chest
-  out.push([KILL_SHOT_T + 0.05, 'metal_knock', { at: 'hit', rate: 0.6, gain: G * 1.1, pan: 0.2, prio: 9, norand: true }]);
-  out.push([KILL_SHOT_T + 0.05, '@sizzle', { vel: G * 0.8, pan: 0.2 }]);
+  // THE FINISH: the rifle slung (a servo clunk), the saber lit, the SANDEVISTAN (time folds: a deep inhaling whoomp,
+  // the world's sound smeared low by the master slow-mo), the pass-cut (buzz + sizzle + armour parting), retract
+  const FD = (a, b) => filmT(b) - filmT(a);                          // cue lengths in film seconds (the bullet time stretches them)
+  out.push([191.18, 'servo', { rate: 1.1, dur: 0.5, fadeOut: 0.2, gain: G * 0.6, pan: -0.2, prio: 7, norand: true }]);
+  out.push([SANDE0 - 0.04, '@beamSaberIgnite', { vel: 0.9 * G }]);
+  out.push([SANDE0 - 0.02, 'power_down', { rate: 0.45, gain: G * 0.9, prio: 9, duck: 1.5, norand: true }]);   // time folding in
+  out.push([SANDE0, '@boom', { bus: 'sfx', f: 30, vel: G * 0.8, dur: 2.2, verb: 0.45 }]);
+  out.push([SANDE0 + 0.02, '@beamSaberHum', { dur: FD(SANDE0, 194.1), vel: 0.75 * G, fadeIn: 0.1, fadeOut: 0.3,
+    swings: [[FD(SANDE0, CUT_T - 0.08), 1, 0.5]] }]);
+  for (const t of [191.47, 191.66, 191.86]) out.push([t - 0.02, 'whoosh:b', { at: 0.55, dur: 0.7, fadeOut: 0.3, rate: 0.7, gain: G * 0.7, pan: -0.3, prio: 8, norand: true }]);   // each leg of the dash
+  out.push([CUT_T - 0.06, '@beamSaberSwing', { vel: G, dur: 0.5 }]);
+  out.push([CUT_T, '@beamSaberClash', { vel: G, grind: 0.9 }]);
+  out.push([CUT_T, 'metal_crush', { at: 'hit', rate: 0.7, gain: G * 1.0, pan: 0.2, prio: 9, norand: true }]);
+  out.push([CUT_T, '@sizzle', { vel: G * 0.9, pan: 0.2 }]);
+  out.push([CUT_T, '@boom', { bus: 'sfx', f: 32, vel: G, dur: 2.0, verb: 0.4 }]);
+  out.push([193.95, '@beamSaberRetract', { vel: 0.7 * G, dur: 0.5 }]);
   // ---- per-mech states
   const DT = 0.02, T0 = 150, T1 = 200;
   const mechs = [['hero', duelHero, -0.2], ['e1', duelEnemy1, 0.35], ['e2', duelEnemy2, 0.25]];

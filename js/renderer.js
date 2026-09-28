@@ -491,7 +491,7 @@ export class Renderer {
     e.flash = 0; e.damage = 0; e.revealDir = 0; e.revealZ = 0; e.revealWidth = 1; e.emissive = 1; e.seed = model.entries.length * 7.13;
     e.tint[0] = 0.4; e.tint[1] = 0.7; e.tint[2] = 1.0;
     e.pose = null; e.hidden = null; e.matOverride = null;
-    e.dmgR = 0; e.clip = null; e.clipHeat = 1; e.clipInv = false; e.stretch = 0; e.stretchOut = false; e.stretchAnchor = undefined; e.wear = 0; e.texSet = 0; e.crush = null; e.melt = null; e.shadeK = 1; e.soot = 0; e.hideMats = null; e.rimK = 1; e.clipPart = null;
+    e.dmgR = 0; e.ghost = 0; e.clip = null; e.clipHeat = 1; e.clipInv = false; e.stretch = 0; e.stretchOut = false; e.stretchAnchor = undefined; e.wear = 0; e.texSet = 0; e.crush = null; e.melt = null; e.shadeK = 1; e.soot = 0; e.hideMats = null; e.rimK = 1; e.clipPart = null;
     model.entries.push(e);
     return e;
   }
@@ -611,7 +611,7 @@ export class Renderer {
           const mt = (e.matOverride && e.matOverride[d.matName]) || d.mat;
           I[o + 16] = mt.base[0]; I[o + 17] = mt.base[1]; I[o + 18] = mt.base[2]; I[o + 19] = mt.metal;
           I[o + 20] = mt.emissive[0]; I[o + 21] = mt.emissive[1]; I[o + 22] = mt.emissive[2]; I[o + 23] = mt.rough;
-          I[o + 24] = e.flash; I[o + 25] = e.damage; I[o + 26] = model.detail; I[o + 27] = e.revealZ;
+          I[o + 24] = e.flash; I[o + 25] = e.damage; I[o + 26] = e.ghost > 0 ? -Math.min(1, e.ghost) : model.detail; I[o + 27] = e.revealZ;   // ghost: afterimage (shader)
           I[o + 28] = e.revealDir; I[o + 29] = e.revealWidth; I[o + 30] = e.emissive; I[o + 31] = e.seed;
           I[o + 32] = e.tint[0]; I[o + 33] = e.tint[1]; I[o + 34] = e.tint[2]; I[o + 35] = e.wear || 0;
           I[o + 36] = e.dmgC[0]; I[o + 37] = e.dmgC[1]; I[o + 38] = e.dmgC[2]; I[o + 39] = e.dmgR;
