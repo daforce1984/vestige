@@ -337,7 +337,9 @@ export const SAMPLE_CUES = [
   ...CAPITAL_KILLS.map(([t, far], i) => [t + 0.3 + 0.1 * (i % 6), i % 2 ? 'debris_impact' : 'metal_groan',
     i % 2 ? { at: 1.0, dur: 3.5, fadeOut: 1, gain: 0.6, far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], prio: 5 }
           : { at: 2.8, dur: 2.6, fadeOut: 0.8, rate: 0.8, gain: 0.65, far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], prio: 5 }]),
-  ...[194].flatMap((t) => [                                                                                   // VANGUARD explodes
+  [193.6, 'hl_explosion', { rate: 1.2, gain: 0.9, prio: 9, norand: true }],                                 // its lower half goes first
+  [193.65, 'expl_debris', { gain: 0.7, rate: 1.1, prio: 8, norand: true }],
+  ...[194].flatMap((t) => [                                                                                   // then the upper half (the reactor)
     [t, 'hl_explosion', { rate: 1.0, gain: 1.3, prio: 9, duck: 2, norand: true }],
     [t, 'hl_big_explosion', { rate: 1.05, gain: 1.0, prio: 9, norand: true }],
     [t + 0.05, 'expl_debris', { gain: 0.9, prio: 8, norand: true }],

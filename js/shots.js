@@ -716,7 +716,7 @@ export function drawGundam(R, t, s, opts = {}) {
 }
 // the finisher: from the moment the magnum shot goes through (192.4) SERAPH comes apart — the beam punches through, the body
 // splits into armour chunks that drift outward in slow motion, then the reactor goes at 194 and everything is flung
-const E2_FIN = 193.95, E1_FIN = 1e9;   // the two halves drift apart until the reactor goes (194)
+const E2_FIN = 1e9, E1_FIN = 1e9;   // (the halves come apart on their own: drawHalves)
 const _fin = {};
 function drawBreakup(R, t, idx) {
   const t0 = idx === 2 ? E2_FIN : E1_FIN;
@@ -759,26 +759,48 @@ function drawLostShield(R, t) {
 // the upper half is carried on along his swing and turns over, the lower drifts back and tumbles the other way
 const LOWER = { pelvis: 1, leg_L_upper: 1, leg_L_lower: 1, foot_L: 1, leg_R_upper: 1, leg_R_lower: 1, foot_R: 1 };
 const _hT = new Float32Array(16), _hA = new Float32Array(16), _hB = new Float32Array(16), _hQ = [0, 0, 0, 1], _hM = new Float32Array(16);
+// each half comes apart on its own: the lower half (hips + legs) breaks up first, then the upper half's reactor goes —
+// each shatters into chunks along its own drift with its own blast (duel audio: HALF_BLAST times)
+export const HALF_BLAST = { lower: 193.6, upper: 194.0 };
+function halfMatrix(out, s, half, lt) {
+  const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, d = ev.dir;
+  const sep = easeOut(sat(lt / 1.2)) * 1.0 + lt * 0.8;               // they part slowly (it all happens in the slow beat)
+  const off = V.madd([0, 0, 0], V.scale([0, 0, 0], d, half * 1.6 * sep), [0, 1, 0], half * 1.2 * sep);
+  M.fromTRS(_hT, [-P[0], -P[1], -P[2]], [0, 0, 0, 1], 1);
+  M.mul(_hA, _hT, msMatrix(_hM, s));
+  Q.fromEuler(_hQ, half * 0.35 * lt, half * 0.2 * lt, -half * 0.3 * lt);
+  M.fromTRS(_hB, V.add([0, 0, 0], P, off), _hQ, 1);
+  return M.mul(out, _hB, _hA);
+}
+/** world centre of a half (for its blast), at story time t */
+export function halfCentre(t, half) {
+  const s = enemyMS2(Math.min(t, 194.15)); if (!s) return null;
+  const m = halfMatrix(new Float32Array(16), s, half, Math.max(0, t - CUT_SPLIT));
+  return M.transformPoint([0, 0, 0], m, [0, half > 0 ? 14.5 : 7, 0]);
+}
+const _halfM = { 1: new Float32Array(16), [-1]: new Float32Array(16) };
 function drawHalves(R, t, s) {
-  const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, d = ev.dir, lt = s.cutK;
-  msMatrix(_hM, s);
+  const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, lt = s.cutK;
   const up = R.models.enemy_ms.parts, hideUp = {}, hideLo = {};
   for (const p of up) { if (LOWER[p.name]) hideUp[p.name] = 1; else if (p.name !== 'torso') hideLo[p.name] = 1; }
-  const sep = easeOut(sat(lt / 1.2)) * 1.0 + lt * 0.8;               // they part slowly (it all happens in the slow beat)
   for (const half of [1, -1]) {
-    const off = V.madd([0, 0, 0], V.scale([0, 0, 0], d, half * 1.6 * sep), [0, 1, 0], half * 1.2 * sep);
-    M.fromTRS(_hT, [-P[0], -P[1], -P[2]], [0, 0, 0, 1], 1);
-    M.mul(_hA, _hT, _hM);
-    Q.fromEuler(_hQ, half * 0.35 * lt, half * 0.2 * lt, -half * 0.3 * lt);
-    M.fromTRS(_hB, V.add([0, 0, 0], P, off), _hQ, 1);
-    const e = R.add('enemy_ms', M.mul(new Float32Array(16), _hB, _hA));
+    const tb = half > 0 ? HALF_BLAST.upper : HALF_BLAST.lower;
+    const hide = { ...(half > 0 ? hideUp : hideLo), shield: 1 };
+    if (t >= tb) {                                                    // this half has come apart: its chunks fly off its drift
+      const sb = enemyMS2(tb) || s;
+      halfMatrix(_halfM[half], sb, half, tb - CUT_SPLIT);
+      shatter(R, 'enemy_ms', _halfM[half], t, tb, half > 0 ? 91 : 57, half > 0 ? [3, 3, 3] : [2, 3, 2], 2.4,
+        { tint: [2, 0.4, 0.3], pose: sb.pose, texSet: R.texLoaded & 4 ? 2 : 0, hidden: hide });
+      continue;
+    }
+    const e = R.add('enemy_ms', halfMatrix(new Float32Array(16), s, half, lt));
     if (!e) continue;
     e.pose = s.pose; e.seed = 10; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0; e.damage = s.damage;
-    e.hidden = { ...(half > 0 ? hideUp : hideLo), shield: 1 };
+    e.hidden = hide;
     e.clipPart = 'torso'; e.clipInv = false; e.clipHeat = -2.6;        // clean beam cut, glowing edge (shader: w < 0)
     e.clip = half > 0 ? [-30, CUT_Y, -30, 30, 40, 30] : [-30, -40, -30, 30, CUT_Y, 30];
   }
-  R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));           // the molten cut glows
+  if (t < HALF_BLAST.upper) R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));   // the molten cut glows
   return null;
 }
 // ---- THE CUT, frame by frame (extreme bullet time, CUT_T−0.04 → CUT_SPLIT): the torso's waist section is an ellipse
@@ -817,7 +839,7 @@ function drawCutDetail(R, t) {
   const live = t < CUT_SPLIT && cur && t - cur.t < 0.004;
   const th0 = P.first.th;
   // the cut edges: arcs of the section from where the blade went in to where it is now, glowing hot at the front
-  if (cur) for (const side of [0, 1]) {
+  if (cur && t < CUT_SPLIT + 0.01) for (const side of [0, 1]) {   // (only while cutting: after that it hung in space as a ring)
     const a0 = th0[side], a1 = cur.th[side];
     let da = a1 - a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
     const n = Math.max(2, Math.ceil(Math.abs(da) / 0.12));
@@ -1063,7 +1085,9 @@ function drawMSBattle(R, t) {
       }
     }
   }
-  explosion(R, t, 194, addv(enemyMS2(194).pos, [0, 6, -3]), 18, 502, 'ship');
+  { const cl = halfCentre(HALF_BLAST.lower, -1), cu = halfCentre(HALF_BLAST.upper, 1);   // each half goes up on its own
+    if (cl) explosion(R, t, HALF_BLAST.lower, cl, 11, 503, 'ship');
+    if (cu) explosion(R, t, HALF_BLAST.upper, cu, 18, 502, 'ship'); }
   return g;
 }
 

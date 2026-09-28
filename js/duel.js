@@ -967,7 +967,7 @@ function enemyRaw_(t) {
   return r;
 }
 export function duelEnemy1(t) { if (t < DUEL_T0 || t >= DUEL_T1) return null; const s = enemyRaw_(t); return t < SERAPH_HANDOFF && t > 160 ? s : { ...s, vis: false }; }
-export function duelEnemy2(t) { if (t < DUEL_T0 || t >= DUEL_T1) return null; const s = enemyRaw_(t); return t >= SERAPH_HANDOFF && t < 194.2 ? s : { ...s, vis: false }; }
+export function duelEnemy2(t) { if (t < DUEL_T0 || t >= DUEL_T1) return null; const s = enemyRaw_(t); return t >= SERAPH_HANDOFF && t < 199.9 ? s : { ...s, vis: false }; }   // (its halves / their chunks until the duel ends)
 const _epose = new Float64Array(NCH);
 function enemyState_(t) {
   const s = base(true);
@@ -1404,7 +1404,7 @@ export const DUEL_CAMS = [
     return { pos: add(add(W, scl(D_L, 26)), add(scl(D_U, -10), [0, 6, 0])), target: add(W, [0, 1, 0]), fov: 40, handheld: 0.03 }; } },
   // ahead of where he comes out of it: he glides toward the lens, the halves drifting apart behind him, then the reactor
   { t0: 192.55, t1: 194.6, name: 'D24 it comes apart behind him', slowmo: true, fn: (t, u) => {
-    return { pos: DP(46, -34, 6), target: pan(E_CUT, lrp(hp(t), ep(Math.min(t, 194)), 0.55), 0.6), fov: 40, handheld: 0.03 }; } },
+    return { pos: DP(46, -34, 6), target: add(pan(E_CUT, lrp(hp(t), ep(Math.min(t, 194)), 0.55), 0.6), [0, 9, 0]), fov: 44, handheld: 0.03 }; } },   // (both halves' blasts in frame)
   { t0: 194.6, t1: 197.2, name: 'D25 aftermath', fn: (t, u) => { const h = hp(t); return { pos: add(h, [-16 - u * 12, 6 + u * 3, -30 - u * 10]), target: up(h, 6), fov: 40, handheld: 0.3 }; } },
   { t0: 197.2, t1: 200.0, name: 'D26 aftermath wide', fn: (t, u) => { const h = hp(t); return { pos: add(h, [-40 - u * 10, 12 + u * 4, -48 - u * 8]), target: up(h, 6), fov: 38, handheld: 0.3 }; } },
 ];

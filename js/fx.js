@@ -414,6 +414,7 @@ export function shatter(R, name, base, t, t0, seed, grid = [2, 2, 3], speed = 1,
     e.emissive = Math.max(0, 1 - lt * 1.5) * (hash(s + 6) > 0.5 ? 1 : 0.2);   // lights die, a few flicker
     if (opts.tint) e.tint = opts.tint;
     if (opts.pose) { e.pose = opts.pose; }
+    if (opts.hidden) e.hidden = opts.hidden;
     if (opts.texSet) e.texSet = opts.texSet;
     if (opts.noFire) continue;
     // venting fire at each chunk centre for a few seconds
