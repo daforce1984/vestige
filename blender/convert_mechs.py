@@ -28,7 +28,12 @@ BASE_MAP = {'root': 'pelvis', 'pelvis': 'pelvis', 'skirt.L': 'pelvis', 'skirt.R'
             'sword.R': 'hand_R',
             'thigh.L': 'leg_L_upper', 'shin.L': 'leg_L_lower', 'foot.L': 'foot_L',
             'thigh.R': 'leg_R_upper', 'shin.R': 'leg_R_lower', 'foot.R': 'foot_R'}
-PIVOT_BONE = {'pelvis': 'pelvis', 'torso': 'chest', 'head': 'head', 'arm_L_upper': 'upper_arm.L',
+# SERAPH / 03's wing chains (root, outer, five feathers per side) ride as one rigid part each, hinged at the wing root
+for _s in ('L', 'R'):
+    for _b in ['wing_root', 'wing_outer'] + ['feather_0%d' % _k for _k in range(1, 6)]:
+        BASE_MAP['%s.%s' % (_b, _s)] = 'wing_' + _s
+EXTRA_PARENT = {'wing_L': 'torso', 'wing_R': 'torso'}
+PIVOT_BONE = {'wing_L': 'wing_root.L', 'wing_R': 'wing_root.R', 'pelvis': 'pelvis', 'torso': 'chest', 'head': 'head', 'arm_L_upper': 'upper_arm.L',
               'arm_L_lower': 'forearm.L', 'hand_L': 'hand.L', 'arm_R_upper': 'upper_arm.R', 'arm_R_lower': 'forearm.R',
               'hand_R': 'hand.R', 'leg_L_upper': 'thigh.L', 'leg_L_lower': 'shin.L', 'foot_L': 'foot.L',
               'leg_R_upper': 'thigh.R', 'leg_R_lower': 'shin.R', 'foot_R': 'foot.R'}
@@ -37,6 +42,10 @@ SPECS = {
     'gundam': dict(src='atlas-09.glb', height=18.0, prefix='atlas', eye_rgb=(0.4, 1.0, 0.9),
                    glow_name='core', engine_rgb=(0.5, 0.75, 1.0), muzzle_empty='Muzzle_R', hilt=True,
                    core_rgb=(0.35, 0.85, 1.0), K=5, clean_emissive=True, hand_rifle=True),
+    # SERAPH / 03 (CC0): the new enemy — black armour, orange lights, wings, a heavy beam cannon on the right arm
+    'enemy_seraph': dict(src='seraph-03.glb', height=19.0, prefix='seraph', eye_rgb=(1.0, 0.42, 0.12),
+                         glow_name='core', engine_rgb=(1.0, 0.45, 0.15), muzzle_empty=None, hilt=False,
+                         core_rgb=(1.0, 0.45, 0.15), K=5, smooth_iter=10, em_thresh=0.12),   # its small orange panel lights
     'enemy_ms': dict(src='ronin-04.glb', height=18.0, prefix='ronin', eye_rgb=(1.0, 0.25, 0.6),
                      glow_name='core', engine_rgb=(1.0, 0.4, 0.12), muzzle_empty=None, hilt=False,
                      sword_forward=True, add_eyes=True, core_rgb=(1.0, 0.4, 0.12), K=5, smooth_iter=12),
@@ -235,7 +244,7 @@ def convert(name):
         np.add.at(wsum, adj_b, area[adj_a])
         base_srgb = acc / wsum[:, None]
     elum = emis.max(1)
-    is_em = elum > 0.35
+    is_em = elum > sp.get('em_thresh', 0.35)
     # sword: keep as its own polished steel/gold cluster set (it is thin; clustering handles it)
     lab, C = kmeans(base_srgb[~is_em], area[~is_em] + 1e-6, sp['K'])
     cluster = np.full(nf, -1)
@@ -363,6 +372,13 @@ def convert(name):
         ob.location = pv
         link(ob)
         objs[node], piv[node] = ob, pv
+    # every joint of the contract exists even if no faces landed on it (SERAPH's right hand is inside its cannon)
+    for node, bone in PIVOT_BONE.items():
+        if node not in objs and bone in bone_heads:
+            ob = bpy.data.objects.new(node, None)
+            ob.location = bone_heads[bone].copy()
+            link(ob)
+            objs[node], piv[node] = ob, ob.location.copy()
     # ---- extras: backpack thrusters, saber hilt, rifle (+muzzle), eyes, shield-less contract nodes
     chest_h = bone_heads['chest']
     torso_faces_y = max(o.bound_box[6][1] for o in [objs['torso']]) + piv['torso'].y  # back surface (+Y)
@@ -508,7 +524,7 @@ def convert(name):
             join_into('torso', mb.to_object('_core', pivot=piv['torso'], smooth_angle=40))
             print('  clean core ring r=%.2f at (%.2f,%.2f,%.2f)' % (r, *c))
     # ---- hierarchy
-    for c, p in PARENT.items():
+    for c, p in list(PARENT.items()) + list(EXTRA_PARENT.items()):
         if c in objs and p in objs:
             set_parent(objs[c], objs[p], piv[c], piv[p])
     e = bpy.data.objects.new('rifle_muzzle', None)
