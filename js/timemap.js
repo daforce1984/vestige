@@ -9,7 +9,7 @@ export const TEAR_S0 = 267.2, TEAR_S1 = 268.0;          // story window
 const TEAR_LEN = 10.8;                                  // film length of the tear window
 
 // every blow of the fight (story time): the swatted bolt (duel.js DODGE.t), then the DUEL_EVENTS clash/block/hit
-export const SLOW_HITS = [166.65, 178.0, 178.2, 178.55, 179.0, 184.5, 186.0, 186.45, 187.6, 188.2, 188.85, 189.45, 190.9, 192.4];
+export const SLOW_HITS = [166.65, 178.05, 179.35, 184.5, 186.0, 186.45, 187.6, 188.2, 188.85, 189.45, 190.9, 192.4];   // + the closest beam near-miss (178.05), the swat (179.35), the beam on the mace (190.9)
 export const SLOW_V = 0.2;                              // picture speed while slowed
 const SLOW_POST = 0.5 * SLOW_V;                         // story seconds held slow after the contact = 0.5 s on screen
 // per-blow window (story s): full slow on [h − pre, h + post], smooth ramps rin / rout either side.
@@ -19,7 +19,7 @@ export const SLOW_WIN = SLOW_HITS.map((h, i) => {
   return { h, pre: Math.min(0.05, 0.15 * gp), rin: Math.min(0.12, 0.2 * gp), post: Math.min(SLOW_POST, 0.35 * gn), rout: Math.min(0.14, 0.25 * gn) };
 });
 // the heavy clock: the whole melee (the charge → RONIN #2's death) at HEAVY_V, eased in / out over ~0.5 s
-export const HEAVY_V = 0.62, HEAVY_S0 = 176.3, HEAVY_S1 = 194.3;
+export const HEAVY_V = 0.62, HEAVY_S0 = 184.0, HEAVY_S1 = 194.3;
 const heavyK = (s) => ss((s - HEAVY_S0) / 0.5) * (1 - ss((s - HEAVY_S1) / 0.5));
 const ss = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 /** 0..1 slow-motion amount at story time s */

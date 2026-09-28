@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2 } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -325,7 +325,7 @@ export const SAMPLE_CUES = [
   ...[136, 136.6, 137.3, 141.8, 142.4, 143].map((t, i) => [t, 'missile', { pan0: i % 2 ? 0.6 : -0.6, pan1: i % 2 ? -0.4 : 0.5, gain: 0.8, far: (i % 3) * 0.15, prio: 6 }]),
   // ---------------- ship kills (enemy losses only after the well collapses; the mech kills in the duel)
   ...CAPITAL_KILLS.map(([t, far], i) => [t + 0.03, ['expl_epic', 'expl_metal', 'expl_distant_huge', 'expl_distant'][i % 4], { far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], gain: 0.5, prio: 5 }]),
-  ...[[179.15, 'expl_metal'], [179.2, 'expl_debris'], [194, 'expl_epic'], [194.05, 'expl_debris']].map(([t, sp]) => [t + 0.03, sp, { far: 0, gain: 0.5, prio: 5 }]),
+  ...[[194, 'expl_epic'], [194.05, 'expl_debris']].map(([t, sp]) => [t + 0.03, sp, { far: 0, gain: 0.5, prio: 5 }]),
   // homeland explosions (its conventions: size → playbackRate; capital = big_explosion 0.98→0.74 + explosion 0.86→0.76)
   ...CAPITAL_KILLS.flatMap(([t, far], i) => {
     const pan = [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6];
@@ -337,7 +337,7 @@ export const SAMPLE_CUES = [
   ...CAPITAL_KILLS.map(([t, far], i) => [t + 0.3 + 0.1 * (i % 6), i % 2 ? 'debris_impact' : 'metal_groan',
     i % 2 ? { at: 1.0, dur: 3.5, fadeOut: 1, gain: 0.6, far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], prio: 5 }
           : { at: 2.8, dur: 2.6, fadeOut: 0.8, rate: 0.8, gain: 0.65, far, pan: [0.4, -0.3, 0.2, -0.5, 0.5, -0.1][i % 6], prio: 5 }]),
-  ...[179.15, 194].flatMap((t) => [                                                                                   // enemy mechs explode
+  ...[194].flatMap((t) => [                                                                                   // SERAPH explodes
     [t, 'hl_explosion', { rate: 1.0, gain: 1.3, prio: 9, duck: 2, norand: true }],
     [t, 'hl_big_explosion', { rate: 1.05, gain: 1.0, prio: 9, norand: true }],
     [t + 0.05, 'expl_debris', { gain: 0.9, prio: 8, norand: true }],
@@ -367,9 +367,11 @@ export const SAMPLE_CUES = [
   ...[138, 141.6, 145, 148.6, 152, 157, 163, 171, 178, 189].map((t, i) => [t, 'hl_explosion', { rate: 1.22, gain: 0.75, far: 0.3 + 0.1 * (i % 3), pan: 'rnd', prio: 5 }]),
   ...[138, 145, 152, 163, 178].map((t, i) => [t + 0.04, 'expl_debris', { rate: 1.15, gain: 0.3, far: 0.4, pan: 'rnd', prio: 3 }]),
   // ---------------- the standoff 171.6–176.4: near-silence, then small sounds that each mean something
-  [172.22, 'hl_thruster', { dur: 0.55, fadeOut: 0.3, rate: 1.1, gain: 0.55, pan: -0.3, far: 0.25, prio: 7, norand: true }],   // RONIN brakes onto its mark
-  [173.95, 'servo', { rate: 0.5, dur: 0.8, fadeOut: 0.3, gain: 0.7, pan: 0.15, prio: 8, norand: true }],                      // the mace comes up, heavy
-  [174.55, 'metal_knock', { at: 'hit', rate: 0.6, gain: 0.35, pan: 0.15, prio: 7, norand: true }],                            // grip locks
+  [172.22, 'hl_thruster', { dur: 0.55, fadeOut: 0.3, rate: 1.1, gain: 0.55, pan: -0.3, far: 0.25, prio: 7, norand: true }],   // SERAPH brakes onto its mark
+  [172.72, 'servo', { rate: 1.3, dur: 0.7, fadeOut: 0.3, gain: 0.55, pan: -0.3, prio: 7, norand: true }],                      // its wings flare
+  [173.1, 'metal_knock', { at: 'hit', rate: 1.2, gain: 0.25, pan: -0.3, prio: 6, norand: true }],
+  [175.45, 'servo', { rate: 0.5, dur: 0.8, fadeOut: 0.3, gain: 0.7, pan: 0.15, prio: 8, norand: true }],                      // the mace comes up, heavy
+  [176.15, 'metal_knock', { at: 'hit', rate: 0.6, gain: 0.35, pan: 0.15, prio: 7, norand: true }],                            // grip locks
   [174.76, 'charge_up', { at: 0, dur: 0.7, fadeOut: 0.3, rate: 1.7, gain: 0.35, pan: -0.25, prio: 7, norand: true }],          // its eye flares
   [175.57, 'mech_powerup', { dur: 0.9, fadeOut: 0.4, rate: 0.8, gain: 0.45, prio: 7, norand: true }],                          // his visor answers
   // ---------------- mech launch 150–161
@@ -651,6 +653,32 @@ function duelCues() {
   out.push([156.9, 'hit_heavy', { rate: 0.7, lp: 1200, gain: G * 0.5, prio: 7, norand: true }]);
   out.push([157.3, 'servo', { rate: 0.6, gain: G * 0.6, prio: 7, norand: true }]);
   out.push([157.35, '@steam', { dur: 1.2, vel: 0.5 }]);
+  // ---- SERAPH's heavy cannon (the ranged duel): charge whine, the blast + a low boom, the shot tearing past him;
+  //      his flash-steps (thruster bursts), the 4th shot struck off the mace, the kick-off and climb away
+  for (const ts of SERAPH_SHOTS) {
+    out.push([ts - 0.3, 'charge_up', { at: 0, dur: 0.34, fadeOut: 0.05, rate: 2.2, gain: G * 0.45, pan: 0.3, prio: 7, norand: true }]);
+    out.push([ts, 'heavy_beam', { rate: 1.15, dur: 0.9, fadeOut: 0.35, gain: G * 0.95, pan: 0.25, prio: 9, duck: 1.2, norand: true }]);
+    out.push([ts, 'beam_blast1', { at: 2.15, dur: 0.9, fadeOut: 0.3, rate: 1.05, gain: G * 0.7, pan: 0.25, prio: 8, norand: true }]);
+    out.push([ts, '@boom', { bus: 'sfx', f: 44, vel: G * 0.5, dur: 0.8, verb: 0.25 }]);
+    if (ts < 179) out.push([ts + 0.05, 'flyby_fast', { rate: 1.2, gain: G * 0.6, pan0: 0.4, pan1: -0.6, dur: 0.45, fadeOut: 0.2, prio: 8, norand: true }]);
+  }
+  for (const tf of [176.97, 177.52, 177.93]) {
+    out.push([tf, 'hl_thruster', { dur: 0.35, fadeOut: 0.2, rate: 1.4, gain: G * 0.6, pan: -0.2, prio: 7, norand: true }]);
+    out.push([tf, 'whoosh:a', { at: 0.55, dur: 0.5, fadeOut: 0.2, rate: 1.3, gain: G * 0.5, pan: -0.2, prio: 7, norand: true }]);
+  }
+  out.push([179.35, 'metal_knock', { at: 'hit', rate: 0.8, gain: G * 1.0, pan: -0.2, prio: 9, duck: 0.8, duckDb: DUEL_DUCK_DB, norand: true }]);
+  out.push([179.35, '@sparkBurst', { vel: G * 0.8, pan: -0.2 }]);
+  out.push([179.37, 'beam_blast4', { at: 1.7, dur: 0.7, fadeOut: 0.3, rate: 1.3, gain: G * 0.55, pan: 0.5, prio: 8, norand: true }]);
+  out.push([179.35, '@metalRing', { vel: G * 0.7, f0: 380, dec: 1.0, pan: -0.2 }]);
+  out.push([178.6, 'hl_thruster', { dur: 1.6, fadeOut: 0.8, rate: 0.9, gain: G * 0.7, pan0: 0.3, pan1: 0.6, prio: 7, norand: true }]);
+  // ---- the finale: full power held on the mace — it grinds there — then cut off as he bursts out of it
+  out.push([190.5, 'charge_up', { at: 0, dur: 0.4, fadeOut: 0.05, rate: 1.3, gain: G * 0.8, pan: 0.2, prio: 8, norand: true }]);
+  out.push([190.85, 'beam', { at: 'hit', gain: G * 1.2, rate: 1.05, prio: 9, duck: 3, norand: true }]);
+  out.push([190.85, 'heavy_beam', { rate: 0.85, dur: 1.4, fadeOut: 0.3, gain: G * 1.1, prio: 9, norand: true }]);
+  for (let tt = 190.9; tt < 191.9; tt += 0.11) out.push([tt, '@sparkBurst', { vel: G * 0.55, pan: -0.1 }]);
+  out.push([190.9, '@metalRing', { vel: G * 0.8, f0: 140, dec: 1.4, pan: -0.1 }]);
+  out.push([191.95, 'beam_blast4', { at: 1.7, dur: 0.6, fadeOut: 0.25, rate: 0.9, gain: G * 0.8, prio: 8, norand: true }]);
+  out.push([191.95, '@boom', { bus: 'sfx', f: 36, vel: G * 0.8, dur: 1.2, verb: 0.3 }]);
   return out;
 }
 
