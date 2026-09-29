@@ -22,29 +22,17 @@
   "end": 169.8
  },
  {
-  "file": "G_duel.mp3",
-  "film": true,
-  "t": 0,
-  "end": 190.7,
-  "offset": 9.5,
-  "hitStory": 170.3,
-  "hitFile": 12.33,
-  "gain": 1.0,
-  "fadeIn": 1.0,
-  "fadeOut": 1.6
- },
- {
-  "file": "G_duel.mp3",
+  "file": "G_duel_fast.mp3",
   "film": true,
   "t": 0,
   "end": 195.969,
-  "offset": 21.098,
-  "hitStory": 170.3,
-  "hitFile": 3.414,
+  "offset": 0.35,
+  "hitStory": 170.0,
+  "hitFile": 0.5,
+  "endStory": 191.3,
   "gain": 1.0,
-  "fadeIn": 1.5,
-  "fadeOut": 0.35,
-  "endStory": 191.3
+  "fadeIn": 0.1,
+  "fadeOut": 0.35
  },
  {
   "file": "H_duel_win.mp3",

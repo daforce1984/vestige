@@ -166,5 +166,41 @@
   "end": 372,
   "caption": "Instrumental only, no vocals, no singing, no lyrics. Epic cinematic film score in the style of Hans Zimmer's Dune and Interstellar: huge orchestra, deep brass, low wordless choir textures, sub-bass, vast reverb. Homecoming. 66 BPM, F major. Quiet solo piano and warm strings, then a slow, enormous emotional swell of full orchestra and horns as the fleet finally descends toward its home planet at sunrise, a grand uplifting final chord, fading to silence.",
   "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Build]\n[Instrumental]\n\n[Climax]\n[Instrumental]\n\n[Outro]\n[Instrumental]"
+ },
+ {
+  "id": "G_duel_fast",
+  "film": true,
+  "dur": 36,
+  "caption": "Global Metadata: Instrumental anime mecha battle score, aggressive hybrid orchestral rock with drum-and-bass energy, 174 BPM, E minor, relentless urgency and danger, for a high-speed giant-robot gunfight in space. Fast, tense, breathless from start to finish.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: Starts immediately at full tempo on the very first beat, no silence, no slow intro: rapid sixteenth-note staccato string ostinato, tight snare rolls, a driving four-on-the-floor kick, a pulsing sixteenth-note synth bass, ticking hi-hats, rising tension and short brass swells. At about 6 seconds: an explosive full-band hit with a huge crash: pounding fast rock drums with double kick and breakbeat fills, distorted electric guitar riffs and palm mutes, heavy brass stabs and a fierce heroic horn theme, fast string runs, arpeggiated synths, taiko hits. Relentless forward drive to the very end, constant rhythmic urgency, no breakdown, no half-time, no slowing down, no fade out.",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n",
+  "chosen": "G_duel2_t3",
+  "seed": 20260930003,
+  "takes": [
+   {
+    "take": "G_duel2_t1",
+    "seed": 20260930001,
+    "flac": "minimax_music_00022.flac",
+    "sha256": "d56dd8171f5287894d0457e4e58e02f459152380a4b463aa7f3da05bcfd59fb8",
+    "note": "rejected: 27.2 s, too short for the 29.7 s slot"
+   },
+   {
+    "take": "G_duel2_t2",
+    "seed": 20260930002,
+    "flac": "minimax_music_00023.flac",
+    "sha256": "dba7bfe79333aba4ef114b4b4ada172893369b8d6aca33316f6ea97ad4176e10",
+    "note": "rejected: quiet start, full band only from ~13 s"
+   },
+   {
+    "take": "G_duel2_t3",
+    "seed": 20260930003,
+    "flac": "minimax_music_00024.flac",
+    "sha256": "c77b348e300eef5a31fff49a0dba0cef47a5bcb970c9cf489c860df8019c1cef",
+    "note": "CHOSEN: loud from the first beat (0.5 s, +37 dB step), fastest pulse (~190 BPM onset rate), a second lift at 20.5 s, no vocal-like segments (Whisper VAD)"
+   }
+  ],
+  "model": "MiniMax Music 3 via ComfyUI (minimax-music skill scripts/music.py)",
+  "sources": "assets/src/music/G_duel2/<take>/ (local only, gitignored)",
+  "export": "x0.891 (-1 dB), libmp3lame 224k (imageio-ffmpeg)",
+  "placement": "film: G_duel_fast.mp3 0.5 s (first hit) on filmT(170.0) (the draw begins), from file 0.35 s; ends at filmT(SANDE0) with a 0.35 s fade; replaces the two G_duel copies"
  }
 ]
