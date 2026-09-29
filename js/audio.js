@@ -608,7 +608,7 @@ function duelCues() {
   // buzz held across the pass (Freesound CC0 'bzzzzzzzzzzpht', FartMuffin) + hot metal searing under it (CC0
   // 'ShovelSizzle8_mod', rabban625), its tail ringing on as the halves part
   out.push([CUT_T - 0.012, 'saber_cut', { at: 'hit', gain: G * 1.1, pan: 0.15, prio: 9, norand: true }]);
-  out.push([CUT_T - 0.01, '@msScrape', { vel: G * 0.9, dur: FD(CUT_T - 0.01, CUT_SPLIT + 0.01), pan: 0.15 }]);   // steel grinding as the blade drags through
+  out.push([CUT_T - 0.01, '@msScrape', { vel: G * 1.6, dur: FD(CUT_T - 0.01, CUT_SPLIT + 0.01), pan: 0.15 }]);   // steel grinding as the blade drags through
   out.push([CUT_T + 0.004, 'cut_sizzle', { at: 'hit', gain: G * 0.55, pan: 0.2, prio: 8, norand: true }]);
   out.push([CUT_T, '@boom', { bus: 'sfx', f: 32, vel: G, dur: 2.0, verb: 0.4 }]);
   out.push([193.95, '@beamSaberRetract', { vel: 0.7 * G, dur: 0.5 }]);
@@ -676,14 +676,11 @@ function duelCues() {
   // he cuts it in half with his saber: ignite, the swing, the cut (a clash + sizzle), both halves whipping past, retract
   out.push([TRANS_PASS - 0.35, '@beamSaberIgnite', { vel: 0.8 * G }]);
   out.push([TRANS_PASS - 0.06, '@beamSaberSwing', { vel: G, dur: 0.4 }]);
-  out.push([TRANS_PASS, '@beamSaberClash', { vel: G, grind: 1.2 }]);
+  out.push([TRANS_PASS, '@beamSaberClash', { vel: G * 1.3, grind: 1.6 }]);   // full-power blade
   out.push([TRANS_PASS, '@boom', { bus: 'sfx', f: 34, vel: G * 0.8, dur: 1.6, verb: 0.4 }]);
-  out.push([TRANS_PASS + 0.01, '@msPass', { vel: G * 0.8, tp: 0.2, ratio: 3, f: 1100, pan0: -0.2, pan1: 0.8 }]);
-  out.push([TRANS_PASS + 0.01, '@msPass', { vel: G * 0.8, tp: 0.25, ratio: 3, f: 950, pan0: 0.2, pan1: -0.8 }]);
+  out.push([TRANS_PASS, 'magic_impact', { at: 'hit', rate: 0.75, gain: G * 1.2, prio: 9, norand: true }]);   // the ball smashed into scattering energy
+  out.push([TRANS_PASS, '@shockwave', { vel: G * 0.7 }]);
   out.push([TRANS_PASS + 0.47, '@beamSaberRetract', { vel: 0.6 * G, dur: 0.4 }]);
-  out.push([TRANS_HIT, 'hl_explosion', { rate: 0.8, gain: G * 1.0, pan: -0.2, prio: 9, norand: true }]);
-  out.push([TRANS_HIT + 0.06, 'hl_explosion', { rate: 0.9, gain: G * 0.9, pan: 0.3, prio: 9, norand: true }]);   // the second half
-  out.push([TRANS_HIT, '@boom', { bus: 'sfx', f: 30, vel: G * 0.8, dur: 2.2, verb: 0.4 }]);
   for (const ts of SERAPH_SHOTS) {
     if (ts === TRANS_SHOT) continue;
     out.push([ts, 'energy_beam2', { at: 'hit', rate: R(0.92, 1.0), gain: G * 0.9, pan: 0.3, prio: 9, norand: true }]);   // its heavier blaster                          // its heavier rifle, pitched down

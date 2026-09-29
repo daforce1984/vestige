@@ -1042,6 +1042,7 @@ function duelHero_(t) {
   s.weapon = tw > 169.5 && tw < HERO_GRAB ? 'none' : tw < 191.22 || tw >= 200 ? 'rifle' : tw < 194.1 ? 'saber' : 'none';   // slung over the shoulder at 191.2
   s.saber = Math.max(smooth(191.26, 191.36, tw) * (1 - smooth(193.85, 194.1, tw)), transSaber(tw));
   s.saberL = transSaber(tw) > 0;                                     // (the saber in his left hand while the rifle stays in his right)
+  s.saberPow = s.saberL ? 2 : 1;                                     // full output against the charged shot: twice as thick
   s.sande = Math.max(sat((tw - SANDE0 + 0.05) / 0.1) * (1 - smooth(CUT_T - 0.05, CUT_T - 0.025, tw)), transGhost(tw));
   s.ghostFrom = tw < SANDE0 - 0.1 ? TRANS_PASS - 0.1 : SANDE0 - 0.02;   // afterimages (shots.js); gone for the close-up of the cut
   s.boost = heroBoost(tw);
@@ -1129,6 +1130,7 @@ function enemyState_(t) {
     const wHip = styleW(tw, SERAPH_SHOTS, ENEMY_STYLE, 'hip'), wSnap = styleW(tw, SERAPH_SHOTS, ENEMY_STYLE, 'snap'), kL = TWO_HAND(tw) * (1 - Math.max(wHip, wSnap));
     aim2H(s, tg, ak, kL, lrp([-0.35, 3.9, 2.3], [-1.6, 1.2, 2.2], wHip));
     if (wSnap > 0) aimEnemy(s, tg, wSnap * ak);                          // the snap shot: its arm thrown out
+    holdWrist(s, tw, [TRANS0], _wristT, (x) => enemyRaw_(x), TRANS_SHOT - TRANS0);   // the transformation: arm + rifle held as one
     holdWrist(s, tw, [...SERAPH_SHOTS, ...ENEMY_BURST], _wristE, (x) => enemyRaw_(x));
     if (kick > 0) {                                                        // the recoil: the arm (wrist + rifle as one) thrown up
       kickArm(s, 'enemy_ms', Math.atan(kick) * ak);
@@ -1411,10 +1413,10 @@ const aimEnemy = (s, target, k) => layRifle(s, 'enemy_ms', target, k);
 // RECOIL: the gun arm thrown up about the shoulder — the forearm, the wrist and the rifle move as one (the wrist joint
 // is not bent), the muzzle climbing by `ang` (rad) about the barrel's side axis
 // the wrist is held at its angle from just before the shot while the recoil plays out (forearm, wrist and rifle as one)
-const lastShot = (tw, list) => { let b = null; for (const ts of list) if (tw > ts && tw - ts < 0.9 && (b === null || ts > b)) b = ts; return b; };
-const _wristE = new Map(), _wristH = new Map();
+const lastShot = (tw, list, win = 0.9) => { let b = null; for (const ts of list) if (tw > ts && tw - ts < win && (b === null || ts > b)) b = ts; return b; };
+const _wristE = new Map(), _wristH = new Map(), _wristT = new Map();
 function holdWrist(s, tw, list, cache, stateAt, hold = 0.2) {   // (the whole gun arm, relative to the torso: it rides the body's kick)
-  const ts = lastShot(tw, list); if (ts === null) return;
+  const ts = lastShot(tw, list, hold + 0.3); if (ts === null) return;
   let ref = cache.get(ts); if (!ref) { const q = stateAt(ts - 0.004).pose; ref = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) ref[p] = (q[p] || [0, 0, 0]).slice(); cache.set(ts, ref); }
   const w = 1 - smooth(ts + hold, ts + hold + 0.25, tw);               // held through the kick, then back onto the aim
   s.pose = { ...s.pose };
@@ -1498,11 +1500,8 @@ export function transPath() {
   const head = add(partPoint(fk, 'head', [0, 1.4, 0.4]), sub(heroRawPos(TRANS_PASS), heroRawPos(T0)));
   const left = nrm(M.transformDir([0, 0, 0], fk.torso, [1, 0, 0]));
   const up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
-  const P = add(add(head, scl(left, 3.5)), scl(up0, 4.0));                       // over his left shoulder, a hair off his snapped-aside head
-  const d0 = m.dir, dist = V.dist(m.pos, P), side = nrm(V.cross([0, 0, 0], d0, [0, 1, 0]));
-  const dirIn = nrm(sub(P, add(m.pos, scl(side, dist * 0.25))));              // it comes in bending round from its right
-  const p1 = add(add(m.pos, scl(d0, dist * 0.35)), add(scl(side, dist * 0.3), [0, dist * 0.06, 0]));
-  const p2 = sub(P, scl(dirIn, dist * 0.3));
+  const dirIn = nrm(sub(head, m.pos)), P = sub(head, scl(dirIn, 8));   // STRAIGHT at his head — his blade meets it 8 m out in front
+  const dist = V.dist(m.pos, P), p1 = lrp(m.pos, P, 1 / 3), p2 = lrp(m.pos, P, 2 / 3);
   _tp = { p0: m.pos, p1, p2, p3: P, dirIn, left, up: up0, ts: TRANS_SHOT, tp: TRANS_PASS, speed: 0.9 * dist / (TRANS_PASS - TRANS_SHOT) };
   return _tp;
 }
@@ -1730,8 +1729,8 @@ export const DUEL_CAMS = [
     return { pos: c.pos, target: lrp(up(ep(T), 6), transHead(Math.max(t, TRANS_SHOT)), 0.6), fov: 44, handheld: 0.06, baseShake: 0.02 }; } },
   { t0: 184.76, t1: 184.93, name: 'D15c behind the light-ball — it bores in at his cockpit (slow motion)', slowmo: true, fn: (t, u) => { const P = transPath(), h = transHead(t), T = nrm(sub(transHead(t + 0.01), h)), e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0]));
     return { pos: add(add(sub(h, scl(T, 26)), scl(e1, 8)), [0, 4, 0]), target: lrp(add(h, scl(T, 20)), P.p3, 0.6), fov: 46, handheld: 0.03, baseShake: 0.03 }; } },
-  { t0: 184.93, t1: 185.25, roll: 0.05, name: 'D15d CU his head — it goes past a hair away as he snaps his neck aside', slowmo: true, fn: (t, u) => { const P = transPath();
-    return { pos: add(add(sub(P.p3, scl(P.dirIn, 13)), scl(P.left, -6)), scl(P.up, -0.5)), target: sub(sub(P.p3, scl(P.left, 1.8)), scl(P.up, 2.2)), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },
+  { t0: 184.93, t1: 185.25, roll: 0.05, name: 'D15d from the side — his full-power blade smashes the light-ball apart', slowmo: true, fn: (t, u) => { const P = transPath(), sd = nrm(V.cross([0, 0, 0], P.dirIn, [0, 1, 0]));
+    return { pos: add(add(add(P.p3, scl(sd, 30)), scl(P.dirIn, 6)), [0, -4, 0]), target: lrp(P.p3, up(hp(t), 6), 0.45), fov: 40, handheld: 0.03, baseShake: 0.04 }; } },
   { t0: 185.2, t1: 186.4, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
   { t0: 186.4, t1: 187.45, roll: -0.16, name: 'D17 fly-by — it quick-boosts aside', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));

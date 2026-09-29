@@ -1967,25 +1967,27 @@ function msShieldBlock(E, t, p) {
 }
 // msScrape: steel grinding on steel as the blade drags through armour — stick-slip: resonant metal bands (1.8/3.1/4.7 kHz,
 // high Q, their pitch wandering) driven by noise whose level judders irregularly, a thin screech on top, crackle under it
-function msScrape(E, t, p) {
-  const vel = p.vel ?? 0.8, dur = p.dur ?? 1.5, end = t + dur, stop = end + 0.5;
-  const v = new Voice(E, 'sfx', { verb: 0.45, pan: p.pan ?? 0 });
-  const bus = v.g(0); bus.connect(v.out);
-  const n = v.noise('white', t, stop), drive = v.g(0.6);
-  jitter(v, t, stop, 45, 0.7).connect(drive.gain);                         // the stick-slip judder
-  n.connect(drive);
-  for (const [f, q, a] of [[1800, 9, 0.9], [3100, 12, 0.7], [4700, 14, 0.5], [760, 6, 0.5]]) {
-    const b = v.f('bandpass', f * R(0.97, 1.03), q), g = v.g(a);
-    b.frequency.setValueAtTime(f, t); b.frequency.linearRampToValueAtTime(f * R(0.85, 1.15), end);
-    drive.connect(b); b.connect(g); g.connect(bus);
+function msScrape(E, t, p) {   // "ga-gak-gak-gak": a ratchet of hard metal catches (~20-30 per second, irregular), loud and gritty
+  const vel = p.vel ?? 1, dur = p.dur ?? 1.5, end = t + dur, stop = end + 0.5;
+  const v = new Voice(E, 'sfx', { verb: 0.35, pan: p.pan ?? 0 });
+  const out = v.g(0), pre = v.g(3.5), sh = v.ws('hard'), post = v.g(0.55);
+  pre.connect(sh); sh.connect(post); post.connect(out); out.connect(v.out);
+  // the catch train: a square gate (each edge a hard catch), its rate wandering 19 -> 28 -> 22 Hz, jittered
+  const gate = v.osc('square', 21, t, stop), gg = v.g(0.5), gdc = v.g(0);
+  gate.frequency.setValueAtTime(19, t); gate.frequency.linearRampToValueAtTime(28, t + dur * 0.5); gate.frequency.linearRampToValueAtTime(22, end);
+  const src = v.noise('white', t, stop), am = v.g(0.5);
+  gate.connect(gg); gg.connect(am.gain); jitter(v, t, stop, 60, 0.35).connect(am.gain);
+  src.connect(am);
+  for (const [f, q, a] of [[1500, 7, 1], [2900, 10, 0.8], [4300, 12, 0.6], [640, 5, 0.9], [230, 3, 0.7]]) {
+    const b = v.f('bandpass', f * R(0.96, 1.04), q), g = v.g(a);
+    b.frequency.setValueAtTime(f, t); b.frequency.linearRampToValueAtTime(f * R(0.85, 1.1), end);
+    am.connect(b); b.connect(g); g.connect(pre);
   }
-  const sq = v.osc('sawtooth', 2300, t, stop), sb = v.f('bandpass', 2600, 6), sg = v.g(0), vib = v.osc('sine', 9, t, stop), vg = v.g(120);
-  vib.connect(vg); vg.connect(sq.frequency); sq.frequency.setValueAtTime(2300, t); sq.frequency.linearRampToValueAtTime(1700, end);
-  sq.connect(sb); sb.connect(sg); sg.connect(bus);
-  jitter(v, t, stop, 25, 0.5).connect(sg.gain);
-  const c = v.noise('crackle', t, stop, 1.4), ch = v.f('highpass', 2500, 0.7), cg = v.g(0.5); c.connect(ch); ch.connect(cg); cg.connect(bus);
-  bus.gain.setValueAtTime(0, t); bus.gain.linearRampToValueAtTime(vel * 1.6, t + 0.05);
-  bus.gain.setValueAtTime(vel * 1.4, end - 0.1); bus.gain.setTargetAtTime(0, end - 0.1, 0.12);
+  const sq = v.osc('sawtooth', 2100, t, stop), sb = v.f('bandpass', 2400, 6), sg = v.g(0.25);   // a screech riding it
+  sq.frequency.setValueAtTime(2100, t); sq.frequency.linearRampToValueAtTime(1600, end);
+  sq.connect(sb); sb.connect(sg); sg.connect(am);
+  out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(vel * 1.4, t + 0.03);
+  out.gain.setValueAtTime(vel * 1.3, end - 0.08); out.gain.setTargetAtTime(0, end - 0.08, 0.1);
 }
 // msPass: a beam bolt whipping past. p.tp = time of the pass after t, p.ratio = pitch drop, p.pan0 / p.pan1
 function msPass(E, t, p) {

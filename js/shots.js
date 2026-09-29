@@ -666,6 +666,19 @@ function sparkBurst(R, p, n, lt, seed, count = 40, spread = 0.8, speed = 40, lif
     const b = (1 - a) * (1 - a); streak(R, tail, q, [col[0] * b, col[1] * b, col[2] * b]);
   }
 }
+// MOLTEN METAL: round gobbets of different sizes (a few pixels to ~10 px), white-yellow hot, cooling to orange and red
+function molten(R, q, age, sz) {
+  const b = 1 - age, hot = b * b;
+  R.glow(q, pxR(q, 0.6) * sz * (0.6 + 0.4 * b), [5 * b + 1.2 * hot, 2.4 * hot + 0.4 * b, 0.6 * hot * hot], 0.12);
+}
+function moltenBurst(R, p, n, lt, seed, count = 40, spread = 0.8, speed = 40, life = 0.5) {
+  for (let i = 0; i < count; i++) {
+    const L = life * (0.4 + 0.6 * hash(seed + i)); if (lt > L) continue;
+    const d = V.norm([0, 0, 0], V.madd([0, 0, 0], n, randDir([0, 0, 0], seed * 1.3 + i * 4.1), spread * 1.5));
+    const v = speed * (0.3 + 0.7 * hash(seed + i + 50));
+    molten(R, madd(p, d, v * lt), lt / L, 6 + 14 * hash(seed + i + 90));
+  }
+}
 function meltHole(e, who, t, part) {
   let h = null;
   for (const x of HOLES) if (x.who === who && t >= x.t && (!part || x.part === part) && (!h || x.t > h.t)) h = x;
@@ -730,11 +743,11 @@ export function drawGundam(R, t, s, opts = {}) {
   // the BEAM SABER (left hand, from the well assault on): cyan blade out of the hilt, red while berserk
   if ((weapon === 'saber' || s.saberL) && s.saber > 0) {
     const [a, , dir] = saberSegment(R, 'gundam', e, 'hand_L', 1);
-    const k = easeOut(sat(s.saber)), tip = madd(a, dir, 13 * k);
+    const k = easeOut(sat(s.saber)), pw = s.saberPow || 1, tip = madd(a, dir, 13 * k);
     const col = bz > 0.05 ? [3.4, 0.5, 0.3] : [0.8, 2.2, 3.2];
-    R.beam(a, tip, 0.5, [col[0] * k, col[1] * k, col[2] * k], 0.5, 26, 1.5, 1.2);
-    R.beam(a, tip, 1.5, [col[0] * k, col[1] * k, col[2] * k], 0.04, 3, 2, 0.8);
-    R.light(lerpv(a, tip, 0.5), 40, bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 4 * k);
+    R.beam(a, tip, 0.5 * pw, [col[0] * k, col[1] * k, col[2] * k], 0.5 * pw, 26, 1.5, 1.2);   // (pw: output — 2 = full power, twice as thick)
+    R.beam(a, tip, 1.5 * pw, [col[0] * k, col[1] * k, col[2] * k], 0.04 * pw, 3, 2, 0.8);
+    R.light(lerpv(a, tip, 0.5), 40 * pw, bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 4 * k * pw);
     GUN.saber = [a, tip];
     if (!s.fpv && k > 0.5) gripHand(R, e, 'L', 0);   // a closed fist round the hilt
   } else GUN.saber = null;
@@ -817,6 +830,28 @@ function drawBlockSplash(R, t) {
     const k = (1 - lt / L) * (0.6 + 0.4 * Math.sin(t * 20 + i));
     R.glow(q, 0.12 + 0.12 * hash(i + 502), [0.6 * k, 1.8 * k, 2.8 * k], 0.2);
   }
+}
+// THE BLOCK: the shield unfolds to twice its size as it comes up (long axis first, then its width), holds, folds back —
+// drawn as a shield-only copy scaled about its face centre in its own frame (the real one hidden meanwhile)
+const SHIELD_FACE = [1.351, -2.337, 0.17];
+const _bsA = new Float32Array(16), _bsB = new Float32Array(16), _bsS = new Float32Array(16), _bsI = new Float32Array(16), _bsM = new Float32Array(16);
+let _bsHide = null;
+function drawBigShield(R, e, s, t) {
+  const up = smooth(178.42, 178.52, t), wide = smooth(178.48, 178.6, t), back = smooth(179.1, 179.35, t);
+  const sy = 1 + (up - back * up), sz = 1 + (wide - back * wide); if (sy < 1.002 && sz < 1.002) return;
+  if (!_bsHide) { _bsHide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'shield') _bsHide[p.name] = 1; }
+  e.hidden = { ...(e.hidden || {}), shield: 1 };
+  const Ms = R.partWorld('enemy_ms', e, 'shield');
+  M.fromTRS(_bsA, SHIELD_FACE, [0, 0, 0, 1], 1);
+  M.identity ? M.identity(_bsS) : _bsS.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  _bsS[0] = 1 + 0.3 * (sy - 1); _bsS[5] = 1 + (sy - 1); _bsS[10] = 1 + (sz - 1);   // (thickness a little, long axis and width ×2)
+  M.fromTRS(_bsB, [-SHIELD_FACE[0], -SHIELD_FACE[1], -SHIELD_FACE[2]], [0, 0, 0, 1], 1);
+  M.mul(_bsM, Ms, M.mul(new Float32Array(16), _bsA, M.mul(new Float32Array(16), _bsS, _bsB)));   // the shield's scaled world matrix
+  M.invert(_bsI, Ms);
+  const Mc = M.mul(new Float32Array(16), _bsM, M.mul(new Float32Array(16), _bsI, e.m));           // the copy's model matrix
+  const c = R.add('enemy_ms', Mc); if (!c) return;
+  c.pose = e.pose; c.hidden = _bsHide; c.seed = e.seed; c.wear = 1; c.texSet = e.texSet; c.matOverride = e.matOverride;
+  shieldScorch(c, t);
 }
 function drawLostShield(R, t) {
   const t0 = SHIELD_HIT_T + 0.03;
@@ -946,11 +981,11 @@ function drawCutDetail(R, t) {
   if (cur && live) for (const side of [0, 1]) {
     const pw = TW(_secP(cur.th[side])), out = V.norm([0, 0, 0], V.sub([0, 0, 0], pw, TW([CUT_E.cx, CUT_Y, CUT_E.cz])));
     R.glow(pw, 0.4, [2.4, 1.2, 0.4], 0.2); R.light(pw, 14, [1, 0.5, 0.2], 1.2);
-    for (let i = 0; i < 900; i++) {                                                 // a torrent of sparks, story-fast: pixel streaks
+    for (let i = 0; i < 450; i++) {                                                 // molten metal thrown off in round gobbets, story-fast
       const life = 0.012 + hash(i + side * 5000) * 0.035, ph = ((t / life) + hash(i + 3 + side * 5000)) % 1;
       const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.1 + side * 7 + Math.floor(t / life) * 0.37), out, 1.4), D_SWEEP(), 0.8));
-      const b = 3.2 * (1 - ph) * (1 - ph), sp = life * (140 + 220 * hash(i + 9)), q = madd(pw, sd, ph * sp);
-      streak(R, madd(q, sd, -Math.min(ph, 0.25) * sp), q, [b * 1.4, b * 0.75, b * 0.25]);
+      const sp = life * (140 + 220 * hash(i + 9)), q = madd(pw, sd, ph * sp);
+      molten(R, q, ph, 6 + 14 * hash(i + side * 5000 + 17));
     }
   }
 }
@@ -965,7 +1000,7 @@ function drawSlash(R, c, t) {
     const k = Math.exp(-lt * 7);
     R.glow(P, 1 + 2 * k, [2.2 * k, 1.4 * k, 0.6 * k], 0.3);
     R.light(P, 40, [1, 0.6, 0.3], 4 * k);
-    sparkBurst(R, P, d, lt, 77, 1200, 1.0, 34, 1.1, [5, 2.8, 1]);
+    moltenBurst(R, P, d, lt, 77, 600, 1.0, 34, 1.1);
     if (lt < 0.3) R.ripple(P, 6 + 40 * easeOut(lt / 0.3), [0.4, 0.4, 0.4], (1 - lt / 0.3) * 1.2);
   }
 }
@@ -994,7 +1029,7 @@ function drawEnemyMS(R, t, s, idx) {
   if (!e) return null;
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
   if (s.noRifle) e.hidden = { ...(e.hidden || {}), rifle: 1 };                // (still on its back)
-  if (!s.shieldLost) { shieldScorch(e, t); drawBlockSplash(R, t); }
+  if (!s.shieldLost) { shieldScorch(e, t); drawBlockSplash(R, t); drawBigShield(R, e, s, t); }
   if (t > ENEMY_CHARGE0 - 0.1 && t < 176.4) drawEnemyCharge(R, t);
   if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
   if (idx === 2 && transK(t) > 0.001) drawRails(R, t, s);
@@ -1349,19 +1384,21 @@ function drawTransShot(R, t) {
     R.light(h, 60, [1, 0.35, 0.55], 4 * g);
     if (orb) { const o = transOrb(t); R.glow(o, 0.6 * g, [5, 3.5, 4.5], 0.2); R.glow(o, 1.2 * g, [2, 0.6, 1.3], 0.3); R.beam(h, o, 0.08, [1.6, 0.5, 1.0], 0.5, 6); }
   };
-  // the halves after his cut: they part either side of the cut plane, carried on, and each bursts on its own
-  const ax = transCutAxis(), half = (sg) => (tt) => { const x = Math.max(0, tt - TRANS_PASS); return madd(transHead(tt), ax, sg * (1.2 + 55 * x)); };
   if (t <= TRANS_PASS) ball(transHead(t), sat(lt / 0.06), TRANS_SHOT, transHead, true);
-  else if (t <= TRANS_HIT) {
-    for (const sg of [1, -1]) ball(half(sg)(t), 0.75, TRANS_PASS, (tt) => (tt < TRANS_PASS ? transHead(tt) : half(sg)(tt)), false);
+  const lc = t - TRANS_PASS;                                           // SMASHED: the ball comes apart into energy — a flash, a
+  if (lc >= 0 && lc < 1.4) {                                           // shock ring, its light scattering off the blade and dying out
+    const P = transHead(TRANS_PASS), ax = transCutAxis(), f = Math.exp(-lc * 9), dirIn = transPath().dirIn;
+    R.glow(P, 1 + 3 * f, [3.5 * f, 2 * f, 3 * f], 0.3); R.light(P, 70, [1, 0.5, 0.8], 5 * f);
+    if (lc < 0.5) R.ripple(P, 3 + 35 * easeOut(lc / 0.5), [0.5, 0.4, 0.5], (1 - lc / 0.5) * 1.3);
+    const back = V.scale([0, 0, 0], dirIn, -1);
+    for (let i = 0; i < 90; i++) {                                     // the ball's energy thrown off in glowing motes
+      const L = 0.5 + 0.8 * hash(i + 1300); if (lc > L) continue;
+      const d = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 2.9 + 31), ax, (hash(i + 1301) - 0.5) * 3), back, 0.6));
+      const q = madd(P, d, (8 + 40 * hash(i + 1302)) * easeOut(sat(lc / L))), k = (1 - lc / L) * (1 - lc / L);
+      R.glow(q, 0.25 + 0.5 * hash(i + 1303), [3 * k, 0.8 * k, 1.8 * k], 0.25);
+    }
+    sparkBurst(R, P, back, lc, 921, 250, 1.8, 60, 0.7, [3.5, 1.5, 2.4]);
   }
-  const lc = t - TRANS_PASS;                                           // the cut: a flash, the orbiter bursting, a torrent of sparks
-  if (lc >= 0 && lc < 0.8) {
-    const P = transHead(TRANS_PASS), f = Math.exp(-lc * 10);
-    R.glow(P, 0.8 + 2.4 * f, [3 * f, 2 * f, 3 * f], 0.3); R.light(P, 50, [1, 0.6, 0.8], 3 * f);   // (small: a big flash whited the frame out)
-    sparkBurst(R, P, ax, lc, 921, 400, 2, 70, 0.8, [3.5, 1.5, 2.4]);
-  }
-  if (t > TRANS_HIT) for (const sg of [1, -1]) explosion(R, t, TRANS_HIT + (sg > 0 ? 0 : 0.06), half(sg)(TRANS_HIT + (sg > 0 ? 0 : 0.06)), 12, sg > 0 ? 733 : 734, 'ship', 2);
 }
 function drawSeraphFire(R, t) {
   drawTransShot(R, t);
