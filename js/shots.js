@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, TRANS0, TRANS_SHOT, TRANS_HIT, transK, enemyRifleFrame, transPath, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -1232,37 +1232,32 @@ function drawRails(R, t, s) {
     }
   }
 }
-const _ico = (() => { const g = (1 + Math.sqrt(5)) / 2, v = [];
-  for (const a of [-1, 1]) for (const b of [-g, g]) { v.push([0, a, b], [a, b, 0], [b, 0, a]); }
-  const n = v.map((p) => V.norm([0, 0, 0], p)), e = [];
-  for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) if (V.dist(v[i], v[j]) < 2.1) e.push([i, j]);
-  return { v: n, e }; })();
-const _oQ = [0, 0, 0, 1], _oM = new Float32Array(16);
+// the shot: a blinding ball of light at the centre, ONE energy source orbiting it on a helix round its line of flight,
+// both trailing light — the ball a thick fading streak, the orbiter a thin spiral; it bursts behind him at TRANS_HIT
 function drawTransShot(R, t) {
   if (t < TRANS_SHOT - 0.01 || t > TRANS_HIT + 3) return;
-  const P = transPath(), bez = (u) => { const v = 1 - u; return [0, 1, 2].map((i) => P.p0[i] * v * v * v + 3 * P.p1[i] * v * v * u + 3 * P.p2[i] * v * u * u + P.p3[i] * u * u * u); };
-  const lt = t - TRANS_SHOT;
+  const lt = t - TRANS_SHOT, P = transPath();
   if (lt >= 0 && lt < 0.35) { const kf = Math.exp(-lt * 9); R.glow(P.p0, 2 + 6 * kf, [3 * kf, 0.6 * kf, 1 * kf], 0.35); R.light(P.p0, 70, [1, 0.3, 0.45], 9 * kf); R.ripple(P.p0, 8 + 40 * easeOut(lt / 0.35), [0.5, 0.5, 0.5], (1 - lt / 0.35) * 1.3); }
+  if (t < TRANS_SHOT) return;
   if (t <= TRANS_HIT) {
-    const u = Math.pow(sat(lt / (TRANS_HIT - TRANS_SHOT)), 1.15), tail = Math.max(0, u - 0.45), n = Math.max(2, Math.ceil((u - tail) * 28));
-    let pa = bez(tail);
-    for (let j = 1; j <= n; j++) { const pb = bez(tail + (u - tail) * j / n); serBeam(R, pa, pb, 1.1, 0.9 + 1.2 * j / n); pa = pb; }
-    // the energy body: a spinning icosahedral lattice of light round a white-hot core, 4.5 m across
-    const h = bez(u), rad = 4.5 * (0.6 + 0.4 * sat(lt / 0.12));
-    Q.fromEuler(_oQ, t * 6.3, t * 4.1, t * 2.7); M.fromTRS(_oM, h, _oQ, rad);
-    const pts = _ico.v.map((p) => M.transformPoint([0, 0, 0], _oM, p));
-    for (const [i, j] of _ico.e) R.beam(pts[i], pts[j], 0.2, [3.2, 0.8, 1.4], 1.1, 8);
-    for (const p of pts) R.glow(p, 0.55, [3, 1, 1.6], 0.2);
-    Q.fromEuler(_oQ, -t * 8, t * 5.5, t * 3.1); M.fromTRS(_oM, h, _oQ, rad * 0.55);   // an inner lattice spinning the other way
-    const pin = _ico.v.map((p) => M.transformPoint([0, 0, 0], _oM, p));
-    for (const [i, j] of _ico.e) R.beam(pin[i], pin[j], 0.12, [3.5, 1.6, 2.2], 1, 8);
-    R.glow(h, 2.2 + 0.3 * Math.sin(t * 40), [4, 2.2, 2.6], 0.4); R.glow(h, rad * 1.5, [1.4, 0.25, 0.5], 0.5);
-    R.light(h, 80, [1, 0.3, 0.45], 8);
-  } else {
-    const lb = t - TRANS_HIT;
-    if (lb < 0.12) { const tail = sat(lb / 0.12); let pa = bez(0.55 + 0.45 * tail); for (let j = 1; j <= 8; j++) { const pb = bez(0.55 + 0.45 * tail + (0.45 - 0.45 * tail) * j / 8); serBeam(R, pa, pb, 1.1 * (1 - tail), 1.6); pa = pb; } }
-    explosion(R, t, TRANS_HIT, P.p3, 16, 733, 'ship', 2);
+    const h = transHead(t), g = sat(lt / 0.06);
+    // trails (story time: 0.07 s of flight ≈ 27 m; in the slow motion they hang in the air)
+    const N = 22, span = Math.min(0.07, lt);
+    let pa = h, oa = transOrb(t);
+    for (let i = 1; i <= N; i++) {
+      const tt = t - span * i / N, f = 1 - (i - 0.5) / N, pb = transHead(tt), ob = transOrb(tt);
+      R.beam(pa, pb, 0.15 + 0.85 * f * f, [SER_COL[0] * 0.8 * f, SER_COL[1] * 0.8 * f, SER_COL[2] * 0.8 * f], 0.5 + 0.5 * f, 8);   // the ball's streak
+      R.beam(oa, ob, 0.06 + 0.3 * f, [3.2 * f, 1.6 * f, 2.6 * f], 1, 10);                                              // the orbiter's spiral
+      pa = pb; oa = ob;
+    }
+    // the ball: white-hot core, a pink body, a wide halo
+    R.glow(h, 1.1 * g, [5, 3.8, 4.4], 0.25); R.glow(h, 2.1 * g, [2.8, 0.7, 1.3], 0.35); R.glow(h, 3.8 * g, [0.7, 0.12, 0.28], 0.45);
+    R.light(h, 60, [1, 0.35, 0.55], 4 * g);
+    // the orbiting energy source
+    const o = transOrb(t); R.glow(o, 0.6 * g, [5, 3.5, 4.5], 0.2); R.glow(o, 1.2 * g, [2, 0.6, 1.3], 0.3);
+    R.beam(h, o, 0.08, [1.6, 0.5, 1.0], 0.5, 6);                                                                     // a thread of energy tying it to the core
   }
+  if (t > TRANS_HIT) explosion(R, t, TRANS_HIT, transHead(TRANS_HIT), 16, 733, 'ship', 2);
 }
 function drawSeraphFire(R, t) {
   drawTransShot(R, t);
@@ -2869,7 +2864,8 @@ cut(143.8, 145.4, 'X frigate dies close', (c) => { const td = lossCam(c, 2, 230,
 cut(148.6, 150, 'X another loss', (c) => { const td = lossCam(c, 3, 260, 5.3, 38); shake(c, td && c.t > td ? 0.9 : 0.2, 9); });
 cut(167.35, 169, 'X carnage over the planet', (c) => {   // (from 166.8: now holds on Sigma until the swatted bolt has burst)
   const { t, u } = c;
-  againstPlanet(c, [0, 0, -700], 1300 - u * 120, 60, 300, 40, 0.06, 0.05, true);
+  // (recomposed: high three-quarter looking down across the battle, the planet's curve big behind it, a slow push)
+  againstPlanet(c, [30, 0, -680], 820 - u * 140, 260, 520, 44, -0.12, 0.1, true);
   handheld(c, 0.4); c.env.shadowRadius = 900; c.env.shadowCenter = [0, 0, -700];
   // (against the planet the hulls face away from the key: a soft fill + rim and a stop more so they read)
   c.env.fill = [0.5, 0.52, 0.6, 0.7]; c.env.rim = [0.7, 0.72, 0.85, 0.8]; c.post.exposure = 1.3;

@@ -502,7 +502,7 @@ const ringE = (phi, r, h) => ringH(phi + Math.PI, r, h);
 export const SERAPH_SHOTS = [176.75, 177.5, 178.35, 179.95, 181.4, 182.1, 182.8, 184.45, 185.35, 186.4, 187.45];
 export const FINALE_T = 190.85, FINALE_END = 191.35;
 // the transforming shot (see transPath): the rifle opens out TRANS0 →, fires at TRANS_SHOT, the energy body bursts at TRANS_HIT
-export const TRANS0 = 183.95, TRANS_SHOT = 184.45, TRANS_HIT = 185.02;
+export const TRANS0 = 183.95, TRANS_SHOT = 184.45, TRANS_PASS = 184.95, TRANS_HIT = 185.13;   // fires → a hair past his head → bursts behind him
 export const transK = (t) => smooth(TRANS0, TRANS0 + 0.35, t) * (1 - smooth(184.95, 185.35, t));
 // ULTIMATE (FINALE_T): a dozen heavy beams burst out of its back in every direction, bend round and home onto him — they
 // converge on where he was at ULT_HIT; he is already gone (the Sandevistan, SANDE0). Each beam: a cubic Bézier from the
@@ -981,6 +981,8 @@ function duelHero_(t) {
   const dk = smooth(191.1, SANDE0, tw) * (1 - smooth(192.35, 192.9, tw));
   if (dk > 0) f = nrm(lrp(f, D_U, dk));
   _pose[PIDX._body + 2] += heroRoll(tw);
+  { const k = smooth(TRANS_PASS - 0.07, TRANS_PASS - 0.025, tw) * (1 - smooth(TRANS_PASS + 0.25, TRANS_PASS + 0.8, tw));   // the neck-snap: a hair
+    if (k > 0) { _pose[PIDX.head + 2] += 0.75 * k; _pose[PIDX.head + 1] += 0.45 * k; _pose[PIDX.head] += 0.2 * k; _pose[PIDX.torso + 2] += 0.15 * k; } }
   s.weapon = tw < 191.22 || tw >= 200 ? 'rifle' : tw < 194.1 ? 'saber' : 'none';   // slung over the shoulder at 191.2
   s.saber = smooth(191.26, 191.36, tw) * (1 - smooth(193.85, 194.1, tw));
   s.sande = sat((tw - SANDE0 + 0.05) / 0.1) * (1 - smooth(CUT_T - 0.05, CUT_T - 0.025, tw));   // afterimages (shots.js); gone for the close-up of the cut
@@ -1303,21 +1305,34 @@ export function enemyRifleFrame(t) {
   return { p: M.transformPoint([0, 0, 0], fk.rifle, [0, 0, 0]), muzzle: fk.muzzle, dir: d, side, up: up1, fk };
 }
 let _tp = null;
-/** the homing path: cubic Bézier from the muzzle out along the barrel, swinging round onto where he will be (a near miss) */
+/** the shot's path: a cubic Bézier from the muzzle bending round onto a point a hair to the left of his head (the cockpit
+ *  line) at TRANS_PASS — his head where it would be without the neck-snap — then straight on at the same speed */
 export function transPath() {
   if (_tp) return _tp;
-  const m = seraphMuzzle(TRANS_SHOT), tgt = add(heroRawPos(TRANS_HIT), [0, 9, 0]);
-  const d = m.dir, dist = V.dist(m.pos, tgt), side = nrm(V.cross([0, 0, 0], d, [0, 1, 0]));
-  const p3 = add(add(tgt, scl(side, -11)), [0, 5, 0]);                       // it misses him by ~12 m
-  const p1 = add(add(m.pos, scl(d, dist * 0.35)), add(scl(side, dist * 0.22), [0, dist * 0.08, 0]));
-  const p2 = add(p3, add(scl(nrm(sub(p3, m.pos)), -dist * 0.3), scl(side, dist * 0.12)));
-  _tp = { p0: m.pos, p1, p2, p3, ts: TRANS_SHOT, ta: TRANS_HIT };
+  _tp = { pending: true };
+  const m = seraphMuzzle(TRANS_SHOT), T0 = TRANS_PASS - 0.12;
+  const h0 = duelHero(T0), fk = duelFK(h0, 'gundam');
+  const head = add(partPoint(fk, 'head', [0, 1.4, 0.4]), sub(heroRawPos(TRANS_PASS), heroRawPos(T0)));
+  const left = nrm(M.transformDir([0, 0, 0], fk.torso, [1, 0, 0]));
+  const P = add(head, scl(left, 2.2));                                          // paper-thin: ~2 m off a 3 m head
+  const d0 = m.dir, dist = V.dist(m.pos, P), side = nrm(V.cross([0, 0, 0], d0, [0, 1, 0]));
+  const dirIn = nrm(sub(P, add(m.pos, scl(side, dist * 0.25))));              // it comes in bending round from its right
+  const p1 = add(add(m.pos, scl(d0, dist * 0.35)), add(scl(side, dist * 0.3), [0, dist * 0.06, 0]));
+  const p2 = sub(P, scl(dirIn, dist * 0.3));
+  _tp = { p0: m.pos, p1, p2, p3: P, dirIn, left, ts: TRANS_SHOT, tp: TRANS_PASS, speed: 0.9 * dist / (TRANS_PASS - TRANS_SHOT) };
   return _tp;
 }
-/** the energy body's position at t (head of the homing beam) */
+/** the light-ball's position at t: along the curve to the pass, then straight on */
 export function transHead(t) {
-  const P = transPath(), u = Math.pow(sat((t - P.ts) / (P.ta - P.ts)), 1.15), v = 1 - u;
+  const P = transPath();
+  if (t > P.tp) return add(P.p3, scl(P.dirIn, P.speed * (t - P.tp)));
+  const u = sat((t - P.ts) / (P.tp - P.ts)), v = 1 - u;
   return [0, 1, 2].map((i) => P.p0[i] * v * v * v + 3 * P.p1[i] * v * v * u + 3 * P.p2[i] * v * u * u + P.p3[i] * u * u * u);
+}
+/** the energy source orbiting the ball: a helix round its line of flight */
+export function transOrb(t) {
+  const c = transHead(t), T = nrm(sub(transHead(t + 0.004), transHead(t - 0.004))), e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0])), e2 = V.cross([0, 0, 0], T, e1), a = (t - TRANS_SHOT) * 48;
+  return add(c, add(scl(e1, 3.2 * Math.cos(a)), scl(e2, 3.2 * Math.sin(a))));
 }
 /** world position + unit direction of the hero's rifle muzzle at story time t */
 export function duelMuzzle(t) {
@@ -1474,9 +1489,11 @@ export const DUEL_CAMS = [
   { t0: 183.9, t1: 184.5, name: 'D15a CU — its rifle transforms and charges', slowmo: true, fn: (t, u) => { const F = enemyRifleFrame(t), c = add(F.p, scl(F.dir, 3.5));
     return { pos: add(add(add(c, scl(F.side, 12 - 2 * u)), scl(F.up, 1.5)), scl(F.dir, 3.5 - 1 * u)), target: add(c, scl(F.dir, 0.5 * u)), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },   // out beside the barrel, ahead of it
   { t0: 184.5, t1: 184.76, roll: -0.05, name: 'D15b over its shoulder — the shot goes', fn: (t, u) => { const T = 184.5, c = ots(ep(T), hp(T), { right: 1, back: 24, lift: 8, fov: 44, side: 10 });
-    return { pos: c.pos, target: lrp(up(ep(T), 6), transHead(t), 0.6), fov: 44, handheld: 0.06, baseShake: 0.02 }; } },
-  { t0: 184.76, t1: 185.2, roll: 0.08, name: 'D15c by him — the energy body comes round at him, spinning', fn: (t, u) => { const T = 184.76, H = hp(185.0), P = transPath(), side = nrm(sub(P.p3, add(H, [0, 9, 0])));
-    return { pos: add(add(H, scl(side, -26)), [0, 14, 0]), target: lrp(transHead(Math.min(t, P.ta)), up(hp(t), 4), 0.3), fov: 50, handheld: 0.07, baseShake: 0.03 }; } },
+    return { pos: c.pos, target: lrp(up(ep(T), 6), transHead(Math.max(t, TRANS_SHOT)), 0.6), fov: 44, handheld: 0.06, baseShake: 0.02 }; } },
+  { t0: 184.76, t1: 184.93, name: 'D15c behind the light-ball — it bores in at his cockpit (slow motion)', slowmo: true, fn: (t, u) => { const P = transPath(), h = transHead(t), T = nrm(sub(transHead(t + 0.01), h)), e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0]));
+    return { pos: add(add(sub(h, scl(T, 26)), scl(e1, 8)), [0, 4, 0]), target: lrp(add(h, scl(T, 20)), P.p3, 0.6), fov: 46, handheld: 0.03, baseShake: 0.03 }; } },
+  { t0: 184.93, t1: 185.25, roll: 0.05, name: 'D15d CU his head — it goes past a hair away as he snaps his neck aside', slowmo: true, fn: (t, u) => { const P = transPath();
+    return { pos: add(add(sub(P.p3, scl(P.dirIn, 12)), scl(P.left, -6)), [0, 2.5, 0]), target: sub(P.p3, scl(P.left, 1.4)), fov: 40, handheld: 0.03, baseShake: 0.02 }; } },
   { t0: 185.2, t1: 186.4, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
   { t0: 186.4, t1: 187.45, roll: -0.16, name: 'D17 fly-by — it quick-boosts aside', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));
