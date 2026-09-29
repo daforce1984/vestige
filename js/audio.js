@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, TRANS0, TRANS_SHOT, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -643,7 +643,20 @@ function duelCues() {
   out.push([157.35, '@steam', { dur: 1.2, vel: 0.5 }]);
   // ---- VANGUARD's beam rifle: a sharp report (pitched lower than Sigma's) + a low thump; the bolts that pass near him
   //      whip past; its jump (179.3) and the quick-boosts come from the per-mech boost edges above
+  // ---- the transforming shot: the rifle opens out (heavy locking clacks), charges, fires a heavy homing shot whose
+  //      energy body roars round after him and bursts behind him
+  const FD2 = (a, b) => filmT(b) - filmT(a);
+  [0, 0.12, 0.26].forEach((d, i) => out.push([TRANS0 + d, 'metal_knock', { at: 'hit', rate: 0.62 + 0.08 * i, gain: G * 0.6, pan: 0.25, prio: 8, norand: true }]));
+  out.push([TRANS0 + 0.05, '@boom', { bus: 'sfx', f: 44, vel: G * 0.35, dur: 0.8, verb: 0.3 }]);
+  out.push([TRANS0 + 0.2, 'charge_up', { at: 0, dur: FD2(TRANS0 + 0.2, TRANS_SHOT), fadeOut: 0.03, rate: 1.1, gain: G * 0.8, pan: 0.25, prio: 8, norand: true }]);
+  out.push([TRANS_SHOT, '@msShot', { vel: G * 1.3, k: 0.4, pan: 0.2 }]);
+  out.push([TRANS_SHOT, '@boom', { bus: 'sfx', f: 26, vel: G * 0.9, dur: 2.0, verb: 0.4 }]);
+  out.push([TRANS_SHOT + 0.02, 'heavy_beam', { rate: 0.6, dur: FD2(TRANS_SHOT, TRANS_HIT + 0.1), fadeOut: 0.15, gain: G * 1.0, prio: 9, norand: true }]);
+  out.push([TRANS_HIT - 0.14, '@msPass', { vel: G * 0.95, tp: 0.12, ratio: 3.5, f: 1100, pan0: 0.6, pan1: -0.6 }]);
+  out.push([TRANS_HIT, 'hl_explosion', { rate: 0.8, gain: G * 1.0, pan: -0.2, prio: 9, norand: true }]);
+  out.push([TRANS_HIT, '@boom', { bus: 'sfx', f: 30, vel: G * 0.8, dur: 2.2, verb: 0.4 }]);
   for (const ts of SERAPH_SHOTS) {
+    if (ts === TRANS_SHOT) continue;
     out.push([ts, '@msShot', { vel: G * 0.85, k: 0.58, pan: 0.3 }]);                          // its heavier rifle, pitched down
     if (Math.abs(ts - HERO_HIT_T) > 0.1) out.push([ts, '@msPass', { vel: G * 0.55, tp: 0.12, ratio: R(1.8, 2.6), f: R(1600, 2000), pan0: 0.5, pan1: -0.7 }]);   // it whips past him
   }

@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, TRANS0, TRANS_SHOT, TRANS_HIT, transK, enemyRifleFrame, transPath, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -963,6 +963,7 @@ function drawEnemyMS(R, t, s, idx) {
   if (!e) return null;
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
   if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
+  if (idx === 2 && transK(t) > 0.001) drawRails(R, t, s);
   if (idx === 2 && t >= RIFLE_DROP_T) { e.hidden = { ...(e.hidden || {}), rifle: 1 }; drawDroppedRifle(R, t); }
   const fn = idx === 1 ? enemyMS1 : enemyMS2;
   const ebk = sat(((s.boost ?? 0.5) - 0.6) / 0.4);   // quick-boosts: the nozzles flare
@@ -1195,8 +1196,78 @@ function drawUlt(R, t) {
     if (i % 2 === 0 && t >= b.ta) explosion(R, t, b.ta, b.p3, 9 + 4 * hash(i + 3), 610 + i, 'ship', 1.5);   // they converge where he was
   }
 }
+// ---- THE TRANSFORMING SHOT: two rails slide out of the rifle either side (copies of the rifle part, offset along its side
+// axis and forward), crackling arcs between rails and muzzle while it charges; then a thick homing beam whose head is a
+// big spinning energy body (a rotating icosahedral lattice of light round a white core), bending round after him
+const _rT2 = new Float32Array(16), _rM2 = new Float32Array(16);
+let _railHide = null;
+function drawRails(R, t, s) {
+  const k = easeOut(transK(t)), F = enemyRifleFrame(t); if (!F) return;
+  if (!_railHide) { _railHide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'rifle') _railHide[p.name] = 1; }
+  msMatrix(_rM2, s);
+  for (const sd of [-1, 1]) {
+    const off = V.add([0, 0, 0], V.scale([0, 0, 0], F.up, sd * 1.35 * k), V.scale([0, 0, 0], F.dir, 1.6 * k));   // the rails open up and down like jaws, sliding forward
+    M.fromTRS(_rT2, off, [0, 0, 0, 1], 1);
+    const w = R.add('enemy_ms', M.mul(new Float32Array(16), _rT2, _rM2)); if (!w) continue;
+    w.pose = s.pose; w.hidden = _railHide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
+    // the rail's inner edge glows with the charge
+    const c = t < TRANS_SHOT ? sat((t - TRANS0 - 0.2) / (TRANS_SHOT - TRANS0 - 0.2)) : Math.exp(-(t - TRANS_SHOT) * 5);
+    if (c > 0.02) {
+      const a = V.add([0, 0, 0], F.p, off), b = V.add([0, 0, 0], F.muzzle, off);
+      R.beam(madd(a, F.up, -sd * 0.45), madd(b, F.up, -sd * 0.45), 0.14, [3 * c, 0.6 * c, 1 * c], 1, 10);
+    }
+  }
+  const c = t < TRANS_SHOT ? sat((t - TRANS0 - 0.2) / (TRANS_SHOT - TRANS0 - 0.2)) : 0;
+  if (c > 0.02) {                                               // charging: crackling arcs between the rails, light gathering at the muzzle
+    const q = c * c * (1 + 0.15 * Math.sin(t * 90));
+    R.glow(F.muzzle, 0.6 + 3.5 * q, [3 * q, 0.6 * q, 1 * q], 0.35); R.light(F.muzzle, 35, [1, 0.3, 0.45], 5 * q);
+    const seed = Math.floor(t * 60);
+    for (let j = 0; j < 4; j++) {
+      const u = (j + 0.5) / 4, pa = madd(madd(lerpv(F.p, F.muzzle, 0.3 + 0.7 * u), F.up, -0.9), F.dir, 1.6), pb = madd(pa, F.up, 1.8);
+      let prev = pa;
+      for (let i = 1; i <= 6; i++) {
+        const f = i / 6, pt = i === 6 ? pb : madd(lerpv(pa, pb, f), randDir([0, 0, 0], seed * 7.1 + j * 13 + i), 0.35);
+        R.beam(prev, pt, 0.05, [2.5 * c, 1.2 * c, 2.8 * c], 1, 8); prev = pt;
+      }
+    }
+  }
+}
+const _ico = (() => { const g = (1 + Math.sqrt(5)) / 2, v = [];
+  for (const a of [-1, 1]) for (const b of [-g, g]) { v.push([0, a, b], [a, b, 0], [b, 0, a]); }
+  const n = v.map((p) => V.norm([0, 0, 0], p)), e = [];
+  for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) if (V.dist(v[i], v[j]) < 2.1) e.push([i, j]);
+  return { v: n, e }; })();
+const _oQ = [0, 0, 0, 1], _oM = new Float32Array(16);
+function drawTransShot(R, t) {
+  if (t < TRANS_SHOT - 0.01 || t > TRANS_HIT + 3) return;
+  const P = transPath(), bez = (u) => { const v = 1 - u; return [0, 1, 2].map((i) => P.p0[i] * v * v * v + 3 * P.p1[i] * v * v * u + 3 * P.p2[i] * v * u * u + P.p3[i] * u * u * u); };
+  const lt = t - TRANS_SHOT;
+  if (lt >= 0 && lt < 0.35) { const kf = Math.exp(-lt * 9); R.glow(P.p0, 2 + 6 * kf, [3 * kf, 0.6 * kf, 1 * kf], 0.35); R.light(P.p0, 70, [1, 0.3, 0.45], 9 * kf); R.ripple(P.p0, 8 + 40 * easeOut(lt / 0.35), [0.5, 0.5, 0.5], (1 - lt / 0.35) * 1.3); }
+  if (t <= TRANS_HIT) {
+    const u = Math.pow(sat(lt / (TRANS_HIT - TRANS_SHOT)), 1.15), tail = Math.max(0, u - 0.45), n = Math.max(2, Math.ceil((u - tail) * 28));
+    let pa = bez(tail);
+    for (let j = 1; j <= n; j++) { const pb = bez(tail + (u - tail) * j / n); serBeam(R, pa, pb, 1.1, 0.9 + 1.2 * j / n); pa = pb; }
+    // the energy body: a spinning icosahedral lattice of light round a white-hot core, 4.5 m across
+    const h = bez(u), rad = 4.5 * (0.6 + 0.4 * sat(lt / 0.12));
+    Q.fromEuler(_oQ, t * 6.3, t * 4.1, t * 2.7); M.fromTRS(_oM, h, _oQ, rad);
+    const pts = _ico.v.map((p) => M.transformPoint([0, 0, 0], _oM, p));
+    for (const [i, j] of _ico.e) R.beam(pts[i], pts[j], 0.2, [3.2, 0.8, 1.4], 1.1, 8);
+    for (const p of pts) R.glow(p, 0.55, [3, 1, 1.6], 0.2);
+    Q.fromEuler(_oQ, -t * 8, t * 5.5, t * 3.1); M.fromTRS(_oM, h, _oQ, rad * 0.55);   // an inner lattice spinning the other way
+    const pin = _ico.v.map((p) => M.transformPoint([0, 0, 0], _oM, p));
+    for (const [i, j] of _ico.e) R.beam(pin[i], pin[j], 0.12, [3.5, 1.6, 2.2], 1, 8);
+    R.glow(h, 2.2 + 0.3 * Math.sin(t * 40), [4, 2.2, 2.6], 0.4); R.glow(h, rad * 1.5, [1.4, 0.25, 0.5], 0.5);
+    R.light(h, 80, [1, 0.3, 0.45], 8);
+  } else {
+    const lb = t - TRANS_HIT;
+    if (lb < 0.12) { const tail = sat(lb / 0.12); let pa = bez(0.55 + 0.45 * tail); for (let j = 1; j <= 8; j++) { const pb = bez(0.55 + 0.45 * tail + (0.45 - 0.45 * tail) * j / 8); serBeam(R, pa, pb, 1.1 * (1 - tail), 1.6); pa = pb; } }
+    explosion(R, t, TRANS_HIT, P.p3, 16, 733, 'ship', 2);
+  }
+}
 function drawSeraphFire(R, t) {
+  drawTransShot(R, t);
   for (const ts of SERAPH_SHOTS) {
+    if (ts === TRANS_SHOT) continue;                           // (the transforming shot: drawTransShot)
     if (t < ts - 0.15 || t > ts + 0.8) continue;
     const L = shotLine(ts); if (!L) continue;
     if (t < ts) {                                              // a charge glint at the muzzle
