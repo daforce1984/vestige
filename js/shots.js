@@ -1240,24 +1240,21 @@ function drawUlt(R, t) {
     if (tm) {
       const bp = M.transformPoint([0, 0, 0], tm, _ultBack), back = V.norm([0, 0, 0], M.transformDir([0, 0, 0], tm, [0, 0, -1]));
       const s1 = V.norm([0, 0, 0], V.cross([0, 0, 0], back, [0, 1, 0])), s2 = V.cross([0, 0, 0], back, s1);
-      if (t < FINALE_T) {
-        const c = sat((t - 189.8) / (FINALE_T - 189.8)), q = c * c * (1 + 0.12 * Math.sin(t * 57));
-        // the energy sphere swelling on its back (white core, pink body)
-        R.glow(bp, 0.8 + 4 * q, [4 * q, 1.2 * q, 2 * q], 0.35); R.glow(bp, 0.4 + 1.6 * q, [5 * q, 4 * q, 4.5 * q], 0.25);
-        R.light(bp, 90, [1, 0.3, 0.5], 14 * q);
-        // three rings of energy spinning round it on tilted planes, tightening as it fills
-        for (let k = 0; k < 3; k++) {
-          const a0 = t * (6 + 2 * k) + k * 2.1, tilt = 0.6 + 0.7 * k, rr = (6 - 2.5 * c) * (1 + 0.25 * k);
-          const ax = V.add([0, 0, 0], V.scale([0, 0, 0], s1, Math.cos(tilt)), V.scale([0, 0, 0], back, Math.sin(tilt))), ay = V.cross([0, 0, 0], ax, s2);
-          let pa = null;
-          for (let j = 0; j <= 28; j++) { const a = a0 + j / 28 * 2 * Math.PI, pb = V.add([0, 0, 0], bp, V.add([0, 0, 0], V.scale([0, 0, 0], s2, Math.cos(a) * rr), V.scale([0, 0, 0], ax, Math.sin(a) * rr)));
-            if (pa) R.beam(pa, pb, 0.08 + 0.08 * c, [2.6 * c, 0.6 * c, 1.4 * c], 1, 8); pa = pb; }
+      if (t < FINALE_T) {                                           // energy gathering at its launch ports, brighter and brighter
+        const c = sat((t - 189.8) / (FINALE_T - 189.8)), q = c * c;
+        const tF = duelFK(enemyMS2(FINALE_T), 'enemy_ms').torso, inv = M.invert(M.new(), tF), bF = M.transformPoint([0, 0, 0], tF, _ultBack);
+        B.forEach((b, i) => {                                        // each beam's port: the beam's exit, carried on the body
+          const dl = M.transformDir([0, 0, 0], inv, V.norm([0, 0, 0], V.sub([0, 0, 0], b.p0, bF)));
+          const port = M.transformPoint([0, 0, 0], tm, V.madd([0, 0, 0], _ultBack, dl, 1.2));
+          const fl = 0.85 + 0.15 * Math.sin(t * 40 + i * 1.7);
+          R.glow(port, 0.3 + 2.2 * q * fl, [3.4 * q, 0.9 * q, 1.8 * q], 0.3);
+          R.glow(port, 0.12 + 0.5 * q, [4 * q, 3 * q, 3.6 * q], 0.2);       // the white-hot core of each port
+        });
+        R.glow(bp, 0.5 + 2.2 * q, [2.4 * q, 0.6 * q, 1.2 * q], 0.4); R.light(bp, 70, [1, 0.3, 0.5], 10 * q);
+        for (let i = 0; i < 16; i++) {                               // a few faint motes drawn in toward it
+          const L = 0.5 + 0.3 * hash(i + 700), ph = ((t / L) + hash(i + 701)) % 1, d = randDir([0, 0, 0], i * 3.3 + Math.floor(t / L + hash(i + 701)) * 1.7), k = ph * c * 1.2;
+          R.glow(madd(bp, d, 3 + 12 * (1 - ph)), 0.15 + 0.2 * ph, [2.4 * k, 0.6 * k, 1.4 * k], 0.2);
         }
-        // energy streaming in from all round, and arcs cracking off the sphere
-        for (let i = 0; i < 48; i++) { const L = 0.35 + 0.3 * hash(i + 700), ph = ((t / L) + hash(i + 701)) % 1, d = randDir([0, 0, 0], i * 3.3 + Math.floor(t / L + hash(i + 701)) * 1.7), r0 = 28 * (1 - ph) + 2, k = ph * c * 2.4;
-          const q0 = madd(bp, d, r0), q1 = madd(bp, d, r0 + 3.5 * (1 - ph)); streak(R, q1, q0, [2.6 * k, 0.7 * k, 1.6 * k], 0.9); }
-        const seed = Math.floor(t * 40);
-        for (let j = 0; j < 5; j++) { if (hash(seed * 7 + j) > 0.35 + 0.6 * c) continue; let pa = bp; const d = randDir([0, 0, 0], seed * 3.1 + j * 11); for (let i = 1; i <= 6; i++) { const pb = madd(madd(bp, d, i * (1 + 1.2 * c)), randDir([0, 0, 0], seed + j * 5 + i), 0.8); R.beam(pa, pb, 0.06, [3 * c, 1.5 * c, 3 * c], 1, 8); pa = pb; } }
       } else {
         const lt = t - FINALE_T;
         if (lt < 0.12) { const f = 1 - lt / 0.12; R.glow(bp, 6 + 22 * f, [6 * f, 4 * f, 5 * f], 0.4); R.light(bp, 200, [1, 0.5, 0.7], 30 * f); }   // the white flash
