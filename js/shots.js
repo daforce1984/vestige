@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -695,7 +695,7 @@ export function drawGundam(R, t, s, opts = {}) {
   if (!e) return null;
   e.pose = s.pose; e.damage = s.damage; e.seed = 5.5; e.wear = 1; e.texSet = R.texLoaded & 1 ? 1 : 0;
   const weapon = s.weapon || (t < 258.3 ? 'rifle' : t < 270.2 ? 'none' : 'saber');
-  e.hidden = { rifle: weapon === 'rifle' ? 0 : 1, saber_hilt: weapon === 'saber' ? 0 : 1 };   // one weapon in hand at a time
+  e.hidden = { rifle: weapon === 'rifle' ? 0 : 1, saber_hilt: weapon === 'saber' || s.saberL ? 0 : 1 };   // one weapon in hand at a time (the charged-shot cut: both)
   if (s.fpv) {
     e.hidden = { rifle: 1, head: 1, torso: 1, backpack: 1, pelvis: 1, arm_L_upper: 1, arm_R_upper: 1, hand_L: 1, hand_R: 1 };   // POV: forearms + articulated hands
     drawPovHands(R, t, e, s);
@@ -728,7 +728,7 @@ export function drawGundam(R, t, s, opts = {}) {
     if (eye) { R.light(eye, 10, [0.4, 1, 0.7], 2 * eyeK); if (s.visorFlare > 0.02) R.glow(eye, 1.4 * s.visorFlare, [0.3 * s.visorFlare, 1.2 * s.visorFlare, 0.7 * s.visorFlare], 0.35); }
   }
   // the BEAM SABER (left hand, from the well assault on): cyan blade out of the hilt, red while berserk
-  if (weapon === 'saber' && s.saber > 0) {
+  if ((weapon === 'saber' || s.saberL) && s.saber > 0) {
     const [a, , dir] = saberSegment(R, 'gundam', e, 'hand_L', 1);
     const k = easeOut(sat(s.saber)), tip = madd(a, dir, 13 * k);
     const col = bz > 0.05 ? [3.4, 0.5, 0.3] : [0.8, 2.2, 3.2];
@@ -946,8 +946,8 @@ function drawCutDetail(R, t) {
   if (cur && live) for (const side of [0, 1]) {
     const pw = TW(_secP(cur.th[side])), out = V.norm([0, 0, 0], V.sub([0, 0, 0], pw, TW([CUT_E.cx, CUT_Y, CUT_E.cz])));
     R.glow(pw, 0.4, [2.4, 1.2, 0.4], 0.2); R.light(pw, 14, [1, 0.5, 0.2], 1.2);
-    for (let i = 0; i < 90; i++) {                                                  // a jet of sparks, story-fast: pixel streaks
-      const life = 0.012 + hash(i + side * 50) * 0.035, ph = ((t / life) + hash(i + 3 + side * 50)) % 1;
+    for (let i = 0; i < 900; i++) {                                                 // a torrent of sparks, story-fast: pixel streaks
+      const life = 0.012 + hash(i + side * 5000) * 0.035, ph = ((t / life) + hash(i + 3 + side * 5000)) % 1;
       const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.1 + side * 7 + Math.floor(t / life) * 0.37), out, 1.4), D_SWEEP(), 0.8));
       const b = 3.2 * (1 - ph) * (1 - ph), sp = life * (140 + 220 * hash(i + 9)), q = madd(pw, sd, ph * sp);
       streak(R, madd(q, sd, -Math.min(ph, 0.25) * sp), q, [b * 1.4, b * 0.75, b * 0.25]);
@@ -965,7 +965,7 @@ function drawSlash(R, c, t) {
     const k = Math.exp(-lt * 7);
     R.glow(P, 1 + 2 * k, [2.2 * k, 1.4 * k, 0.6 * k], 0.3);
     R.light(P, 40, [1, 0.6, 0.3], 4 * k);
-    sparkBurst(R, P, d, lt, 77, 120, 0.9, 30, 1.0, [5, 2.8, 1]);
+    sparkBurst(R, P, d, lt, 77, 1200, 1.0, 34, 1.1, [5, 2.8, 1]);
     if (lt < 0.3) R.ripple(P, 6 + 40 * easeOut(lt / 0.3), [0.4, 0.4, 0.4], (1 - lt / 0.3) * 1.2);
   }
 }
@@ -1336,25 +1336,32 @@ function drawTransShot(R, t) {
   const lt = t - TRANS_SHOT, P = transPath();
   if (lt >= 0 && lt < 0.35) { const kf = Math.exp(-lt * 9); R.glow(P.p0, 2 + 6 * kf, [3 * kf, 0.6 * kf, 1 * kf], 0.35); R.light(P.p0, 70, [1, 0.3, 0.45], 9 * kf); R.ripple(P.p0, 8 + 40 * easeOut(lt / 0.35), [0.5, 0.5, 0.5], (1 - lt / 0.35) * 1.3); }
   if (t < TRANS_SHOT) return;
-  if (t <= TRANS_HIT) {
-    const h = transHead(t), g = sat(lt / 0.06);
-    // trails (story time: 0.07 s of flight ≈ 27 m; in the slow motion they hang in the air)
-    const N = 22, span = Math.min(0.07, lt);
-    let pa = h, oa = transOrb(t);
+  const ball = (h, g, tr0, trFn, orb) => {                           // a light-ball: trail, core, body, halo (+ the orbiter)
+    const N = 22, span = Math.min(0.07, t - tr0);
+    let pa = h, oa = orb ? transOrb(t) : null;
     for (let i = 1; i <= N; i++) {
-      const tt = t - span * i / N, f = 1 - (i - 0.5) / N, pb = transHead(tt), ob = transOrb(tt);
-      R.beam(pa, pb, 0.15 + 0.85 * f * f, [SER_COL[0] * 0.8 * f, SER_COL[1] * 0.8 * f, SER_COL[2] * 0.8 * f], 0.5 + 0.5 * f, 8);   // the ball's streak
-      R.beam(oa, ob, 0.06 + 0.3 * f, [3.2 * f, 1.6 * f, 2.6 * f], 1, 10);                                              // the orbiter's spiral
-      pa = pb; oa = ob;
+      const tt = t - span * i / N, f = 1 - (i - 0.5) / N, pb = trFn(tt);
+      R.beam(pa, pb, (0.15 + 0.85 * f * f) * g, [SER_COL[0] * 0.8 * f, SER_COL[1] * 0.8 * f, SER_COL[2] * 0.8 * f], 0.5 + 0.5 * f, 8);
+      if (orb) { const ob = transOrb(tt); R.beam(oa, ob, 0.06 + 0.3 * f, [3.2 * f, 1.6 * f, 2.6 * f], 1, 10); oa = ob; }
+      pa = pb;
     }
-    // the ball: white-hot core, a pink body, a wide halo
     R.glow(h, 1.1 * g, [5, 3.8, 4.4], 0.25); R.glow(h, 2.1 * g, [2.8, 0.7, 1.3], 0.35); R.glow(h, 3.8 * g, [0.7, 0.12, 0.28], 0.45);
     R.light(h, 60, [1, 0.35, 0.55], 4 * g);
-    // the orbiting energy source
-    const o = transOrb(t); R.glow(o, 0.6 * g, [5, 3.5, 4.5], 0.2); R.glow(o, 1.2 * g, [2, 0.6, 1.3], 0.3);
-    R.beam(h, o, 0.08, [1.6, 0.5, 1.0], 0.5, 6);                                                                     // a thread of energy tying it to the core
+    if (orb) { const o = transOrb(t); R.glow(o, 0.6 * g, [5, 3.5, 4.5], 0.2); R.glow(o, 1.2 * g, [2, 0.6, 1.3], 0.3); R.beam(h, o, 0.08, [1.6, 0.5, 1.0], 0.5, 6); }
+  };
+  // the halves after his cut: they part either side of the cut plane, carried on, and each bursts on its own
+  const ax = transCutAxis(), half = (sg) => (tt) => { const x = Math.max(0, tt - TRANS_PASS); return madd(transHead(tt), ax, sg * (1.2 + 55 * x)); };
+  if (t <= TRANS_PASS) ball(transHead(t), sat(lt / 0.06), TRANS_SHOT, transHead, true);
+  else if (t <= TRANS_HIT) {
+    for (const sg of [1, -1]) ball(half(sg)(t), 0.75, TRANS_PASS, (tt) => (tt < TRANS_PASS ? transHead(tt) : half(sg)(tt)), false);
   }
-  if (t > TRANS_HIT) explosion(R, t, TRANS_HIT, transHead(TRANS_HIT), 16, 733, 'ship', 2);
+  const lc = t - TRANS_PASS;                                           // the cut: a flash, the orbiter bursting, a torrent of sparks
+  if (lc >= 0 && lc < 0.8) {
+    const P = transHead(TRANS_PASS), f = Math.exp(-lc * 10);
+    R.glow(P, 0.8 + 2.4 * f, [3 * f, 2 * f, 3 * f], 0.3); R.light(P, 50, [1, 0.6, 0.8], 3 * f);   // (small: a big flash whited the frame out)
+    sparkBurst(R, P, ax, lc, 921, 400, 2, 70, 0.8, [3.5, 1.5, 2.4]);
+  }
+  if (t > TRANS_HIT) for (const sg of [1, -1]) explosion(R, t, TRANS_HIT + (sg > 0 ? 0 : 0.06), half(sg)(TRANS_HIT + (sg > 0 ? 0 : 0.06)), 12, sg > 0 ? 733 : 734, 'ship', 2);
 }
 function drawSeraphFire(R, t) {
   drawTransShot(R, t);

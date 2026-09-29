@@ -1965,6 +1965,28 @@ function msShieldBlock(E, t, p) {
   s.connect(sp); sp.connect(sh); sh.connect(sg); sg.connect(v.out); perc(sg.gain, t, vel * 0.7, 0.12, 0.003);
   const c = v.noise('white', t, t + 0.15), cb = v.f('bandpass', 1800, 1), cg = v.g(0); c.connect(cb); cb.connect(cg); cg.connect(v.out); perc(cg.gain, t, vel * 0.6, 0.04, 0.001);
 }
+// msScrape: steel grinding on steel as the blade drags through armour — stick-slip: resonant metal bands (1.8/3.1/4.7 kHz,
+// high Q, their pitch wandering) driven by noise whose level judders irregularly, a thin screech on top, crackle under it
+function msScrape(E, t, p) {
+  const vel = p.vel ?? 0.8, dur = p.dur ?? 1.5, end = t + dur, stop = end + 0.5;
+  const v = new Voice(E, 'sfx', { verb: 0.45, pan: p.pan ?? 0 });
+  const bus = v.g(0); bus.connect(v.out);
+  const n = v.noise('white', t, stop), drive = v.g(0.6);
+  jitter(v, t, stop, 45, 0.7).connect(drive.gain);                         // the stick-slip judder
+  n.connect(drive);
+  for (const [f, q, a] of [[1800, 9, 0.9], [3100, 12, 0.7], [4700, 14, 0.5], [760, 6, 0.5]]) {
+    const b = v.f('bandpass', f * R(0.97, 1.03), q), g = v.g(a);
+    b.frequency.setValueAtTime(f, t); b.frequency.linearRampToValueAtTime(f * R(0.85, 1.15), end);
+    drive.connect(b); b.connect(g); g.connect(bus);
+  }
+  const sq = v.osc('sawtooth', 2300, t, stop), sb = v.f('bandpass', 2600, 6), sg = v.g(0), vib = v.osc('sine', 9, t, stop), vg = v.g(120);
+  vib.connect(vg); vg.connect(sq.frequency); sq.frequency.setValueAtTime(2300, t); sq.frequency.linearRampToValueAtTime(1700, end);
+  sq.connect(sb); sb.connect(sg); sg.connect(bus);
+  jitter(v, t, stop, 25, 0.5).connect(sg.gain);
+  const c = v.noise('crackle', t, stop, 1.4), ch = v.f('highpass', 2500, 0.7), cg = v.g(0.5); c.connect(ch); ch.connect(cg); cg.connect(bus);
+  bus.gain.setValueAtTime(0, t); bus.gain.linearRampToValueAtTime(vel * 1.6, t + 0.05);
+  bus.gain.setValueAtTime(vel * 1.4, end - 0.1); bus.gain.setTargetAtTime(0, end - 0.1, 0.12);
+}
 // msPass: a beam bolt whipping past. p.tp = time of the pass after t, p.ratio = pitch drop, p.pan0 / p.pan1
 function msPass(E, t, p) {
   const vel = p.vel ?? 0.6, tp = t + (p.tp ?? 0.12), f = p.f ?? 1800, ratio = p.ratio ?? 2.2, t0 = Math.max(t, tp - 0.3), stop = tp + 1.2;
@@ -2138,5 +2160,5 @@ export const INSTR = {
   // v9 beam saber (procedural)
   beamSaberIgnite, beamSaberHum, beamSaberSwing, beamSaberRetract, beamSaberClash,
   // v10 mech SFX (procedural)
-  msShot, msBoost, msArmorHit, msShieldBlock, msPass,
+  msShot, msBoost, msArmorHit, msShieldBlock, msPass, msScrape,
 };

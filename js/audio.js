@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, inSkip, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -608,6 +608,7 @@ function duelCues() {
   // buzz held across the pass (Freesound CC0 'bzzzzzzzzzzpht', FartMuffin) + hot metal searing under it (CC0
   // 'ShovelSizzle8_mod', rabban625), its tail ringing on as the halves part
   out.push([CUT_T - 0.012, 'saber_cut', { at: 'hit', gain: G * 1.1, pan: 0.15, prio: 9, norand: true }]);
+  out.push([CUT_T - 0.01, '@msScrape', { vel: G * 0.9, dur: FD(CUT_T - 0.01, CUT_SPLIT + 0.01), pan: 0.15 }]);   // steel grinding as the blade drags through
   out.push([CUT_T + 0.004, 'cut_sizzle', { at: 'hit', gain: G * 0.55, pan: 0.2, prio: 8, norand: true }]);
   out.push([CUT_T, '@boom', { bus: 'sfx', f: 32, vel: G, dur: 2.0, verb: 0.4 }]);
   out.push([193.95, '@beamSaberRetract', { vel: 0.7 * G, dur: 0.5 }]);
@@ -672,8 +673,16 @@ function duelCues() {
   out.push([TRANS_SHOT, 'sfx16_beam', { at: 'hit', gain: G * 1.15, pan: 0.2, prio: 9, norand: true }]);   // Pixabay 'Sfx16 - Beam' (Yarzur_ofc)
   out.push([TRANS_SHOT, '@boom', { bus: 'sfx', f: 26, vel: G * 0.9, dur: 2.0, verb: 0.4 }]);
   out.push([TRANS_SHOT + 0.02, 'heavy_beam', { rate: 0.6, dur: FD2(TRANS_SHOT, TRANS_PASS), fadeOut: 0.15, gain: G * 1.0, prio: 9, norand: true }]);
-  out.push([TRANS_PASS - 0.012, '@msPass', { vel: G * 1.0, tp: 0.25, ratio: 3.5, f: 1000, pan0: -0.7, pan1: 0.7 }]);   // a hair past his head (slow motion: film seconds)
+  // he cuts it in half with his saber: ignite, the swing, the cut (a clash + sizzle), both halves whipping past, retract
+  out.push([TRANS_PASS - 0.35, '@beamSaberIgnite', { vel: 0.8 * G }]);
+  out.push([TRANS_PASS - 0.06, '@beamSaberSwing', { vel: G, dur: 0.4 }]);
+  out.push([TRANS_PASS, '@beamSaberClash', { vel: G, grind: 1.2 }]);
+  out.push([TRANS_PASS, '@boom', { bus: 'sfx', f: 34, vel: G * 0.8, dur: 1.6, verb: 0.4 }]);
+  out.push([TRANS_PASS + 0.01, '@msPass', { vel: G * 0.8, tp: 0.2, ratio: 3, f: 1100, pan0: -0.2, pan1: 0.8 }]);
+  out.push([TRANS_PASS + 0.01, '@msPass', { vel: G * 0.8, tp: 0.25, ratio: 3, f: 950, pan0: 0.2, pan1: -0.8 }]);
+  out.push([TRANS_PASS + 0.47, '@beamSaberRetract', { vel: 0.6 * G, dur: 0.4 }]);
   out.push([TRANS_HIT, 'hl_explosion', { rate: 0.8, gain: G * 1.0, pan: -0.2, prio: 9, norand: true }]);
+  out.push([TRANS_HIT + 0.06, 'hl_explosion', { rate: 0.9, gain: G * 0.9, pan: 0.3, prio: 9, norand: true }]);   // the second half
   out.push([TRANS_HIT, '@boom', { bus: 'sfx', f: 30, vel: G * 0.8, dur: 2.2, verb: 0.4 }]);
   for (const ts of SERAPH_SHOTS) {
     if (ts === TRANS_SHOT) continue;

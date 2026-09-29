@@ -777,18 +777,22 @@ function shieldArm(s, tw) {
 }
 // THE BLOCK: the shield forearm laid diagonally across its front, the shield's face (the forearm's +X) toward him —
 // the wrist placed low in front of the chest, the forearm rising across it to the elbow (arm IK on the hand frame)
-function guardIK(s, tw) {
+function guardIK(s, tw) {   // the shield raised in front of its head, its face square to him (arm IK + the shield swivel, 4 corrections)
   const k = smooth(178.45, 178.6, tw) * (1 - smooth(179.05, 179.25, tw)); if (k <= 0) return;
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
-  const fk = duelFK(s, 'enemy_ms'), n = nrm(flat(sub(heroRawPos(tw), s.pos), 0)), side = nrm(V.cross([0, 0, 0], [0, 1, 0], n));
-  const Y = nrm(add(scl([0, 1, 0], 0.72), scl(side, -0.7))), X = nrm(sub(n, scl(Y, V.dot(n, Y)))), Z = V.cross([0, 0, 0], X, Y);
-  const wrist = M.transformPoint([0, 0, 0], fk.torso, [-1.2, 1.4, 4.2]);
-  armIK(s, fk, 'enemy_ms', 'L', wrist, [...X, ...Y, ...Z]);                 // the forearm brought across its front …
+  const n = nrm(flat(sub(heroRawPos(tw), s.pos), 0)), side = nrm(V.cross([0, 0, 0], [0, 1, 0], n));
+  const Y = nrm(add(scl([0, 1, 0], 0.92), scl(side, -0.35))), X = nrm(sub(n, scl(Y, V.dot(n, Y)))), Z = V.cross([0, 0, 0], X, Y), Rs = [...X, ...Y, ...Z];
+  let fk = duelFK(s, 'enemy_ms');
+  const C = add(partPoint(fk, 'head', [0, 0.8, 0]), scl(n, 3.5));      // the shield's face centre: in front of its face
+  let W = add(C, [0, -2.5, 0]);
+  for (let it = 0; it < 4; it++) {
+    armIK(s, fk, 'enemy_ms', 'L', W, Rs);
+    fk = duelFK(s, 'enemy_ms'); s.pose.shield = euler3(r3mul(r3T(r3(fk.arm_L_lower)), Rs));
+    fk = duelFK(s, 'enemy_ms'); W = add(W, sub(C, partPoint(fk, 'shield', SHIELD_C)));
+  }
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
-  // … and the shield swivelled on its elbow mount so its face (+X) is square to him and its long axis runs diagonally
-  const fk2 = duelFK(s, 'enemy_ms'), rel = euler3(r3mul(r3T(r3(fk2.arm_L_lower)), [...X, ...Y, ...Z]));
-  s.pose.shield = rel.map((v) => v * k);
+  s.pose.shield = s.pose.shield.map((v) => v * k);
 }
 const TWO_HAND = (tw) => (1 - smooth(178.4, 178.55, tw) * (1 - smooth(179.05, 179.25, tw))) * (1 - smooth(183.25, 183.3, tw) * (1 - smooth(183.8, 184.1, tw))) * smooth(SHIELD_HIT_T + 0.3, SHIELD_HIT_T + 0.55, tw);   // (one-handed while the shield is on its left forearm: the rifle went through it)
 const HAND_TO_RIFLE = () => sub(PIV.enemy_ms.rifle, PIV.enemy_ms.hand_R);
@@ -1034,17 +1038,16 @@ function duelHero_(t) {
   const dk = smooth(191.1, SANDE0, tw) * (1 - smooth(192.35, 192.9, tw));
   if (dk > 0) f = nrm(lrp(f, D_U, dk));
   _pose[PIDX._body + 2] += heroRoll(tw);
-  { const k = smooth(TRANS_PASS - 0.07, TRANS_PASS - 0.025, tw) * (1 - smooth(TRANS_PASS + 0.25, TRANS_PASS + 0.8, tw));   // the neck-snap: a hair
-    if (k > 0) { _pose[PIDX.head + 2] += 0.75 * k; _pose[PIDX.head + 1] += 0.45 * k; _pose[PIDX.head] += 0.2 * k; _pose[PIDX.torso + 2] += 0.15 * k; } }
   s.eye = 1 + 2.2 * Math.exp(-Math.abs(tw - HERO_FLARE - 0.03) * 40) * (tw > HERO_FLARE - 0.03 ? 1 : 0);   // the eye flares once he is on it
   s.weapon = tw > 169.5 && tw < HERO_GRAB ? 'none' : tw < 191.22 || tw >= 200 ? 'rifle' : tw < 194.1 ? 'saber' : 'none';   // slung over the shoulder at 191.2
-  s.saber = smooth(191.26, 191.36, tw) * (1 - smooth(193.85, 194.1, tw));
+  s.saber = Math.max(smooth(191.26, 191.36, tw) * (1 - smooth(193.85, 194.1, tw)), transSaber(tw));
+  s.saberL = transSaber(tw) > 0;                                     // (the saber in his left hand while the rifle stays in his right)
   s.sande = Math.max(sat((tw - SANDE0 + 0.05) / 0.1) * (1 - smooth(CUT_T - 0.05, CUT_T - 0.025, tw)), transGhost(tw));
   s.ghostFrom = tw < SANDE0 - 0.1 ? TRANS_PASS - 0.1 : SANDE0 - 0.02;   // afterimages (shots.js); gone for the close-up of the cut
   s.boost = heroBoost(tw);
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
-  { if (tw >= HERO_GRAB - 0.16 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } heroLeft(s, tw); }   // the rifle laid on its target, held upright
+  { if (tw >= HERO_GRAB - 0.16 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } heroLeft(s, tw); transCutIK(s, tw); }   // the rifle laid on its target, held upright
   slashIK(s, tw);                                                   // the pass-cut: the blade swept exactly through its waist
   hitReact('hero', tw, s, 'gundam');
   // hand-over to the old aftermath formula (identical at t = 200)
@@ -1367,7 +1370,7 @@ function heroDraw(s, tw) {
   const k = smooth(HERO_GRAB - 0.2, HERO_GRAB - 0.1, tw);            // the hand gets to the grip fast
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
-const heroLeftW = (tw) => smooth(HERO_LOAD - 0.3, HERO_LOAD - 0.2, tw) * (1 - smooth(190.85, 191.05, tw)) * (1 - Math.max(styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip'), styleW(tw, HERO_SHOTS, HERO_STYLE, 'snap')));   // on from the pac grab through the whole gunfight
+const heroLeftW = (tw) => smooth(HERO_LOAD - 0.3, HERO_LOAD - 0.2, tw) * (1 - smooth(190.85, 191.05, tw)) * (1 - transCutW(tw)) * (1 - Math.max(styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip'), styleW(tw, HERO_SHOTS, HERO_STYLE, 'snap')));   // on from the pac grab through the whole gunfight
 const HERO_CAP_L = [0.1, -1.0, 0.6];   // the E-pac in his left hand (hand frame)
 function heroLeftWrist(fk, tw, Rw) {   // wrist target: the pac off the hip → slammed into the breech → the hand on the fore-end
   const hip = M.transformPoint([0, 0, 0], fk.torso, HERO_HIP), rear = M.transformPoint([0, 0, 0], fk.rifle, HERO_REAR), fore = M.transformPoint([0, 0, 0], fk.rifle, HERO_FORE);
@@ -1505,11 +1508,39 @@ export function transPath() {
 }
 // his slip out of the charged shot: ~9 m to his right (away from its line) in 0.07 s, held, back over 0.7 s
 const transSlip = (tw) => smooth(TRANS_PASS - 0.09, TRANS_PASS - 0.02, tw) * (1 - smooth(TRANS_PASS + 0.3, TRANS_PASS + 1.0, tw));
-export const transGhost = (tw) => smooth(TRANS_PASS - 0.1, TRANS_PASS - 0.07, tw) * (1 - smooth(TRANS_PASS + 0.15, TRANS_PASS + 0.35, tw));
+export const transGhost = (tw) => 0 * smooth(TRANS_PASS - 0.1, TRANS_PASS - 0.07, tw) * (1 - smooth(TRANS_PASS + 0.15, TRANS_PASS + 0.35, tw));
 function transDodge(tw) {
+  return [0, 0, 0];                                                  // (no slip any more: he cuts the shot in half — transCutIK)
   const k = transSlip(tw); if (k <= 0) return [0, 0, 0];
   const f = flat(sub(enemyRawPos(TRANS_PASS), heroRawPos(TRANS_PASS)), 0), right = [-f[2], 0, f[0]];
   return scl(right, 9 * k);
+}
+// HE CUTS IT IN HALF: his left hand lets go of the fore-end, the saber ignites (TRANS_PASS − 0.35) and he sweeps it down
+// through the light-ball exactly as it arrives (the blade passes through its centre at TRANS_PASS); the two halves part
+// either side of the cut plane (transCutAxis) and burst behind him
+const transSaber = (tw) => smooth(TRANS_PASS - 0.35, TRANS_PASS - 0.25, tw) * (1 - smooth(TRANS_PASS + 0.45, TRANS_PASS + 0.6, tw));
+const transCutW = (tw) => smooth(TRANS_PASS - 0.32, TRANS_PASS - 0.2, tw) * (1 - smooth(TRANS_PASS + 0.3, TRANS_PASS + 0.55, tw));
+let _tcut = null;
+function transCutRef() {   // the blade's line onto the ball at the pass (from where his hilt is then), computed once
+  if (_tcut) return _tcut;
+  if (!_tp || _tp.pending) return null;
+  _tcut = { pending: true };
+  const h = duelHero_(TRANS_PASS), fk = duelFK(h, 'gundam'), hilt = hiltAt(fk), P = transHead(TRANS_PASS);
+  const base = nrm(sub(P, hilt)), a = nrm(V.cross([0, 0, 0], base, [0, 1, 0]));
+  _tcut = { base, a, reach: V.dist(P, hilt) };
+  return _tcut;
+}
+export const transCutAxis = () => { const r = transCutRef(); return r && !r.pending ? r.a : [1, 0, 0]; };
+function transCutIK(s, tw) {
+  const k = transCutW(tw); if (k <= 0) return;
+  const ref = transCutRef(); if (!ref || ref.pending) return;
+  const ang = clamp((tw - TRANS_PASS) / 0.1, -1.3, 1.3) * 55 * DEG;     // from high to low, through the ball at the pass
+  const dir = rotAxis(ref.base, ref.a, -ang), upv = nrm(V.cross([0, 0, 0], dir, ref.a)), xv = V.cross([0, 0, 0], upv, dir), Hw = [...xv, ...upv, ...dir];
+  s.pose = { ...s.pose };
+  const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
+  const fk = duelFK(s, 'gundam'), hilt = hiltAt(fk);
+  armIK(s, fk, 'gundam', 'L', sub(hilt, r3v(Hw, [0, -1.2, 0.6])), Hw);
+  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
 /** the light-ball's position at t: along the curve to the pass, then straight on */
 export function transHead(t) {
