@@ -568,10 +568,11 @@ function duelCues() {
   // his beam rifle: crack, the falling zap, the sine punch, a gritty body
   DUEL_RIFLE.forEach((t) => out.push([t, '@msShot', { vel: G * R(0.9, 1.0), k: R(0.7, 0.75), pan: -0.15 }]));
   // the shots that land: struck plate, ring, and the armour burning through
-  out.push([SHIELD_HIT_T + 0.03, '@msArmorHit', { vel: G * 1.0, f: 180, burn: 0.8, pan: 0.3 }]);   // the shield torn off its arm
+  out.push([SHIELD_HIT_T + 0.03, '@msShieldBlock', { vel: G * 0.8, hold: 0.45, pan: 0.3 }]);        // the shield takes it …
+  out.push([SHIELD_HIT_T + 0.05, '@msArmorHit', { vel: G * 1.0, hold: 1.1, pan: 0.3 }]);              // … and it burns through, tearing it off
   out.push([SHIELD_HIT_T + 0.03, '@sparkBurst', { vel: G * 0.6, pan: 0.3 }]);
-  out.push([THIGH_T + 0.03, '@msArmorHit', { vel: G * 0.95, f: 210, burn: 1.2, pan: 0.3 }]);       // through its thigh
-  out.push([HERO_HIT_T + 0.04, '@msArmorHit', { vel: G * 1.0, f: 230, burn: 1.1, pan: -0.25 }]);   // into his pauldron
+  out.push([THIGH_T + 0.03, '@msArmorHit', { vel: G * 0.95, hold: 0.9, pan: 0.3 }]);                // through its thigh
+  out.push([HERO_HIT_T + 0.04, '@msArmorHit', { vel: G * 1.0, hold: 0.8, pan: -0.25 }]);            // into his pauldron
   out.push([HERO_HIT_T + 0.04, '@sparkBurst', { vel: G * 0.7, pan: -0.25 }]);
   // the charge: both light every thruster at once (the quick-boost edges below take over from the first jinks)
   out.push([170.05, '@msBoost', { vel: G * 0.9, dur: 1.3, pan: -0.15 }]);
@@ -648,7 +649,7 @@ function duelCues() {
   }
   out.push([179.3, '@msBoost', { vel: G * 0.75, dur: 1.0, pan: 0.35 }]);                     // the boost-jump
   // his 178.7 splashes off its shield: the plate rings, the face burns (the hole stays)
-  out.push([BLOCK_T + 0.03, '@msArmorHit', { vel: G * 0.85, f: 260, burn: 0.9, pan: 0.3 }]);
+  out.push([BLOCK_T + 0.03, '@msShieldBlock', { vel: G * 0.95, hold: 0.9, pan: 0.3 }]);
   out.push([BLOCK_T + 0.03, '@sparkBurst', { vel: G * 0.6, pan: 0.3 }]);
   // ---- its ULTIMATE: the back charging while it gathers in, a dozen heavy beams tearing out of it at once, their roar as
   //      they bend round onto him, and the chain of blasts where they converge (he is already gone)

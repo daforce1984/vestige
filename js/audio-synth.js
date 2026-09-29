@@ -1891,30 +1891,79 @@ function msBoost(E, t, p) {
   c.connect(ch); ch.connect(cg); cg.connect(v.out);
   envAR(cg.gain, t + 0.04, dur, 0.05, 0.3, vel * 0.22);
 }
-// msArmorHit: a beam landing on armour — click, struck plate, a long ring, then the burn-through sizzle / arc
+// Gundam hit references (YouTube, analysis only, 2026-09-29: 連邦vs.ジオンDX 被弾音(ビーム), "Gundam sound effect - Hit #1/#2",
+// Witch from Mercury ep1/ep9 shield blocks, Unicorn vs Sinanju): a beam HIT is not a ringing plate but a flat crackling
+// "bzzzzt" — two noise humps (190 Hz and 2.5 kHz, equal level, the 400–1000 Hz band 12 dB down, nothing much above
+// 8 kHz) whose level jitters irregularly at ~75–140 Hz (CV 0.5–0.8), held flat 0.65–1.3 s, then cut off at ~75 dB/s;
+// a < 5 ms onset with a 1.3 kHz blip and a second low burst 110 ms in. A SHIELD BLOCK is brighter (~20 dB more top),
+// a fine fizz rather than a crackle, plus a harmonic 'wobble' chirp (780 Hz series) pulsing at ~6.5 Hz with each pulse
+// falling ~10 % in pitch, and a steady 990 Hz field tone underneath.
+// crackle modulator: noise → lowpass → hard clip → scaled/offset, into a gain's .gain
+function jitter(v, t, stop, lp, depth) {
+  const n = v.noise('white', t, stop), l = v.f('lowpass', lp, 0.7), pre = v.g(8), sh = v.ws('hard'), sc = v.g(depth);
+  n.connect(l); l.connect(pre); pre.connect(sh); sh.connect(sc);
+  return sc;
+}
+// msArmorHit: a beam burning into armour. p.hold = plateau length (s, 0.65 normal … 1.3 heavy)
 function msArmorHit(E, t, p) {
-  const vel = p.vel ?? 0.9, base = p.f ?? 200, burn = p.burn ?? 1, stop = t + 3;
-  const v = new Voice(E, 'sfx', { verb: 0.5, pan: p.pan ?? 0 });
-  const c = v.noise('white', t, t + 0.1), chp = v.f('highpass', 3000, 0.7), cg = v.g(0);
-  c.connect(chp); chp.connect(cg); cg.connect(v.out);
-  perc(cg.gain, t, vel * 0.6, 0.015, 0.001);
-  for (const [m, a, t60] of [[1, 0.5, 1.7], [1.67, 1, 0.8], [3.61, 0.4, 1.0], [4.78, 0.32, 0.6], [1300 / base, 0.18, 0.8], [1660 / base, 0.18, 0.8], [4000 / base, 0.25, 1.9]]) {
-    const o = v.osc('sine', base * m * R(0.99, 1.01), t, stop), g = v.g(0);
-    o.connect(g); g.connect(v.out);
-    perc(g.gain, t, vel * 0.4 * a, t60 / 6.9, 0.002);
+  const vel = p.vel ?? 0.9, hold = p.hold ?? 0.8, end = t + hold, stop = end + 0.6;
+  const v = new Voice(E, 'sfx', { verb: 0.3, pan: p.pan ?? 0 });
+  const bus = v.g(0), scoop = v.f('peaking', 630, 0.8), top = v.f('lowpass', 3800, 0.9);
+  scoop.gain.value = -8;
+  bus.connect(scoop); scoop.connect(top); top.connect(v.out);
+  // the two humps, each through its own jittering gain (the crackle)
+  const hump = (fc, q, depth, lvl) => {
+    const n = v.noise('white', t, stop), b = v.f('bandpass', fc, q), g = v.g(1 - depth), lg = v.g(lvl);
+    jitter(v, t, stop, 110, depth).connect(g.gain);
+    n.connect(b); b.connect(g); g.connect(lg); lg.connect(bus);
+    return lg;
+  };
+  hump(190 * R(0.95, 1.05), 2.5, 0.3, 3.2);
+  const hi = hump(2300, 0.9, 0.4, 1.3);
+  const s = v.osc('sine', 185 * R(0.95, 1.05), t, stop), sg = v.g(0.25); s.connect(sg); sg.connect(bus);
+  // envelope: hard onset, flat plateau (the mids sag a little), fast cut-off
+  bus.gain.setValueAtTime(0, t); bus.gain.linearRampToValueAtTime(vel * 0.55, t + 0.004);
+  bus.gain.setValueAtTime(vel * 0.5, end); bus.gain.setTargetAtTime(0, end, 0.12);
+  hi.gain.setValueAtTime(1.1, t + 0.1); hi.gain.linearRampToValueAtTime(0.7, end);
+  // onset: a 1.3 kHz blip, a transient at 250 Hz / 2 kHz, the second low burst 110 ms in
+  const bl = v.osc('sine', 1300, t, t + 0.12), blg = v.g(0); bl.connect(blg); blg.connect(v.out); perc(blg.gain, t, vel * 0.18, 0.03, 0.002);
+  const tr = v.noise('white', t, t + 0.1), tb = v.f('bandpass', 2000, 0.9), tg = v.g(0); tr.connect(tb); tb.connect(tg); tg.connect(v.out); perc(tg.gain, t, vel * 0.5, 0.02, 0.001);
+  const lb = v.noise('brown', t + 0.1, t + 0.4), ll = v.f('lowpass', 300, 0.7), lg2 = v.g(0); lb.connect(ll); ll.connect(lg2); lg2.connect(v.out); perc(lg2.gain, t + 0.11, vel * 0.7, 0.05, 0.004);
+  const th = v.osc('sine', 110, t, t + 0.6), thg = v.g(0); th.connect(thg); thg.connect(v.out); perc(thg.gain, t, vel * 0.5, 0.1, 0.003);   // a thud under it
+}
+// msShieldBlock: a beam splashing off a shield — bright fizz, the pulsing wobble chirp, a field tone, a low bump
+function msShieldBlock(E, t, p) {
+  const vel = p.vel ?? 0.9, hold = p.hold ?? 0.9, end = t + hold, stop = end + 0.5;
+  const v = new Voice(E, 'sfx', { verb: 0.4, pan: p.pan ?? 0 });
+  // wash: broadband fizz, fine jitter
+  const n = v.noise('white', t, stop), hs = v.f('highshelf', 6000, 0.7), ls = v.f('lowshelf', 160, 0.7), wg = v.g(0.75), wa = v.g(0);
+  hs.gain.value = -8; ls.gain.value = 4;
+  jitter(v, t, stop, 250, 0.25).connect(wg.gain);
+  const tl = v.f('lowpass', 9000, 0.7), mb = v.f('peaking', 350, 1); mb.gain.value = 5;
+  n.connect(ls); ls.connect(mb); mb.connect(hs); hs.connect(tl); tl.connect(wg); wg.connect(wa); wa.connect(v.out);
+  wa.gain.setValueAtTime(0, t); wa.gain.linearRampToValueAtTime(vel * 0.3, t + 0.01);
+  wa.gain.setValueAtTime(vel * 0.28, end); wa.gain.setTargetAtTime(0, end, 0.07);
+  const b = v.noise('brown', t, stop), bl = v.f('lowpass', 160, 0.8), bg = v.g(0); b.connect(bl); bl.connect(bg); bg.connect(v.out);
+  envAR(bg.gain, t, hold, 0.01, 0.15, vel * 0.9);
+  // the wobble chirp: saw at 780 Hz → band 2 kHz, pulsing ~6.5 Hz, each pulse falling ~10 %
+  const z = v.osc('sawtooth', 780, t, stop), zb = v.f('bandpass', 2000, 0.5), zg = v.g(0);
+  z.connect(zb); zb.connect(zg); zg.connect(v.out);
+  const P = 0.155;
+  for (let k = 0, tt = t; tt < end; k++, tt += P) {
+    const f0 = 780 * (1 + 0.04 * Math.sin(k * 1.7));
+    z.frequency.setValueAtTime(f0, tt); z.frequency.linearRampToValueAtTime(f0 * 0.9, tt + P * 0.98);
+    zg.gain.setValueAtTime(vel * 0.03, tt); zg.gain.linearRampToValueAtTime(vel * 0.16, tt + 0.06); zg.gain.linearRampToValueAtTime(vel * 0.03, tt + P * 0.98);
   }
-  const th = v.osc('sine', 50, t, stop), tg = v.g(0);
-  th.connect(tg); tg.connect(v.out);
-  perc(tg.gain, t, vel * 0.35, 0.1, 0.005);
-  if (burn > 0) {
-    const n = v.noise('white', t, stop), hp = v.f('highpass', 2000, 0.7), pk = v.f('peaking', 6000, 1), g = v.g(0);
-    pk.gain.value = 4;
-    n.connect(hp); hp.connect(pk); pk.connect(g); g.connect(v.out);
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vel * 0.2 * burn, t + 0.17); g.gain.setTargetAtTime(0, t + 0.18, 0.35 * burn);
-    const a = v.noise('crackle', t, stop, 0.4), ah = v.f('highpass', 6000, 0.7), ag = v.g(0);
-    a.connect(ah); ah.connect(ag); ag.connect(v.out);
-    perc(ag.gain, t + 0.02, vel * 0.35 * burn, 0.4 * burn, 0.01);
-  }
+  zg.gain.setTargetAtTime(0, end, 0.06);
+  // field tone
+  const ft = v.g(0); ft.connect(v.out);
+  for (const [f, a] of [[990, 1], [1980, 0.55]]) { const o = v.osc('sine', f, t, stop), og = v.g(a); o.connect(og); og.connect(ft); }
+  envAR(ft.gain, t + 0.02, hold, 0.05, 0.1, vel * 0.05);
+  // onset: a low bump (120 → 60 Hz, driven) and a 1.8 kHz snap
+  const s = v.osc('sine', 120, t, t + 0.5), sp = v.g(1.6), sh = v.ws('soft'), sg = v.g(0);
+  s.frequency.setValueAtTime(120, t); s.frequency.setTargetAtTime(60, t, 0.08);
+  s.connect(sp); sp.connect(sh); sh.connect(sg); sg.connect(v.out); perc(sg.gain, t, vel * 0.7, 0.12, 0.003);
+  const c = v.noise('white', t, t + 0.15), cb = v.f('bandpass', 1800, 1), cg = v.g(0); c.connect(cb); cb.connect(cg); cg.connect(v.out); perc(cg.gain, t, vel * 0.6, 0.04, 0.001);
 }
 // msPass: a beam bolt whipping past. p.tp = time of the pass after t, p.ratio = pitch drop, p.pan0 / p.pan1
 function msPass(E, t, p) {
@@ -2089,5 +2138,5 @@ export const INSTR = {
   // v9 beam saber (procedural)
   beamSaberIgnite, beamSaberHum, beamSaberSwing, beamSaberRetract, beamSaberClash,
   // v10 mech SFX (procedural)
-  msShot, msBoost, msArmorHit, msPass,
+  msShot, msBoost, msArmorHit, msShieldBlock, msPass,
 };
