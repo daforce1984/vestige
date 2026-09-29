@@ -665,3 +665,23 @@ Loudness is measured with EBU R128 (ffmpeg `ebur128`); gain is capped at −1 dB
 - gain capped by -1.0 dBFS sample peak
 - Applied gain: -1.1 dB
 
+## saber_cut.mp3
+- Source: **bzzzzzzzzzzpht** by **FartMuffin**, https://freesound.org/people/FartMuffin/sounds/571423/
+- Source file: `sfx_src/saber_cut.mp3`, sha256 `6a7c0a56b17552609f844697d1639b7e0f1fed42c71492786968afc788954617`
+- trimmed to 0.00–2.56 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.40 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: +3.6 dB
+
+## cut_sizzle.mp3
+- Source: **ShovelSizzle8_mod** by **rabban625**, https://freesound.org/people/rabban625/sounds/436470/
+- Source file: `sfx_src/cut_sizzle.mp3`, sha256 `d3a74aca49f12edb807d8df2808bc1d89ceb6d403489984d6f938aaa3618d3bb`
+- trimmed to 0.00–3.00 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (1.20 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: +9.9 dB
+

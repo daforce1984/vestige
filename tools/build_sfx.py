@@ -106,6 +106,8 @@ SPEC = {
     'energy_beam2':   dict(seg=(0.02, 1.8), st=False, kind='one', hit=0.035, fo=0.4),   # variant ('Short energy beam shot (4)', Yodguard)
     'magic_impact':   dict(seg=(0.02, 1.12), st=False, kind='one', hit=0.045, fo=0.3), # shield block: front impact only ('Elemental Magic Spell Impact Outgoing', RescopicSound)
     'sfx16_beam':     dict(seg=(0.0, 2.8), st=False, kind='one', hit=0.01, fo=0.6),    # the transforming-rifle shot ('Sfx16 - Beam', Yarzur_ofc)
+    'saber_cut':      dict(seg=(0.0, 2.56), st=False, kind='one', hit=0.02, fo=0.4),   # the pass-cut, melting through ('bzzzzzzzzzzpht', FartMuffin, CC0)
+    'cut_sizzle':     dict(seg=(0.0, 3.0), st=False, kind='one', hit=0.1, fo=1.2),     # hot metal searing under it ('ShovelSizzle8_mod', rabban625, CC0)
 }
 
 

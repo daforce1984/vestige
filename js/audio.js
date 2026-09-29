@@ -594,9 +594,11 @@ function duelCues() {
     swings: [[FD(SANDE0, CUT_T - 0.08), 1, 0.5]] }]);
   for (const t of [191.47, 191.66, 191.86]) out.push([t - 0.02, '@msBoost', { vel: G * 0.8, dur: 0.25, pan: -0.3 }]);   // each leg of the dash
   out.push([CUT_T - 0.06, '@beamSaberSwing', { vel: G, dur: 0.5 }]);
-  out.push([CUT_T, '@beamSaberClash', { vel: G, grind: 0.9 }]);
-  out.push([CUT_T, 'metal_crush', { at: 'hit', rate: 0.7, gain: G * 1.0, pan: 0.2, prio: 9, norand: true }]);
-  out.push([CUT_T, '@sizzle', { vel: G * 0.9, pan: 0.2 }]);
+  // the blade melting through (film seconds: the extreme bullet time stretches the pass to ~2 s): a hum-and-grind
+  // buzz held across the pass (Freesound CC0 'bzzzzzzzzzzpht', FartMuffin) + hot metal searing under it (CC0
+  // 'ShovelSizzle8_mod', rabban625), its tail ringing on as the halves part
+  out.push([CUT_T - 0.012, 'saber_cut', { at: 'hit', gain: G * 1.1, pan: 0.15, prio: 9, norand: true }]);
+  out.push([CUT_T + 0.004, 'cut_sizzle', { at: 'hit', gain: G * 0.55, pan: 0.2, prio: 8, norand: true }]);
   out.push([CUT_T, '@boom', { bus: 'sfx', f: 32, vel: G, dur: 2.0, verb: 0.4 }]);
   out.push([193.95, '@beamSaberRetract', { vel: 0.7 * G, dur: 0.5 }]);
   // ---- per-mech states

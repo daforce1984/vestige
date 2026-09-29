@@ -539,6 +539,20 @@
    "kind": "one",
    "hit": 0.01,
    "dur": 2.8
+  },
+  "saber_cut": {
+   "file": "saber_cut.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.02,
+   "dur": 2.557
+  },
+  "cut_sizzle": {
+   "file": "cut_sizzle.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.1,
+   "dur": 3.0
   }
  }
 }
