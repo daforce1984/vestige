@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -643,7 +643,7 @@ const SANDE_COL = [[0.3, 2.2, 1.0], [0.3, 1.6, 2.4], [2.2, 0.4, 1.9]];
 function drawAfterimages(R, t, s) {
   const K = 8;
   for (let k = 1; k <= K; k++) {
-    const tp = t - k * 0.045; if (tp < SANDE0 - 0.02) break;
+    const tp = t - k * 0.045; if (tp < (s.ghostFrom ?? SANDE0 - 0.02)) break;
     const q = gundamState(tp); if (!q || !q.vis) continue;
     const g = R.add('gundam', msMatrix(new Float32Array(16), q)); if (!g) continue;
     g.pose = q.pose; g.seed = 5.5; g.texSet = 0;
@@ -1334,7 +1334,7 @@ function drawTransShot(R, t) {
 }
 function drawSeraphFire(R, t) {
   drawTransShot(R, t);
-  for (const ts of SERAPH_SHOTS) {
+  for (const ts of [...SERAPH_SHOTS, ...ENEMY_BURST]) {
     if (ts === TRANS_SHOT) continue;                           // (the transforming shot: drawTransShot)
     if (t < ts - 0.15 || t > ts + 0.8) continue;
     const L = shotLine(ts); if (!L) continue;

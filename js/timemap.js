@@ -13,7 +13,7 @@ export const SLOW_HITS = [178.73, 179.95, 183.28, 190.95, 192.05];   // the gunf
 // sustained bullet time: the SANDEVISTAN dash (duel.js SANDE0–SANDE1) — the world all but stops while he crosses it
 // [from, to, picture speed]: the Sandevistan dash (he still has to read FAST), and inside it the blade going through its
 // waist in extreme bullet time (0.1 s of story → ~4 s on screen: the parts being cut and thrown off)
-export const SLOW_RANGES = [[183.95, 184.5, 0.45], [184.8, 185.02, 0.1], [191.28, 192.2, 0.4], [192.015, 192.1, 0.025]];   // (+ its rifle transforming)
+export const SLOW_RANGES = [[183.95, 184.5, 0.45], [184.43, 184.57, 0.04], [184.8, 185.02, 0.1], [191.28, 192.2, 0.4], [192.015, 192.1, 0.025]];   // (+ its rifle transforming)
 export const SLOW_V = 0.2;                              // picture speed while slowed
 const SLOW_POST = 0.5 * SLOW_V;                         // story seconds held slow after the contact = 0.5 s on screen
 // per-blow window (story s): full slow on [h − pre, h + post], smooth ramps rin / rout either side.

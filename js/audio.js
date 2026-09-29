@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -561,6 +561,8 @@ function duelCues() {
   }
   // ---- MECH SFX: procedural voices modelled on CC0 references (audio-synth.js msShot / msBoost / msArmorHit / msPass)
   // his beam rifle: crack, the falling zap, the sine punch, a gritty body
+  HERO_BURST.forEach((t) => out.push([t, 'energy_beam', { at: 'hit', rate: R(1.02, 1.1), gain: G * 0.8, pan: -0.15, prio: 8, norand: true }]));   // his bursts
+  ENEMY_BURST.forEach((t) => out.push([t, 'energy_beam2', { at: 'hit', rate: R(0.98, 1.05), gain: G * 0.75, pan: 0.3, prio: 8, norand: true }]));   // its bursts
   DUEL_RIFLE.forEach((t) => {   // the blaster report: Pixabay 'Short energy beam shot (3)' (sfx energy_beam) + a little low weight
     out.push([t, 'energy_beam', { at: 'hit', rate: R(0.96, 1.04), gain: G * 1.0, pan: -0.15, prio: 9, norand: true }]);
     out.push([t, '@boom', { bus: 'sfx', f: 50, vel: G * 0.35, dur: 0.8, verb: 0.25 }]);
