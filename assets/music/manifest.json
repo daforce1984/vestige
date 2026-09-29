@@ -37,26 +37,14 @@
   "file": "G_duel.mp3",
   "film": true,
   "t": 0,
-  "end": 199.6,
+  "end": 195.969,
   "offset": 21.098,
   "hitStory": 170.3,
   "hitFile": 3.414,
   "gain": 1.0,
   "fadeIn": 1.5,
-  "fadeOut": 1.5
- },
- {
-  "file": "G_duel.mp3",
-  "film": true,
-  "t": 0,
-  "end": 201.79,
-  "offset": 21.998,
-  "hitStory": 170.3,
-  "hitFile": -5.502,
-  "endStory": 191.3,
-  "gain": 1.0,
-  "fadeIn": 1.5,
-  "fadeOut": 0.35
+  "fadeOut": 0.35,
+  "endStory": 191.3
  },
  {
   "file": "H_duel_win.mp3",

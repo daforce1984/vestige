@@ -159,16 +159,6 @@
    "dur": 2.04
   },
   {
-   "id": "v6p04",
-   "t": 179.4,
-   "voice": "PILOT",
-   "radio": true,
-   "text": "[low] Above.",
-   "ko": "위다.",
-   "stability": 0.5,
-   "dur": 1.96
-  },
-  {
    "id": "v7s06",
    "t": 202.2,
    "voice": "SENSOR",
@@ -263,7 +253,7 @@
   },
   {
    "id": "v8p_strain1",
-   "t": 276.821,
+   "t": 274.705,
    "filmTime": true,
    "voice": "PILOT",
    "radio": true,

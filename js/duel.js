@@ -504,7 +504,7 @@ const ringE = (phi, r, h) => ringH(phi + Math.PI, r, h);
 
 // the enemy's shots (name kept from the SERAPH version): at range, from the top of its flip (inverted), in the zig-zag
 // advance, round the circling run. Its full-power shot: FINALE_T (he slips it).
-export const SERAPH_SHOTS = [176.75, 177.5, 178.35, 179.95, 181.4, 182.1, 182.8, 184.45, 185.35, 186.4, 187.45];
+export const SERAPH_SHOTS = [176.75, 177.5, 178.35, 181.4, 182.1, 182.8, 184.45, 185.35, 186.4, 187.45];
 export const FINALE_T = 190.85, FINALE_END = 191.35;
 export const ENEMY_GRAB = 173.45, ENEMY_EYE = 173.95, ENEMY_CHARGE0 = 174.1, ENEMY_CHARGE1 = 175.15;   // it rips its rifle off its hip, levels it, its eye glints, it charges (3 steps)
 // the transforming shot (see transPath): the rifle opens out TRANS0 →, fires at TRANS_SHOT, the energy body bursts at TRANS_HIT
@@ -1685,8 +1685,6 @@ export const DUEL_CAMS = [
     return { pos: at(E, -150, -40, 6, T), target: pan(up(E, 2), up(ep(t), 2), 0.9), fov: 12, handheld: 0.06 }; } },
   { t0: 178.55, t1: 179.25, snap: 1.8, name: 'D09 front on — the shield across its front takes his shot, the energy splashing off', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T), f = nrm(flat(sub(hp(T), E), 0)), sd = [f[2], 0, -f[0]];
     return { pos: add(add(add(E, scl(f, 30)), scl(sd, 4)), [0, 8, 0]), target: pan(up(E, 8), up(ep(t), 8), 0.8), fov: 38, handheld: 0.03, baseShake: 0.02 }; } },
-  { t0: 179.25, t1: 180.45, name: 'D10 from far below — it boosts up and fires down', fn: (t, u) => { const T = 179.25, E = ep(T);
-    return { pos: at(lrp(hp(T), E, 0.75), 0, 70, -60, T), target: pan(up(E, 8), ep(t), 0.85), fov: 38, handheld: 0.06 }; } },
   { t0: 180.45, t1: 181.4, roll: -0.1, name: 'D11 profile — he rolls out and answers', fn: (t, u) => { const T = 180.45, H = hp(T);
     return { pos: add(at(H, 0, 38, 2, T), scl(sub(hp(t), H), 0.4)), target: up(hp(t), 3), fov: 38, handheld: 0.08 }; } },   // a slow dolly, half his speed
   { t0: 181.4, t1: 182.45, snap: 2.4, name: 'D12 long lens down the line — the zig-zag', fn: (t, u) => { const T = 181.4, H = hp(T);

@@ -19,7 +19,7 @@ import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
 import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
-import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
+import { filmT, inSkip, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
 // The Score clock is FILM time. Every table below (CUES, SAMPLE_CUES, SECTIONS, AUTOMATION, ION_SHOTS, DUEL_EVENTS,
 // lines.json `t`) is STORY time and is mapped with filmT() when events are built. The first-person tear insert
 // (film TEAR_S0–TEAR_F1) is designed directly in film time (insertCues). Voice lines with "filmTime": true are film time.
@@ -1112,6 +1112,7 @@ export default class Score {
       if (e.film) { mapped.push(e); continue; }
       const anchor = e.anchor ?? e.t, lead = anchor - e.t;
       if (anchor > TEAR_S0 + 1e-6 && anchor < TEAR_S1 - 1e-6) continue;
+      if (inSkip(e.t)) continue;                                        // (cut out of the film: timemap SKIP_RANGES)
       const t = filmT(anchor) - lead;
       let p = e.p;
       const stretch = p.dur && (p.loop || (STRETCH_TYPES.has(e.type) && p.dur >= RESUME_MIN));
