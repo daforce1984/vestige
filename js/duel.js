@@ -1039,7 +1039,7 @@ function duelHero_(t) {
   if (dk > 0) f = nrm(lrp(f, D_U, dk));
   _pose[PIDX._body + 2] += heroRoll(tw);
   s.eye = 1 + 2.2 * Math.exp(-Math.abs(tw - HERO_FLARE - 0.03) * 40) * (tw > HERO_FLARE - 0.03 ? 1 : 0);   // the eye flares once he is on it
-  s.weapon = tw > 169.5 && tw < HERO_GRAB ? 'none' : tw < 191.22 || tw >= 200 ? 'rifle' : tw < 194.1 ? 'saber' : 'none';   // slung over the shoulder at 191.2
+  s.weapon = tw < HERO_GRAB ? 'back' : tw < 191.22 || tw >= 200 ? 'rifle' : tw < 194.1 ? 'saber' : 'none';   // slung over the shoulder at 191.2
   s.saber = Math.max(smooth(191.26, 191.36, tw) * (1 - smooth(193.85, 194.1, tw)), transSaber(tw));
   s.saberL = transSaber(tw) > 0;                                     // (the saber in his left hand while the rifle stays in his right)
   s.saberPow = s.saberL ? 2 : 1;                                     // full output against the charged shot: twice as thick
@@ -1173,7 +1173,7 @@ const FK_ORDER = Object.keys(PARENT);
 // (re-check with: python3 -c "…" in blender/DUEL_NOTES.md if the rifle is re-modelled; sanity check compares them)
 export const RIFLE_T = [-0.10266, -0.84395, 0.50666];   // (raised 2026-09-29: the grip in the fist, not the receiver under it)
 export const MUZZLE_T = [0, 1.96, 17.98];   // the new rifle's muzzle (Quaternius Scifi Sniper at HERO_RIFLE_S: 24 m long)
-export const HERO_RIFLE_S = [8, 4, 4];     // its scale on the hand (6 m model → 24 m, twice as wide again so it isn't paper-thin)
+export const HERO_RIFLE_S = [1, 1, 1];     // its scale on the hand (blender/build_hero_rifle.py builds it at size: ~25 m, twice the old one)
 export const RIFLE_Q = [-0.130526, 0, 0, 0.991445];   // the rifle node's rotation on hand_R (assets/gundam.glb): the grip raked 15° like a pistol grip
 // VANGUARD's rifle (assets/enemy_ms.glb): rifle_muzzle in the rifle part's frame; the barrel runs from the grip pivot to it
 export const VAN_MUZZLE = [0.4134, -8.6024, 0.7292];            // the enemy rifle (rifle part frame)
@@ -1354,11 +1354,19 @@ function heroAim2H(s, target, k) {
 // (HERO_LOAD), the strip lights in two steps (HERO_LOCK); it snaps down onto the target (HERO_SNAP0 → 1, a little
 // overshoot) and he holds dead still while his eye flares
 export const HERO_GRAB = 170.28, HERO_EJECT = 170.95, HERO_LOAD = 171.55, HERO_LOCK = 171.75, HERO_SNAP0 = 171.95, HERO_SNAP1 = 172.2, HERO_FLARE = 172.4;
-const HERO_FORE = [0, -0.7, 4.5], HERO_REAR = [1.4, -1.2, 0.6], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
+const HERO_FORE = [0, -0.7, 4.5], HERO_REAR = [1.6, -1.0, 1.85], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
+// the back mount (torso frame): grip behind his right shoulder, the barrel slung diagonally down across his back to
+// the left hip, its flank against the pack — carried like this from the launch until he rips it off at HERO_GRAB
+const HERO_BACK_G = [-3.0, 4.8, -3.4], HERO_BACK_D = [0.55, -0.78, -0.28];
+/** the slung rifle's torso-local 4x4 (column-major; rifle node frame, same basis heroDraw builds at roll 0) */
+export function heroBackMount() {
+  const d = nrm(HERO_BACK_D), U = nrm(sub([0, 1, 0], scl(d, d[1]))), X = V.cross([0, 0, 0], U, d), g = HERO_BACK_G;
+  return new Float32Array([...X, 0, ...U, 0, ...d, 0, ...g, 1]);
+}
 // placed-rifle keys (torso frame): [t, grip, barrel direction, roll about the barrel (deg), ease]
 const HERO_DRAWK = [
-  [HERO_GRAB - 0.16, [-3.0, 4.8, -2.4], [0.25, -0.55, -0.8], 0],        // the hand on the grip behind his shoulder
-  [HERO_GRAB, [-3.0, 4.8, -2.4], [0.25, -0.55, -0.8], 0],
+  [HERO_GRAB - 0.16, HERO_BACK_G, HERO_BACK_D, 0],                     // the hand on the grip behind his shoulder (= the back mount)
+  [HERO_GRAB, HERO_BACK_G, HERO_BACK_D, 0],
   [170.45, [-3.3, 4.4, 1.0], [0.05, 1, 0.25], 0, 'back'],                // ripped up: muzzle-up beside his head, hard stop
   [170.72, [-3.3, 4.4, 1.0], [0.05, 1, 0.25], 0],
   [170.88, [0.3, 1.4, 3.0], [0.35, 0.55, 0.75], 22, 'back'],          // out in front of his chest, tipped across to the lens for the eject
@@ -1411,7 +1419,7 @@ export function heroEject() {
   if (_ej) return _ej;
   const h = duelHero(HERO_EJECT), fk = duelFK(h, 'gundam'), v0 = scl(sub(heroRawPos(HERO_EJECT + 0.02), heroRawPos(HERO_EJECT - 0.02)), 25);
   const right = scl(nrm(M.transformDir([0, 0, 0], fk.torso, [1, 0, 0])), -1);   // ejected out to his right, like a rifle's ejection port
-  _ej = { p: M.transformPoint([0, 0, 0], fk.rifle, [0.9, 2.8, 0.4]), up: nrm(M.transformDir([0, 0, 0], fk.rifle, [0, 1, 0])), back: right, vShip: v0 };
+  _ej = { p: M.transformPoint([0, 0, 0], fk.rifle, [0.62, 3.6, 0.4]), up: nrm(M.transformDir([0, 0, 0], fk.rifle, [0, 1, 0])), back: right, vShip: v0 };
   return _ej;
 }
 /** the E-cap in his left hand (171.85 → HERO_LOAD), world position + its axis; null when not held */

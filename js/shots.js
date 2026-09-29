@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -302,7 +302,7 @@ export function gundamState(t) {
   const r = gundamStateRaw(t, s);
   // the beam RIFLE from the launch to the dive; he puts it away on his back at 257.6–258.3 (over the shoulder) and
   // draws the beam SABER at 270.2 for the ram into the core
-  r.weapon = t < 258.3 ? 'rifle' : t < 270.2 ? 'none' : 'saber';
+  r.weapon = t < 170 ? 'back' : t < 258.3 ? 'rifle' : t < 270.2 ? 'none' : 'saber';
   if (t < 262) r.saber = 0;
   return r;
 }
@@ -712,6 +712,7 @@ export function drawGundam(R, t, s, opts = {}) {
   e.hidden = { rifle: 1, saber_hilt: weapon === 'saber' || s.saberL ? 0 : 1 };   // (the built-in rifle replaced by hero_rifle, drawn on its node)
   if (weapon === 'rifle' && !s.fpv) { const rw = R.partWorld('gundam', e, 'rifle'); if (rw) { M.fromTRS(_hrS, [0, 0, 0], [0, 0, 0, 1], 1); _hrS[0] = HERO_RIFLE_S[0]; _hrS[5] = HERO_RIFLE_S[1]; _hrS[10] = HERO_RIFLE_S[2];
     const g = R.add('hero_rifle', M.mul(new Float32Array(16), rw, _hrS)); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }
+  if (weapon === 'back' && !s.fpv) { const tw = R.partWorld('gundam', e, 'torso'); if (tw) { const g = R.add('hero_rifle', M.mul(new Float32Array(16), tw, heroBackMount())); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }   // slung on his back
   if (s.fpv) {
     e.hidden = { rifle: 1, head: 1, torso: 1, backpack: 1, pelvis: 1, arm_L_upper: 1, arm_R_upper: 1, hand_L: 1, hand_R: 1 };   // POV: forearms + articulated hands
     drawPovHands(R, t, e, s);
@@ -1304,7 +1305,7 @@ function drawLoad(R, t) {
   const up = V.norm([0, 0, 0], V.cross([0, 0, 0], F.dir, V.cross([0, 0, 0], [0, 1, 0], F.dir)));
   const strip = t < HERO_EJECT ? 0.5 : t < HERO_LOCK ? 0 : t < HERO_LOCK + 0.1 ? 0.5 : 1;   // dark between the eject and the lock
   const flash = t > HERO_LOCK && t < HERO_LOCK + 0.25 ? 1 + 1.5 * Math.exp(-(t - HERO_LOCK) * 20) : 1;
-  if (strip > 0) for (let i = 0; i < 6; i++) { const p = madd(madd(F.p, F.dir, 0.5 + 1.9 * i), up, 3.3); const k = strip * flash * 0.7; R.glow(p, 0.22, [0.3 * k, 1.8 * k, 1.1 * k], 0.2); }
+  if (strip > 0) for (let i = 0; i < 6; i++) { const p = madd(madd(madd(F.p, F.dir, -2.6 + 1.05 * i), up, 2.4), F.left, 1.15); const k = strip * flash * 0.7; R.glow(p, 0.22, [0.3 * k, 1.8 * k, 1.1 * k], 0.2); }
   const ej = heroEject(), le = t - HERO_EJECT;
   if (le >= 0 && le < 1.6) {                                           // the spent pac: popped up and back, tumbling
     const v = V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], ej.up, 4), V.scale([0, 0, 0], ej.back, 7)), ej.vShip);
@@ -1504,7 +1505,7 @@ function drawHangar(R, t, phase) {
 
 // ------------------------------------------------------------------ shots
 function gundamHangarState(t, phase) {
-  const s = { vis: true, pos: addv(HANGAR, [0, 9, 0]), fwd: [0, 0, 1], pose: {}, saber: 0, weapon: 'rifle', thr: 0, damage: 0, eye: 0, roll: 0, pitch: 0 };   // rifle in hand
+  const s = { vis: true, pos: addv(HANGAR, [0, 9, 0]), fwd: [0, 0, 1], pose: {}, saber: 0, weapon: 'back', thr: 0, damage: 0, eye: 0, roll: 0, pitch: 0 };   // rifle slung on his back
   if (phase === 'standby') {
     blendPose('stand', 'stand', 0, s.pose);
     s.weapon = 'none';                             // rifle racked while standing by
