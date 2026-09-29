@@ -648,9 +648,9 @@ const heroPos = posTrack([
   [191.47, DP(-D_LEN * 0.8, -9, 2), 'cr'],              // SANDEVISTAN: three hard legs …
   [191.66, DP(-D_LEN * 0.5, 5, -1), 'cr'],
   [191.86, DP(-D_LEN * 0.2, -11, 1.5), 'cr'],
-  [192.0, DP(-5, -10.5, 1.8), 'cr'],                    // … in at its left side
-  [CUT_T, DP(1, -10, 1.8), 'cr'],                       // THE CUT, passing
-  [192.3, DP(16, -9, 2.2), 'out'],                      // carried on past it
+  [192.0, DP(-5, -12.5, 1.8), 'cr'],                    // … in at its left side
+  [CUT_T, DP(1, -12, 1.8), 'cr'],                       // THE CUT, passing
+  [192.3, DP(16, -11, 2.2), 'out'],                      // carried on past it
   [192.9, DP(24, -3, 2), 'io'],
   [193.8, DP(36, -12, 3), 'io'], [194.6, DP(44, -14, 3), 'io'],   // on away from it (the reactor goes behind him)
 ]);
@@ -694,7 +694,7 @@ const enemyPose = poseTrack([
   [183.4, VG.hit, 'out'], [183.8, VG.aim, 'io'],       // the shield gone, it fights on one-handed
   [184.2, VG.fly, 'io'], [188.4, VG.fly],
   [189.2, VG.fly, 'io'], [189.8, VG.gather, 'io'], [190.8, VG.gather], [FINALE_T + 0.08, VG.ult, 'out'], [191.6, VG.ult],   // the ultimate (the rifle thrown away: arms flung wide, it is open to the cut)
-  [CUT_T - 0.02, W(VG.ult, { torso: [-18, 12, 0], head: [-10, 25, 0] })], [CUT_T + 0.25, W(VG.hit, { torso: [-35, 10, 20] }), 'out'], [193.4, VG.limp, 'io'],
+  [CUT_T - 0.02, W(VG.ult, { torso: [-18, 12, 0], head: [-10, 25, 0], arm_L_upper: [-165, 0, 10], arm_R_upper: [-165, 0, -10] })], [CUT_T + 0.25, W(VG.hit, { torso: [-35, 10, 20] }), 'out'], [193.4, VG.limp, 'io'],
 ]);
 const enemyImp = impulses([
   ...SERAPH_SHOTS.map((ts) => [ts + 0.001, P({ arm_R_upper: [-12, 0, 0], torso: [-6, 0, 0], _body: [-4, 0, 0] }), 0.03, 0.45, 14]),   // recoil
