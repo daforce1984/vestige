@@ -654,7 +654,7 @@ function duelCues() {
   [0, 0.12, 0.26].forEach((d, i) => out.push([TRANS0 + d, 'metal_knock', { at: 'hit', rate: 0.62 + 0.08 * i, gain: G * 0.6, pan: 0.25, prio: 8, norand: true }]));
   out.push([TRANS0 + 0.05, '@boom', { bus: 'sfx', f: 44, vel: G * 0.35, dur: 0.8, verb: 0.3 }]);
   out.push([TRANS0 + 0.2, 'charge_up', { at: 0, dur: FD2(TRANS0 + 0.2, TRANS_SHOT), fadeOut: 0.03, rate: 1.1, gain: G * 0.8, pan: 0.25, prio: 8, norand: true }]);
-  out.push([TRANS_SHOT, '@msShot', { vel: G * 1.3, k: 0.4, pan: 0.2 }]);
+  out.push([TRANS_SHOT, 'sfx16_beam', { at: 'hit', gain: G * 1.15, pan: 0.2, prio: 9, norand: true }]);   // Pixabay 'Sfx16 - Beam' (Yarzur_ofc)
   out.push([TRANS_SHOT, '@boom', { bus: 'sfx', f: 26, vel: G * 0.9, dur: 2.0, verb: 0.4 }]);
   out.push([TRANS_SHOT + 0.02, 'heavy_beam', { rate: 0.6, dur: FD2(TRANS_SHOT, TRANS_PASS), fadeOut: 0.15, gain: G * 1.0, prio: 9, norand: true }]);
   out.push([TRANS_PASS - 0.012, '@msPass', { vel: G * 1.0, tp: 0.25, ratio: 3.5, f: 1000, pan0: -0.7, pan1: 0.7 }]);   // a hair past his head (slow motion: film seconds)

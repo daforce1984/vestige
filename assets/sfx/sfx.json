@@ -532,6 +532,13 @@
    "kind": "one",
    "hit": 0.025,
    "dur": 1.1
+  },
+  "sfx16_beam": {
+   "file": "sfx16_beam.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.01,
+   "dur": 2.8
   }
  }
 }

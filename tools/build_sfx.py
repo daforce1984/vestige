@@ -105,6 +105,7 @@ SPEC = {
     'energy_beam':    dict(seg=(0.02, 1.8), st=False, kind='one', hit=0.035, fo=0.35),  # beam rifle shot ('Short energy beam shot (3)', Yodguard)
     'energy_beam2':   dict(seg=(0.02, 1.8), st=False, kind='one', hit=0.035, fo=0.4),   # variant ('Short energy beam shot (4)', Yodguard)
     'magic_impact':   dict(seg=(0.02, 1.12), st=False, kind='one', hit=0.045, fo=0.3), # shield block: front impact only ('Elemental Magic Spell Impact Outgoing', RescopicSound)
+    'sfx16_beam':     dict(seg=(0.0, 2.8), st=False, kind='one', hit=0.01, fo=0.6),    # the transforming-rifle shot ('Sfx16 - Beam', Yarzur_ofc)
 }
 
 

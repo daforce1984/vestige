@@ -27,6 +27,7 @@ The full per-file list (source, author, license, trims, gain) is in [`sfx/CREDIT
 | `sfx/energy_beam.mp3` (beam rifle shot) | Short energy beam shot (3) | Yodguard | https://pixabay.com/sound-effects/film-special-effects-short-energy-beam-shot-3-482517/ | source 0.02–1.80 s, mono, 0.35 s fade-out, −14 LUFS max short-term / −1 dBFS peak |
 | `sfx/energy_beam2.mp3` (variant) | Short energy beam shot (4) | Yodguard | https://pixabay.com/sound-effects/film-special-effects-short-energy-beam-shot-4-482500/ | source 0.02–1.80 s, mono, 0.40 s fade-out, same normalisation |
 | `sfx/magic_impact.mp3` (shield block) | Elemental Magic Spell Impact Outgoing | RescopicSound | https://pixabay.com/sound-effects/elemental-magic-spell-impact-outgoing-228342/ | front impact only: source 0.02–1.12 s, mono, 0.30 s fade-out, same normalisation |
+| `sfx/sfx16_beam.mp3` (the transforming-rifle shot) | Sfx16 - Beam | Yarzur_ofc (formerly Data_pion) | https://pixabay.com/sound-effects/film-special-effects-sfx16-beam-324574/ | source 0.00–2.80 s, mono, 0.60 s fade-out, same normalisation |
 
 ## Evaluated but not used (ships)
 No CC0/CC-BY spaceship that downloads without a login came close to the v2 procedural ships (60–90k-triangle hulls with layered armor). Everything found was low-poly or stylized, and most of its look came from textures, which the engine cannot use. So the seven ship GLBs stay procedural (`blender/ships_*.py`, see `blender/DESIGN_NOTES.md`). What was checked:

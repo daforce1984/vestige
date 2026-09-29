@@ -655,3 +655,13 @@ Loudness is measured with EBU R128 (ffmpeg `ebur128`); gain is capped at −1 dB
 - gain capped by -1.0 dBFS sample peak
 - Applied gain: +0.2 dB
 
+## sfx16_beam.mp3
+- Source: **Sfx16 - Beam** by **Yarzur_ofc (formerly Data_pion)**, https://pixabay.com/sound-effects/film-special-effects-sfx16-beam-324574/
+- Source file: `sfx_src/sfx16_beam.mp3`, sha256 `84334b50498016d5d103ec561fc766dfebb781257881bf6faee90ee5a58fb34f`
+- trimmed to 0.00–2.80 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.60 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: -1.1 dB
+
