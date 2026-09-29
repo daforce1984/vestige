@@ -155,6 +155,7 @@ function nozzleHeart(R, p, r, col, k, dir) {
   const w = (c) => (c * 0.55 + 0.45) * 7 * k;
   R.glow(p, rr * 1.0, [w(col[0]), w(col[1]), w(col[2])], 0.15);          // bright HDR core: the bloom pass makes its glow
 }
+const GUNDAM_NOZZLE = [0, -1, -0.25];
 export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail = 1, opts = null) {
   // past states are expensive (full choreography evaluations): quantise tau to 1/48 s and share them between emitters
   if (opts && opts.past) {
@@ -194,7 +195,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     M.transformPoint(tmp, pm, ep.pos);
     const r = Math.max(ep.r, 0.3) * scale;
     const flick = 0.92 + Math.sin(time * 27 + i * 1.7) * 0.08;
-    M.transformDir(tmp2, pm, [0, 0, -1]);
+    M.transformDir(tmp2, pm, name === 'gundam' ? GUNDAM_NOZZLE : [0, 0, -1]);   // (Sigma's backpack nozzles point DOWN, a little back)
     V.norm(tmp2, tmp2);
     if (name === 'enemy_ms' && mechBack) { V.lerp(tmp2, tmp2, mechBack, 0.6); V.norm(tmp2, tmp2); }   // mechs: the plumes held near the body's back axis (limb swings bent them about); his follow his nozzles exactly
     const len = r * (1.7 + throttle * 5.0) * Math.max(0.5, trail * 0.6);
