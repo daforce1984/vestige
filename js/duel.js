@@ -1312,6 +1312,23 @@ const aimRifle = (s, target, k) => layRifle(s, 'gundam', target, k);
 // back along the forearm to the right shoulder, the barrel on the target, its top toward his chest's up — and the right
 // arm solved onto the grip by IK (the left comes onto the fore-end: heroLeft). No more arm-out pistol aim.
 const HERO_GRIP = [-2.7, 2.7, 2.8];                     // torso frame
+// HIS GUN ARM, THE WRIST LOCKED (the rifle 100 % with the forearm): the hand is held at one fixed angle on the forearm
+// (HERO_WRIST); from the rifle's wanted world rotation Rr the forearm's rotation follows exactly (Rf = Rr·(Rh0·Rq)⁻¹),
+// so the barrel lands exactly on the target; then only the shoulder turns, swinging the elbow so the grip comes as
+// close as the arm allows to where it is wanted
+const HERO_WRIST = [95, 0, 0];
+let _rh0 = null; const RH0 = () => _rh0 || (_rh0 = r3(M.fromTRS(M.new(), [0, 0, 0], Q.fromEuler([0, 0, 0, 1], ...HERO_WRIST.map((v) => v * DEG)), 1)));
+function heroArmPlace(s, fk, gripDes, Rr) {
+  const T = r3(fk.torso), piv = PIV.gundam, vU = sub(piv.arm_R_lower, piv.arm_R_upper), vF = sub(piv.hand_R, piv.arm_R_lower);
+  const Rf = r3mul(Rr, r3T(r3mul(RH0(), RQ3()))), Rh = r3mul(Rf, RH0());
+  const S = partPoint(fk, 'arm_R_upper'), Ed = sub(sub(gripDes, r3v(Rf, vF)), r3v(Rh, RIFLE_T));
+  const E = add(S, scl(nrm(sub(Ed, S)), Math.hypot(...vU)));
+  const Ru = r3mul(r3between(nrm(r3v(T, vU)), nrm(sub(E, S))), T);
+  s.pose = { ...s.pose };
+  s.pose.arm_R_upper = euler3(r3mul(r3T(T), Ru));
+  s.pose.arm_R_lower = euler3(r3mul(r3T(Ru), Rf));
+  s.pose.hand_R = HERO_WRIST.map((v) => v * DEG);
+}
 let _rq = null; const RQ3 = () => _rq || (_rq = r3(M.fromTRS(M.new(), [0, 0, 0], RIFLE_Q, 1)));
 const styleW = (tw, list, styles, want) => { let w = 0; list.forEach((ts, i) => { const st = Array.isArray(styles) ? styles[i] : styles[ts]; if (st === want) w = Math.max(w, smooth(ts - 0.45, ts - 0.25, tw) * (1 - smooth(ts + 0.25, ts + 0.5, tw))); }); return w; };
 const HERO_GRIP_HIP = [-2.9, 0.9, 2.3];
@@ -1323,7 +1340,7 @@ function heroAim2H(s, target, k) {
   const d = nrm(sub(target, grip)), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
   const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
   const Rh = r3mul([...X, ...U, ...d], r3T(RQ3()));                       // hand rotation so the rifle frame lands on (X, U, d)
-  armIK(s, fk, 'gundam', 'R', sub(grip, r3v(Rh, RIFLE_T)), Rh);
+  heroArmPlace(s, fk, grip, r3mul(Rh, RQ3()));                      // (the wrist locked: arm + rifle as one — see heroArmPlace)
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
   const wSnap = styleW(tw, HERO_SHOTS, HERO_STYLE, 'snap'); if (wSnap > 0) aimRifle(s, target, wSnap * k);   // the snap shot: one arm thrown out
   let hk = 0; for (const ts of [...HERO_SHOTS, ...HERO_BURST]) hk = Math.max(hk, 0.1 * kickCurve(tw - ts));
@@ -1368,7 +1385,7 @@ function heroDraw(s, tw) {
   const up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0])), U0 = nrm(sub(up0, scl(d, V.dot(up0, d))));
   const X0 = V.cross([0, 0, 0], U0, d), U = add(scl(U0, Math.cos(roll)), scl(X0, Math.sin(roll))), X = V.cross([0, 0, 0], U, d);
   const Rh = r3mul([...X, ...U, ...d], r3T(RQ3()));
-  armIK(s, fk, 'gundam', 'R', sub(grip, r3v(Rh, RIFLE_T)), Rh);
+  heroArmPlace(s, fk, grip, r3mul(Rh, RQ3()));                      // (the wrist locked: arm + rifle as one — see heroArmPlace)
   const k = smooth(HERO_GRAB - 0.2, HERO_GRAB - 0.1, tw);            // the hand gets to the grip fast
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
