@@ -674,7 +674,7 @@ function duelCues() {
   out.push([189.85, 'charge_up', { at: 0, dur: FD(189.85, FINALE_T), fadeOut: 0.05, rate: 0.75, gain: G * 0.95, pan: 0.2, prio: 8, norand: true }]);
   out.push([FINALE_T, '@msShot', { vel: G * 1.25, k: 0.45, pan: 0.2 }]);
   out.push([FINALE_T, '@boom', { bus: 'sfx', f: 28, vel: G * 0.9, dur: 2.0, verb: 0.4 }]);
-  ultBeams().forEach((b, i) => { if (i % 2) out.push([b.ti, '@msShot', { vel: G * 0.5, k: R(0.5, 0.62), pan: R(-0.6, 0.6) }]); });
+  ultBeams().forEach((b) => out.push([b.ti, 'magic_impact', { at: 'hit', rate: R(0.9, 1.05), gain: G * 0.6, pan: R(-0.6, 0.6), prio: 8, norand: true }]));   // one per beam as it tears out ('Elemental Magic Spell Impact Outgoing', front)
   out.push([FINALE_T + 0.02, 'heavy_beam', { rate: 0.7, dur: FD(FINALE_T, ULT_HIT + 0.2), fadeOut: 0.3, gain: G * 1.1, prio: 9, norand: true }]);
   out.push([ULT_HIT - 0.12, '@msPass', { vel: G * 0.9, tp: 0.1, ratio: 3.2, f: 1300, pan0: 0.5, pan1: -0.6 }]);
   out.push([ULT_HIT, '@boom', { bus: 'sfx', f: 26, vel: G * 1.0, dur: 2.6, verb: 0.45 }]);

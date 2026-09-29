@@ -1938,6 +1938,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   shake(c, k.shake, k.shakeFreq); handheld(c, k.handheld);
   c.env.shadowCenter = k.focus; c.env.shadowRadius = k.shadowRadius;
   c.post.shakeBlur = k.blur;                                   // (no whole-screen flash on duel contacts: it read as flicker)
+  if (c.t >= 170 && c.t < 176.4) { c.post.motionBlur = 0; c.post.shakeBlur = 0; }   // the draw + load: crisp, no motion blur
   if (k.name.startsWith('D12')) c.post.distort = 0;           // scene 45 (the dive): no screen distortion
                                    // (the strong fill + rim were for the mechs, which no longer take either — on the
   c.post.lensA = { enable: 0 };   // distant ships they only washed the hulls out white)   the well is far away: no background lensing (it smeared the planet into grey)
