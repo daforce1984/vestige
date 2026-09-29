@@ -484,6 +484,7 @@ VG.gather = W(VG.idle, { torso: [28, 0, 0], head: [18, 0, 0], arm_L_upper: [-35,
   leg_L_upper: [-60, 0, 5], leg_L_lower: [90, 0, 0], foot_L: [20, 0, 0], leg_R_upper: [-50, 0, -5], leg_R_lower: [85, 0, 0], foot_R: [20, 0, 0], _body: [10, 0, 0] });
 VG.ult = W(VG.idle, { torso: [-25, 0, 0], head: [-25, 0, 0], arm_L_upper: [-20, 0, 65], arm_L_lower: [-15, 0, 0], arm_R_upper: [-20, 0, -65], arm_R_lower: [-15, 0, 0],
   leg_L_upper: [15, 0, 18], leg_L_lower: [20, 0, 0], leg_R_upper: [15, 0, -18], leg_R_lower: [20, 0, 0], _body: [-12, 0, 0] });
+VG.ultDown = withParts(W(VG.ult, { torso: [-18, 12, 0], head: [-10, 25, 0] }), VG.idle, ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']);   // spent: arms hanging
 export const POSE_LIB = { hero: L, vanguard: VG };
 
 // ============================================================================ choreography
@@ -693,8 +694,8 @@ const enemyPose = poseTrack([
   [182.45, VG.stepR, 'out'], [182.8, VG.fly, 'io'], [183.2, VG.fly],
   [183.4, VG.hit, 'out'], [183.8, VG.aim, 'io'],       // the shield gone, it fights on one-handed
   [184.2, VG.fly, 'io'], [188.4, VG.fly],
-  [189.2, VG.fly, 'io'], [189.8, VG.gather, 'io'], [190.8, VG.gather], [FINALE_T + 0.08, VG.ult, 'out'], [191.6, VG.ult],   // the ultimate (the rifle thrown away: arms flung wide, it is open to the cut)
-  [CUT_T - 0.02, W(VG.ult, { torso: [-18, 12, 0], head: [-10, 25, 0], arm_L_upper: [-165, 0, 10], arm_R_upper: [-165, 0, -10] })], [CUT_T + 0.25, W(VG.hit, { torso: [-35, 10, 20] }), 'out'], [193.4, VG.limp, 'io'],
+  [189.2, VG.fly, 'io'], [189.8, VG.gather, 'io'], [190.8, VG.gather], [FINALE_T + 0.08, VG.ult, 'out'], [191.6, VG.ult], [191.85, VG.ultDown, 'io'],   // the ultimate, then its arms drop (the rifle thrown away: arms flung wide, it is open to the cut)
+  [CUT_T - 0.02, VG.ultDown], [CUT_T + 0.25, W(VG.hit, { torso: [-35, 10, 20] }), 'out'], [193.4, VG.limp, 'io'],
 ]);
 const enemyImp = impulses([
   ...SERAPH_SHOTS.map((ts) => [ts + 0.001, P({ arm_R_upper: [-12, 0, 0], torso: [-6, 0, 0], _body: [-4, 0, 0] }), 0.03, 0.45, 14]),   // recoil
