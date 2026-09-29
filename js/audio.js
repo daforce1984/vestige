@@ -577,22 +577,23 @@ function duelCues() {
   out.push([HERO_HIT_T + 0.04, '@msArmorHit', { vel: G * 1.0, hold: 0.8, pan: -0.25 }]);            // into his pauldron
   out.push([HERO_HIT_T + 0.04, '@sparkBurst', { vel: G * 0.7, pan: -0.25 }]);
   // the charge: both light every thruster at once (the quick-boost edges below take over from the first jinks)
-  // the draw + load (duel.js heroDraw / the enemy's draw): a clack on each grab, a thruster puff on the rip, the spent
-  // pac's ka-chunk, the fresh one slammed home (clank + a short spark), the lock-in whine, a low hum as he holds; its
-  // draw clack, a tick on its eye glint, a 3-step rising charge, the vents' hiss
+  // the draw + load (duel.js heroDraw / the enemy's draw): a heavy slap on the grab, a thruster puff on the rip, the spent
+  // pac's clamp chain + vent hiss, the fresh one slammed home (clack-CLACK), the lock-in whine; its mount release,
+  // a tick on its eye glint, a 3-step rising whine, the vents' hiss
   out.push([170.05, '@msBoost', { vel: G * 0.7, dur: 1.2, pan: -0.1 }]);
-  out.push([HERO_GRAB, 'metal_knock', { at: 'hit', rate: 0.9, gain: G * 0.6, pan: -0.2, prio: 8, norand: true }]);
+  const ld = (t, name, o) => out.push([t, name, { at: 'hit', prio: 9, norand: true, ...o }]);   // (reload_* : Freesound CC0 samples)
+  ld(HERO_GRAB, 'reload_grab', { rate: 0.8, gain: G * 0.8, pan: -0.2 });
   out.push([170.45, '@msBoost', { vel: G * 0.45, dur: 0.15, pan: -0.2 }]);
-  out.push([HERO_EJECT, 'metal_knock', { at: 'hit', rate: 1.3, gain: G * 0.7, pan: -0.15, prio: 8, norand: true }]);
-  out.push([HERO_EJECT, '@steam', { dur: 0.5, vel: 0.35 }]);
-  out.push([HERO_LOAD, 'metal_knock', { at: 'hit', rate: 1.05, gain: G * 0.9, pan: -0.1, prio: 9, norand: true }]);
-  out.push([HERO_LOAD, '@sparkBurst', { vel: G * 0.5, pan: -0.1 }]);
-  out.push([HERO_LOCK, 'charge_up', { at: 0, dur: 0.35, fadeOut: 0.1, rate: 1.6, gain: G * 0.5, pan: -0.1, prio: 8, norand: true }]);
+  ld(HERO_EJECT, 'reload_eject', { rate: 0.85, gain: G * 0.9, pan: -0.15 });
+  ld(HERO_EJECT + 0.03, 'reload_hiss', { rate: 0.8, gain: G * 0.45, pan: -0.15 });
+  ld(HERO_LOAD, 'reload_slam', { rate: 0.8, gain: G * 1.0, pan: -0.1 });
+  out.push([HERO_LOAD, '@sparkBurst', { vel: G * 0.35, pan: -0.1 }]);
+  ld(HERO_LOCK, 'reload_whine', { at: 0, dur: 0.7, fadeOut: 0.2, rate: 1.1, gain: G * 0.55, pan: -0.1 });
   out.push([HERO_SNAP0, '@msBoost', { vel: G * 0.35, dur: 0.12, pan: -0.1 }]);
-  out.push([ENEMY_GRAB, 'metal_knock', { at: 'hit', rate: 0.75, gain: G * 0.6, pan: 0.2, prio: 8, norand: true }]);
+  ld(ENEMY_GRAB, 'enemy_draw', { rate: 0.85, gain: G * 0.8, pan: 0.2 });
   out.push([ENEMY_EYE + 0.02, '@beep', { f: 2600, dur: 0.05, vel: 0.35, pan: 0.2 }]);
-  [0, 0.35, 0.7].forEach((d, i) => out.push([ENEMY_CHARGE0 + d, 'charge_up', { at: 0, dur: 0.3, fadeOut: 0.08, rate: 0.85 + 0.2 * i, gain: G * (0.45 + 0.1 * i), pan: 0.2, prio: 8, norand: true }]));
-  out.push([ENEMY_CHARGE1 - 0.05, '@steam', { dur: 0.7, vel: 0.45 }]);
+  [0, 0.35, 0.7].forEach((d, i) => ld(ENEMY_CHARGE0 + d, 'reload_whine', { at: 0.1, dur: 0.32, fadeOut: 0.08, rate: 0.75 + 0.2 * i, gain: G * (0.45 + 0.1 * i), pan: 0.2 }));
+  ld(ENEMY_CHARGE1 - 0.05, 'reload_hiss', { rate: 0.7, gain: G * 0.5, pan: 0.2 });
   // THE FINISH: the rifle slung (a servo clunk), the saber lit, the SANDEVISTAN (time folds: a deep inhaling whoomp,
   // the world's sound smeared low by the master slow-mo), the pass-cut (buzz + sizzle + armour parting), retract
   const FD = (a, b) => filmT(b) - filmT(a);                          // cue lengths in film seconds (the bullet time stretches them)

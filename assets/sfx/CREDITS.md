@@ -685,3 +685,63 @@ Loudness is measured with EBU R128 (ffmpeg `ebur128`); gain is capped at −1 dB
 - gain capped by -1.0 dBFS sample peak
 - Applied gain: +9.9 dB
 
+## reload_grab.mp3
+- Source: **A heavy battle rifle being dropped on the floor; 4 takes** by **serøutōnin--deprivəd**, https://freesound.org/people/serøutōnin--deprivəd/sounds/755987/
+- Source file: `sfx_src/reload_grab.mp3`, sha256 `3c9c227272c8ad83130139cd35003405b6ff9c29beb8349b4b43310dc5d03f3a`
+- trimmed to 0.36–0.95 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.20 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: +2.0 dB
+
+## reload_eject.mp3
+- Source: **MechanicalClamp** by **Skullsmasha**, https://freesound.org/people/Skullsmasha/sounds/123253/
+- Source file: `sfx_src/reload_eject.mp3`, sha256 `2bfeb21558e83dade90a12769b2723c3fe8bf548ecce6f583d5c95b145c6deef`
+- trimmed to 2.25–3.20 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.12 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: -1.1 dB
+
+## reload_hiss.mp3
+- Source: **release_air_pffft** by **reg7783**, https://freesound.org/people/reg7783/sounds/131302/
+- Source file: `sfx_src/reload_hiss.mp3`, sha256 `56ba199e5b6e90bc2d671b41af1e150f91e2db635315a6026299f1c2d0c9d5c6`
+- trimmed to 0.24–1.60 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.50 s)
+- normalised to -18 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: +0.1 dB
+
+## reload_slam.mp3
+- Source: **GunRack3** by **AKkingStudio**, https://freesound.org/people/AKkingStudio/sounds/679878/
+- Source file: `sfx_src/reload_slam.mp3`, sha256 `79e5e9f33baabff59eb3252c4ec205e9ead957d646ef06bed74627e75133fdc2`
+- trimmed to 0.08–0.63 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.10 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: +2.4 dB
+
+## reload_whine.mp3
+- Source: **Sci-Fi Charge Up** by **Hemplock**, https://freesound.org/people/Hemplock/sounds/558679/
+- Source file: `sfx_src/reload_whine.mp3`, sha256 `483c5f9914d5f482db6f2d0b8a686d283d93118786fa2f479f7dd422b759c4f7`
+- trimmed to 0.00–1.21 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.15 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: +6.8 dB
+
+## enemy_draw.mp3
+- Source: **Mechanical Slide** by **steaq**, https://freesound.org/people/steaq/sounds/144314/
+- Source file: `sfx_src/enemy_draw.mp3`, sha256 `26a7839960964f3a001e9488cc31ba796e48aae9cf25df89f1941df1e3a03a92`
+- trimmed to 0.00–0.62 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.10 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: +2.7 dB
+

@@ -31,6 +31,12 @@ The full per-file list (source, author, license, trims, gain) is in [`sfx/CREDIT
 | `sfx/sfx16_beam.mp3` (the transforming-rifle shot) | Sfx16 - Beam | Yarzur_ofc (formerly Data_pion) | https://pixabay.com/sound-effects/film-special-effects-sfx16-beam-324574/ | source 0.00–2.80 s, mono, 0.60 s fade-out, same normalisation |
 | `sfx/saber_cut.mp3` (the pass-cut) | bzzzzzzzzzzpht | FartMuffin | https://freesound.org/people/FartMuffin/sounds/571423/ (CC0) | whole 2.56 s, mono, 0.40 s fade-out, same normalisation |
 | `sfx/cut_sizzle.mp3` (under the pass-cut) | ShovelSizzle8_mod | rabban625 | https://freesound.org/people/rabban625/sounds/436470/ (CC0) | source 0–3.0 s, mono, 1.2 s fade-out, same normalisation |
+| `sfx/reload_grab.mp3` (his hand on the rifle) | A heavy battle rifle being dropped on the floor; 4 takes | serøutōnin--deprivəd | https://freesound.org/people/serøutōnin--deprivəd/sounds/755987/ (CC0) | source 0.36–0.95 s (take 1), mono, short fade-out, same normalisation |
+| `sfx/reload_eject.mp3` (the spent E-pac out) | MechanicalClamp | Skullsmasha | https://freesound.org/people/Skullsmasha/sounds/123253/ (CC0) | source 2.25–3.20 s (the clamp chain), mono, short fade-out, same normalisation |
+| `sfx/reload_hiss.mp3` (vent hiss under the eject / its charge) | release_air_pffft | reg7783 | https://freesound.org/people/reg7783/sounds/131302/ (CC0) | source 0.24–1.60 s, mono, short fade-out, same normalisation |
+| `sfx/reload_slam.mp3` (the fresh pac slammed + locked) | GunRack3 | AKkingStudio | https://freesound.org/people/AKkingStudio/sounds/679878/ (CC0) | source 0.08–0.63 s, mono, short fade-out, same normalisation |
+| `sfx/reload_whine.mp3` (lock-in whine / its 3-step charge) | Sci-Fi Charge Up | Hemplock | https://freesound.org/people/Hemplock/sounds/558679/ (CC0) | source whole 1.21 s, mono, short fade-out, same normalisation |
+| `sfx/enemy_draw.mp3` (its rifle off the hip mount) | Mechanical Slide | steaq | https://freesound.org/people/steaq/sounds/144314/ (CC0) | source 0.00–0.62 s, mono, short fade-out, same normalisation |
 
 ## Evaluated but not used (ships)
 No CC0/CC-BY spaceship that downloads without a login came close to the v2 procedural ships (60–90k-triangle hulls with layered armor). Everything found was low-poly or stylized, and most of its look came from textures, which the engine cannot use. So the seven ship GLBs stay procedural (`blender/ships_*.py`, see `blender/DESIGN_NOTES.md`). What was checked:

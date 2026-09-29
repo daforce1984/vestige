@@ -553,6 +553,48 @@
    "kind": "one",
    "hit": 0.1,
    "dur": 3.0
+  },
+  "reload_grab": {
+   "file": "reload_grab.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.08,
+   "dur": 0.59
+  },
+  "reload_eject": {
+   "file": "reload_eject.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.05,
+   "dur": 0.95
+  },
+  "reload_hiss": {
+   "file": "reload_hiss.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.06,
+   "dur": 1.36
+  },
+  "reload_slam": {
+   "file": "reload_slam.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.11,
+   "dur": 0.5483
+  },
+  "reload_whine": {
+   "file": "reload_whine.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.0,
+   "dur": 1.21
+  },
+  "enemy_draw": {
+   "file": "enemy_draw.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.05,
+   "dur": 0.62
   }
  }
 }
