@@ -368,14 +368,7 @@ export const SAMPLE_CUES = [
   // fighter kills (small)
   ...[138, 141.6, 145, 148.6, 152, 157, 163, 171, 178, 189].map((t, i) => [t, 'hl_explosion', { rate: 1.22, gain: 0.75, far: 0.3 + 0.1 * (i % 3), pan: 'rnd', prio: 5 }]),
   ...[138, 145, 152, 163, 178].map((t, i) => [t + 0.04, 'expl_debris', { rate: 1.15, gain: 0.3, far: 0.4, pan: 'rnd', prio: 3 }]),
-  // ---------------- the standoff 171.6–176.4: near-silence, then small sounds that each mean something
-  [172.22, 'hl_thruster', { dur: 0.55, fadeOut: 0.3, rate: 1.1, gain: 0.55, pan: -0.3, far: 0.25, prio: 7, norand: true }],   // VANGUARD brakes onto its mark
-  [172.72, 'servo', { rate: 1.3, dur: 0.7, fadeOut: 0.3, gain: 0.55, pan: -0.3, prio: 7, norand: true }],                      // its wings flare
-  [173.1, 'metal_knock', { at: 'hit', rate: 1.2, gain: 0.25, pan: -0.3, prio: 6, norand: true }],
-  [175.45, 'servo', { rate: 0.5, dur: 0.8, fadeOut: 0.3, gain: 0.7, pan: 0.15, prio: 8, norand: true }],                      // the rifle comes up, heavy
-  [176.15, 'metal_knock', { at: 'hit', rate: 0.6, gain: 0.35, pan: 0.15, prio: 7, norand: true }],                            // grip locks
-  [174.76, 'charge_up', { at: 0, dur: 0.7, fadeOut: 0.3, rate: 1.7, gain: 0.35, pan: -0.25, prio: 7, norand: true }],          // its eye flares
-  [175.57, 'mech_powerup', { dur: 0.9, fadeOut: 0.4, rate: 0.8, gain: 0.45, prio: 7, norand: true }],                          // his visor answers
+  // (no standoff: from 170 the two charge straight at each other — the thrusters come from duelCues)
   // ---------------- mech launch 150–161
   [151,   'servo',     { gain: 0.6, pan: -0.2, prio: 6 }],
   [152.2, 'servo',     { gain: 0.6, pan: 0.3, rate: 0.85, prio: 6 }],
@@ -753,7 +746,7 @@ SAMPLE_CUES.push(...ionShotCues(), ...duelCues(), ...warpCues(), ...lossCues(), 
 // H_duel_win, played at normal speed against the stretched picture), so no pitch / level dips on its blows: only a
 // short music duck under the Sandevistan + the cut (the score is out there anyway), released for the reactor's hit.
 export const DUEL_SCORE0 = 169.8, DUEL_SCORE1 = 195.0;
-export const DUEL_ERUPT = 176.4;   // story: the standoff breaks — G_duel's full-band entrance lands here
+export const DUEL_ERUPT = 170.3;   // story: the charge — G_duel's full-band entrance lands here
 export const DUEL_BOOM = 194.0;    // story: VANGUARD's reactor goes — H_duel_win's first hit lands here
 // bullet time on every blow (timemap.js SLOW_WIN) outside the duel score: samples pitch down, the score sinks back
 const slowKeys = (lo, hi) => SLOW_WIN.filter((w) => w.h < DUEL_SCORE0 || w.h > DUEL_SCORE1).flatMap((w) => [

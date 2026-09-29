@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -652,6 +652,15 @@ function drawAfterimages(R, t, s) {
     const c = SANDE_COL[k % 3]; g.tint[0] = c[0]; g.tint[1] = c[1]; g.tint[2] = c[2];
   }
 }
+// a shot that LANDS burns a hole through the armour it hits (duel.js HOLES): the plate melts open around the hit point —
+// it opens out in a fifth of a second, white-hot at first, cooling to a dull cherry rim that stays for the rest of the fight
+function meltHole(e, who, t, part) {
+  let h = null;
+  for (const x of HOLES) if (x.who === who && t >= x.t && (!part || x.part === part) && (!h || x.t > h.t)) h = x;
+  if (!h) return;
+  const lt = t - h.t, r = h.r * (0.35 + 0.65 * easeOut(sat(lt / 0.2)));
+  e.melt = [h.local[0], h.local[1], h.local[2], r, h.depth, 0.35 + 2.4 * Math.exp(-lt * 1.3)]; e.meltPart = h.part;
+}
 export function drawGundam(R, t, s, opts = {}) {
   if (!s.vis) return null;
   if ((s.sande || 0) > 0.01 && !s.fpv) drawAfterimages(R, t, s);
@@ -710,7 +719,7 @@ export function drawGundam(R, t, s, opts = {}) {
     if (mz) { R.glow(mz, 0.6 + 3.2 * q, [0.8 * q, 2.2 * q, 3.2 * q], 0.35); R.light(mz, 60, [0.4, 0.8, 1], 12 * q); }
     e.matOverride.core = { ...e.matOverride.core, emissive: e.matOverride.core.emissive.map((v) => v * (1 + 6 * q)) };
   }
-  if (t >= 170 && t < 200 && !s.fpv) heavyDamage(R, t, e, 0);
+  if (t >= 170 && t < 200 && !s.fpv) { heavyDamage(R, t, e, 0); meltHole(e, 'hero', t); }
   GUN.gundam = e;
   return e;
 }
@@ -752,7 +761,7 @@ function drawLostShield(R, t) {
   const w = R.add('enemy_ms', M.mul(new Float32Array(16), _wB, _wA));
   if (!w) return;
   w.pose = _wing.pose; w.hidden = _wing.hide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
-  w.damage = 0.6;
+  w.damage = 0.6; meltHole(w, 'enemy', t, 'shield');
   if (lt < 3) R.light(V.madd([0, 0, 0], P, _wing.v, lt), 30, [1, 0.5, 0.2], 4 * Math.exp(-lt * 2));   // the burnt mount glowing hot for a moment
 }
 // cut in half at the waist (CUT_T): two copies, the torso part clipped clean at the cut line (a glowing, molten edge);
@@ -797,6 +806,7 @@ function drawHalves(R, t, s) {
     if (!e) continue;
     e.pose = s.pose; e.seed = 10; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0; e.damage = s.damage;
     e.hidden = hide;
+    meltHole(e, 'enemy', t, 'leg_R_upper');
     e.clipPart = 'torso'; e.clipInv = false; e.clipHeat = -2.6;        // clean beam cut, glowing edge (shader: w < 0)
     e.clip = half > 0 ? [-30, CUT_Y, -30, 30, 40, 30] : [-30, -40, -30, 30, CUT_Y, 30];
   }
@@ -940,6 +950,7 @@ function drawEnemyMS(R, t, s, idx) {
     e.damage = Math.max(e.damage || 0, 0.35 * sat(lt / 0.3));
   }
   heavyDamage(R, t, e, idx);
+  if (t > 170 && t < 200) meltHole(e, 'enemy', t, s.shieldLost ? 'leg_R_upper' : null);
   const eye = emitWorld(R, 'enemy_ms', e, 'eye');
   const eyeFl = idx === 1 ? 1 + 1.6 * smooth(174.75, 174.9, t) * (1 - smooth(175.15, 175.6, t)) : 1;   // the standoff: its eye flares
   if (eye) {   // VANGUARD's eyes: a small glint on each (no big round glow), flaring in the standoff
@@ -1110,6 +1121,15 @@ function shotLine(ts) {
   if (!L) { const m = seraphMuzzle(ts); if (!m) return null; L = { from: m.pos, dir: m.dir }; _shotLine.set(ts, L); }
   return L;
 }
+// the one bolt of its that lands (on his left pauldron): the line ends there
+const _stop = new Map();
+function shotStop(ts) {
+  if (!_stop.has(ts)) {
+    const ev = DUEL_EVENTS.find((e) => e.heroHit && Math.abs(e.t - ts) < 0.1), L = shotLine(ts);
+    _stop.set(ts, ev && L ? { pos: ev.pos, d: Math.max(5, V.dot(V.sub([0, 0, 0], ev.pos, L.from), L.dir)) } : null);
+  }
+  return _stop.get(ts);
+}
 function drawSeraphFire(R, t) {
   for (const ts of SERAPH_SHOTS) {
     if (t < ts - 0.15 || t > ts + 0.8) continue;
@@ -1119,11 +1139,18 @@ function drawSeraphFire(R, t) {
       if (m) { R.glow(m.pos, 0.5 + 1.2 * c * c, [3 * c, 0.6 * c, 0.9 * c], 0.3); R.light(m.pos, 30, [1, 0.3, 0.45], 2 * c); }
       continue;
     }
-    const lt = t - ts, head = Math.min(1500, 5000 * lt + 3), tail = Math.max(0, 5000 * (lt - 0.12)), kk = 1 - 0.6 * sat((lt - 0.05) / 0.25);
+    const lt = t - ts, stop = shotStop(ts), head = Math.min(stop ? stop.d : 1500, 5000 * lt + 3), tail = Math.max(0, 5000 * (lt - 0.12)), kk = 1 - 0.6 * sat((lt - 0.05) / 0.25);
     if (head > tail) {                                          // a beam line, like his (see rifleShot)
       const a = madd(L.from, L.dir, tail), b = madd(L.from, L.dir, head);
       R.beam(a, b, 0.75 * kk + 0.2, [SER_COL[0] * kk, SER_COL[1] * kk, SER_COL[2] * kk], 1, 20, 0.6, 0.8);
       R.beam(a, b, 2.4, [SER_COL[0] * 0.6 * kk, SER_COL[1] * 0.6 * kk, SER_COL[2] * 0.6 * kk], 0.04, 3, 2, 0.6);
+    }
+    if (stop && lt > stop.d / 5000) {                           // it lands: sparks and molten spatter off his shoulder
+      const la = lt - stop.d / 5000;
+      if (la < 0.7) { R.light(stop.pos, 40, [1, 0.5, 0.3], 2.5 * Math.exp(-la * 6));
+        for (let i = 0; i < 40; i++) { const life = 0.3 + hash(i + 11) * 0.5; if (la > life) continue;
+          const a = la / life, sd = randDir([0, 0, 0], i * 3.7 + 5), b = 4.5 * (1 - a) * (1 - a);
+          spark(R, madd(stop.pos, sd, (2 + 18 * hash(i + 4)) * easeOut(a)), 0.45 + 0.4 * (1 - a), [b, b * 0.55, b * 0.25]); } }
     }
     const kf = Math.exp(-lt * 12);
     if (lt < 0.25) { R.glow(L.from, 1 + 2.5 * kf, [3 * kf, 0.6 * kf, 0.9 * kf], 0.35); R.light(L.from, 60, [1, 0.3, 0.45], 6 * kf); }
