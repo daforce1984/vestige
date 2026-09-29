@@ -2871,6 +2871,8 @@ cut(167.35, 169, 'X carnage over the planet', (c) => {   // (from 166.8: now hol
   const { t, u } = c;
   againstPlanet(c, [0, 0, -700], 1300 - u * 120, 60, 300, 40, 0.06, 0.05, true);
   handheld(c, 0.4); c.env.shadowRadius = 900; c.env.shadowCenter = [0, 0, -700];
+  // (against the planet the hulls face away from the key: a soft fill + rim and a stop more so they read)
+  c.env.fill = [0.5, 0.52, 0.6, 0.7]; c.env.rim = [0.7, 0.72, 0.85, 0.8]; c.post.exposure = 1.3;
 });
 cut(196.8, 200, 'X wide over the planet', (c) => {
   const { t, u } = c;
