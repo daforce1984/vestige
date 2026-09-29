@@ -1342,12 +1342,13 @@ export function transPath() {
   const h0 = duelHero(T0), fk = duelFK(h0, 'gundam');
   const head = add(partPoint(fk, 'head', [0, 1.4, 0.4]), sub(heroRawPos(TRANS_PASS), heroRawPos(T0)));
   const left = nrm(M.transformDir([0, 0, 0], fk.torso, [1, 0, 0]));
-  const P = add(head, scl(left, 2.2));                                          // paper-thin: ~2 m off a 3 m head
+  const up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
+  const P = add(add(head, scl(left, 3.5)), scl(up0, 4.0));                       // over his left shoulder, a hair off his snapped-aside head
   const d0 = m.dir, dist = V.dist(m.pos, P), side = nrm(V.cross([0, 0, 0], d0, [0, 1, 0]));
   const dirIn = nrm(sub(P, add(m.pos, scl(side, dist * 0.25))));              // it comes in bending round from its right
   const p1 = add(add(m.pos, scl(d0, dist * 0.35)), add(scl(side, dist * 0.3), [0, dist * 0.06, 0]));
   const p2 = sub(P, scl(dirIn, dist * 0.3));
-  _tp = { p0: m.pos, p1, p2, p3: P, dirIn, left, ts: TRANS_SHOT, tp: TRANS_PASS, speed: 0.9 * dist / (TRANS_PASS - TRANS_SHOT) };
+  _tp = { p0: m.pos, p1, p2, p3: P, dirIn, left, up: up0, ts: TRANS_SHOT, tp: TRANS_PASS, speed: 0.9 * dist / (TRANS_PASS - TRANS_SHOT) };
   return _tp;
 }
 /** the light-ball's position at t: along the curve to the pass, then straight on */
@@ -1360,7 +1361,7 @@ export function transHead(t) {
 /** the energy source orbiting the ball: a helix round its line of flight */
 export function transOrb(t) {
   const c = transHead(t), T = nrm(sub(transHead(t + 0.004), transHead(t - 0.004))), e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0])), e2 = V.cross([0, 0, 0], T, e1), a = (t - TRANS_SHOT) * 48;
-  return add(c, add(scl(e1, 3.2 * Math.cos(a)), scl(e2, 3.2 * Math.sin(a))));
+  return add(c, add(scl(e1, 2.4 * Math.cos(a)), scl(e2, 2.4 * Math.sin(a))));
 }
 /** where his 178.7 shot splashes on the shield: part-local spot, and at time t its world position + the face normal */
 let _bs = null;
@@ -1533,7 +1534,7 @@ export const DUEL_CAMS = [
   { t0: 184.76, t1: 184.93, name: 'D15c behind the light-ball — it bores in at his cockpit (slow motion)', slowmo: true, fn: (t, u) => { const P = transPath(), h = transHead(t), T = nrm(sub(transHead(t + 0.01), h)), e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0]));
     return { pos: add(add(sub(h, scl(T, 26)), scl(e1, 8)), [0, 4, 0]), target: lrp(add(h, scl(T, 20)), P.p3, 0.6), fov: 46, handheld: 0.03, baseShake: 0.03 }; } },
   { t0: 184.93, t1: 185.25, roll: 0.05, name: 'D15d CU his head — it goes past a hair away as he snaps his neck aside', slowmo: true, fn: (t, u) => { const P = transPath();
-    return { pos: add(add(sub(P.p3, scl(P.dirIn, 12)), scl(P.left, -6)), [0, 2.5, 0]), target: sub(P.p3, scl(P.left, 1.4)), fov: 40, handheld: 0.03, baseShake: 0.02 }; } },
+    return { pos: add(add(sub(P.p3, scl(P.dirIn, 13)), scl(P.left, -6)), scl(P.up, -0.5)), target: sub(sub(P.p3, scl(P.left, 1.8)), scl(P.up, 2.2)), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },
   { t0: 185.2, t1: 186.4, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
   { t0: 186.4, t1: 187.45, roll: -0.16, name: 'D17 fly-by — it quick-boosts aside', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));
