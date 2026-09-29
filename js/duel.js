@@ -925,8 +925,13 @@ function duelHero_(t) {
     const toE = flat(sub(enemyRawPos(tw), s.pos));
     f = nrm(lrp(path, toE, smooth(169.3, 170.3, tw)));
     _pose[PIDX._body + 2] += Math.sin(tw * 0.8) * 0.1 * (1 - smooth(169, 170, tw));
-    { const u = sat((tw - (DODGE.t - 0.3)) / 0.75);                                   // a barrel roll out of the bolt's path
-      if (u > 0 && u < 1) { _pose[PIDX._body + 2] += DODGE.side * 2 * Math.PI * u * u * (3 - 2 * u); _pose[PIDX.torso] += 0.2 * Math.sin(Math.PI * u); } }
+    { const u = (tw - (DODGE.t - 0.5)) / 1.6;                                         // no roll: he slips sideways out of the
+      if (u > 0 && u < 1) {                                                             // bolt's line, banking a little into the
+        const k = Math.sin(Math.PI * u) ** 2;                                           // side-step, head and chest turned to watch
+        _pose[PIDX._body + 2] += -DODGE.side * 0.32 * k;                                // it go past (dodgeOffset moves him ~13 m)
+        _pose[PIDX.torso + 1] += DODGE.side * 0.25 * k; _pose[PIDX.head + 1] += DODGE.side * 0.35 * k;
+        _pose[PIDX.leg_L_upper + 2] += 0.2 * k; _pose[PIDX.leg_R_upper + 2] += 0.2 * k;
+      } }
   } else {
     f = flat(sub(enemyRawPos(tw), s.pos), 0.6);               // always squared up to it (strafing sideways round the ring)
     if (ROUGH(tw) > 0) f = nrm(lrp(f, roughDir(heroRawPos, enemyRawPos, tw), ROUGH(tw)));
