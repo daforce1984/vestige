@@ -60,6 +60,8 @@ export const BATTLE_TEXTURE = [
   { t0: 286, t1: 312, density: 0.4 },
 ];
 // mech duel (160–200) — driven by duel.js (DUEL_EVENTS + per-mech states)
+// story spans with NO sound effects (the music and voices carry on): scene 44 (D12, the zig-zag down the line)
+export const SFX_MUTE = [[181.4, 182.45]];
 export const DUEL_GAIN = 1.0;                   // master trim of the duel layer
 export const DUEL_DUCK_DB = -6;                 // music duck on clashes / hits
 export const DUEL_RIFLE = HERO_SHOTS;   // Sigma's beam-rifle shots (the last one is the charged kill shot)
@@ -686,6 +688,12 @@ function duelCues() {
   //      they bend round onto him, and the chain of blasts where they converge (he is already gone)
   out.push([189.85, 'charge_up', { at: 0, dur: FD(189.85, FINALE_T), fadeOut: 0.05, rate: 0.75, gain: G * 0.95, pan: 0.2, prio: 8, norand: true }]);
   out.push([FINALE_T, '@msShot', { vel: G * 1.25, k: 0.45, pan: 0.2 }]);
+  out.push([189.85, '@lanceCharge', { dur: FD(189.85, FINALE_T), vel: G * 1.0 }]);            // a low, warping charge rising under the whine
+  out.push([FINALE_T - 0.02, 'braam', { rate: 0.8, gain: G * 1.0, prio: 9, duck: 2, norand: true }]);
+  out.push([FINALE_T, '@lanceFire', { vel: G * 1.1 }]);                                          // the release
+  out.push([FINALE_T, 'expl_epic', { at: 'hit', rate: 0.85, gain: G * 1.0, prio: 9, norand: true }]);
+  out.push([FINALE_T, '@shockwave', { vel: G * 0.9 }]);                                           // the halo's shock
+  out.push([FINALE_T + 0.03, 'big_beam', { at: 'hit', rate: 0.8, gain: G * 0.9, prio: 9, norand: true }]);
   out.push([FINALE_T, '@boom', { bus: 'sfx', f: 28, vel: G * 0.9, dur: 2.0, verb: 0.4 }]);
   ultBeams().forEach((b) => out.push([b.ti, 'magic_impact', { at: 'hit', rate: R(0.9, 1.05), gain: G * 0.6, pan: R(-0.6, 0.6), prio: 8, norand: true }]));   // one per beam as it tears out ('Elemental Magic Spell Impact Outgoing', front)
   out.push([FINALE_T + 0.02, 'heavy_beam', { rate: 0.7, dur: FD(FINALE_T, ULT_HIT + 0.2), fadeOut: 0.3, gain: G * 1.1, prio: 9, norand: true }]);
@@ -1061,6 +1069,7 @@ export default class Score {
     const r = rng(1337);
     let nSmp = 0;
     for (const [t, spec, o = {}] of SAMPLE_CUES) {
+      if (SFX_MUTE.some(([m0, m1]) => t >= m0 && t < m1)) continue;   // (scenes cut to silence: music + voices only)
       if (spec[0] === '@') { ev.push({ t, type: spec.slice(1), p: o }); continue; }   // synth voice inside the sample table
       const e = this._sampleEvent(t, spec, o, r); if (e) { ev.push(e); nSmp++; }
     }

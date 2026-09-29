@@ -155,7 +155,7 @@ function nozzleHeart(R, p, r, col, k, dir) {
   const w = (c) => (c * 0.55 + 0.45) * 7 * k;
   R.glow(p, rr * 1.0, [w(col[0]), w(col[1]), w(col[2])], 0.15);          // bright HDR core: the bloom pass makes its glow
 }
-const GUNDAM_NOZZLE = [0, -1, -0.25], ENEMY_POD = [0, -0.954, -0.30];   // (enemy pod axis: its lower nozzle − upper cap, backpack frame)
+const GUNDAM_NOZZLE = [0, -1, -0.25], ENEMY_POD = [0.035, -0.888, -0.459];   // (enemy pod axis measured from the mesh: PCA of each pod, backpack frame; x mirrored per side)
 export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail = 1, opts = null) {
   // past states are expensive (full choreography evaluations): quantise tau to 1/48 s and share them between emitters
   if (opts && opts.past) {
@@ -194,7 +194,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     const r = Math.max(ep.r, 0.3) * scale;
     const flick = 0.92 + Math.sin(time * 27 + i * 1.7) * 0.08;
     const pod = name === 'enemy_ms' && ep.pos[1] < -2;                          // its booster pods' nozzles (their lower ends)
-    M.transformDir(tmp2, pm, name === 'gundam' ? GUNDAM_NOZZLE : pod ? ENEMY_POD : [0, 0, -1]);   // (Sigma's backpack nozzles point DOWN, a little back; its pods fire down their own axis)
+    M.transformDir(tmp2, pm, name === 'gundam' ? GUNDAM_NOZZLE : pod ? [ENEMY_POD[0] * Math.sign(ep.pos[0] || 1), ENEMY_POD[1], ENEMY_POD[2]] : [0, 0, -1]);   // (Sigma's backpack nozzles point DOWN, a little back; its pods fire down their own axis)
     V.norm(tmp2, tmp2);
     const vent = name === 'enemy_ms' && !pod ? 0.45 : 1;                         // the pods' upper ends: small vents
     const len = r * vent * (1.7 + throttle * 5.0) * Math.max(0.5, trail * 0.6);
@@ -250,9 +250,10 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     }
     if (isShip) { crossPlume(R, tmp, tmp2, r, len, c); continue; }   // (glow: the bloom pass)   // one smooth cone + a glow AT the nozzle only (no bead mid-plume)
     V.scale(tmp3, tmp2, len);
-    R.flame(tmp, tmp3, r * 1.7, c, 1.4, i * 3.1, 1);
-    crossPlume(R, tmp, tmp2, r * 0.8, len * 1.1, c);                  // the same cone plume as the ships (hot, additive base)
-    R.glow(tmp, r * 1.1, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5], 0.15);   // mechs: tight nozzle glow (a big halo read as a white blob head-on)
+    const rw = Math.max(ep.r, 0.18);                                   // mechs: the flame never wider than its nozzle (only longer)
+    R.flame(tmp, tmp3, rw, c, 1.4, i * 3.1, 1);
+    crossPlume(R, tmp, tmp2, rw * 0.5, len * 1.1, c);                 // the same cone plume as the ships (hot, additive base)
+    R.glow(tmp, rw * 0.9, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5], 0.15);   // tight nozzle glow
   }
 }
 // two plume planes crossed along the thrust axis (reads as a volume from any angle), sized from the nozzle radius

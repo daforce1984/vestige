@@ -1200,15 +1200,39 @@ const _ultBack = [0, 3.4, -2.0];
 function drawUlt(R, t) {
   if (t < 189.8 || t > ULT_HIT + 1.6) return;
   const B = ultBeams();
-  if (t < FINALE_T + 0.35) {                                    // the charge on its back, then the launch flash
-    const e = enemyMS2(t); const tm = e && e.vis ? duelFK(e, 'enemy_ms').torso : null;
+  if (t < FINALE_T + 1.4) {                                     // THE CHARGE on its back, then THE LAUNCH: flash + halo + shock rings
+    const e = enemyMS2(Math.min(t, FINALE_T)); const tm = e && e.vis ? duelFK(e, 'enemy_ms').torso : null;
     if (tm) {
-      const bp = M.transformPoint([0, 0, 0], tm, _ultBack);
-      const c = t < FINALE_T ? sat((t - 189.8) / (FINALE_T - 189.8)) : Math.exp(-(t - FINALE_T) * 9), q = c * c * (1 + 0.12 * Math.sin(t * 57));
-      R.glow(bp, 1 + 4.5 * q, [3 * q, 0.55 * q, 0.9 * q], 0.35); R.light(bp, 45, [1, 0.3, 0.45], 7 * q);
-      if (t < FINALE_T) for (let i = 0; i < 16; i++) {           // energy drawn in to the back
-        const ph = ((t * 1.8 + hash(i + 70)) % 1), d = randDir([0, 0, 0], i * 4.7 + 9), k = ph * ph * c;
-        spark(R, madd(bp, d, 14 * (1 - ph)), 0.2 + 0.25 * ph, [2.4 * k, 0.4 * k, 0.8 * k]);
+      const bp = M.transformPoint([0, 0, 0], tm, _ultBack), back = V.norm([0, 0, 0], M.transformDir([0, 0, 0], tm, [0, 0, -1]));
+      const s1 = V.norm([0, 0, 0], V.cross([0, 0, 0], back, [0, 1, 0])), s2 = V.cross([0, 0, 0], back, s1);
+      if (t < FINALE_T) {
+        const c = sat((t - 189.8) / (FINALE_T - 189.8)), q = c * c * (1 + 0.12 * Math.sin(t * 57));
+        // the energy sphere swelling on its back (white core, pink body)
+        R.glow(bp, 0.8 + 4 * q, [4 * q, 1.2 * q, 2 * q], 0.35); R.glow(bp, 0.4 + 1.6 * q, [5 * q, 4 * q, 4.5 * q], 0.25);
+        R.light(bp, 90, [1, 0.3, 0.5], 14 * q);
+        // three rings of energy spinning round it on tilted planes, tightening as it fills
+        for (let k = 0; k < 3; k++) {
+          const a0 = t * (6 + 2 * k) + k * 2.1, tilt = 0.6 + 0.7 * k, rr = (6 - 2.5 * c) * (1 + 0.25 * k);
+          const ax = V.add([0, 0, 0], V.scale([0, 0, 0], s1, Math.cos(tilt)), V.scale([0, 0, 0], back, Math.sin(tilt))), ay = V.cross([0, 0, 0], ax, s2);
+          let pa = null;
+          for (let j = 0; j <= 28; j++) { const a = a0 + j / 28 * 2 * Math.PI, pb = V.add([0, 0, 0], bp, V.add([0, 0, 0], V.scale([0, 0, 0], s2, Math.cos(a) * rr), V.scale([0, 0, 0], ax, Math.sin(a) * rr)));
+            if (pa) R.beam(pa, pb, 0.08 + 0.08 * c, [2.6 * c, 0.6 * c, 1.4 * c], 1, 8); pa = pb; }
+        }
+        // energy streaming in from all round, and arcs cracking off the sphere
+        for (let i = 0; i < 48; i++) { const L = 0.35 + 0.3 * hash(i + 700), ph = ((t / L) + hash(i + 701)) % 1, d = randDir([0, 0, 0], i * 3.3 + Math.floor(t / L + hash(i + 701)) * 1.7), r0 = 28 * (1 - ph) + 2, k = ph * c * 2.4;
+          const q0 = madd(bp, d, r0), q1 = madd(bp, d, r0 + 3.5 * (1 - ph)); streak(R, q1, q0, [2.6 * k, 0.7 * k, 1.6 * k], 0.9); }
+        const seed = Math.floor(t * 40);
+        for (let j = 0; j < 5; j++) { if (hash(seed * 7 + j) > 0.35 + 0.6 * c) continue; let pa = bp; const d = randDir([0, 0, 0], seed * 3.1 + j * 11); for (let i = 1; i <= 6; i++) { const pb = madd(madd(bp, d, i * (1 + 1.2 * c)), randDir([0, 0, 0], seed + j * 5 + i), 0.8); R.beam(pa, pb, 0.06, [3 * c, 1.5 * c, 3 * c], 1, 8); pa = pb; } }
+      } else {
+        const lt = t - FINALE_T;
+        if (lt < 0.12) { const f = 1 - lt / 0.12; R.glow(bp, 6 + 22 * f, [6 * f, 4 * f, 5 * f], 0.4); R.light(bp, 200, [1, 0.5, 0.7], 30 * f); }   // the white flash
+        for (const [d0, sz] of [[0, 140], [0.08, 90], [0.2, 190]]) { const l2 = lt - d0; if (l2 > 0 && l2 < 0.7) R.ripple(bp, 10 + sz * easeOut(l2 / 0.7), [0.6, 0.45, 0.55], (1 - l2 / 0.7) * 1.4); }   // shock rings
+        if (lt < 1.3) {                                              // the halo: a ring of light bursting out round the machine
+          const rr = 5 + 70 * easeOut(Math.min(1, lt / 1.1)), k = Math.pow(1 - lt / 1.3, 1.5);
+          for (let j = 0; j < 72; j++) { const a = j / 72 * 2 * Math.PI, p = V.add([0, 0, 0], bp, V.add([0, 0, 0], V.scale([0, 0, 0], s1, Math.cos(a) * rr), V.scale([0, 0, 0], s2, Math.sin(a) * rr)));
+            R.glow(p, 1.2 + 1.5 * k, [3 * k, 0.9 * k, 1.8 * k], 0.3); }
+          sparkBurst(R, bp, back, lt, 811, 160, 1.6, 90, 1.2, [5, 2, 3.2]);
+        }
       }
     }
   }
