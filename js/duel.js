@@ -1172,7 +1172,8 @@ const FK_ORDER = Object.keys(PARENT);
 // assets/gundam.glb node translations (glTF): rifle ← hand_R, rifle_muzzle ← rifle; barrel = rifle local +Z.
 // (re-check with: python3 -c "…" in blender/DUEL_NOTES.md if the rifle is re-modelled; sanity check compares them)
 export const RIFLE_T = [-0.10266, -0.84395, 0.50666];   // (raised 2026-09-29: the grip in the fist, not the receiver under it)
-export const MUZZLE_T = [0, 0.55, 8.4];
+export const MUZZLE_T = [0, 1.96, 17.98];   // the new rifle's muzzle (Quaternius Scifi Sniper at HERO_RIFLE_S: 24 m long)
+export const HERO_RIFLE_S = [8, 4, 4];     // its scale on the hand (6 m model → 24 m, twice as wide again so it isn't paper-thin)
 export const RIFLE_Q = [-0.130526, 0, 0, 0.991445];   // the rifle node's rotation on hand_R (assets/gundam.glb): the grip raked 15° like a pistol grip
 // VANGUARD's rifle (assets/enemy_ms.glb): rifle_muzzle in the rifle part's frame; the barrel runs from the grip pivot to it
 export const VAN_MUZZLE = [0.4134, -8.6024, 0.7292];            // the enemy rifle (rifle part frame)
@@ -1353,18 +1354,18 @@ function heroAim2H(s, target, k) {
 // (HERO_LOAD), the strip lights in two steps (HERO_LOCK); it snaps down onto the target (HERO_SNAP0 → 1, a little
 // overshoot) and he holds dead still while his eye flares
 export const HERO_GRAB = 170.28, HERO_EJECT = 170.95, HERO_LOAD = 171.55, HERO_LOCK = 171.75, HERO_SNAP0 = 171.95, HERO_SNAP1 = 172.2, HERO_FLARE = 172.4;
-const HERO_FORE = [0.15, -0.35, 3.2], HERO_REAR = [0.95, 0.25, -1.2], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
+const HERO_FORE = [0, -0.7, 4.5], HERO_REAR = [1.4, -1.2, 0.6], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
 // placed-rifle keys (torso frame): [t, grip, barrel direction, roll about the barrel (deg), ease]
 const HERO_DRAWK = [
   [HERO_GRAB - 0.16, [-3.0, 4.8, -2.4], [0.25, -0.55, -0.8], 0],        // the hand on the grip behind his shoulder
   [HERO_GRAB, [-3.0, 4.8, -2.4], [0.25, -0.55, -0.8], 0],
   [170.45, [-3.3, 4.4, 1.0], [0.05, 1, 0.25], 0, 'back'],                // ripped up: muzzle-up beside his head, hard stop
   [170.72, [-3.3, 4.4, 1.0], [0.05, 1, 0.25], 0],
-  [170.88, [-1.8, 2.4, 4.6], [0.35, 0.55, 0.75], 22, 'back'],          // out in front of his chest, tipped across to the lens for the eject
-  [HERO_LOAD - 0.01, [-1.8, 2.4, 4.6], [0.35, 0.55, 0.75], 22],
-  [HERO_LOAD + 0.05, [-1.8, 2.25, 4.6], [0.35, 0.47, 0.81], 22],        // the slam kicks it down ~5°
-  [HERO_LOAD + 0.16, [-1.8, 2.4, 4.6], [0.35, 0.55, 0.75], 22],
-  [HERO_SNAP0, [-1.8, 2.4, 4.6], [0.35, 0.55, 0.75], 22],               // lock-in hold
+  [170.88, [0.3, 1.4, 3.0], [0.35, 0.55, 0.75], 22, 'back'],          // out in front of his chest, tipped across to the lens for the eject
+  [HERO_LOAD - 0.01, [0.3, 1.4, 3.0], [0.35, 0.55, 0.75], 22],
+  [HERO_LOAD + 0.05, [0.3, 1.25, 3.0], [0.35, 0.47, 0.81], 22],        // the slam kicks it down ~5°
+  [HERO_LOAD + 0.16, [0.3, 1.4, 3.0], [0.35, 0.55, 0.75], 22],
+  [HERO_SNAP0, [0.3, 1.4, 3.0], [0.35, 0.55, 0.75], 22],               // lock-in hold
 ];
 const easeBack = (u) => { const c = 1.9; return 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2); };   // ~3-5 % overshoot
 function drawKey(tw) {
@@ -1410,7 +1411,7 @@ export function heroEject() {
   if (_ej) return _ej;
   const h = duelHero(HERO_EJECT), fk = duelFK(h, 'gundam'), v0 = scl(sub(heroRawPos(HERO_EJECT + 0.02), heroRawPos(HERO_EJECT - 0.02)), 25);
   const right = scl(nrm(M.transformDir([0, 0, 0], fk.torso, [1, 0, 0])), -1);   // ejected out to his right, like a rifle's ejection port
-  _ej = { p: M.transformPoint([0, 0, 0], fk.rifle, [0, 0.9, -0.3]), up: nrm(M.transformDir([0, 0, 0], fk.rifle, [0, 1, 0])), back: right, vShip: v0 };
+  _ej = { p: M.transformPoint([0, 0, 0], fk.rifle, [0.9, 2.8, 0.4]), up: nrm(M.transformDir([0, 0, 0], fk.rifle, [0, 1, 0])), back: right, vShip: v0 };
   return _ej;
 }
 /** the E-cap in his left hand (171.85 → HERO_LOAD), world position + its axis; null when not held */
@@ -1708,9 +1709,9 @@ export const DUEL_CAMS = [
   // ---- THE DRAW + LOAD (Unicorn-style: short cuts, a close-up on each thing that matters)
   { t0: 170.0, t1: 170.72, name: 'D01a beside him — he rips the rifle off his back', fn: (t, u) => { const H = hp(t), f = nrm(sub(hp(t + 0.1), H)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
     return { pos: add(add(add(H, scl(sd, -15)), scl(f, 3)), [0, 6, 0]), target: add(add(H, scl(f, 1)), [0, 6, 0]), fov: 46, handheld: 0.06 }; } },
-  { t0: 170.72, t1: 171.95, snap: 1.6, name: 'D01b CU the receiver — the spent pac pops out, the fresh one slammed in', fn: (t, u) => { const F = heroRifleFrame(t), c = add(F.rear, scl(F.dir, 0.8));
+  { t0: 170.72, t1: 171.95, snap: 1.6, name: 'D01b CU the receiver — the spent pac pops out, the fresh one slammed in', fn: (t, u) => { const F = heroRifleFrame(t), c = add(F.rear, scl(F.dir, 2.5));
     const H = hp(t), hf = nrm(sub(hp(t + 0.1), H));
-    return { pos: add(add(add(c, scl(hf, 10)), scl(F.left, 2)), [0, 4.5, 0]), target: add(c, [0, 0.6, 0]), fov: 40, handheld: 0.03 }; } },   // from ahead of him, above: the receiver held out in front of his chest
+    return { pos: add(add(add(F.rear, scl(F.left, 22)), scl(hf, 8)), [0, 3, 0]), target: add(c, [0, 0.5, 0]), fov: 42, handheld: 0.03 }; } },   // from ahead of him, above: the receiver held out in front of his chest
   { t0: 171.95, t1: 172.4, snap: 1.8, name: 'D01c low 3/4 — it snaps down onto the target', fn: (t, u) => { const T = 171.95, H = hp(T), f = nrm(sub(ep(T), H)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
     return { pos: add(add(add(hp(t), scl(f, 22)), scl(sd, -10)), [0, -3, 0]), target: add(hp(t), [0, 6, 0]), fov: 42, handheld: 0.04 }; } },
   { t0: 172.4, t1: 173.2, name: 'D01d his face — the eye flares, dead still', fn: (t, u) => { const h = duelHero(t), fk = duelFK(h, 'gundam'), E = partPoint(fk, 'head', [0, 1.2, 0.8]), f = nrm(sub(ep(t), hp(t)));

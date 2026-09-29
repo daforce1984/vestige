@@ -15,6 +15,7 @@ const MODELS = [
   { name: 'enemy_fighter', detail: 0 }, { name: 'enemy_fighter_b', detail: 0 }, { name: 'enemy_fighter_c', detail: 0 },
   { name: 'gundam', detail: 0, keep: MS_KEEP },
   { name: 'enemy_ms', detail: 0, keep: MS_KEEP },
+  { name: 'hero_rifle', detail: 0 },                                  // Sigma's rifle: Quaternius 'Scifi Sniper' (CC0), assets/src/rifle
   { name: 'gravity_well', detail: 2.5, keep: ['ring', 'core', 'pylons'] },
   { name: 'hangar', detail: 0, metalize: true },
   { name: 'mace', detail: 0 },
