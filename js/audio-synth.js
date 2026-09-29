@@ -1831,25 +1831,25 @@ function breath(E, t, p) {
 //    +18–20 dB in the last 100–300 ms, −20 dB within 0.1 s after; noise centroid 6.4 → 1.4 kHz within 80 ms.
 // msShot: a mobile-suit beam rifle report. p.k = pitch scale (VANGUARD's heavier rifle < 1), p.vel, p.pan
 function msShot(E, t, p) {
-  const vel = p.vel ?? 0.9, k = p.k ?? 1, stop = t + 2.2;
-  const v = new Voice(E, 'sfx', { verb: 0.45, pan: p.pan ?? 0 });
+  const vel = p.vel ?? 0.9, k = p.k ?? 1, stop = t + 2.8;
+  const v = new Voice(E, 'sfx', { verb: 0.55, pan: p.pan ?? 0 });
   // crack: band noise + two bright partials, ~12 ms
   const n = v.noise('white', t, t + 0.2), nb = v.f('bandpass', 1800 * k, 1.2), ng = v.g(0);
   n.connect(nb); nb.connect(ng); ng.connect(v.out);
-  perc(ng.gain, t, vel * 1.6, 0.014, 0.001);
+  perc(ng.gain, t, vel * 1.1, 0.014, 0.001);
   const cg = v.g(0); cg.connect(v.out);
   for (const [f, a] of [[1780, 0.5], [3600, 0.22]]) { const o = v.osc('sine', f * k, t, t + 0.3), og = v.g(a); o.connect(og); og.connect(cg); }
   perc(cg.gain, t, vel * 1.1, 0.02, 0.001);
   // the zap: a saw falling 1.4 kHz → 180 Hz through a tracking band (the beam 'bshuun')
-  const z = v.osc('sawtooth', 1400 * k, t, t + 0.6), zb = v.f('bandpass', 1600 * k, 2.5), zg = v.g(0);
-  sweep(z.frequency, t, 1400 * k, t + 0.22, 180 * k); sweep(zb.frequency, t, 1600 * k, t + 0.25, 300 * k);
+  const z = v.osc('sawtooth', 1000 * k, t, t + 0.7), zb = v.f('bandpass', 1200 * k, 2.5), zg = v.g(0);
+  sweep(z.frequency, t, 1000 * k, t + 0.28, 110 * k); sweep(zb.frequency, t, 1200 * k, t + 0.3, 220 * k);
   z.connect(zb); zb.connect(zg); zg.connect(v.out);
   perc(zg.gain, t, vel * 0.9, 0.09, 0.002);
   // the punch: sine drop 210 → 49 Hz, lightly driven
   const s = v.osc('sine', 210 * k, t, stop), sp = v.g(1.5), sh = v.ws('soft'), sg = v.g(0);
   s.frequency.setValueAtTime(210 * k, t); s.frequency.setTargetAtTime(49 * k, t, 0.12);
   s.connect(sp); sp.connect(sh); sh.connect(sg); sg.connect(v.out);
-  perc(sg.gain, t, vel * 0.5, 0.35, 0.005);
+  perc(sg.gain, t, vel * 0.95, 0.45, 0.005);
   // body: detuned saws ~100 Hz through a closing lowpass, with a ~22 Hz grit on its level
   const lp = v.f('lowpass', 3500, 0.9), bg = v.g(0), am = v.g(0.5), bd = v.g(1);
   sweep(lp.frequency, t, 3500, t + 0.1, 600); sweep(lp.frequency, t + 0.1, 600, t + 0.8, 150);
@@ -1861,6 +1861,10 @@ function msShot(E, t, p) {
   const r = v.noise('brown', t, stop), rl = v.f('lowpass', 400, 0.7), rg = v.g(0);
   r.connect(rl); rl.connect(rg); rg.connect(v.out);
   perc(rg.gain, t, vel * 0.3, 0.4, 0.01);
+  // weight: a driven low boom under it all (the 'heavy' in a heavy beam)
+  const w = v.noise('brown', t, stop), wl = v.f('lowpass', 180, 0.9), wp = v.g(2.2), ws = v.ws('soft'), wg = v.g(0);
+  w.connect(wl); wl.connect(wp); wp.connect(ws); ws.connect(wg); wg.connect(v.out);
+  perc(wg.gain, t, vel * 0.8, 0.35, 0.004);
 }
 // msBoost: a quick-boost burst — thump, a hiss sweeping down, a short crackling roar. p.dur = burn length (s)
 function msBoost(E, t, p) {

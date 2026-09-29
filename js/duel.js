@@ -474,6 +474,12 @@ VG.brace = W(VG.aim, { pelvis: [0, -10, 0], torso: [14, 8, 0], head: [-6, -6, 0]
 VG.limp = P({ pelvis: [10, 0, 0], torso: [28, 10, 15], head: [30, 0, 0], arm_L_upper: [20, 0, 10], arm_L_lower: [-35, 0, 0], arm_R_upper: [25, 0, -8], arm_R_lower: [-40, 0, 0],
   leg_L_upper: [-40, 0, 5], leg_L_lower: [70, 0, 0], leg_R_upper: [-25, 0, -5], leg_R_lower: [60, 0, 0], _body: [0, 0, 0] });
 VG.recoil = W(VG.brace, { torso: [-6, 8, 0], head: [-10, 0, 0], _body: [-8, 0, 0] });
+// its ULTIMATE: it gathers itself in (curled, arms drawn in across the chest, knees up) while the back charges, then throws
+// itself open — chest out, arms flung wide, head back — as the beams burst out of its back
+VG.gather = W(VG.idle, { torso: [28, 0, 0], head: [18, 0, 0], arm_L_upper: [-35, -25, -15], arm_L_lower: [-70, 0, 0], arm_R_upper: [-35, 25, 15], arm_R_lower: [-70, 0, 0],
+  leg_L_upper: [-60, 0, 5], leg_L_lower: [90, 0, 0], foot_L: [20, 0, 0], leg_R_upper: [-50, 0, -5], leg_R_lower: [85, 0, 0], foot_R: [20, 0, 0], _body: [10, 0, 0] });
+VG.ult = W(VG.idle, { torso: [-25, 0, 0], head: [-25, 0, 0], arm_L_upper: [-20, 0, 65], arm_L_lower: [-15, 0, 0], arm_R_upper: [-20, 0, -65], arm_R_lower: [-15, 0, 0],
+  leg_L_upper: [15, 0, 18], leg_L_lower: [20, 0, 0], leg_R_upper: [15, 0, -18], leg_R_lower: [20, 0, 0], _body: [-12, 0, 0] });
 export const POSE_LIB = { hero: L, vanguard: VG };
 
 // ============================================================================ choreography
@@ -494,6 +500,32 @@ const ringE = (phi, r, h) => ringH(phi + Math.PI, r, h);
 // advance, round the circling run. Its full-power shot: FINALE_T (he slips it).
 export const SERAPH_SHOTS = [172.9, 174.6, 176.75, 177.5, 178.35, 179.95, 181.4, 182.1, 182.8, 184.45, 185.35, 186.4, 187.45];
 export const FINALE_T = 190.85, FINALE_END = 191.35;
+// ULTIMATE (FINALE_T): a dozen heavy beams burst out of its back in every direction, bend round and home onto him — they
+// converge on where he was at ULT_HIT; he is already gone (the Sandevistan, SANDE0). Each beam: a cubic Bézier from the
+// back (p0) out along its launch direction (p1), swinging round (p2) onto the target (p3); ti launch, ta arrival.
+export const ULT_N = 12, ULT_HIT = 191.44;
+const ULT_BACK = [0, 3.4, -2.0];   // torso-local: between the backpack thrusters
+const hsh = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+let _ult = null;
+export function ultBeams() {
+  if (_ult) return _ult;
+  const e = enemyRaw_(FINALE_T), E = duelFK(e, 'enemy_ms'), p0 = partPoint(E, 'torso', ULT_BACK);
+  const f = nrm([e.fwd[0], 0, e.fwd[2]]), back = scl(f, -1), side = [f[2], 0, -f[0]], upv = [0, 1, 0];
+  const tgt0 = add(heroRawPos(SANDE0 + 0.03), [0, 9, 0]), dist = V.dist(p0, tgt0);
+  _ult = [];
+  for (let i = 0; i < ULT_N; i++) {
+    const a = 2 * Math.PI * (i + 0.3 * hsh(i)) / ULT_N, c = (58 + 22 * hsh(i + 20)) * DEG;
+    const rad = add(scl(side, Math.cos(a)), scl(upv, Math.sin(a) * 0.9 + 0.25));
+    const d = nrm(add(scl(back, Math.cos(c)), scl(nrm(rad), Math.sin(c))));
+    const p3 = add(tgt0, [(hsh(i + 40) - 0.5) * 10, (hsh(i + 60) - 0.5) * 8, (hsh(i + 80) - 0.5) * 10]);
+    const L = dist * (0.35 + 0.2 * hsh(i + 5)), p1 = add(p0, scl(d, L));
+    const p2 = add(lrp(p1, p3, 0.55), scl(d, L * 0.35));
+    const ti = FINALE_T + 0.018 * i, ta = ULT_HIT + 0.012 * i;
+    _ult.push({ p0: add(p0, scl(d, 2.5)), p1, p2, p3, ti, ta });
+  }
+  return _ult;
+}
+export const ultPoint = (b, u) => { const v = 1 - u; return add(add(scl(b.p0, v * v * v), scl(b.p1, 3 * v * v * u)), add(scl(b.p2, 3 * v * u * u), scl(b.p3, u * u * u))); };
 // Sigma's shots: 178.7 is taken on the shield; 183.25 tears the shield off; the charged 192.35 goes through its chest
 export const HERO_SHOTS = [173.6, 175.4, 177.2, 177.85, 178.7, 180.55, 181.7, 182.4, 183.25, 184.9, 185.9, 186.85, 187.9];
 export const BLOCK_T = 178.7, SHIELD_HIT_T = 183.25;
@@ -663,13 +695,13 @@ const enemyPose = poseTrack([
   [182.45, VG.stepR, 'out'], [182.8, VG.fly, 'io'], [183.2, VG.fly],
   [183.4, VG.hit, 'out'], [183.8, VG.aim, 'io'],       // the shield gone, it fights on one-handed
   [184.2, VG.fly, 'io'], [188.4, VG.fly],
-  [189.2, VG.aim, 'io'], [189.75, VG.brace, 'io'], [190.85, VG.brace], [191.1, VG.recoil, 'out'], [191.9, VG.brace, 'io'],
-  [CUT_T - 0.02, VG.brace], [CUT_T + 0.25, W(VG.hit, { torso: [-35, 10, 20] }), 'out'], [193.4, VG.limp, 'io'],
+  [189.2, VG.fly, 'io'], [189.8, VG.gather, 'io'], [190.8, VG.gather], [FINALE_T + 0.08, VG.ult, 'out'], [191.6, VG.ult],   // the ultimate
+  [CUT_T - 0.02, VG.ult], [CUT_T + 0.25, W(VG.hit, { torso: [-35, 10, 20] }), 'out'], [193.4, VG.limp, 'io'],
 ]);
 const enemyImp = impulses([
   ...SERAPH_SHOTS.map((ts) => [ts + 0.001, P({ arm_R_upper: [-12, 0, 0], torso: [-6, 0, 0], _body: [-4, 0, 0] }), 0.03, 0.45, 14]),   // recoil
   [BLOCK_T + 0.03, P({ arm_L_upper: [18, 0, 0], torso: [-10, 0, 0], _body: [-6, 0, 0] }), 0.03, 0.5, 12],             // the shield takes it
-  [FINALE_T, P({ arm_R_upper: [-18, 0, 0], torso: [-10, 0, 0], _body: [-8, 0, 0] }), 0.05, 0.6],                       // full-power recoil
+  [FINALE_T, P({ torso: [-12, 0, 0], head: [-10, 0, 0], _body: [-8, 0, 0] }), 0.05, 0.6],                               // the beams tear out of its back
 ]);
 // the backflip (179.62–180.4): the body turns over backwards; limbs from VANGUARD's own Backflip clip (1.0 → 2.7 s)
 const FLIP0 = 179.6, FLIP1 = 180.42;
@@ -699,18 +731,17 @@ function pauldronW() {
 }
 function enemyAim(tw) {
   if (tw > HERO_HIT_T - 0.45 && tw < HERO_HIT_T + 0.3 && !_pauldronBusy) return pauldronW();   // this one lands
-  if (tw > 190.2 && tw < FINALE_END + 0.3) return add(heroRawPos(FINALE_T - 0.12), [0, 9, 0]);   // full power: locked on — he slips it
   const ts = SERAPH_SHOTS.find((x) => tw > x - 0.45 && tw < x + 0.3), ta = ts !== undefined ? ts - 0.25 : tw - 0.1;
   const p = heroRawPos(ta), q = heroRawPos(ta - 0.1), lead = ts !== undefined ? (ts - ta) / 0.1 : 1.2;
   return add(add(p, scl(sub(p, q), lead)), [0, 9, 0]);
 }
 const ENEMY_AIM = (tw) => { let k = smooth(170.6, 171.0, tw) * (1 - smooth(178.45, 178.6, tw)) + smooth(179.1, 179.3, tw) * (1 - smooth(179.45, 179.6, tw))
-    + smooth(180.5, 180.9, tw) * (1 - smooth(183.25, 183.35, tw)) + smooth(183.8, 184.1, tw);   // (held up to the cut: frozen there)
+    + smooth(180.5, 180.9, tw) * (1 - smooth(183.25, 183.35, tw)) + smooth(183.8, 184.1, tw) * (1 - smooth(189.3, 189.7, tw));   // (the rifle goes down for the ultimate)
   for (const ts of SERAPH_SHOTS) k = Math.max(k, smooth(ts - 0.35, ts - 0.2, tw) * (1 - smooth(ts + 0.12, ts + 0.3, tw)));
   return Math.min(1, k); };
 const enemyBoost = scalarTrack([[170, 1], [172.8, 0.9], [173.2, 1, 'lin'], [173.6, 0.9], [174.9, 0.9], [175.0, 1, 'lin'], [175.5, 0.85], [176.5, 0.6],
   ...[177.2, 177.85, 179.5, 180.9, 181.55, 182.25, 183.3, 184.85, 185.85, 186.86, 188.5].flatMap((t) => [[t - 0.02, 0.5], [t + 0.03, 1, 'lin'], [t + 0.35, 0.55]]),
-  [183.8, 0.7], [184.3, 1], [187.8, 1], [189.5, 0.6], [190.85, 0.6], [192.4, 0.1], [200, 0.1]]);
+  [183.8, 0.7], [184.3, 1], [187.8, 1], [189.5, 0.6], [190.83, 0.6], [190.9, 1, 'lin'], [191.3, 0.75], [192.4, 0.1], [200, 0.1]]);
 
 // TWO-HANDED AIM (the enemy's 8.6 m rifle): the rifle is PLACED — its grip in front of the chest, a little right of the
 // centre line, the barrel on the target, its top toward the chest's up — and both arms are solved onto it by IK: the
@@ -1308,7 +1339,7 @@ const EV = [
   [THIGH_T + 0.03, 'hit', 0.7, { kind: 'shot', part: ['e2', 'leg_R_upper', THIGH_P], note: 'his shot burns through its right thigh' }],
   [HERO_HIT_T + 0.04, 'hit', 0.7, { kind: 'heroHit', part: ['hero', 'arm_L_upper', PAULDRON_P], note: 'its shot burns through his left pauldron' }],
   [FINALE_T, 'shake', 0.6, { on: 'e2', note: 'VANGUARD fires at full power' }],
-  [FINALE_T + 0.1, 'shake', 0.9, { on: 'hero', note: 'the beam tears past him' }],
+  [ULT_HIT, 'shake', 0.9, { on: 'hero', note: 'the beams converge where he was' }],
   [CUT_T, 'hit', 1.0, { kind: 'slash', note: 'the beam saber cuts it in half at the waist' }],
   [194.0, 'shake', 1.2, { on: 'e2', note: 'VANGUARD explodes' }],
 ];
@@ -1421,10 +1452,10 @@ export const DUEL_CAMS = [
     return { pos: c0.pos, target: pan(lrp(hp(T), ep(T), 0.7), lrp(hp(t), ep(t), 0.7), 0.6), fov: 30, handheld: 0.06 }; } },
   { t0: 188.4, t1: 189.6, name: 'D19 EWS — it breaks away', fn: (t, u) => { const T = 188.4, M = mid(T);
     return { pos: at(M, -60, -400, -70, T), target: pan(M, mid(t), 0.5), fov: 36, handheld: 0.04 }; } },
-  { t0: 189.6, t1: 190.7, snap: 1.6, roll: 0.06, name: 'D20 push in on the charging rifle', fn: (t, u) => { const T = 189.6, E = ep(T);
-    return { pos: lrp(at(E, -50, 16, 4, T), at(E, -28, 10, 3, T), easeInOut(u)), target: up(ep(t), 3), fov: 30, handheld: 0.04, baseShake: 0.03 }; } },
-  { t0: 190.7, t1: 191.25, roll: 0.1, name: 'D21 the full-power beam goes past him', slowmo: true, fn: (t, u) => { const T = 190.7, H = hp(T);
-    return { pos: at(H, -26, 30, 6, T), target: pan(up(H, 3), up(hp(t), 3), 0.8), fov: 42, handheld: 0.06 }; } },
+  { t0: 189.6, t1: 190.7, snap: 1.6, roll: 0.06, name: 'D20 it gathers itself in, its back charging', fn: (t, u) => { const T = 189.6, E = ep(T);
+    return { pos: lrp(at(E, 46, 24, 12, T), at(E, 32, 17, 9, T), easeInOut(u)), target: up(ep(t), 5), fov: 34, handheld: 0.04, baseShake: 0.03 }; } },
+  { t0: 190.7, t1: 191.25, roll: 0.06, name: 'D21 behind and above it — the beams burst out and bend round onto him', slowmo: true, fn: (t, u) => { const T = 190.7, E = ep(T), H = hp(T);
+    return { pos: at(E, 95, 40, 55, T), target: pan(up(E, 4), lrp(E, H, 0.45), 0.35 + 0.4 * u), fov: 58, handheld: 0.05, baseShake: 0.03 }; } },
   // SANDEVISTAN: a locked-off camera well to the side of his line — he streaks across the frozen frame, afterimages behind
   { t0: 191.25, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
     return { pos: add(add(Pm, scl(D_L, -150)), [0, 12, 0]), target: pan(Pm, up(hp(t), 2), 0.85), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },

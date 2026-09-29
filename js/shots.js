@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -807,7 +807,7 @@ function drawHalves(R, t, s) {
     e.pose = s.pose; e.seed = 10; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0; e.damage = s.damage;
     e.hidden = hide;
     meltHole(e, 'enemy', t, 'leg_R_upper');
-    e.clipPart = 'torso'; e.clipInv = false; e.clipHeat = -2.6;        // clean beam cut, glowing edge (shader: w < 0)
+    e.clipPart = 'torso'; e.clipInv = false; e.clipHeat = -(0.25 + 2.35 * Math.exp(-lt * 2.2));   // the faces cool        // clean beam cut, glowing edge (shader: w < 0)
     e.clip = half > 0 ? [-30, CUT_Y, -30, 30, 40, 30] : [-30, -40, -30, 30, CUT_Y, 30];
   }
   if (t < HALF_BLAST.upper) R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));   // the molten cut glows
@@ -839,7 +839,6 @@ function cutPath() {   // sampled once: per story time, the chord's two ends as 
   return _cutPath;
 }
 const _secP = (th, lift = 0) => [CUT_E.cx + Math.cos(th) * CUT_E.rx * 1.03, CUT_Y + lift, CUT_E.cz + Math.sin(th) * CUT_E.rz * 1.03];
-const CRIMSON = { hull: { base: [0.5, 0.04, 0.05], metal: 0.3, rough: 0.4, emissive: [0, 0, 0] } };
 function drawCutDetail(R, t) {
   if (t < CUT_T - 0.06 || t > CUT_SPLIT + 1.2) return;
   const P = cutPath(); if (!P.first) return;
@@ -849,7 +848,7 @@ function drawCutDetail(R, t) {
   const live = t < CUT_SPLIT && cur && t - cur.t < 0.004;
   const th0 = P.first.th;
   // the cut edges: arcs of the section from where the blade went in to where it is now, glowing hot at the front
-  if (cur && t < CUT_SPLIT + 0.01) for (const side of [0, 1]) {   // (only while cutting: after that it hung in space as a ring)
+  if (cur && live) for (const side of [0, 1]) {   // (only while the blade is in it: after the split it hung between the halves)
     const a0 = th0[side], a1 = cur.th[side];
     let da = a1 - a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
     const n = Math.max(2, Math.ceil(Math.abs(da) / 0.12));
@@ -865,30 +864,13 @@ function drawCutDetail(R, t) {
   if (cur && live) for (const side of [0, 1]) {
     const pw = TW(_secP(cur.th[side])), out = V.norm([0, 0, 0], V.sub([0, 0, 0], pw, TW([CUT_E.cx, CUT_Y, CUT_E.cz])));
     R.glow(pw, 0.55, [2.2, 1.3, 0.6], 0.2); R.light(pw, 20, [1, 0.6, 0.3], 2.5);
-    for (let i = 0; i < 28; i++) {                                                  // a jet of molten droplets, story-fast
-      const life = 0.012 + hash(i + side * 50) * 0.03, ph = ((t / life) + hash(i + 3 + side * 50)) % 1;
+    for (let i = 0; i < 46; i++) {                                                  // a jet of sparks, story-fast: bright streaks
+      const life = 0.012 + hash(i + side * 50) * 0.035, ph = ((t / life) + hash(i + 3 + side * 50)) % 1;
       const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.1 + side * 7 + Math.floor(t / life) * 0.37), out, 1.4), D_SWEEP(), 0.8));
-      const b = 2.6 * (1 - ph) * (1 - ph);
-      spark(R, madd(pw, sd, ph * life * (120 + 180 * hash(i + 9))), 0.1 + 0.14 * (1 - ph), [b, b * 0.6, b * 0.25]);
+      const b = 3.2 * (1 - ph) * (1 - ph), sp = life * (140 + 220 * hash(i + 9)), q = madd(pw, sd, ph * sp);
+      R.beam(madd(q, sd, -Math.min(ph, 0.25) * sp), q, 0.035 + 0.05 * (1 - ph), [b, b * 0.55, b * 0.18], 1, 4);
+      spark(R, q, 0.08 + 0.12 * (1 - ph), [b, b * 0.6, b * 0.25]);
     }
-  }
-  // plates cut loose: spawned along the cut front, flung out along the blade and the swing, tumbling, their edges hot
-  for (let i = 0; i < 18; i++) {
-    const ts = P.first.t + (CUT_SPLIT - P.first.t) * (i + 0.5) / 18, lt = t - ts;
-    if (lt < 0 || lt > 1.2) continue;
-    const q = P.out.find((x) => x.t >= ts && x.th); if (!q) continue;
-    const side = i % 2, p0 = TW(_secP(q.th[side], (hash(i + 4) - 0.5) * 0.6));
-    const out = V.norm([0, 0, 0], V.sub([0, 0, 0], p0, TW([CUT_E.cx, CUT_Y, CUT_E.cz])));
-    const v = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], out, D_SWEEP(), 0.9), randDir([0, 0, 0], i * 5.3), 0.5));
-    const pos = madd(p0, v, (40 + 90 * hash(i + 2)) * lt);
-    Q.fromEuler(_hQ, lt * (20 + 40 * hash(i)), lt * (30 + 30 * hash(i + 1)), lt * 25);
-    const sc = 0.045 + 0.05 * hash(i + 6);                                        // hand-sized plates (the debris pieces are ~5 m)
-    M.fromTRS(_hT, pos, _hQ, sc);
-    const d = R.add('debris', _hT); if (!d) continue;
-    d.hidden = debrisOnly(R, 'hull' + (i % 4)); d.seed = i * 1.7;
-    const hk = 0.35 * Math.exp(-lt * 8);
-    d.matOverride = { ...CRIMSON, scorch: { base: [0.12, 0.05, 0.04], metal: 0.4, rough: 0.6, emissive: [2.5 * hk, 0.8 * hk, 0.15 * hk] },
-      metal: { base: [0.4, 0.38, 0.4], metal: 1, rough: 0.3, emissive: [2 * hk, 0.6 * hk, 0.1 * hk] }, rust: CRIMSON.hull };
   }
 }
 let _dsw = null; const D_SWEEP = () => _dsw || (_dsw = (() => { const ev = DUEL_EVENTS.find((x) => x.slash); return ev ? ev.dir : [0, 0, 1]; })());
@@ -1104,7 +1086,7 @@ function drawMSBattle(R, t) {
 
 // VANGUARD's beam rifle: bolts (a 70 m streak racing out at 2.2 km/s along the line fixed at the moment of firing), a
 // short charge glint and a muzzle flash; light spills on Sigma as one goes past him — every one misses. The finale: a
-// sustained full-power beam along the line it laid on him, which he slips a moment before it fires (FINALE_T–END).
+// dozen homing heavy beams out of its back (drawUlt).
 // Crimson-pink (its paint); the white core kept low (intensity).
 const SER_COL = [3.0, 0.55, 0.9];
 function serBeam(R, a, b, k, r = 1.3) {
@@ -1129,6 +1111,42 @@ function shotStop(ts) {
     _stop.set(ts, ev && L ? { pos: ev.pos, d: Math.max(5, V.dot(V.sub([0, 0, 0], ev.pos, L.from), L.dir)) } : null);
   }
   return _stop.get(ts);
+}
+// ---- its ULTIMATE (duel.js ultBeams): the back charges while it gathers itself in, then a dozen thick heavy beams burst
+// out of it in every direction, bend round and home onto him, converging (in a chain of blasts) where he was
+const _ultBack = [0, 3.4, -2.0];
+function drawUlt(R, t) {
+  if (t < 189.8 || t > ULT_HIT + 1.6) return;
+  const B = ultBeams();
+  if (t < FINALE_T + 0.35) {                                    // the charge on its back, then the launch flash
+    const e = enemyMS2(t); const tm = e && e.vis ? duelFK(e, 'enemy_ms').torso : null;
+    if (tm) {
+      const bp = M.transformPoint([0, 0, 0], tm, _ultBack);
+      const c = t < FINALE_T ? sat((t - 189.8) / (FINALE_T - 189.8)) : Math.exp(-(t - FINALE_T) * 9), q = c * c * (1 + 0.12 * Math.sin(t * 57));
+      R.glow(bp, 1 + 4.5 * q, [3 * q, 0.55 * q, 0.9 * q], 0.35); R.light(bp, 45, [1, 0.3, 0.45], 7 * q);
+      if (t < FINALE_T) for (let i = 0; i < 16; i++) {           // energy drawn in to the back
+        const ph = ((t * 1.8 + hash(i + 70)) % 1), d = randDir([0, 0, 0], i * 4.7 + 9), k = ph * ph * c;
+        spark(R, madd(bp, d, 14 * (1 - ph)), 0.2 + 0.25 * ph, [2.4 * k, 0.4 * k, 0.8 * k]);
+      }
+    }
+  }
+  for (let i = 0; i < B.length; i++) {
+    const b = B[i]; if (t < b.ti) continue;
+    const u = sat((t - b.ti) / (b.ta - b.ti)), head = Math.pow(u, 1.25);
+    const drain = t > b.ta ? sat((t - b.ta) / 0.09) : 0, tail = Math.max(0, head - 0.3) + drain * (1 - Math.max(0, head - 0.3));
+    if (head - tail > 0.004) {
+      const n = Math.max(2, Math.ceil((head - tail) * 22)); let pa = ultPoint(b, tail);
+      for (let j = 1; j <= n; j++) {
+        const pb = ultPoint(b, tail + (head - tail) * j / n), f = j / n;   // thick at the head, thinning back along the trail
+        serBeam(R, pa, pb, 1.1, 1.1 + 1.1 * f);
+        pa = pb;
+      }
+      const hp = ultPoint(b, head); R.glow(hp, 2.2, [3, 0.6, 1], 0.35);
+      if (i % 3 === 0) R.light(hp, 60, [1, 0.3, 0.45], 5);
+    }
+    if (u < 0.08) R.glow(b.p0, 2.5 * (1 - u / 0.08), [3, 0.6, 1], 0.35);   // each beam's exit flash
+    if (i % 2 === 0 && t >= b.ta) explosion(R, t, b.ta, b.p3, 9 + 4 * hash(i + 3), 610 + i, 'ship', 6);   // they converge where he was
+  }
 }
 function drawSeraphFire(R, t) {
   for (const ts of SERAPH_SHOTS) {
@@ -1159,18 +1177,7 @@ function drawSeraphFire(R, t) {
       if (u > tail - 20 && u < head + 20) R.light(madd(L.from, L.dir, clamp(u, tail, head)), 50, [1, 0.3, 0.45], 5);
     }
   }
-  // ---- the finale: full power, a sustained beam along the line it had laid on him — he has already slipped aside
-  if (t > FINALE_T - 0.4 && t < FINALE_END + 0.35) {
-    const L = shotLine(FINALE_T);
-    if (L && t < FINALE_T) { const m = seraphMuzzle(t), c = sat((t - (FINALE_T - 0.4)) / 0.4); if (m) { R.glow(m.pos, 1 + 4 * c * c, [3 * c, 0.6 * c, 0.9 * c], 0.35); R.light(m.pos, 60, [1, 0.3, 0.45], 6 * c); } }
-    else if (L) {
-      const lt = t - FINALE_T, k = t < FINALE_END ? 1.1 + 0.12 * Math.sin(t * 43) : Math.max(0, 1 - (t - FINALE_END) / 0.3);
-      serBeam(R, L.from, madd(L.from, L.dir, Math.min(4000, 3000 * lt + 5)), k, 2.4);
-      if (lt < 0.35) R.ripple(L.from, 10 + 60 * easeOut(lt / 0.35), [0.5, 0.5, 0.5], (1 - lt / 0.35) * 1.3);
-      R.light(madd(L.from, L.dir, 30), 110, [1, 0.3, 0.45], 9 * k);   // out along the beam (at the muzzle it washed its own body pink)
-      const g = gundamState(t); if (g && g.vis) { const d = V.sub([0, 0, 0], g.pos, L.from), u = Math.max(0, V.dot(d, L.dir)); R.light(madd(L.from, L.dir, u), 90, [1, 0.3, 0.45], 10 * k); }   // it lights him as it tears past
-    }
-  }
+  drawUlt(R, t);
 }
 // ---- Sigma's beam rifle: fast cyan bolts; the reversal shot takes SERAPH's left wing; the charged shot is a magnum —
 // a thick beam that goes straight through its chest and on out into space

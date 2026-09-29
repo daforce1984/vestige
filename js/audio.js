@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -566,7 +566,7 @@ function duelCues() {
   }
   // ---- MECH SFX: procedural voices modelled on CC0 references (audio-synth.js msShot / msBoost / msArmorHit / msPass)
   // his beam rifle: crack, the falling zap, the sine punch, a gritty body
-  DUEL_RIFLE.forEach((t) => out.push([t, '@msShot', { vel: G * R(0.85, 0.95), k: R(0.98, 1.04), pan: -0.15 }]));
+  DUEL_RIFLE.forEach((t) => out.push([t, '@msShot', { vel: G * R(0.9, 1.0), k: R(0.7, 0.75), pan: -0.15 }]));
   // the shots that land: struck plate, ring, and the armour burning through
   out.push([SHIELD_HIT_T + 0.03, '@msArmorHit', { vel: G * 1.0, f: 180, burn: 0.8, pan: 0.3 }]);   // the shield torn off its arm
   out.push([SHIELD_HIT_T + 0.03, '@sparkBurst', { vel: G * 0.6, pan: 0.3 }]);
@@ -643,19 +643,25 @@ function duelCues() {
   // ---- VANGUARD's beam rifle: a sharp report (pitched lower than Sigma's) + a low thump; the bolts that pass near him
   //      whip past; its jump (179.3) and the quick-boosts come from the per-mech boost edges above
   for (const ts of SERAPH_SHOTS) {
-    out.push([ts, '@msShot', { vel: G * 0.75, k: 0.8, pan: 0.3 }]);                          // its heavier rifle, pitched down
+    out.push([ts, '@msShot', { vel: G * 0.85, k: 0.58, pan: 0.3 }]);                          // its heavier rifle, pitched down
     if (Math.abs(ts - HERO_HIT_T) > 0.1) out.push([ts, '@msPass', { vel: G * 0.55, tp: 0.12, ratio: R(1.8, 2.6), f: R(1600, 2000), pan0: 0.5, pan1: -0.7 }]);   // it whips past him
   }
   out.push([179.3, '@msBoost', { vel: G * 0.75, dur: 1.0, pan: 0.35 }]);                     // the boost-jump
   // his 178.7 splashes off its shield: the plate rings, the face burns (the hole stays)
   out.push([BLOCK_T + 0.03, '@msArmorHit', { vel: G * 0.85, f: 260, burn: 0.9, pan: 0.3 }]);
   out.push([BLOCK_T + 0.03, '@sparkBurst', { vel: G * 0.6, pan: 0.3 }]);
-  // ---- the finale: full power along the line it laid on him — he has slipped it; it roars past him
-  out.push([FINALE_T - 0.35, 'charge_up', { at: 0, dur: 0.4, fadeOut: 0.05, rate: 1.3, gain: G * 0.8, pan: 0.2, prio: 8, norand: true }]);
-  out.push([FINALE_T, '@msShot', { vel: G * 1.2, k: 0.62 }]);
-  out.push([FINALE_T, 'heavy_beam', { rate: 0.85, dur: FINALE_END - FINALE_T + 0.6, fadeOut: 0.3, gain: G * 1.1, prio: 9, norand: true }]);
-  out.push([FINALE_T, '@msPass', { vel: G * 0.9, tp: 0.1, ratio: 3.2, f: 1500, pan0: 0.5, pan1: -0.6 }]);   // it roars past him
-  out.push([FINALE_T, '@boom', { bus: 'sfx', f: 38, vel: G * 0.7, dur: 1.2, verb: 0.3 }]);
+  // ---- its ULTIMATE: the back charging while it gathers in, a dozen heavy beams tearing out of it at once, their roar as
+  //      they bend round onto him, and the chain of blasts where they converge (he is already gone)
+  out.push([189.85, 'charge_up', { at: 0, dur: FD(189.85, FINALE_T), fadeOut: 0.05, rate: 0.75, gain: G * 0.95, pan: 0.2, prio: 8, norand: true }]);
+  out.push([FINALE_T, '@msShot', { vel: G * 1.25, k: 0.45, pan: 0.2 }]);
+  out.push([FINALE_T, '@boom', { bus: 'sfx', f: 28, vel: G * 0.9, dur: 2.0, verb: 0.4 }]);
+  ultBeams().forEach((b, i) => { if (i % 2) out.push([b.ti, '@msShot', { vel: G * 0.5, k: R(0.5, 0.62), pan: R(-0.6, 0.6) }]); });
+  out.push([FINALE_T + 0.02, 'heavy_beam', { rate: 0.7, dur: FD(FINALE_T, ULT_HIT + 0.2), fadeOut: 0.3, gain: G * 1.1, prio: 9, norand: true }]);
+  out.push([ULT_HIT - 0.12, '@msPass', { vel: G * 0.9, tp: 0.1, ratio: 3.2, f: 1300, pan0: 0.5, pan1: -0.6 }]);
+  out.push([ULT_HIT, '@boom', { bus: 'sfx', f: 26, vel: G * 1.0, dur: 2.6, verb: 0.45 }]);
+  out.push([ULT_HIT, 'hl_explosion', { rate: 0.8, gain: G * 1.0, prio: 9, norand: true }]);
+  out.push([ULT_HIT + 0.06, 'expl_metal', { rate: 0.85, gain: G * 0.7, pan: 0.3, prio: 8, norand: true }]);
+  out.push([ULT_HIT + 0.12, 'hl_explosion', { rate: 0.95, gain: G * 0.7, pan: -0.3, prio: 8, norand: true }]);
   return out;
 }
 
