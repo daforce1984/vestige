@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, BLOCK_SPOT, blockFrame, HERO_LOAD, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -995,7 +995,7 @@ function drawEnemyMS(R, t, s, idx) {
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
   if (s.noRifle) e.hidden = { ...(e.hidden || {}), rifle: 1 };                // (still on its back)
   if (!s.shieldLost) { shieldScorch(e, t); drawBlockSplash(R, t); }
-  if (t > ENEMY_CHARGE0 - 0.1 && t < ENEMY_CHARGE1 + 0.8) drawEnemyCharge(R, t);
+  if (t > ENEMY_CHARGE0 - 0.1 && t < 176.4) drawEnemyCharge(R, t);
   if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
   if (idx === 2 && transK(t) > 0.001) drawRails(R, t, s);
   if (idx === 2 && t >= RIFLE_DROP_T) { e.hidden = { ...(e.hidden || {}), rifle: 1 }; drawDroppedRifle(R, t); }
@@ -1015,7 +1015,7 @@ function drawEnemyMS(R, t, s, idx) {
   heavyDamage(R, t, e, idx);
   if (t > 170 && t < 200) meltHole(e, 'enemy', t, s.shieldLost ? 'leg_R_upper' : null);
   const eye = emitWorld(R, 'enemy_ms', e, 'eye');
-  const eyeFl = idx === 1 ? 1 + 1.6 * smooth(174.75, 174.9, t) * (1 - smooth(175.15, 175.6, t)) : 1;   // the standoff: its eye flares
+  const eyeFl = idx === 1 ? 1 + 3 * Math.exp(-Math.abs(t - ENEMY_EYE - 0.04) * 30) : 1;   // its eye glints as it levels the rifle
   if (eye) {   // VANGUARD's eyes: a small glint on each (no big round glow), flaring in the standoff
     const pts = R.models.enemy_ms.emitPoints.eye || [];
     for (let i = 0; i < pts.length; i++) { const p = emitWorld(R, 'enemy_ms', e, 'eye', i); if (p) R.glow(p, 0.3 * (0.8 + 0.2 * eyeFl), [2.6 * eyeFl, 0.5 * eyeFl, 0.7 * eyeFl], 0.2); }
@@ -1235,27 +1235,38 @@ function drawUlt(R, t) {
 // big spinning energy body (a rotating icosahedral lattice of light round a white core), bending round after him
 const _rT2 = new Float32Array(16), _rM2 = new Float32Array(16);
 let _railHide = null;
-// THE LOAD: the E-cap in his left hand (a glowing cell), slammed into the rifle at HERO_LOAD — a flash at the breech and
-// the rifle's lines lighting up from the back to the muzzle, settling to a charged glow
+// THE LOAD (duel.js heroDraw): the spent E-pac pops out of the receiver at HERO_EJECT and tumbles away (a steam puff,
+// a couple of sparks); the fresh pac glows in his left hand until it is slammed home at HERO_LOAD (a spark flash);
+// the indicator strip on top of the rifle goes dark at the eject and lights in two steps at HERO_LOCK
+const _ejT = new Float32Array(16), _ejQ = [0, 0, 0, 1];
 function drawLoad(R, t) {
-  if (t < 171.8 || t > HERO_LOAD + 1.2) return;
-  const cap = heroCap(t);
-  if (cap) { const a = madd(cap.p, cap.axis, -0.7), b = madd(cap.p, cap.axis, 0.7); R.beam(a, b, 0.45, [0.7, 2.2, 3.2], 1, 4); R.glow(cap.p, 1.3, [0.5, 1.5, 2.2], 0.3); R.light(cap.p, 12, [0.4, 0.8, 1], 1.5); }
-  const lt = t - HERO_LOAD; if (lt < 0) return;
+  if (t < HERO_GRAB || t > 176.4) return;
   const F = heroRifleFrame(t); if (!F) return;
-  const fl = Math.exp(-lt * 10), run = sat(lt / 0.3), k = 0.35 + 0.65 * Math.exp(-lt * 3);
-  if (fl > 0.02) { R.glow(F.rear, 0.8 + 2.5 * fl, [1.2 * fl, 2.6 * fl, 3.4 * fl], 0.3); R.light(F.rear, 20, [0.4, 0.8, 1], 3 * fl); }
-  const up = [0, 1, 0];
-  for (let i = 0; i < 10; i++) {                                      // the charge runs down the barrel
-    const f = i / 9; if (f > run) break;
-    const p = madd(madd(F.p, F.dir, -1 + 8 * f), up, 0.55);
-    R.glow(p, 0.35 + 0.2 * k, [0.4 * k, 1.4 * k, 2.2 * k], 0.25);
+  const up = V.norm([0, 0, 0], V.cross([0, 0, 0], F.dir, V.cross([0, 0, 0], [0, 1, 0], F.dir)));
+  const strip = t < HERO_EJECT ? 0.5 : t < HERO_LOCK ? 0 : t < HERO_LOCK + 0.1 ? 0.5 : 1;   // dark between the eject and the lock
+  const flash = t > HERO_LOCK && t < HERO_LOCK + 0.25 ? 1 + 1.5 * Math.exp(-(t - HERO_LOCK) * 20) : 1;
+  if (strip > 0) for (let i = 0; i < 6; i++) { const p = madd(madd(F.p, F.dir, -0.8 + 1.1 * i), up, 0.85); const k = strip * flash * 0.7; R.glow(p, 0.22, [0.3 * k, 1.8 * k, 1.1 * k], 0.2); }
+  const ej = heroEject(), le = t - HERO_EJECT;
+  if (le >= 0 && le < 1.6) {                                           // the spent pac: popped up and back, tumbling
+    const v = V.add([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], ej.up, 4), V.scale([0, 0, 0], ej.back, 7)), ej.vShip);
+    const p = madd(ej.p, v, le);
+    Q.fromEuler(_ejQ, le * 12.5, le * 4, le * 7); M.fromTRS(_ejT, p, _ejQ, 0.28);
+    const d = R.add('debris', _ejT); if (d) { const hk = 0.8 * Math.exp(-le * 1.5); d.hidden = debrisOnly(R, 'hull1'); d.seed = 3.3; d.matOverride = { hull: { base: [0.35, 0.36, 0.4], metal: 0.8, rough: 0.35, emissive: [0.3 * hk, 1.2 * hk, 1.6 * hk] } }; }   // the spent pac, still glowing faintly
+    R.glow(p, 1.1, [0.4, 1.3, 1.8].map((c) => c * Math.exp(-le * 1.2)), 0.25);
+    if (le < 0.5) { const k = 1 - le / 0.5; for (let i = 0; i < 5; i++) R.glow(madd(ej.p, randDir([0, 0, 0], i * 3.7 + 9), 0.4 + 2.5 * le), 0.5 + 1.2 * le, [0.35 * k, 0.35 * k, 0.37 * k], 0.5); }   // a steam puff
+    if (le < 0.3) sparkBurst(R, ej.p, ej.up, le, 91, 6, 0.8, 18, 0.3, [4, 2.4, 0.9]);
   }
+  const cap = heroCap(t);
+  if (cap) { const c0 = madd(cap.p, cap.axis, 0.9), a = madd(c0, cap.axis, -1.1), b = madd(c0, cap.axis, 1.1); R.beam(a, b, 0.6, [0.7, 2.2, 3.2], 1, 4); R.glow(c0, 1.6, [0.5, 1.5, 2.2], 0.3); R.light(c0, 14, [0.4, 0.8, 1], 2); }   // the fresh pac, sticking out of his fist
+  const lt = t - HERO_LOAD;
+  if (lt >= 0 && lt < 0.4) { const fl = Math.exp(-lt * 14); R.glow(F.rear, 0.8 + 2.4 * fl, [1.6 * fl, 2.4 * fl, 3.2 * fl], 0.3); R.light(F.rear, 20, [0.6, 0.8, 1], 3 * fl); sparkBurst(R, F.rear, up, lt, 57, 24, 0.9, 16, 0.35, [4, 2.6, 1.2]); }
 }
 // its rifle charging (ENEMY_CHARGE0 → 1): light gathering along the barrel into the muzzle, crackling
 function drawEnemyCharge(R, t) {
   const F = enemyRifleFrame(t); if (!F) return;
-  const c = sat((t - ENEMY_CHARGE0) / (ENEMY_CHARGE1 - ENEMY_CHARGE0)), fade = t > ENEMY_CHARGE1 ? Math.exp(-(t - ENEMY_CHARGE1) * 4) : 1, q = c * c * fade;
+  const step = Math.min(3, Math.floor((t - ENEMY_CHARGE0) / 0.35) + 1), stepT = ENEMY_CHARGE0 + (step - 1) * 0.35;   // 3 steps, not a smooth fill
+  const c = t < ENEMY_CHARGE0 ? 0 : (step - 1 + sat((t - stepT) / 0.05)) / 3, fade = t > ENEMY_CHARGE1 ? 0.35 + 0.65 * Math.exp(-(t - ENEMY_CHARGE1) * 4) : 1, q = c * fade;
+  if (t > ENEMY_CHARGE1 - 0.1 && t < ENEMY_CHARGE1 + 0.5) { const ls = t - ENEMY_CHARGE1 + 0.1, k = 1 - ls / 0.6; for (let i = 0; i < 8; i++) R.glow(madd(madd(F.p, F.side, (i % 2 ? 1 : -1) * (0.8 + 2.5 * ls)), F.up, 0.5 + 1.5 * ls * hash(i + 3)), 0.5 + 1.4 * ls, [0.4 * k, 0.4 * k, 0.42 * k], 0.5); }   // vents puff steam
   if (q < 0.01) return;
   for (let i = 0; i < 8; i++) {
     const f = i / 7, ph = (t * 3 + f) % 1, p = lerpv(F.p, F.muzzle, f);

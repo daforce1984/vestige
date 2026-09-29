@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -573,16 +573,22 @@ function duelCues() {
   out.push([HERO_HIT_T + 0.04, '@msArmorHit', { vel: G * 1.0, hold: 0.8, pan: -0.25 }]);            // into his pauldron
   out.push([HERO_HIT_T + 0.04, '@sparkBurst', { vel: G * 0.7, pan: -0.25 }]);
   // the charge: both light every thruster at once (the quick-boost edges below take over from the first jinks)
-  // the draw + load on the move: his rifle off his back (a clack), the E-cap slammed home (a clack + a rising whine),
-  // then its rifle drawn and charged
-  out.push([170.05, '@msBoost', { vel: G * 0.7, dur: 1.5, pan: -0.1 }]);
-  out.push([170.97, 'metal_knock', { at: 'hit', rate: 0.9, gain: G * 0.55, pan: -0.2, prio: 8, norand: true }]);
-  out.push([172.35, 'metal_knock', { at: 'hit', rate: 1.15, gain: G * 0.8, pan: -0.1, prio: 9, norand: true }]);
-  out.push([172.36, '@boom', { bus: 'sfx', f: 60, vel: G * 0.3, dur: 0.6, verb: 0.2 }]);
-  out.push([172.38, 'charge_up', { at: 0, dur: 0.7, fadeOut: 0.3, rate: 1.4, gain: G * 0.55, pan: -0.1, prio: 8, norand: true }]);
-  out.push([173.2, '@msBoost', { vel: G * 0.7, dur: 1.5, pan: 0.15 }]);
-  out.push([173.97, 'metal_knock', { at: 'hit', rate: 0.7, gain: G * 0.6, pan: 0.2, prio: 8, norand: true }]);
-  out.push([174.9, 'charge_up', { at: 0, dur: 0.9, fadeOut: 0.2, rate: 0.9, gain: G * 0.7, pan: 0.2, prio: 8, norand: true }]);
+  // the draw + load (duel.js heroDraw / the enemy's draw): a clack on each grab, a thruster puff on the rip, the spent
+  // pac's ka-chunk, the fresh one slammed home (clank + a short spark), the lock-in whine, a low hum as he holds; its
+  // draw clack, a tick on its eye glint, a 3-step rising charge, the vents' hiss
+  out.push([170.05, '@msBoost', { vel: G * 0.7, dur: 1.2, pan: -0.1 }]);
+  out.push([HERO_GRAB, 'metal_knock', { at: 'hit', rate: 0.9, gain: G * 0.6, pan: -0.2, prio: 8, norand: true }]);
+  out.push([170.45, '@msBoost', { vel: G * 0.45, dur: 0.15, pan: -0.2 }]);
+  out.push([HERO_EJECT, 'metal_knock', { at: 'hit', rate: 1.3, gain: G * 0.7, pan: -0.15, prio: 8, norand: true }]);
+  out.push([HERO_EJECT, '@steam', { dur: 0.5, vel: 0.35 }]);
+  out.push([HERO_LOAD, 'metal_knock', { at: 'hit', rate: 1.05, gain: G * 0.9, pan: -0.1, prio: 9, norand: true }]);
+  out.push([HERO_LOAD, '@sparkBurst', { vel: G * 0.5, pan: -0.1 }]);
+  out.push([HERO_LOCK, 'charge_up', { at: 0, dur: 0.35, fadeOut: 0.1, rate: 1.6, gain: G * 0.5, pan: -0.1, prio: 8, norand: true }]);
+  out.push([HERO_SNAP0, '@msBoost', { vel: G * 0.35, dur: 0.12, pan: -0.1 }]);
+  out.push([ENEMY_GRAB, 'metal_knock', { at: 'hit', rate: 0.75, gain: G * 0.6, pan: 0.2, prio: 8, norand: true }]);
+  out.push([ENEMY_EYE + 0.02, '@beep', { f: 2600, dur: 0.05, vel: 0.35, pan: 0.2 }]);
+  [0, 0.35, 0.7].forEach((d, i) => out.push([ENEMY_CHARGE0 + d, 'charge_up', { at: 0, dur: 0.3, fadeOut: 0.08, rate: 0.85 + 0.2 * i, gain: G * (0.45 + 0.1 * i), pan: 0.2, prio: 8, norand: true }]));
+  out.push([ENEMY_CHARGE1 - 0.05, '@steam', { dur: 0.7, vel: 0.45 }]);
   // THE FINISH: the rifle slung (a servo clunk), the saber lit, the SANDEVISTAN (time folds: a deep inhaling whoomp,
   // the world's sound smeared low by the master slow-mo), the pass-cut (buzz + sizzle + armour parting), retract
   const FD = (a, b) => filmT(b) - filmT(a);                          // cue lengths in film seconds (the bullet time stretches them)
