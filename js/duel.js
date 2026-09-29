@@ -756,6 +756,9 @@ const enemyBoost = scalarTrack([[170, 1], [175.9, 1], [176.5, 0.6],
 // centre line, the barrel on the target, its top toward the chest's up — and both arms are solved onto it by IK: the
 // right fist on the grip, the left on the fore-end. (Swinging the gun arm alone left the fore-end out of the left arm's reach.)
 // k = aim weight (pose → placed rifle), kL = the left hand's weight (off while the shield is up / after the cut)
+// recoil: the muzzle climbs with the body's kick (fraction of the range raised at the target), then settles
+const kickCurve = (x) => (x <= 0 || x > 0.9 ? 0 : (1 - Math.exp(-x * 45)) * Math.exp(-x * 5.5));
+const recoilKick = (tw) => { let k = 0.32 * kickCurve(tw - TRANS_SHOT); for (const ts of SERAPH_SHOTS) if (ts !== TRANS_SHOT) k = Math.max(k, 0.08 * kickCurve(tw - ts)); return k; };
 const TWO_HAND = (tw) => (1 - smooth(178.4, 178.55, tw) * (1 - smooth(179.05, 179.25, tw))) * (1 - smooth(183.25, 183.3, tw) * (1 - smooth(183.8, 184.1, tw))) * smooth(174.5, 174.9, tw);
 const HAND_TO_RIFLE = () => sub(PIV.enemy_ms.rifle, PIV.enemy_ms.hand_R);
 function aim2H(s, target, k, kL) {
@@ -1003,7 +1006,7 @@ function duelHero_(t) {
   s.boost = heroBoost(tw);
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
-  { const ak = HERO_AIM(tw); if (ak > 0) aimRifle(s, heroAimPoint(tw), ak); heroLeft(s, tw); }   // the rifle laid on its target, held upright
+  { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); heroLeft(s, tw); }   // the rifle laid on its target, held upright
   slashIK(s, tw);                                                   // the pass-cut: the blade swept exactly through its waist
   hitReact('hero', tw, s, 'gundam');
   // hand-over to the old aftermath formula (identical at t = 200)
@@ -1079,7 +1082,10 @@ function enemyState_(t) {
   s.eye = tw > CUT_T + 0.1 ? Math.max(0, 1 - (tw - CUT_T - 0.1) / 1.2) * (Math.sin(t * 50) > -0.2 ? 1 : 0.2) : 1;
   finish(s, _epose, f, false);
   const ak = ENEMY_AIM(tw);
-  if (ak > 0 && !(tw > CUT_T)) aim2H(s, enemyAim(tw), ak, TWO_HAND(tw));   // the rifle levelled on where he is going, in both hands
+  if (ak > 0 && !(tw > CUT_T)) {   // the rifle levelled on where he is going, in both hands — the muzzle kicks up with the body on each shot
+    const tg = enemyAim(tw), kick = recoilKick(tw);
+    aim2H(s, kick > 0 ? add(tg, [0, V.dist(tg, s.pos) * kick, 0]) : tg, ak, TWO_HAND(tw));
+  }
   if (tw > CUT_T) {   // cut: the machine keeps the pose it was cut in (both halves), sagging only slowly toward limp — the aim
     const P0 = cutPose(), k = 0.6 * smooth(0, 2.2, tw - CUT_T);                    // IK switching off made the arms jump
     for (const p in P0) { const a = P0[p], b = s.pose[p] || a; s.pose[p] = [lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)]; }
@@ -1247,12 +1253,27 @@ function layRifle(s, model, target, k, twist = 1) {
   return s;
 }
 const aimRifle = (s, target, k) => layRifle(s, 'gundam', target, k);
+// SIGMA'S HOLD (after DOOM's shotgun): the rifle is PLACED — grip at the right of his chest, a little forward, the stock
+// back along the forearm to the right shoulder, the barrel on the target, its top toward his chest's up — and the right
+// arm solved onto the grip by IK (the left comes onto the fore-end: heroLeft). No more arm-out pistol aim.
+const HERO_GRIP = [-2.7, 2.7, 2.8];                     // torso frame
+let _rq = null; const RQ3 = () => _rq || (_rq = r3(M.fromTRS(M.new(), [0, 0, 0], RIFLE_Q, 1)));
+function heroAim2H(s, target, k) {
+  s.pose = { ...s.pose };
+  const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
+  const fk = duelFK(s, 'gundam'), grip = M.transformPoint([0, 0, 0], fk.torso, HERO_GRIP);
+  const d = nrm(sub(target, grip)), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
+  const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
+  const Rh = r3mul([...X, ...U, ...d], r3T(RQ3()));                       // hand rotation so the rifle frame lands on (X, U, d)
+  armIK(s, fk, 'gundam', 'R', sub(grip, r3v(Rh, RIFLE_T)), Rh);
+  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+}
 // THE DRAW + LOAD (170–173.2, on the move): he reaches back over his shoulder and draws the rifle (HERO_GRAB), swings it
 // forward; his left hand takes an E-cap off his hip, slams it into the back of the receiver (HERO_LOAD: the rifle lights
 // up) and comes forward onto the fore-end, where it stays through the approach
 export const HERO_GRAB = 170.95, HERO_LOAD = 172.35;
 const HERO_FORE = [0.15, -0.35, 3.2], HERO_REAR = [0.95, 0.25, -1.2], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
-const heroLeftW = (tw) => smooth(171.7, 172.0, tw) * (1 - smooth(176.1, 176.5, tw));
+const heroLeftW = (tw) => smooth(171.7, 172.0, tw) * (1 - smooth(190.85, 191.05, tw));   // two hands on it through the whole gunfight
 const HERO_CAP_L = [0.1, -1.0, 0.6];   // the E-cap in his left hand (hand frame)
 function heroLeftWrist(fk, tw, Rw) {   // wrist target: the cap on the hip → the cap in the breech → the hand on the fore-end
   const hip = M.transformPoint([0, 0, 0], fk.torso, HERO_HIP), rear = M.transformPoint([0, 0, 0], fk.rifle, HERO_REAR), fore = M.transformPoint([0, 0, 0], fk.rifle, HERO_FORE);

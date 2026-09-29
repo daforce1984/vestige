@@ -155,7 +155,7 @@ function nozzleHeart(R, p, r, col, k, dir) {
   const w = (c) => (c * 0.55 + 0.45) * 7 * k;
   R.glow(p, rr * 1.0, [w(col[0]), w(col[1]), w(col[2])], 0.15);          // bright HDR core: the bloom pass makes its glow
 }
-const GUNDAM_NOZZLE = [0, -1, -0.25];
+const GUNDAM_NOZZLE = [0, -1, -0.25], ENEMY_POD = [0, -0.954, -0.30];   // (enemy pod axis: its lower nozzle − upper cap, backpack frame)
 export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail = 1, opts = null) {
   // past states are expensive (full choreography evaluations): quantise tau to 1/48 s and share them between emitters
   if (opts && opts.past) {
@@ -186,8 +186,6 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     }
   }
   const time = R._time || 0;
-  let mechBack = null;
-  if (!isShip) { const rm = R.partWorld(name, entry, 'torso'); if (rm) { mechBack = V.norm([0, 0, 0], M.transformDir([0, 0, 0], rm, [0, -0.45, -1])); } }
   for (let i = 0; i < pts.length; i++) {
     const ep = pts[i];
     const pname = model.parts[ep.part].name;
@@ -195,10 +193,11 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     M.transformPoint(tmp, pm, ep.pos);
     const r = Math.max(ep.r, 0.3) * scale;
     const flick = 0.92 + Math.sin(time * 27 + i * 1.7) * 0.08;
-    M.transformDir(tmp2, pm, name === 'gundam' ? GUNDAM_NOZZLE : [0, 0, -1]);   // (Sigma's backpack nozzles point DOWN, a little back)
+    const pod = name === 'enemy_ms' && ep.pos[1] < -2;                          // its booster pods' nozzles (their lower ends)
+    M.transformDir(tmp2, pm, name === 'gundam' ? GUNDAM_NOZZLE : pod ? ENEMY_POD : [0, 0, -1]);   // (Sigma's backpack nozzles point DOWN, a little back; its pods fire down their own axis)
     V.norm(tmp2, tmp2);
-    if (name === 'enemy_ms' && mechBack) { V.lerp(tmp2, tmp2, mechBack, 0.6); V.norm(tmp2, tmp2); }   // mechs: the plumes held near the body's back axis (limb swings bent them about); his follow his nozzles exactly
-    const len = r * (1.7 + throttle * 5.0) * Math.max(0.5, trail * 0.6);
+    const vent = name === 'enemy_ms' && !pod ? 0.45 : 1;                         // the pods' upper ends: small vents
+    const len = r * vent * (1.7 + throttle * 5.0) * Math.max(0.5, trail * 0.6);
     // seen straight down the exhaust axis the plume planes collapse into a flat glowing disc: fade it end-on
     let endOn = 1;
     if (R.camPos) { const vx = R.camPos[0] - tmp[0], vy = R.camPos[1] - tmp[1], vz = R.camPos[2] - tmp[2], vl = Math.hypot(vx, vy, vz) || 1;

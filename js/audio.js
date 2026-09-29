@@ -631,13 +631,16 @@ function duelCues() {
         lit = null;
       }
     }
-    // thruster boosts: boost rising edges (jump ≥0.3 within 0.2 s, to ≥0.85), debounced
+    // thruster boosts: every time the plumes flare (the same measure the picture uses: bk = (boost − 0.62) / 0.38 rising
+    // through 0.45 from below 0.25 within 0.3 s), a burst — its length follows how long the flare holds
     let lastDash = -9;
-    for (let i = 10; i < S.length; i++) {
-      const t = S[i].t, b = val(i, 'boost'), b0 = val(i - 10, 'boost');
-      if (b >= 0.85 && b - b0 >= 0.3 && t - lastDash > 0.6) {
+    const bkAt = (i) => Math.min(1, Math.max(0, (val(i, 'boost') - 0.62) / 0.38));
+    for (let i = 15; i < S.length; i++) {
+      const t = S[i].t, b = bkAt(i), b0 = Math.min(...[5, 10, 15].map((d) => bkAt(i - d)));
+      if (b >= 0.45 && b0 < 0.25 && t - lastDash > 0.4) {
         lastDash = t;
-        out.push([t - 0.04, '@msBoost', { vel: G * (name === 'hero' ? R(0.7, 0.85) : R(0.5, 0.65)), dur: R(0.25, 0.4), pan }]);
+        let j = i; while (j < S.length - 1 && bkAt(j) > 0.35 && S[j].t - t < 1.5) j++;
+        out.push([t - 0.03, '@msBoost', { vel: G * (name === 'hero' ? R(0.75, 0.9) : R(0.6, 0.75)), dur: Math.max(0.2, S[j].t - t), pan }]);
       }
     }
     // (no servo / footstep rattle on pose changes: under the AMBAC limb motion it read as a constant "drrrr")
