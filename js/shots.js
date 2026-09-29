@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, BLOCK_SPOT, blockFrame, HERO_LOAD, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, BLOCK_SPOT, blockFrame, HERO_LOAD, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -842,7 +842,8 @@ function drawLostShield(R, t) {
 }
 // cut in half at the waist (CUT_T): two copies, the torso part clipped clean at the cut line (a glowing, molten edge);
 // the upper half is carried on along his swing and turns over, the lower drifts back and tumbles the other way
-const LOWER = { pelvis: 1, leg_L_upper: 1, leg_L_lower: 1, foot_L: 1, leg_R_upper: 1, leg_R_lower: 1, foot_R: 1 };
+const LOWER = { pelvis: 1, leg_L_upper: 1, leg_L_lower: 1, foot_L: 1, leg_R_upper: 1, leg_R_lower: 1, foot_R: 1, arm_L_lower: 1, hand_L: 1, arm_R_lower: 1, hand_R: 1 };
+const SPLIT = { torso: 1, arm_L_upper: 1, arm_R_upper: 1 };   // cut through: drawn in both halves, each clipped to its side (the arms hang along its body: cut with it)
 const _hT = new Float32Array(16), _hA = new Float32Array(16), _hB = new Float32Array(16), _hQ = [0, 0, 0, 1], _hM = new Float32Array(16);
 // each half comes apart on its own: the lower half (hips + legs) breaks up first, then the upper half's reactor goes —
 // each shatters into chunks along its own drift with its own blast (duel audio: HALF_BLAST times)
@@ -869,7 +870,8 @@ const CUT_SEAM_T = CUT_T - 0.012;
 function drawHalves(R, t, s) {
   const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, lt = s.cutK;
   const up = R.models.enemy_ms.parts, hideUp = {}, hideLo = {};
-  for (const p of up) { if (LOWER[p.name]) hideUp[p.name] = 1; else if (p.name !== 'torso') hideLo[p.name] = 1; }
+  for (const p of up) { if (LOWER[p.name]) hideUp[p.name] = 1; else if (!SPLIT[p.name]) hideLo[p.name] = 1; }
+  const CA = cutArms();
   for (const half of [1, -1]) {
     const tb = half > 0 ? HALF_BLAST.upper : HALF_BLAST.lower;
     const hide = { ...(half > 0 ? hideUp : hideLo), shield: 1, rifle: 1 };
@@ -885,8 +887,9 @@ function drawHalves(R, t, s) {
     e.pose = s.pose; e.seed = 10; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0; e.damage = s.damage;
     e.hidden = hide;
     meltHole(e, 'enemy', t, 'leg_R_upper');
-    e.clipPart = 'torso'; e.clipInv = false; e.clipHeat = -(0.5 + 1.6 * Math.exp(-lt * 1.0)) * (0.35 + 0.65 * sat((t - CUT_SEAM_T) / (CUT_SPLIT - CUT_SEAM_T)));   // the molten rim of the cut: thick, white-hot, cooling to red (shader band)        // clean beam cut, glowing edge (shader: w < 0)
-    e.clip = half > 0 ? [-30, CUT_Y, -30, 30, 40, 30] : [-30, -40, -30, 30, CUT_Y, 30];
+    e.clipInv = false; e.clipHeat = -(0.5 + 1.6 * Math.exp(-lt * 1.0)) * (0.35 + 0.65 * sat((t - CUT_SEAM_T) / (CUT_SPLIT - CUT_SEAM_T)));   // the molten rim of the cut: thick, white-hot, cooling to red (shader band; w < 0: a clean beam cut)
+    const box = (y) => (half > 0 ? [-30, y, -30, 30, 40, 30] : [-30, -40, -30, 30, y, 30]);
+    e.clipParts = { torso: box(CUT_Y), arm_L_upper: box(CA.arm_L_upper), arm_R_upper: box(CA.arm_R_upper) };
   }
   if (t < HALF_BLAST.upper) R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));   // the molten cut glows
   return null;

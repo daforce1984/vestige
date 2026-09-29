@@ -484,7 +484,7 @@ VG.gather = W(VG.idle, { torso: [28, 0, 0], head: [18, 0, 0], arm_L_upper: [-35,
   leg_L_upper: [-60, 0, 5], leg_L_lower: [90, 0, 0], foot_L: [20, 0, 0], leg_R_upper: [-50, 0, -5], leg_R_lower: [85, 0, 0], foot_R: [20, 0, 0], _body: [10, 0, 0] });
 VG.ult = W(VG.idle, { torso: [-25, 0, 0], head: [-25, 0, 0], arm_L_upper: [-20, 0, 65], arm_L_lower: [-15, 0, 0], arm_R_upper: [-20, 0, -65], arm_R_lower: [-15, 0, 0],
   leg_L_upper: [15, 0, 18], leg_L_lower: [20, 0, 0], leg_R_upper: [15, 0, -18], leg_R_lower: [20, 0, 0], _body: [-12, 0, 0] });
-VG.ultDown = withParts(W(VG.ult, { torso: [-18, 12, 0], head: [-10, 25, 0] }), VG.idle, ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']);   // spent: arms hanging
+VG.ultDown = W(VG.ult, { torso: [-18, 12, 0], head: [-10, 25, 0], arm_L_upper: [0, 0, 0], arm_L_lower: [0, 0, 0], hand_L: [0, 0, 0], arm_R_upper: [0, 0, 0], arm_R_lower: [0, 0, 0], hand_R: [0, 0, 0] });   // spent: arms hanging straight along its body (so the cut goes square through them too)
 export const POSE_LIB = { hero: L, vanguard: VG };
 
 // ============================================================================ choreography
@@ -546,7 +546,16 @@ const THIGH_P = [-0.87, -2.2, 0.3], PAULDRON_P = [2.3, 1.5, 0];
 // of neon afterimages behind — and cuts it in half at the waist as he passes
 export const SANDE0 = 191.3, SANDE1 = 192.2, CUT_T = 192.05;
 export const CUT_Y = 3.7;   // (above the pelvis block's top, so the halves don't overlap)
-export const CUT_SPLIT = CUT_T + 0.04;   // the blade is through: the halves start to part   // the cut: torso-local height of the waist line (VANGUARD torso pivot 10.9 m)
+export const CUT_SPLIT = CUT_T + 0.04;
+let _cutArms = null;
+/** the cut plane (torso-local y = CUT_Y) in each upper arm's own frame at the cut: its local y there (arms hang along the torso) */
+export function cutArms() {
+  if (_cutArms) return _cutArms;
+  const E = duelFK(enemyRaw_(CUT_T), 'enemy_ms'), P = partPoint(E, 'torso', [0, CUT_Y, 0]);
+  _cutArms = {};
+  for (const p of ['arm_L_upper', 'arm_R_upper']) _cutArms[p] = M.transformPoint([0, 0, 0], M.invert(M.new(), E[p]), P)[1];
+  return _cutArms;
+}   // the blade is through: the halves start to part   // the cut: torso-local height of the waist line (VANGUARD torso pivot 10.9 m)
 export const KILL_SHOT_T = CUT_T;   // (old name: the killing blow)
 export const WING_HIT_T = SHIELD_HIT_T;   // (old name)
 export const SERAPH_HANDOFF = 180.9;       // duelEnemy1 → duelEnemy2 (one machine; the slot changes on a cut)
