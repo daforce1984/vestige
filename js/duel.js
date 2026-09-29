@@ -695,8 +695,8 @@ const enemyPose = poseTrack([
   [182.45, VG.stepR, 'out'], [182.8, VG.fly, 'io'], [183.2, VG.fly],
   [183.4, VG.hit, 'out'], [183.8, VG.aim, 'io'],       // the shield gone, it fights on one-handed
   [184.2, VG.fly, 'io'], [188.4, VG.fly],
-  [189.2, VG.fly, 'io'], [189.8, VG.gather, 'io'], [190.8, VG.gather], [FINALE_T + 0.08, VG.ult, 'out'], [191.6, VG.ult],   // the ultimate
-  [CUT_T - 0.02, VG.ult], [CUT_T + 0.25, W(VG.hit, { torso: [-35, 10, 20] }), 'out'], [193.4, VG.limp, 'io'],
+  [189.2, VG.fly, 'io'], [189.8, VG.gather, 'io'], [190.8, VG.gather], [FINALE_T + 0.08, VG.ult, 'out'], [191.6, VG.ult],   // the ultimate (the rifle thrown away: arms flung wide, it is open to the cut)
+  [CUT_T - 0.02, W(VG.ult, { torso: [-18, 12, 0], head: [-10, 25, 0] })], [CUT_T + 0.25, W(VG.hit, { torso: [-35, 10, 20] }), 'out'], [193.4, VG.limp, 'io'],
 ]);
 const enemyImp = impulses([
   ...SERAPH_SHOTS.map((ts) => [ts + 0.001, P({ arm_R_upper: [-12, 0, 0], torso: [-6, 0, 0], _body: [-4, 0, 0] }), 0.03, 0.45, 14]),   // recoil
@@ -1377,6 +1377,7 @@ REACTS = DUEL_EVENTS.filter((e) => e.shotDir && !e.cut).map((e) => {
 // the holes the landed shots burn: part, part-local centre, radius, depth (through the part along its local X), from when
 export const HOLES = [
   (() => { const e = DUEL_EVENTS.find((x) => x.block), fk = duelFK(enemyRaw_(e.t), 'enemy_ms'); return { who: 'enemy', part: 'shield', t: e.t, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk.shield), e.pos), r: 1.05, depth: 3 }; })(),
+  (() => { const e = DUEL_EVENTS.find((x) => Math.abs(x.t - SHIELD_HIT_T - 0.03) < 1e-6), fk = duelFK(enemyRaw_(e.t), 'enemy_ms'); return { who: 'enemy', part: 'shield', t: e.t, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk.shield), e.pos), r: 1.1, depth: 3 }; })(),   // the shot that tears it off
   { who: 'enemy', part: 'leg_R_upper', t: THIGH_T + 0.03, local: THIGH_P, r: 0.85, depth: 2.4 },
   { who: 'hero', part: 'arm_L_upper', t: HERO_HIT_T + 0.04, local: PAULDRON_P, r: 0.85, depth: 1.2 },
 ];
@@ -1465,7 +1466,7 @@ export const DUEL_CAMS = [
   // THE CUT in extreme bullet time: tight on its waist from the far side, the blade coming through toward the lens, the
   // armour parting along the slit, molten spray and cut plates flung off — the camera drifts along with the cut front
   { t0: 192.015, t1: 192.1, name: 'D23b the cut, close', slowmo: true, sande: true, fn: (t, u) => { const W = CUT_W();
-    return { pos: add(add(W, scl(D_L, 16 - 2 * u)), add(scl(D_U, -6 + 7 * u), [0, 2.2 - 0.8 * u, 0])), target: add(W, add(scl(D_U, -1.5 + 3 * u), [0, 0.3, 0])), fov: 32, handheld: 0.02, baseShake: 0 }; } },
+    return { pos: add(add(W, scl(D_L, 2 - 1.5 * u)), add(scl(D_U, -12 + 1.5 * u), [0, 1.2 - 0.4 * u, 0])), target: add(W, [0, 0.4, 0]), fov: 36, handheld: 0.02, baseShake: 0 }; } },   // square on to its chest: the seam melts open across it
   { t0: 192.1, t1: 192.55, name: 'D23c it comes apart', slowmo: true, sande: true, fn: (t, u) => { const W = CUT_W();
     return { pos: add(add(W, scl(D_L, 26)), add(scl(D_U, -10), [0, 6, 0])), target: add(W, [0, 1, 0]), fov: 40, handheld: 0.03 }; } },
   // ahead of where he comes out of it: he glides toward the lens, the halves drifting apart behind him, then the reactor

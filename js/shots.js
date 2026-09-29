@@ -654,12 +654,39 @@ function drawAfterimages(R, t, s) {
 }
 // a shot that LANDS burns a hole through the armour it hits (duel.js HOLES): the plate melts open around the hit point —
 // it opens out in a fifth of a second, white-hot at first, cooling to a dull cherry rim that stays for the rest of the fight
+// SPARK STREAKS a pixel wide (not round dots): the ribbon radius is set from the distance to the camera
+const pxR = (p, k = 0.6) => { const c = ctx.cam, R = ctx.R, d = V.dist(c.pos, p); return k * d * 2 * Math.tan((c.fov || 0.8) * 0.5) / Math.max(1, (R && R.height) || 1080); };
+function streak(R, a, b, col, k = 0.6) { R.beam(a, b, pxR(b, k), col, 1, 2, 0, 0); }
+// a burst of pixel sparks from p (directions around n, spread 0..1), story time lt since it began; life / speed ranges
+function sparkBurst(R, p, n, lt, seed, count = 40, spread = 0.8, speed = 40, life = 0.5, col = [4, 2.2, 0.8]) {
+  for (let i = 0; i < count; i++) {
+    const L = life * (0.4 + 0.6 * hash(seed + i)); if (lt > L) continue;
+    const a = lt / L, d = V.norm([0, 0, 0], V.madd([0, 0, 0], n, randDir([0, 0, 0], seed * 1.3 + i * 4.1), spread * 1.5));
+    const v = speed * (0.3 + 0.7 * hash(seed + i + 50)), q = madd(p, d, v * lt), tail = madd(q, d, -Math.min(v * lt, v * 0.03));
+    const b = (1 - a) * (1 - a); streak(R, tail, q, [col[0] * b, col[1] * b, col[2] * b]);
+  }
+}
 function meltHole(e, who, t, part) {
   let h = null;
   for (const x of HOLES) if (x.who === who && t >= x.t && (!part || x.part === part) && (!h || x.t > h.t)) h = x;
   if (!h) return;
   const lt = t - h.t, r = h.r * (0.35 + 0.65 * easeOut(sat(lt / 0.2)));
   e.melt = [h.local[0], h.local[1], h.local[2], r, h.depth, 0.35 + 2.4 * Math.exp(-lt * 1.3)]; e.meltPart = h.part;
+  // the impact rides WITH the part it hit: flash, a spray of pixel sparks out of the wound, then a molten glow that cools
+  // and a trickle of embers (all in the part's frame, so it follows the machine as it moves)
+  const R = ctx.R, model = who === 'hero' ? 'gundam' : 'enemy_ms'; if (!R || lt > 5) return;
+  const pm = R.partWorld(model, e, h.part), p = M.transformPoint([0, 0, 0], pm, h.local);
+  const n = V.norm([0, 0, 0], M.transformDir([0, 0, 0], pm, [1, 0, 0]));          // the hole's outward axis (part-local +X)
+  const hk = Math.exp(-lt * 1.1);
+  if (lt < 0.12) { const f = 1 - lt / 0.12; R.glow(p, 1.5 + 5 * f, [4 * f, 2.6 * f, 1.4 * f], 0.3); }
+  R.glow(p, h.r * (1.2 + 0.8 * hk), [2.6 * hk + 0.25, 0.9 * hk + 0.05, 0.25 * hk], 0.25);
+  R.light(p, 25, [1, 0.5, 0.2], 1.5 + 5 * Math.exp(-lt * 6));
+  sparkBurst(R, p, n, lt, 31 + h.t, 60, 0.9, 55, 0.7, [5, 2.6, 0.9]);
+  for (let i = 0; i < 10; i++) {                                                   // embers still spitting out of the melt
+    const L = 0.35 + 0.3 * hash(i + 90), ph = ((lt / L) + hash(i + 7)) % 1, cyc = Math.floor(lt / L + hash(i + 7));
+    const d = V.norm([0, 0, 0], V.madd([0, 0, 0], n, randDir([0, 0, 0], i * 2.3 + cyc * 0.71), 0.9)), q = madd(p, d, ph * 9), b = hk * 2.5 * (1 - ph);
+    if (b > 0.03) streak(R, madd(q, d, -0.6), q, [b * 1.6, b * 0.7, b * 0.2]);
+  }
 }
 export function drawGundam(R, t, s, opts = {}) {
   if (!s.vis) return null;
@@ -742,6 +769,27 @@ function drawBreakup(R, t, idx) {
 // VANGUARD's shield, torn off its forearm by Sigma's shot (SHIELD_HIT_T): the same model with only the shield part shown,
 // frozen in the pose it had at the hit, tumbling about the hit point and drifting off along the shot
 const _wing = {}, _wT = new Float32Array(16), _wA = new Float32Array(16), _wB = new Float32Array(16), _wQ = [0, 0, 0, 1];
+// its rifle, flung away as it opens up for the ultimate: the rifle part alone, frozen at the release, spinning off
+const RIFLE_DROP_T = 190.8, _rif = {}, _rT = new Float32Array(16), _rA = new Float32Array(16), _rB = new Float32Array(16), _rQ = [0, 0, 0, 1];
+function drawDroppedRifle(R, t) {
+  if (!_rif.m) {
+    const s0 = enemyMS2(RIFLE_DROP_T), s1 = enemyMS2(RIFLE_DROP_T + 0.05);
+    _rif.m = msMatrix(new Float32Array(16), s0); _rif.pose = JSON.parse(JSON.stringify(s0.pose));
+    const fk = duelFK(s0, 'enemy_ms'); _rif.pivot = M.transformPoint([0, 0, 0], fk.rifle, [0, 0, 0]);
+    const vs = V.scale([0, 0, 0], V.sub([0, 0, 0], s1.pos, s0.pos), 1 / 0.05), side = V.norm([0, 0, 0], V.sub([0, 0, 0], _rif.pivot, s0.pos));
+    _rif.v = V.madd([0, 0, 0], V.madd([0, 0, 0], vs, side, 9), [0, 1, 0], -3);
+    _rif.hide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'rifle') _rif.hide[p.name] = 1;
+  }
+  const lt = t - RIFLE_DROP_T; if (lt < 0 || lt > 8) return;
+  const P = _rif.pivot, d = V.madd([0, 0, 0], P, _rif.v, lt);
+  M.fromTRS(_rT, [-P[0], -P[1], -P[2]], [0, 0, 0, 1], 1);
+  M.mul(_rA, _rT, _rif.m);
+  Q.fromEuler(_rQ, lt * 1.4, lt * 0.5, -lt * 2.1);
+  M.fromTRS(_rB, d, _rQ, 1);
+  const w = R.add('enemy_ms', M.mul(new Float32Array(16), _rB, _rA));
+  if (!w) return;
+  w.pose = _rif.pose; w.hidden = _rif.hide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
+}
 function drawLostShield(R, t) {
   const t0 = SHIELD_HIT_T + 0.03;
   if (!_wing.m) {
@@ -788,13 +836,15 @@ export function halfCentre(t, half) {
   return M.transformPoint([0, 0, 0], m, [0, half > 0 ? 14.5 : 7, 0]);
 }
 const _halfM = { 1: new Float32Array(16), [-1]: new Float32Array(16) };
+// the blade's first touch: from here the two halves are drawn in place (lt = 0) so the melt band runs along the real armour
+const CUT_SEAM_T = CUT_T - 0.012;
 function drawHalves(R, t, s) {
   const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, lt = s.cutK;
   const up = R.models.enemy_ms.parts, hideUp = {}, hideLo = {};
   for (const p of up) { if (LOWER[p.name]) hideUp[p.name] = 1; else if (p.name !== 'torso') hideLo[p.name] = 1; }
   for (const half of [1, -1]) {
     const tb = half > 0 ? HALF_BLAST.upper : HALF_BLAST.lower;
-    const hide = { ...(half > 0 ? hideUp : hideLo), shield: 1 };
+    const hide = { ...(half > 0 ? hideUp : hideLo), shield: 1, rifle: 1 };
     if (t >= tb) {                                                    // this half has come apart: its chunks fly off its drift
       const sb = enemyMS2(tb) || s;
       halfMatrix(_halfM[half], sb, half, tb - CUT_SPLIT);
@@ -807,7 +857,7 @@ function drawHalves(R, t, s) {
     e.pose = s.pose; e.seed = 10; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0; e.damage = s.damage;
     e.hidden = hide;
     meltHole(e, 'enemy', t, 'leg_R_upper');
-    e.clipPart = 'torso'; e.clipInv = false; e.clipHeat = -(0.25 + 2.35 * Math.exp(-lt * 2.2));   // the faces cool        // clean beam cut, glowing edge (shader: w < 0)
+    e.clipPart = 'torso'; e.clipInv = false; e.clipHeat = -(0.5 + 1.6 * Math.exp(-lt * 1.0)) * (0.35 + 0.65 * sat((t - CUT_SEAM_T) / (CUT_SPLIT - CUT_SEAM_T)));   // the molten rim of the cut: thick, white-hot, cooling to red (shader band)        // clean beam cut, glowing edge (shader: w < 0)
     e.clip = half > 0 ? [-30, CUT_Y, -30, 30, 40, 30] : [-30, -40, -30, 30, CUT_Y, 30];
   }
   if (t < HALF_BLAST.upper) R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));   // the molten cut glows
@@ -817,7 +867,7 @@ function drawHalves(R, t, s) {
 // (torso-local, from the mesh bounds); the blade line crosses it as a chord that sweeps through. Where the chord meets the
 // armour, the cut edge glows white → orange and cools behind it, molten metal sprays off both ends, and crimson armour
 // plates cut loose are flung out along the swing. All motion in story seconds (the picture runs at 1/40 here).
-const CUT_E = { cx: 0, cz: 0.6, rx: 1.6, rz: 1.4 };   // waist section at CUT_Y (torso local, measured from the mesh)
+const CUT_E = { cx: 0, cz: 0.43, rx: 1.27, rz: 1.53 };   // section at CUT_Y (torso local, measured from the mesh: x ±1.26, z −1.09…1.96)
 let _cutPath = null;
 function cutPath() {   // sampled once: per story time, the chord's two ends as ellipse angles (NaN = not in contact)
   if (_cutPath) return _cutPath;
@@ -838,7 +888,7 @@ function cutPath() {   // sampled once: per story time, the chord's two ends as 
   _cutPath = { out, first };
   return _cutPath;
 }
-const _secP = (th, lift = 0) => [CUT_E.cx + Math.cos(th) * CUT_E.rx * 1.03, CUT_Y + lift, CUT_E.cz + Math.sin(th) * CUT_E.rz * 1.03];
+const _secP = (th, lift = 0) => [CUT_E.cx + Math.cos(th) * CUT_E.rx * 1.01, CUT_Y + lift, CUT_E.cz + Math.sin(th) * CUT_E.rz * 1.01];
 function drawCutDetail(R, t) {
   if (t < CUT_T - 0.06 || t > CUT_SPLIT + 1.2) return;
   const P = cutPath(); if (!P.first) return;
@@ -856,20 +906,20 @@ function drawCutDetail(R, t) {
     for (let i = 1; i <= n; i++) {
       const f = i / n, pb = TW(_secP(a0 + da * f)), age = (1 - f) * Math.min(0.05, t - P.first.t) + Math.max(0, t - CUT_SPLIT);
       const k = Math.exp(-age * 25) * 0.85 + 0.25;                                // white at the front, cooling to orange-red
-      R.beam(pa, pb, 0.26, [1.8 * k + 0.45, 0.8 * k * k + 0.16, 0.22 * k * k], 0.8, 6);
+      R.beam(pa, pb, 0.3, [1.9 * k + 1.1, 0.75 * k * k + 0.22, 0.12 * k * k + 0.02], 1, 8);         // the melt line: thick, orange, white only at the front
+      R.beam(pa, pb, 0.7, [0.5 * k + 0.3, 0.08 * k + 0.03, 0.01], 0.35, 2);                          // its red glow
       pa = pb;
     }
   }
   // at the two ends of the chord: the blade in the armour — molten spray, and plates cut loose
   if (cur && live) for (const side of [0, 1]) {
     const pw = TW(_secP(cur.th[side])), out = V.norm([0, 0, 0], V.sub([0, 0, 0], pw, TW([CUT_E.cx, CUT_Y, CUT_E.cz])));
-    R.glow(pw, 0.55, [2.2, 1.3, 0.6], 0.2); R.light(pw, 20, [1, 0.6, 0.3], 2.5);
-    for (let i = 0; i < 46; i++) {                                                  // a jet of sparks, story-fast: bright streaks
+    R.glow(pw, 0.4, [2.4, 1.2, 0.4], 0.2); R.light(pw, 14, [1, 0.5, 0.2], 1.2);
+    for (let i = 0; i < 90; i++) {                                                  // a jet of sparks, story-fast: pixel streaks
       const life = 0.012 + hash(i + side * 50) * 0.035, ph = ((t / life) + hash(i + 3 + side * 50)) % 1;
       const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.1 + side * 7 + Math.floor(t / life) * 0.37), out, 1.4), D_SWEEP(), 0.8));
       const b = 3.2 * (1 - ph) * (1 - ph), sp = life * (140 + 220 * hash(i + 9)), q = madd(pw, sd, ph * sp);
-      R.beam(madd(q, sd, -Math.min(ph, 0.25) * sp), q, 0.035 + 0.05 * (1 - ph), [b, b * 0.55, b * 0.18], 1, 4);
-      spark(R, q, 0.08 + 0.12 * (1 - ph), [b, b * 0.6, b * 0.25]);
+      streak(R, madd(q, sd, -Math.min(ph, 0.25) * sp), q, [b * 1.4, b * 0.75, b * 0.25]);
     }
   }
 }
@@ -882,14 +932,9 @@ function drawSlash(R, c, t) {
   const P = ev.pos, d = ev.dir;
   if (lt >= 0) {
     const k = Math.exp(-lt * 7);
-    R.glow(P, 1.5 + 4 * k, [2.2 * k, 3 * k, 3.2 * k], 0.35);
-    R.light(P, 70, [0.6, 0.9, 1], 18 * k);
-    for (let i = 0; i < 60; i++) {
-      const life = 0.35 + hash(i + 3) * 0.7; if (lt > life) continue;
-      const a = lt / life, sd = V.norm([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.3 + 1), d, 1.3));
-      const b = 4.5 * (1 - a) * (1 - a);
-      spark(R, madd(P, sd, (2 + 22 * hash(i + 11)) * easeOut(a)), 0.4 + 0.4 * (1 - a), [b, b * 0.6, b * 0.25]);
-    }
+    R.glow(P, 1 + 2 * k, [2.2 * k, 1.4 * k, 0.6 * k], 0.3);
+    R.light(P, 40, [1, 0.6, 0.3], 4 * k);
+    sparkBurst(R, P, d, lt, 77, 120, 0.9, 30, 1.0, [5, 2.8, 1]);
     if (lt < 0.3) R.ripple(P, 6 + 40 * easeOut(lt / 0.3), [0.4, 0.4, 0.4], (1 - lt / 0.3) * 1.2);
   }
 }
@@ -913,11 +958,12 @@ function drawEnemyMS(R, t, s, idx) {
   if (idx === 2 && t > E2_FIN + 0.03 && t < 200) { drawBreakup(R, t, 2); return null; }
   if (idx === 1 && t > E1_FIN + 0.05 && t < 195) { drawBreakup(R, t, 1); return null; }
   if (!s.vis) return null;
-  if (idx === 2 && s.cutKf === undefined && (s.cutK || 0) > 0) return drawHalves(R, t, s);
+  if (idx === 2 && s.cutKf === undefined && ((s.cutK || 0) > 0 || (t >= CUT_SEAM_T && t < 199))) return drawHalves(R, t, s);   // (from the blade's first touch: the seam melts open in place)
   const e = R.add('enemy_ms', msMatrix(tmpM, s));
   if (!e) return null;
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
   if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
+  if (idx === 2 && t >= RIFLE_DROP_T) { e.hidden = { ...(e.hidden || {}), rifle: 1 }; drawDroppedRifle(R, t); }
   const fn = idx === 1 ? enemyMS1 : enemyMS2;
   const ebk = sat(((s.boost ?? 0.5) - 0.6) / 0.4);   // quick-boosts: the nozzles flare
   engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE, 0.9 * (1 + 0.9 * ebk), s.thr ?? 0.8, 1.2 + 1.5 * ebk, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
@@ -1031,6 +1077,7 @@ function drawMSBattle(R, t) {
   for (const ev of [...DUEL_EVENTS, ...AUTO_FX]) {                  // choreographed + hitbox-detected contacts
     const lt = t - ev.t;
     if (lt < 0 || lt > 0.7 || !ev.pos) continue;
+    if (ev.slash || (ev.shotDir && !ev.cut)) continue;   // (beam hits: the effect rides on the hit part — meltHole; the cut: drawSlash)
     const st = ev.strength ?? 1;
     const k = Math.exp(-lt * 7);
     if (ev.type === 'clash' || ev.type === 'block' || ev.type === 'spark' || ev.type === 'hit') {
@@ -1145,7 +1192,7 @@ function drawUlt(R, t) {
       if (i % 3 === 0) R.light(hp, 60, [1, 0.3, 0.45], 5);
     }
     if (u < 0.08) R.glow(b.p0, 2.5 * (1 - u / 0.08), [3, 0.6, 1], 0.35);   // each beam's exit flash
-    if (i % 2 === 0 && t >= b.ta) explosion(R, t, b.ta, b.p3, 9 + 4 * hash(i + 3), 610 + i, 'ship', 6);   // they converge where he was
+    if (i % 2 === 0 && t >= b.ta) explosion(R, t, b.ta, b.p3, 9 + 4 * hash(i + 3), 610 + i, 'ship', 1.5);   // they converge where he was
   }
 }
 function drawSeraphFire(R, t) {
@@ -1162,13 +1209,6 @@ function drawSeraphFire(R, t) {
       const a = madd(L.from, L.dir, tail), b = madd(L.from, L.dir, head);
       R.beam(a, b, 0.75 * kk + 0.2, [SER_COL[0] * kk, SER_COL[1] * kk, SER_COL[2] * kk], 1, 20, 0.6, 0.8);
       R.beam(a, b, 2.4, [SER_COL[0] * 0.6 * kk, SER_COL[1] * 0.6 * kk, SER_COL[2] * 0.6 * kk], 0.04, 3, 2, 0.6);
-    }
-    if (stop && lt > stop.d / 5000) {                           // it lands: sparks and molten spatter off his shoulder
-      const la = lt - stop.d / 5000;
-      if (la < 0.7) { R.light(stop.pos, 40, [1, 0.5, 0.3], 2.5 * Math.exp(-la * 6));
-        for (let i = 0; i < 40; i++) { const life = 0.3 + hash(i + 11) * 0.5; if (la > life) continue;
-          const a = la / life, sd = randDir([0, 0, 0], i * 3.7 + 5), b = 4.5 * (1 - a) * (1 - a);
-          spark(R, madd(stop.pos, sd, (2 + 18 * hash(i + 4)) * easeOut(a)), 0.45 + 0.4 * (1 - a), [b, b * 0.55, b * 0.25]); } }
     }
     const kf = Math.exp(-lt * 12);
     if (lt < 0.25) { R.glow(L.from, 1 + 2.5 * kf, [3 * kf, 0.6 * kf, 0.9 * kf], 0.35); R.light(L.from, 60, [1, 0.3, 0.45], 6 * kf); }
@@ -1188,13 +1228,6 @@ function drawHeroFire(R, t) {
     const lt = t - sh.t;
     if (!sh.kill) {
       rifleShot(R, t, sh.t, sh.from, sh.to, false);   // (no flash ball on the wing hit: the sparks + light carry it)
-      if (sh.hit && lt > 0.01 && lt < 0.7) {                     // the wing torn off: a burst of sparks at its root
-        const la = lt - 0.01;
-        R.light(sh.to, 40, [1, 0.6, 0.3], 2 * Math.exp(-la * 6));   // (white armour blooms out easily)
-        for (let i = 0; i < 40; i++) { const life = 0.3 + hash(i + 7) * 0.5; if (la > life) continue;
-          const a = la / life, sd = randDir([0, 0, 0], i * 4.1 + 3), b = 4.5 * (1 - a) * (1 - a);
-          spark(R, madd(sh.to, sd, (3 + 24 * hash(i + 2)) * easeOut(a)), 0.5 + 0.4 * (1 - a), [b, b * 0.6, b * 0.3]); }
-      }
       continue;
     }
     // the magnum

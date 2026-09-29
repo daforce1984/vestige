@@ -620,7 +620,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let sc = min(0.01 * min(min(span.x, span.y), span.z) + 0.12, 0.6);
     if (inst.clipMin.w > 0.5) {
       if (inside < 0.0) { discard; }
-      tornEdge = abs(inst.clipMax.w) * exp(-inside / sc);
+      tornEdge = select(abs(inst.clipMax.w) * exp(-inside / sc),
+        abs(inst.clipMax.w) * (exp(-inside / 0.2) + 0.3 * exp(-inside / 0.55)), inst.clipMax.w < 0.0);   // a beam cut: a thick molten seam + a soft glow
     } else {
       if (inside > 0.0) { discard; }                  // hole punched out of the hull
       tornEdge = inst.clipMax.w * exp(inside / (sc * 1.5));
@@ -863,7 +864,9 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   }
   col += emis;
   col += inst.tint.rgb * hyper * 6.0;
-  if (inst.clipMin.w > 1.5) {                                        // melt hole: red → white-hot molten rim
+  if (inst.clipMin.w > 0.5 && inst.clipMin.w < 1.5 && inst.clipMax.w < 0.0) {   // beam-cut seam: deep molten orange, yellow-hot in the core
+    col = mix(col, mix(vec3f(3.0, 0.55, 0.08), vec3f(4.2, 2.4, 0.8), clamp(tornEdge - 1.2, 0.0, 1.0)) * tornEdge, clamp(tornEdge, 0.0, 1.0)) * (0.85 + 0.15 * sin(F.camPos.w * 23.0 + i.lp.x * 3.0));
+  } else if (inst.clipMin.w > 1.5) {                                 // melt hole: red → white-hot molten rim
     col += mix(vec3f(3.2, 0.8, 0.16), vec3f(4.5, 3.0, 1.5), clamp(tornEdge - 0.9, 0.0, 1.0)) * tornEdge * (0.7 + 0.3 * sin(F.camPos.w * 17.0 + i.lp.x));
   } else {                                                           // broken-off chunk: only the torn edge smoulders dark cherry red
     col += vec3f(1.1, 0.12, 0.03) * tornEdge * tornEdge * (0.8 + 0.2 * sin(F.camPos.w * 11.0 + i.lp.x * 0.3));
