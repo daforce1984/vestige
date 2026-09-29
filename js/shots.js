@@ -2581,7 +2581,6 @@ export function frame(R, film) {
     if (ctx.debris || (wt > 280 && wt < 346)) drawDebrisField(R, wt);
     if (ctx.worldT === undefined && t > 62 && t < IMPLODE + 0.5 && !ctx.post.lensA) ctx.post.lensA = wellLens(ctx, wellMass(t), 1.2, true, 1);
     drawShield(R, wt, ctx);
-    drawDodgeBolt(R, wt);
     const g = gundamState(wt);
     if (g.berserk) ctx.post.berserk = Math.max(ctx.post.berserk || 0, g.berserk * (0.35 + 0.65 * berserkHitK(wt)));
   }

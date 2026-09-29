@@ -410,11 +410,6 @@ export const SAMPLE_CUES = [
   ...HB.map((t, i) => [t - 0.1, 'heartbeat:s' + (i % 3), { gain: 0.6 + 0.4 * i / HB.length, prio: 8, norand: true }]),
   // ---- WELL ASSAULT 262–273: berserk mech tears through the core's energy shield (no dialogue)
   [181.0, 'braam2',    { at: 0.15, rate: 1.1, gain: 0.8, prio: 8, norand: true }],   // the zig-zag advance begins
-  // launch run: an enemy ion bolt screams in, Sigma rolls out of its way (duel.js DODGE 166.65) — no parry
-  [166.03, 'laser_cannon:s2', { dur: 1.2, fadeOut: 0.5, rate: 0.7, gain: 0.5, far: 0.55, pan: 0.3, prio: 7, norand: true }],
-  [166.35, 'flyby_fast', { rate: 0.8, gain: 0.8, pan0: 0.1, pan1: 0.5, dur: 0.5, fadeOut: 0.2, prio: 8, norand: true }],   // incoming
-  [166.5, '@msBoost', { vel: 0.85, dur: 0.45, pan: -0.3 }],                                                            // he slips sideways out of it
-  [166.66, 'flyby_fast', { rate: 0.9, gain: 1.0, pan0: 0.4, pan1: -0.7, dur: 0.6, fadeOut: 0.25, prio: 9, norand: true }],     // it roars past the empty space
   [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar
   [262.05,'servo',     { rate: 0.5, gain: 0.9, prio: 8, norand: true }],
   [262,   'braam',     { rate: 0.85, gain: 1, prio: 9, duck: 2, norand: true }],
@@ -575,9 +570,8 @@ function duelCues() {
   out.push([HERO_HIT_T + 0.04, '@msArmorHit', { vel: G * 1.0, hold: 0.8, pan: -0.25 }]);            // into his pauldron
   out.push([HERO_HIT_T + 0.04, '@sparkBurst', { vel: G * 0.7, pan: -0.25 }]);
   // the charge: both light every thruster at once (the quick-boost edges below take over from the first jinks)
-  out.push([170.05, '@msBoost', { vel: G * 0.9, dur: 1.3, pan: -0.15 }]);
-  out.push([170.35, '@msBoost', { vel: G * 0.45, dur: 1.1, pan: 0.35 }]);
-  for (const t of [173.1, 174.8]) out.push([t - 0.03, '@msBoost', { vel: G * 0.75, dur: 0.3, pan: -0.2 }]);
+  out.push([170.05, '@msBoost', { vel: G * 1.0, dur: 3.0, pan: -0.1 }]);                              // his burn, flat out (D01)
+  out.push([173.2, '@msBoost', { vel: G * 1.0, dur: 3.0, pan: 0.15 }]);                               // its burn, flat out (D02)
   // THE FINISH: the rifle slung (a servo clunk), the saber lit, the SANDEVISTAN (time folds: a deep inhaling whoomp,
   // the world's sound smeared low by the master slow-mo), the pass-cut (buzz + sizzle + armour parting), retract
   const FD = (a, b) => filmT(b) - filmT(a);                          // cue lengths in film seconds (the bullet time stretches them)
