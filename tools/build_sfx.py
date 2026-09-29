@@ -1,6 +1,8 @@
 """Build runtime SFX (assets/sfx/) from the Pixabay sources (assets/sfx_src/).
 
-Run:  uv run --with numpy --with imageio-ffmpeg python tools/build_sfx.py
+Run:  uv run --with numpy --with imageio-ffmpeg python tools/build_sfx.py [name ...]
+      (with names: build only those and merge them into the existing sfx.json / CREDITS.md —
+       note a full rebuild would overwrite the hand-built stereo warp_out.mp3 with the SPEC's mono one)
 
 Per file: decode → trim → mono/stereo → fades (one-shots) or crossfaded seamless loop (ambiences)
 → loudness normalisation (EBU R128 via ffmpeg) with a -1 dBFS sample-peak cap → 44.1 kHz MP3 160 kbps.
@@ -26,6 +28,7 @@ PEAK_CAP = -1.0            # dBFS sample peak
 # name: (source start, end) [s], stereo?, kind ('one' | 'loop'), options
 #   target : loudness target (one: max short-term LUFS; loop: integrated LUFS)
 #   slices : {slice: (src_start, dur)} in SOURCE seconds; converted to output seconds
+#   fo     : fade-out length (s) for one-shots (default min(0.5, 12% of the length))
 #   hit    : source time of the "moment" (the runtime can align it to the cue time)
 #   loop   : cycle length L (s), taken from `start`, crossfade X
 #   comp   : [(src_start, dur), ...] compile these source regions back-to-back (gap 0.25 s) → slices s0..sn
@@ -98,6 +101,10 @@ SPEC = {
     'hl_charge2':     dict(seg=(0.8, 19.85), st=False, kind='one', target=-16),
     'hl_thruster':    dict(seg=(0.0, 8.05), st=True, kind='loop', start=0.5, loop=6.5, xf=1.0, target=-22),
     'hl_thruster2':   dict(alias='hl_thruster'),                                 # byte-identical source
+    # ---- v5 (2026-09-29): mech beam-rifle shots + shield-block impact (Pixabay)
+    'energy_beam':    dict(seg=(0.02, 1.8), st=False, kind='one', hit=0.035, fo=0.35),  # beam rifle shot ('Short energy beam shot (3)', Yodguard)
+    'energy_beam2':   dict(seg=(0.02, 1.8), st=False, kind='one', hit=0.035, fo=0.4),   # variant ('Short energy beam shot (4)', Yodguard)
+    'magic_impact':   dict(seg=(0.02, 1.12), st=False, kind='one', hit=0.045, fo=0.3), # shield block: front impact only ('Elemental Magic Spell Impact Outgoing', RescopicSound)
 }
 
 
@@ -140,11 +147,13 @@ def encode(x, path):
                    input=x.astype(np.float32).tobytes(), check=True)
 
 
-def main():
+def main(only=None):
+    """only: build just these names and merge them into the existing sfx.json / CREDITS.md (other files untouched)."""
     os.makedirs(OUT, exist_ok=True)
     man = {m['name']: m for m in json.load(open(os.path.join(SRC, 'manifest.json')))}
     table, credits = {}, []
     for name, sp in SPEC.items():
+        if only and name not in only: continue
         if sp.get('alias'):
             table[name] = {'alias': sp['alias']}
             credits.append((name, man.get(name) or man.get('hl_*', {}), [f"alias of {sp['alias']}.mp3 — the source file is byte-identical, so no separate file is built"], 0.0))
@@ -195,8 +204,9 @@ def main():
         else:
             if not sp.get('comp'):
                 x = tail_trim(x)
-                x = fade(x, 0.003, min(0.5, len(x) / SR * 0.12))
-                edits.append('3 ms fade-in, tail trimmed below −62 dB, fade-out')
+                fo = sp.get('fo', min(0.5, len(x) / SR * 0.12))
+                x = fade(x, 0.003, fo)
+                edits.append('3 ms fade-in, tail trimmed below −62 dB, fade-out' + (f" ({fo:.2f} s)" if 'fo' in sp else ''))
             I, S = lufs(x)
             tgt = sp.get('target', ONESHOT_TARGET)
             gain = tgt - S
@@ -217,21 +227,40 @@ def main():
         m = man.get(name) or (man.get('hl_*', {}) if name.startswith('hl_') else {})
         credits.append((name, m, edits, gain))
         print(f'{name:18s} {entry["dur"]:6.2f}s ch={entry["ch"]} gain={gain:+5.1f} dB  {entry.get("slices", "")}{entry.get("loop", "")}')
+    if only:                                   # partial build: merge into the existing table / credits
+        old = json.load(open(os.path.join(OUT, 'sfx.json')))['samples']
+        old.update(table); table = old
+        prev = open(os.path.join(OUT, 'CREDITS.md'), encoding='utf-8').read()
     json.dump({'sampleRate': SR, 'samples': table}, open(os.path.join(OUT, 'sfx.json'), 'w'), indent=1)
+    if only:
+        import io
+        f = io.StringIO()
+        for name, m, edits, gain in credits: credit_section(f, name, m, edits, gain)
+        secs = prev.split('\n## ')
+        for sec in f.getvalue().split('## ')[1:]:
+            key = sec.split('\n', 1)[0]
+            i = next((j for j, o in enumerate(secs) if o.split('\n', 1)[0] == key), None)
+            if i is None: secs.append(sec)
+            else: secs[i] = sec
+        open(os.path.join(OUT, 'CREDITS.md'), 'w', encoding='utf-8').write('\n\n## '.join(o.rstrip('\n') for o in secs) + '\n\n')
+        return
     with open(os.path.join(OUT, 'CREDITS.md'), 'w', encoding='utf-8') as f:
         f.write('# SFX credits and edits\n\nSources are from Pixabay (Pixabay Content License, https://pixabay.com/service/license-summary/), except the `hl_*` files, which come from the user\'s own project `../homeland/static`.\n'
                 'Runtime files were produced by `tools/build_sfx.py` from `assets/sfx_src/` (44.1 kHz MP3, 160 kbps).\n'
                 'Loudness is measured with EBU R128 (ffmpeg `ebur128`); gain is capped at −1 dBFS sample peak.\n\n')
-        for name, m, edits, gain in credits:
-            src_sha = __import__('hashlib').sha256(open(os.path.join(SRC, name + '.mp3'), 'rb').read()).hexdigest()
-            if name.startswith('hl_'):
-                f.write(f"## {name}\n- Source: `static/{name[3:]}.mp3` from the user's own project `../homeland` (local asset, not Pixabay)\n")
-            else:
-                f.write(f"## {name}.mp3\n- Source: **{m.get('title', '?')}** by **{m.get('author', '?')}**, {m.get('page', '?')}\n")
-            f.write(f"- Source file: `sfx_src/{name}.mp3`, sha256 `{src_sha}`\n")
-            for e in edits: f.write(f'- {e}\n')
-            f.write(f'- Applied gain: {gain:+.1f} dB\n\n')
+        for name, m, edits, gain in credits: credit_section(f, name, m, edits, gain)
+
+
+def credit_section(f, name, m, edits, gain):
+    src_sha = __import__('hashlib').sha256(open(os.path.join(SRC, name + '.mp3'), 'rb').read()).hexdigest()
+    if name.startswith('hl_'):
+        f.write(f"## {name}\n- Source: `static/{name[3:]}.mp3` from the user's own project `../homeland` (local asset, not Pixabay)\n")
+    else:
+        f.write(f"## {name}.mp3\n- Source: **{m.get('title', '?')}** by **{m.get('author', '?')}**, {m.get('page', '?')}\n")
+    f.write(f"- Source file: `sfx_src/{name}.mp3`, sha256 `{src_sha}`\n")
+    for e in edits: f.write(f'- {e}\n')
+    f.write(f'- Applied gain: {gain:+.1f} dB\n\n')
 
 
 if __name__ == '__main__':
-    main()
+    main(set(sys.argv[1:]) or None)

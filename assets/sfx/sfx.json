@@ -511,6 +511,27 @@
    "kind": "one",
    "hit": 0.0,
    "dur": 3.8
+  },
+  "energy_beam": {
+   "file": "energy_beam.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.015,
+   "dur": 1.78
+  },
+  "energy_beam2": {
+   "file": "energy_beam2.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.015,
+   "dur": 1.78
+  },
+  "magic_impact": {
+   "file": "magic_impact.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.025,
+   "dur": 1.1
   }
  }
 }

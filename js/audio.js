@@ -561,7 +561,10 @@ function duelCues() {
   }
   // ---- MECH SFX: procedural voices modelled on CC0 references (audio-synth.js msShot / msBoost / msArmorHit / msPass)
   // his beam rifle: crack, the falling zap, the sine punch, a gritty body
-  DUEL_RIFLE.forEach((t) => out.push([t, '@msShot', { vel: G * R(0.9, 1.0), k: R(0.7, 0.75), pan: -0.15 }]));
+  DUEL_RIFLE.forEach((t) => {   // the blaster report: Pixabay 'Short energy beam shot (3)' (sfx energy_beam) + a little low weight
+    out.push([t, 'energy_beam', { at: 'hit', rate: R(0.96, 1.04), gain: G * 1.0, pan: -0.15, prio: 9, norand: true }]);
+    out.push([t, '@boom', { bus: 'sfx', f: 50, vel: G * 0.35, dur: 0.8, verb: 0.25 }]);
+  });
   // the shots that land: struck plate, ring, and the armour burning through
   out.push([SHIELD_HIT_T + 0.03, '@msShieldBlock', { vel: G * 0.8, hold: 0.45, pan: 0.3 }]);        // the shield takes it …
   out.push([SHIELD_HIT_T + 0.05, '@msArmorHit', { vel: G * 1.0, hold: 1.1, pan: 0.3 }]);              // … and it burns through, tearing it off
@@ -570,8 +573,16 @@ function duelCues() {
   out.push([HERO_HIT_T + 0.04, '@msArmorHit', { vel: G * 1.0, hold: 0.8, pan: -0.25 }]);            // into his pauldron
   out.push([HERO_HIT_T + 0.04, '@sparkBurst', { vel: G * 0.7, pan: -0.25 }]);
   // the charge: both light every thruster at once (the quick-boost edges below take over from the first jinks)
-  out.push([170.05, '@msBoost', { vel: G * 1.0, dur: 3.0, pan: -0.1 }]);                              // his burn, flat out (D01)
-  out.push([173.2, '@msBoost', { vel: G * 1.0, dur: 3.0, pan: 0.15 }]);                               // its burn, flat out (D02)
+  // the draw + load on the move: his rifle off his back (a clack), the E-cap slammed home (a clack + a rising whine),
+  // then its rifle drawn and charged
+  out.push([170.05, '@msBoost', { vel: G * 0.7, dur: 1.5, pan: -0.1 }]);
+  out.push([170.97, 'metal_knock', { at: 'hit', rate: 0.9, gain: G * 0.55, pan: -0.2, prio: 8, norand: true }]);
+  out.push([172.35, 'metal_knock', { at: 'hit', rate: 1.15, gain: G * 0.8, pan: -0.1, prio: 9, norand: true }]);
+  out.push([172.36, '@boom', { bus: 'sfx', f: 60, vel: G * 0.3, dur: 0.6, verb: 0.2 }]);
+  out.push([172.38, 'charge_up', { at: 0, dur: 0.7, fadeOut: 0.3, rate: 1.4, gain: G * 0.55, pan: -0.1, prio: 8, norand: true }]);
+  out.push([173.2, '@msBoost', { vel: G * 0.7, dur: 1.5, pan: 0.15 }]);
+  out.push([173.97, 'metal_knock', { at: 'hit', rate: 0.7, gain: G * 0.6, pan: 0.2, prio: 8, norand: true }]);
+  out.push([174.9, 'charge_up', { at: 0, dur: 0.9, fadeOut: 0.2, rate: 0.9, gain: G * 0.7, pan: 0.2, prio: 8, norand: true }]);
   // THE FINISH: the rifle slung (a servo clunk), the saber lit, the SANDEVISTAN (time folds: a deep inhaling whoomp,
   // the world's sound smeared low by the master slow-mo), the pass-cut (buzz + sizzle + armour parting), retract
   const FD = (a, b) => filmT(b) - filmT(a);                          // cue lengths in film seconds (the bullet time stretches them)
@@ -651,12 +662,12 @@ function duelCues() {
   out.push([TRANS_HIT, '@boom', { bus: 'sfx', f: 30, vel: G * 0.8, dur: 2.2, verb: 0.4 }]);
   for (const ts of SERAPH_SHOTS) {
     if (ts === TRANS_SHOT) continue;
-    out.push([ts, '@msShot', { vel: G * 0.85, k: 0.58, pan: 0.3 }]);                          // its heavier rifle, pitched down
+    out.push([ts, 'energy_beam2', { at: 'hit', rate: R(0.92, 1.0), gain: G * 0.9, pan: 0.3, prio: 9, norand: true }]);   // its heavier blaster                          // its heavier rifle, pitched down
     if (Math.abs(ts - HERO_HIT_T) > 0.1) out.push([ts, '@msPass', { vel: G * 0.55, tp: 0.12, ratio: R(1.8, 2.6), f: R(1600, 2000), pan0: 0.5, pan1: -0.7 }]);   // it whips past him
   }
   out.push([179.3, '@msBoost', { vel: G * 0.75, dur: 1.0, pan: 0.35 }]);                     // the boost-jump
   // his 178.7 splashes off its shield: the plate rings, the face burns (the hole stays)
-  out.push([BLOCK_T + 0.03, '@msShieldBlock', { vel: G * 0.95, hold: 0.9, pan: 0.3 }]);
+  out.push([BLOCK_T + 0.03, 'magic_impact', { at: 'hit', gain: G * 1.1, pan: 0.3, prio: 9, norand: true }]);   // the splash on the shield: Pixabay 'Elemental Magic Spell Impact Outgoing' (front 1.1 s)
   out.push([BLOCK_T + 0.03, '@sparkBurst', { vel: G * 0.6, pan: 0.3 }]);
   // ---- its ULTIMATE: the back charging while it gathers in, a dozen heavy beams tearing out of it at once, their roar as
   //      they bend round onto him, and the chain of blasts where they converge (he is already gone)

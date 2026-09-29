@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, BLOCK_SPOT, blockFrame, HERO_LOAD, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -746,7 +746,7 @@ export function drawGundam(R, t, s, opts = {}) {
     if (mz) { R.glow(mz, 0.6 + 3.2 * q, [0.8 * q, 2.2 * q, 3.2 * q], 0.35); R.light(mz, 60, [0.4, 0.8, 1], 12 * q); }
     e.matOverride.core = { ...e.matOverride.core, emissive: e.matOverride.core.emissive.map((v) => v * (1 + 6 * q)) };
   }
-  if (t >= 170 && t < 200 && !s.fpv) { heavyDamage(R, t, e, 0); meltHole(e, 'hero', t); }
+  if (t >= 170 && t < 200 && !s.fpv) { heavyDamage(R, t, e, 0); meltHole(e, 'hero', t); drawLoad(R, t); }
   GUN.gundam = e;
   return e;
 }
@@ -790,6 +790,34 @@ function drawDroppedRifle(R, t) {
   if (!w) return;
   w.pose = _rif.pose; w.hidden = _rif.hide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
 }
+// the block (his 178.7 shot on the shield): no hole — the face is scorched black round the splash (renderer damage
+// sphere on the shield part only), with glowing cracks cooling in it
+function shieldScorch(e, t) {
+  const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0) return;   // (the line reaches it ~8 ms after the event)
+  const g = easeOut(sat(lt / 0.15));
+  e.dmgC = B.local; e.dmgR = 1.5 * (0.3 + 0.7 * g); e.dmgPart = 'shield'; e.damage = Math.max(e.damage || 0, 0.55 * g);   // patchy soot, cracks glowing
+}
+// …and the shot's energy breaks up into particles on it: a burst of pixel sparks skating out along the face, then a
+// slow cloud of glowing motes drifting off and fading
+function drawBlockSplash(R, t) {
+  const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0 || lt > 2.5) return;
+  const F = blockFrame(t); if (!F) return;
+  const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], F.n, F.up));
+  if (lt < 0.1) { const f = 1 - lt / 0.1; R.glow(F.p, 1 + 3 * f, [1.4 * f, 3 * f, 4 * f], 0.3); R.light(F.p, 30, [0.5, 0.8, 1], 4 * f); }
+  for (let i = 0; i < 60; i++) {                                     // skating out along the face (the energy splashes flat)
+    const L = 0.25 + 0.4 * hash(i + 400); if (lt > L) continue;
+    const a = 2 * Math.PI * hash(i + 401), along = V.add([0, 0, 0], V.scale([0, 0, 0], F.up, Math.cos(a)), V.scale([0, 0, 0], sd, Math.sin(a)));
+    const d = V.norm([0, 0, 0], V.madd([0, 0, 0], along, F.n, 0.15 + 0.5 * hash(i + 402))), v = 8 + 18 * hash(i + 403), q = madd(F.p, d, v * lt * (1 - 0.4 * lt / L));
+    const b = (1 - lt / L) ** 2 * 3;
+    streak(R, madd(q, d, -Math.min(v * lt, 0.7)), q, [0.7 * b, 2.0 * b, 3.0 * b]);
+  }
+  for (let i = 0; i < 60; i++) {                                     // the motes: the beam's energy coming apart, drifting off
+    const L = 1.0 + 1.3 * hash(i + 500); if (lt > L) continue;
+    const d = V.norm([0, 0, 0], V.madd([0, 0, 0], F.n, randDir([0, 0, 0], i * 5.1 + 17), 0.9)), q = madd(F.p, d, (2 + 10 * hash(i + 501)) * easeOut(sat(lt / L)));
+    const k = (1 - lt / L) * (0.6 + 0.4 * Math.sin(t * 20 + i));
+    R.glow(q, 0.12 + 0.12 * hash(i + 502), [0.6 * k, 1.8 * k, 2.8 * k], 0.2);
+  }
+}
 function drawLostShield(R, t) {
   const t0 = SHIELD_HIT_T + 0.03;
   if (!_wing.m) {
@@ -809,7 +837,7 @@ function drawLostShield(R, t) {
   const w = R.add('enemy_ms', M.mul(new Float32Array(16), _wB, _wA));
   if (!w) return;
   w.pose = _wing.pose; w.hidden = _wing.hide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
-  w.damage = 0.6; meltHole(w, 'enemy', t, 'shield');
+  w.damage = 0.6; meltHole(w, 'enemy', t, 'shield'); shieldScorch(w, t);
   if (lt < 3) R.light(V.madd([0, 0, 0], P, _wing.v, lt), 30, [1, 0.5, 0.2], 4 * Math.exp(-lt * 2));   // the burnt mount glowing hot for a moment
 }
 // cut in half at the waist (CUT_T): two copies, the torso part clipped clean at the cut line (a glowing, molten edge);
@@ -962,6 +990,9 @@ function drawEnemyMS(R, t, s, idx) {
   const e = R.add('enemy_ms', msMatrix(tmpM, s));
   if (!e) return null;
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
+  if (s.noRifle) e.hidden = { ...(e.hidden || {}), rifle: 1 };                // (still on its back)
+  if (!s.shieldLost) { shieldScorch(e, t); drawBlockSplash(R, t); }
+  if (t > ENEMY_CHARGE0 - 0.1 && t < ENEMY_CHARGE1 + 0.8) drawEnemyCharge(R, t);
   if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
   if (idx === 2 && transK(t) > 0.001) drawRails(R, t, s);
   if (idx === 2 && t >= RIFLE_DROP_T) { e.hidden = { ...(e.hidden || {}), rifle: 1 }; drawDroppedRifle(R, t); }
@@ -1201,6 +1232,34 @@ function drawUlt(R, t) {
 // big spinning energy body (a rotating icosahedral lattice of light round a white core), bending round after him
 const _rT2 = new Float32Array(16), _rM2 = new Float32Array(16);
 let _railHide = null;
+// THE LOAD: the E-cap in his left hand (a glowing cell), slammed into the rifle at HERO_LOAD — a flash at the breech and
+// the rifle's lines lighting up from the back to the muzzle, settling to a charged glow
+function drawLoad(R, t) {
+  if (t < 171.8 || t > HERO_LOAD + 1.2) return;
+  const cap = heroCap(t);
+  if (cap) { const a = madd(cap.p, cap.axis, -0.7), b = madd(cap.p, cap.axis, 0.7); R.beam(a, b, 0.45, [0.7, 2.2, 3.2], 1, 4); R.glow(cap.p, 1.3, [0.5, 1.5, 2.2], 0.3); R.light(cap.p, 12, [0.4, 0.8, 1], 1.5); }
+  const lt = t - HERO_LOAD; if (lt < 0) return;
+  const F = heroRifleFrame(t); if (!F) return;
+  const fl = Math.exp(-lt * 10), run = sat(lt / 0.3), k = 0.35 + 0.65 * Math.exp(-lt * 3);
+  if (fl > 0.02) { R.glow(F.rear, 0.8 + 2.5 * fl, [1.2 * fl, 2.6 * fl, 3.4 * fl], 0.3); R.light(F.rear, 20, [0.4, 0.8, 1], 3 * fl); }
+  const up = [0, 1, 0];
+  for (let i = 0; i < 10; i++) {                                      // the charge runs down the barrel
+    const f = i / 9; if (f > run) break;
+    const p = madd(madd(F.p, F.dir, -1 + 8 * f), up, 0.55);
+    R.glow(p, 0.35 + 0.2 * k, [0.4 * k, 1.4 * k, 2.2 * k], 0.25);
+  }
+}
+// its rifle charging (ENEMY_CHARGE0 → 1): light gathering along the barrel into the muzzle, crackling
+function drawEnemyCharge(R, t) {
+  const F = enemyRifleFrame(t); if (!F) return;
+  const c = sat((t - ENEMY_CHARGE0) / (ENEMY_CHARGE1 - ENEMY_CHARGE0)), fade = t > ENEMY_CHARGE1 ? Math.exp(-(t - ENEMY_CHARGE1) * 4) : 1, q = c * c * fade;
+  if (q < 0.01) return;
+  for (let i = 0; i < 8; i++) {
+    const f = i / 7, ph = (t * 3 + f) % 1, p = lerpv(F.p, F.muzzle, f);
+    R.glow(p, 0.3 + 0.35 * q, [2.6 * q * (0.6 + 0.4 * ph), 0.5 * q, 0.9 * q], 0.25);
+  }
+  R.glow(F.muzzle, 0.5 + 2.2 * q * (1 + 0.1 * Math.sin(t * 70)), [3 * q, 0.6 * q, 1 * q], 0.35); R.light(F.muzzle, 30, [1, 0.3, 0.45], 4 * q);
+}
 function drawRails(R, t, s) {
   const k = easeOut(transK(t)), F = enemyRifleFrame(t); if (!F) return;
   if (!_railHide) { _railHide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'rifle') _railHide[p.name] = 1; }

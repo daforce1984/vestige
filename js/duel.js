@@ -155,6 +155,7 @@ L.brace = W(L.aimRifle, { torso: [10, -12, 0], arm_L_upper: [-70, -35, -10], arm
 L.recoilShot = W(L.brace, { torso: [-8, -12, 0], head: [-10, 20, 0], _body: [-10, 0, 0] });
 // SANDEVISTAN: the rifle slung over the shoulder, the saber drawn low and back in the left hand, body flat along the dash
 L.finish = W(L.iaiEnd, { torso: [8, 30, 0], arm_L_upper: [-22, 45, 18], arm_L_lower: [-42, 0, 0], hand_L: [15, 0, 0], _body: [0, 0, 0] });   // blade lowered, arm relaxed
+L.port = W(L.flyAim, { arm_R_upper: [-35, 65, -5], arm_R_lower: [-95, 0, 0], hand_R: [70, 0, 0], torso: [6, 10, 0] });   // the rifle pulled in across the chest to load
 L.stow = W(L.flyAim, { arm_R_upper: [-155, -25, -18], arm_R_lower: [-95, 0, 0], hand_R: [20, 0, 0], head: [0, 15, 0] });
 L.sandeDash = W(L.iaiWind, { torso: [30, -35, 0], head: [-25, 35, 0], arm_R_upper: [-10, 0, -35], arm_R_lower: [-50, 0, 0], leg_L_upper: [-30, 0, 10], leg_L_lower: [60, 0, 0], leg_R_upper: [25, 0, -10], leg_R_lower: [70, 0, 0], _body: [45, 0, 0] });
 // zero-g ragdoll: after an impulse at t0 every joint swings loose as a heavy damped oscillation (0.8–1.8 Hz, decaying
@@ -466,6 +467,8 @@ VG.boost = withParts(VG.aim, fromClip('tryout.Jump', 0.62), LEGS);              
 VG.tuck = VG.boost;
 VG.fly = withParts(W(VG.aim, { _body: [10, 0, 0] }), fromClip('tryout.Boost_Forward', 0), LEGS);   // on thrusters: legs trailing
 VG.charge = withParts(W(VG.aim, { _body: [38, 0, 0], head: [-25, 0, 0] }), fromClip('tryout.Boost_Forward', 0), LEGS);   // flat out: leaning hard into the burn, legs trailing
+VG.chargeEmpty = withParts(VG.charge, VG.idle, ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']);   // flat out, empty-handed
+VG.reach = W(VG.chargeEmpty, { arm_R_upper: [-165, 0, 25], arm_R_lower: [-85, 0, 0], head: [-10, 20, 0] });            // right hand back over its shoulder
 VG.stepL = withParts(W(VG.aim, { _body: [0, 10, 16] }), fromClip('tryout.Boost_Left', 0), [...LEGS, 'torso']);
 VG.stepR = withParts(W(VG.aim, { _body: [0, -10, -16] }), fromClip('tryout.Boost_Right', 0), [...LEGS, 'torso']);
 VG.hit = W(VG.aim, { torso: [-22, 25, 12], head: [-18, 12, 0], arm_L_upper: [10, -25, 40], arm_L_lower: [-10, 0, 0], _body: [-18, 30, 18] });
@@ -501,6 +504,7 @@ const ringE = (phi, r, h) => ringH(phi + Math.PI, r, h);
 // advance, round the circling run. Its full-power shot: FINALE_T (he slips it).
 export const SERAPH_SHOTS = [176.75, 177.5, 178.35, 179.95, 181.4, 182.1, 182.8, 184.45, 185.35, 186.4, 187.45];
 export const FINALE_T = 190.85, FINALE_END = 191.35;
+export const ENEMY_GRAB = 173.95, ENEMY_CHARGE0 = 174.9, ENEMY_CHARGE1 = 175.7;   // it draws its rifle from its back, then charges it
 // the transforming shot (see transPath): the rifle opens out TRANS0 →, fires at TRANS_SHOT, the energy body bursts at TRANS_HIT
 export const TRANS0 = 183.95, TRANS_SHOT = 184.45, TRANS_PASS = 184.95, TRANS_HIT = 185.13;   // fires → a hair past his head → bursts behind him
 export const transK = (t) => smooth(TRANS0, TRANS0 + 0.35, t) * (1 - smooth(184.95, 185.35, t));
@@ -651,7 +655,7 @@ const heroPos = posTrack([
   [193.8, DP(36, -12, 3), 'io'], [194.6, DP(44, -14, 3), 'io'],   // on away from it (the reactor goes behind him)
 ]);
 const heroPose = poseTrack([
-  [169.3, L.flight], [170.5, L.flyAim, 'io'],                // straight into it, the rifle up
+  [169.3, L.flight], [170.35, L.flight], [170.8, L.stow, 'io'], [171.05, L.stow], [171.6, L.flyAim, 'out'], [171.95, L.port, 'io'], [172.5, L.port], [172.9, L.flyAim, 'io'],   // reaches back, draws the rifle; pulls it in and loads it
   [176.55, L.flyAim, 'io'], [176.95, L.dodgeAimL, 'out'], [177.3, L.flyAim, 'io'],
   [177.65, L.dodgeAimR, 'out'], [177.95, L.flyAim, 'io'], [178.25, L.flyAim, 'io'],
   [178.55, L.dodgeUpAim, 'out'], [178.9, L.aimRifle, 'io'], [179.4, L.flyAim, 'io'],
@@ -678,7 +682,7 @@ const heroBoost = scalarTrack([[170, 1], [175.9, 1], [176.5, 0.7],
 const heroRoll = (tw) => { let r = 0; for (const [t0, d, s] of [[179.98, 0.36, -1]]) { const u = sat((tw - t0) / d); r += s * 2 * Math.PI * u * u * (3 - 2 * u); } return r; };
 
 const enemyPose = poseTrack([
-  [169.5, VG.fly], [170.6, VG.charge, 'io'], [175.7, VG.charge], [176.3, VG.fly, 'io'],   // the charge: flat out, the rifle levelled in both hands
+  [169.5, VG.fly], [170.6, VG.chargeEmpty, 'io'], [173.45, VG.chargeEmpty], [173.8, VG.reach, 'io'], [ENEMY_GRAB + 0.05, VG.reach], [174.45, VG.charge, 'out'], [175.7, VG.charge], [176.3, VG.fly, 'io'],   // the charge: flat out, the rifle levelled in both hands
   [176.62, VG.aim, 'io'], [177.1, VG.fly, 'io'],   // levels the rifle; fires first
   [177.35, VG.stepL, 'out'], [177.6, VG.fly, 'io'], [178.1, VG.stepR, 'out'], [178.4, VG.fly, 'io'],
   [178.6, VG.guard, 'io'], [178.9, VG.guard], [179.1, VG.fly, 'io'],   // the shield up for his 178.7
@@ -730,7 +734,7 @@ function enemyAim(tw) {
   const p = heroRawPos(ta), q = heroRawPos(ta - 0.1), lead = ts !== undefined ? (ts - ta) / 0.1 : 1.2;
   return add(add(p, scl(sub(p, q), lead)), [0, 9, 0]);
 }
-const ENEMY_AIM = (tw) => { let k = smooth(170.6, 171.0, tw) * (1 - smooth(178.45, 178.6, tw)) + smooth(179.1, 179.3, tw) * (1 - smooth(179.45, 179.6, tw))
+const ENEMY_AIM = (tw) => { let k = smooth(174.3, 174.7, tw) * (1 - smooth(178.45, 178.6, tw)) + smooth(179.1, 179.3, tw) * (1 - smooth(179.45, 179.6, tw))
     + smooth(180.5, 180.9, tw) * (1 - smooth(183.25, 183.35, tw)) + smooth(183.8, 184.1, tw) * (1 - smooth(189.3, 189.7, tw));   // (the rifle goes down for the ultimate)
   for (const ts of SERAPH_SHOTS) k = Math.max(k, smooth(ts - 0.35, ts - 0.2, tw) * (1 - smooth(ts + 0.12, ts + 0.3, tw)));
   return Math.min(1, k); };
@@ -742,7 +746,7 @@ const enemyBoost = scalarTrack([[170, 1], [175.9, 1], [176.5, 0.6],
 // centre line, the barrel on the target, its top toward the chest's up — and both arms are solved onto it by IK: the
 // right fist on the grip, the left on the fore-end. (Swinging the gun arm alone left the fore-end out of the left arm's reach.)
 // k = aim weight (pose → placed rifle), kL = the left hand's weight (off while the shield is up / after the cut)
-const TWO_HAND = (tw) => (1 - smooth(178.4, 178.55, tw) * (1 - smooth(179.05, 179.25, tw))) * (1 - smooth(183.25, 183.3, tw) * (1 - smooth(183.8, 184.1, tw))) * smooth(170.5, 170.9, tw);
+const TWO_HAND = (tw) => (1 - smooth(178.4, 178.55, tw) * (1 - smooth(179.05, 179.25, tw))) * (1 - smooth(183.25, 183.3, tw) * (1 - smooth(183.8, 184.1, tw))) * smooth(174.5, 174.9, tw);
 const HAND_TO_RIFLE = () => sub(PIV.enemy_ms.rifle, PIV.enemy_ms.hand_R);
 function aim2H(s, target, k, kL) {
   s.pose = { ...s.pose };
@@ -763,7 +767,7 @@ function aim2H(s, target, k, kL) {
 }
 // ---------------- Sigma's aim: laid on the target round each shot. Misses go just past (it quick-boosts); 178.7 lands on
 // the shield (it blocks), 183.25 on the shield (torn off), the charged shot on its chest
-const HERO_AIM = (tw) => { let k = smooth(170.7, 171.1, tw) * (1 - smooth(190.95, 191.12, tw));
+const HERO_AIM = (tw) => { let k = smooth(171.3, 171.7, tw) * (1 - smooth(171.75, 171.95, tw) * (1 - smooth(172.55, 172.9, tw))) * (1 - smooth(190.95, 191.12, tw));
   for (const ts of HERO_SHOTS) k = Math.max(k, smooth(ts - 0.4, ts - 0.2, tw) * (1 - smooth(ts + 0.12, ts + 0.3, tw)));
   return Math.min(1, k); };
 const MISS = [[0, 6], [6, 1], null, [-6, 4], [2, -6], [6, 3], null, [1, 7], [-7, 0], [5, -5], [-5, 5]];   // [side, up] (m) across the line of fire
@@ -842,7 +846,7 @@ function ambac(s, arr, fwdBase) {
   arr[PIDX.arm_L_upper] += 0.5 * sa * k; arr[PIDX.arm_L_upper + 2] -= 0.55 * sal * k;
   arr[PIDX.torso + 1] += 0.18 * sal * k; arr[PIDX.head + 1] -= 0.12 * sal * k;   // (the head holds the target)
   // the body tips into the burst: pitch with forward accel, bank (own side down) into a lateral one
-  return [(0.38 * sa - 0.2 * sau) * k, -0.55 * sal * k];
+  return [(0.2 * sa - 0.1 * sau) * k, -0.28 * sal * k];   // (halved: the whole machine tipping hard swung the boosters about)
 }
 function finish(s, arr, fwdBase, limits = true) {
   const b = PIDX._body;
@@ -983,13 +987,13 @@ function duelHero_(t) {
   _pose[PIDX._body + 2] += heroRoll(tw);
   { const k = smooth(TRANS_PASS - 0.07, TRANS_PASS - 0.025, tw) * (1 - smooth(TRANS_PASS + 0.25, TRANS_PASS + 0.8, tw));   // the neck-snap: a hair
     if (k > 0) { _pose[PIDX.head + 2] += 0.75 * k; _pose[PIDX.head + 1] += 0.45 * k; _pose[PIDX.head] += 0.2 * k; _pose[PIDX.torso + 2] += 0.15 * k; } }
-  s.weapon = tw < 191.22 || tw >= 200 ? 'rifle' : tw < 194.1 ? 'saber' : 'none';   // slung over the shoulder at 191.2
+  s.weapon = tw > 169.5 && tw < HERO_GRAB ? 'none' : tw < 191.22 || tw >= 200 ? 'rifle' : tw < 194.1 ? 'saber' : 'none';   // slung over the shoulder at 191.2
   s.saber = smooth(191.26, 191.36, tw) * (1 - smooth(193.85, 194.1, tw));
   s.sande = sat((tw - SANDE0 + 0.05) / 0.1) * (1 - smooth(CUT_T - 0.05, CUT_T - 0.025, tw));   // afterimages (shots.js); gone for the close-up of the cut
   s.boost = heroBoost(tw);
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
-  { const ak = HERO_AIM(tw); if (ak > 0) aimRifle(s, heroAimPoint(tw), ak); const k2 = HERO_2H(tw); if (k2 > 0) heroSupport(s, k2); }   // the rifle laid on its target, held upright
+  { const ak = HERO_AIM(tw); if (ak > 0) aimRifle(s, heroAimPoint(tw), ak); heroLeft(s, tw); }   // the rifle laid on its target, held upright
   slashIK(s, tw);                                                   // the pass-cut: the blade swept exactly through its waist
   hitReact('hero', tw, s, 'gundam');
   // hand-over to the old aftermath formula (identical at t = 200)
@@ -1058,6 +1062,7 @@ function enemyState_(t) {
   f = yawRot(f, shieldSpin(tw));                                   // … knocked half round by the shield hit
   s.cutK = tw > CUT_SPLIT ? tw - CUT_SPLIT : 0;                      // cut in half (shots.js draws the two halves)
   s.shieldLost = tw >= SHIELD_HIT_T + 0.03;
+  s.noRifle = tw > 168 && tw < ENEMY_GRAB;                         // (on its back until it draws it)
   s.boost = enemyBoost(tw);
   s.thr = tw > CUT_T ? 0 : clamp(0.4 + s.boost * 0.6, 0, 1);
   s.damage = 0.12 * smooth(SHIELD_HIT_T, SHIELD_HIT_T + 0.1, t) + 0.3 * smooth(CUT_T, CUT_T + 1, t);
@@ -1232,15 +1237,38 @@ function layRifle(s, model, target, k, twist = 1) {
   return s;
 }
 const aimRifle = (s, target, k) => layRifle(s, 'gundam', target, k);
-// the charge: his left hand comes onto the rifle's fore-end (under the barrel, ~3 m out), the hand turned like the right
-const HERO_2H = (tw) => smooth(170.5, 170.9, tw) * (1 - smooth(176.1, 176.5, tw));
-const HERO_FORE = [0.15, -0.35, 3.2], HERO_LH = [0.10266, -0.84395, 0.50666];   // fore-end (rifle frame); grip offset mirrored
-function heroSupport(s, k) {
+// THE DRAW + LOAD (170–173.2, on the move): he reaches back over his shoulder and draws the rifle (HERO_GRAB), swings it
+// forward; his left hand takes an E-cap off his hip, slams it into the back of the receiver (HERO_LOAD: the rifle lights
+// up) and comes forward onto the fore-end, where it stays through the approach
+export const HERO_GRAB = 170.95, HERO_LOAD = 172.35;
+const HERO_FORE = [0.15, -0.35, 3.2], HERO_REAR = [0.95, 0.25, -1.2], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
+const heroLeftW = (tw) => smooth(171.7, 172.0, tw) * (1 - smooth(176.1, 176.5, tw));
+const HERO_CAP_L = [0.1, -1.0, 0.6];   // the E-cap in his left hand (hand frame)
+function heroLeftWrist(fk, tw, Rw) {   // wrist target: the cap on the hip → the cap in the breech → the hand on the fore-end
+  const hip = M.transformPoint([0, 0, 0], fk.torso, HERO_HIP), rear = M.transformPoint([0, 0, 0], fk.rifle, HERO_REAR), fore = M.transformPoint([0, 0, 0], fk.rifle, HERO_FORE);
+  const load = sub(lrp(hip, rear, smooth(172.0, HERO_LOAD - 0.02, tw)), r3v(Rw, HERO_CAP_L));
+  return lrp(load, sub(fore, r3v(Rw, HERO_LH)), smooth(172.55, 172.85, tw));
+}
+function heroLeft(s, tw) {
+  const k = heroLeftW(tw); if (k <= 0) return;
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
-  const fk = duelFK(s, 'gundam'), Rw = r3(fk.hand_R), fore = M.transformPoint([0, 0, 0], fk.rifle, HERO_FORE);
-  armIK(s, fk, 'gundam', 'L', sub(fore, r3v(Rw, HERO_LH)), Rw);
+  const fk = duelFK(s, 'gundam'), Rw = r3(fk.hand_R);
+  armIK(s, fk, 'gundam', 'L', heroLeftWrist(fk, tw, Rw), Rw);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+}
+/** the E-cap in his left hand (171.85 → HERO_LOAD), world position + its axis; null when not held */
+export function heroCap(t) {
+  if (t < 171.85 || t > HERO_LOAD) return null;
+  const h = duelHero(t); if (!h) return null;
+  const fk = duelFK(h, 'gundam');
+  return { p: M.transformPoint([0, 0, 0], fk.hand_L, HERO_CAP_L), axis: nrm(fk.muzzleDir) };
+}
+/** his rifle's frame at t (grip, barrel direction, his left) */
+export function heroRifleFrame(t) {
+  const h = duelHero(t); if (!h) return null;
+  const fk = duelFK(h, 'gundam');
+  return { p: M.transformPoint([0, 0, 0], fk.rifle, [0, 0, 0]), dir: fk.muzzleDir, left: nrm(M.transformDir([0, 0, 0], fk.torso, [1, 0, 0])), rear: M.transformPoint([0, 0, 0], fk.rifle, HERO_REAR) };
 }
 const aimEnemy = (s, target, k) => layRifle(s, 'enemy_ms', target, k);
 // ---------------------------------------------------------------- the pass-cut (CUT_T)
@@ -1334,6 +1362,14 @@ export function transOrb(t) {
   const c = transHead(t), T = nrm(sub(transHead(t + 0.004), transHead(t - 0.004))), e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0])), e2 = V.cross([0, 0, 0], T, e1), a = (t - TRANS_SHOT) * 48;
   return add(c, add(scl(e1, 3.2 * Math.cos(a)), scl(e2, 3.2 * Math.sin(a))));
 }
+/** where his 178.7 shot splashes on the shield: part-local spot, and at time t its world position + the face normal */
+let _bs = null;
+export const BLOCK_SPOT = () => _bs || (_bs = (() => { const e = DUEL_EVENTS.find((x) => x.block), fk = duelFK(enemyRaw_(e.t), 'enemy_ms'); return { t: e.t, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk.shield), e.pos) }; })());
+export function blockFrame(t) {
+  const st = enemyRaw_(t); if (!st) return null;
+  const fk = duelFK(st, 'enemy_ms'), B = BLOCK_SPOT();
+  return { p: M.transformPoint([0, 0, 0], fk.shield, B.local), n: nrm(M.transformDir([0, 0, 0], fk.shield, [1, 0, 0])), up: nrm(M.transformDir([0, 0, 0], fk.shield, [0, 1, 0])) };
+}
 /** world position + unit direction of the hero's rifle muzzle at story time t */
 export function duelMuzzle(t) {
   const s = duelHero(t);
@@ -1425,7 +1461,6 @@ REACTS = DUEL_EVENTS.filter((e) => e.shotDir && !e.cut).map((e) => {
 });
 // the holes the landed shots burn: part, part-local centre, radius, depth (through the part along its local X), from when
 export const HOLES = [
-  (() => { const e = DUEL_EVENTS.find((x) => x.block), fk = duelFK(enemyRaw_(e.t), 'enemy_ms'); return { who: 'enemy', part: 'shield', t: e.t, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk.shield), e.pos), r: 1.05, depth: 3 }; })(),
   (() => { const e = DUEL_EVENTS.find((x) => Math.abs(x.t - SHIELD_HIT_T - 0.03) < 1e-6), fk = duelFK(enemyRaw_(e.t), 'enemy_ms'); return { who: 'enemy', part: 'shield', t: e.t, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk.shield), e.pos), r: 1.1, depth: 3 }; })(),   // the shot that tears it off
   { who: 'enemy', part: 'leg_R_upper', t: THIGH_T + 0.03, local: THIGH_P, r: 0.85, depth: 2.4 },
   { who: 'hero', part: 'arm_L_upper', t: HERO_HIT_T + 0.04, local: PAULDRON_P, r: 0.85, depth: 1.2 },
@@ -1461,10 +1496,15 @@ function ots(from, to, { right = 1, back = 16, lift = 6, fov = 42, side = 7 } = 
 }
 export const DUEL_CAMS = [
   // ---- THE CHARGE (no standoff): out of the launch they drive straight at each other from ~700 m, jinking, firing
-  { t0: 170.0, t1: 173.2, name: 'D01 tracking ahead of him — flat out at it, both hands on the rifle', fn: (t, u) => { const H = hp(t), f = nrm(sub(hp(t + 0.1), H)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
-    return { pos: add(add(add(H, scl(f, 30 - 14 * u)), scl(sd, 8)), [0, 3.5, 0]), target: add(add(H, scl(f, 6)), [0, 4, 0]), fov: 52, handheld: 0.12, baseShake: 0.06 }; } },
-  { t0: 173.2, t1: 176.4, snap: 1.6, name: 'D02 tracking ahead of it — it comes flat out at him', fn: (t, u) => { const E = ep(t), f = nrm(sub(ep(t + 0.1), E)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
-    return { pos: add(add(add(E, scl(f, 32 - 16 * u)), scl(sd, -9)), [0, 4, 0]), target: add(add(E, scl(f, 6)), [0, 5, 0]), fov: 52, handheld: 0.12, baseShake: 0.06 }; } },
+  { t0: 170.0, t1: 171.7, name: 'D01 beside him on the move — he reaches back and draws the rifle', fn: (t, u) => { const H = hp(t), f = nrm(sub(hp(t + 0.1), H)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
+    return { pos: add(add(add(H, scl(sd, -17)), scl(f, 5)), [0, 5, 0]), target: add(add(H, scl(f, 1.5)), [0, 5, 0]), fov: 44, handheld: 0.08, baseShake: 0.03 }; } },
+  { t0: 171.7, t1: 173.2, snap: 1.6, name: 'D01b CU — the E-cap slammed into the rifle, it lights up', fn: (t, u) => { const F = heroRifleFrame(t), c = add(F.rear, scl(F.dir, 1.2));
+    const H = hp(t), fw = nrm(sub(hp(t + 0.1), H)), lf = nrm(V.cross([0, 0, 0], [0, 1, 0], fw));
+    return { pos: add(add(add(F.rear, scl(fw, 13 - 2 * u)), scl(lf, 6)), [0, 5, 0]), target: add(F.rear, [0, 0.5, 0]), fov: 40, handheld: 0.04, baseShake: 0.03 }; } },
+  { t0: 173.2, t1: 174.7, name: 'D02 beside it on the move — it draws its rifle off its back', fn: (t, u) => { const E = ep(t), f = nrm(sub(ep(t + 0.1), E)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
+    return { pos: add(add(add(E, scl(sd, 18)), scl(f, 5)), [0, 6, 0]), target: add(add(E, scl(f, 1.5)), [0, 6, 0]), fov: 44, handheld: 0.08, baseShake: 0.03 }; } },
+  { t0: 174.7, t1: 176.4, snap: 1.6, name: 'D02b CU — its rifle charging, levelled on him', fn: (t, u) => { const F = enemyRifleFrame(t), c = add(F.p, scl(F.dir, 3.5));
+    return { pos: add(add(add(c, scl(F.side, 10 - 2 * u)), scl(F.up, 2)), scl(F.dir, 3.5 - 1.5 * u)), target: add(c, scl(F.dir, 1 * u)), fov: 44, handheld: 0.04, baseShake: 0.03 }; } },
   // ---- THE GUNFIGHT, shot like a film: every camera is PLACED once for its cut (from where the machines are when the
   // cut starts) and then only pans after them, or dollies slowly — it never rides along. Shot size and angle change
   // cut to cut: extreme wides, long-lens compression, low and high angles, close-ups, fly-bys past the lens.
@@ -1474,8 +1514,8 @@ export const DUEL_CAMS = [
     return { pos: at(H, 30, -48, -26, T), target: pan(up(H, 4), up(hp(t), 4), 0.8), fov: 36, handheld: 0.1 }; } },
   { t0: 177.8, t1: 178.55, snap: 2.2, roll: -0.06, name: 'D08 long lens on it', fn: (t, u) => { const T = 177.8, E = ep(T);
     return { pos: at(E, -150, -40, 6, T), target: pan(up(E, 2), up(ep(t), 2), 0.9), fov: 12, handheld: 0.06 }; } },
-  { t0: 178.55, t1: 179.25, snap: 1.8, name: 'D09 CU — the shield takes it', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T);
-    return { pos: at(E, -16, -14, 3, T), target: pan(up(E, 3), up(ep(t), 3), 0.8), fov: 38, handheld: 0.05 }; } },
+  { t0: 178.55, t1: 179.25, snap: 1.8, name: 'D09 CU on the shield — his shot splashes into sparks of energy, the face scorched', slowmo: true, fn: (t, u) => { const F = blockFrame(Math.min(t, 179.0)), sd = nrm(V.cross([0, 0, 0], F.n, F.up));
+    return { pos: add(add(add(F.p, scl(F.n, 10)), scl(sd, 5)), scl(F.up, 2)), target: add(F.p, scl(F.n, 1)), fov: 42, handheld: 0.03, baseShake: 0.02 }; } },
   { t0: 179.25, t1: 180.45, name: 'D10 from far below — it boosts up and fires down', fn: (t, u) => { const T = 179.25, E = ep(T);
     return { pos: at(lrp(hp(T), E, 0.75), 0, 70, -60, T), target: pan(up(E, 8), ep(t), 0.85), fov: 38, handheld: 0.06 }; } },
   { t0: 180.45, t1: 181.4, roll: -0.1, name: 'D11 profile — he rolls out and answers', fn: (t, u) => { const T = 180.45, H = hp(T);

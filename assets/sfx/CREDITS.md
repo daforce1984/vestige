@@ -625,3 +625,33 @@ Loudness is measured with EBU R128 (ffmpeg `ebur128`); gain is capped at −1 dB
 - alias of hl_thruster.mp3 — the source file is byte-identical, so no separate file is built
 - Applied gain: +0.0 dB
 
+## energy_beam.mp3
+- Source: **Short energy beam shot (3)** by **Yodguard**, https://pixabay.com/sound-effects/film-special-effects-short-energy-beam-shot-3-482517/
+- Source file: `sfx_src/energy_beam.mp3`, sha256 `792802af81f6421ec60098b7b5b650a8083e8828a0e1459a710d73c3b452760c`
+- trimmed to 0.02–1.80 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.35 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: -0.1 dB
+
+## energy_beam2.mp3
+- Source: **Short energy beam shot (4)** by **Yodguard**, https://pixabay.com/sound-effects/film-special-effects-short-energy-beam-shot-4-482500/
+- Source file: `sfx_src/energy_beam2.mp3`, sha256 `9112dafdc637026a4696fa82265bac57b8769a8201a89b100442d693304bd1ba`
+- trimmed to 0.02–1.80 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.40 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: +2.5 dB
+
+## magic_impact.mp3
+- Source: **Elemental Magic Spell Impact Outgoing** by **RescopicSound**, https://pixabay.com/sound-effects/elemental-magic-spell-impact-outgoing-228342/
+- Source file: `sfx_src/magic_impact.mp3`, sha256 `02ab5c0879fe6ed60ee4b458bc500341ef1e385cd311bd86c00de165b94c1dc6`
+- trimmed to 0.02–1.12 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.30 s)
+- normalised to -14.0 LUFS max short-term
+- gain capped by -1.0 dBFS sample peak
+- Applied gain: +0.2 dB
+
