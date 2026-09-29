@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
+import { THROW0, CATCH_T, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, inSkip, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -563,10 +563,10 @@ function duelCues() {
   }
   // ---- MECH SFX: procedural voices modelled on CC0 references (audio-synth.js msShot / msBoost / msArmorHit / msPass)
   // his beam rifle: crack, the falling zap, the sine punch, a gritty body
-  HERO_BURST.forEach((t) => out.push([t, 'energy_beam', { at: 'hit', rate: R(1.02, 1.1), gain: G * 0.8, pan: -0.15, prio: 8, norand: true }]));   // his bursts
+  HERO_BURST.forEach((t) => out.push([t, 'heavy_beam', { rate: R(0.95, 1.02), gain: G * 0.75, dur: 0.55, fadeOut: 0.3, pan: -0.15, prio: 8, norand: true }]));   // his bursts
   ENEMY_BURST.forEach((t) => out.push([t, 'energy_beam2', { at: 'hit', rate: R(0.98, 1.05), gain: G * 0.75, pan: 0.3, prio: 8, norand: true }]));   // its bursts
-  DUEL_RIFLE.forEach((t) => {   // the blaster report: Pixabay 'Short energy beam shot (3)' (sfx energy_beam) + a little low weight
-    out.push([t, 'energy_beam', { at: 'hit', rate: R(0.96, 1.04), gain: G * 1.0, pan: -0.15, prio: 9, norand: true }]);
+  DUEL_RIFLE.forEach((t) => {   // his HEAVY beam: the heavy_beam attack, cut short and pitched down a little, + low weight
+    out.push([t, 'heavy_beam', { rate: R(0.86, 0.92), gain: G * 1.05, dur: 1.1, fadeOut: 0.55, pan: -0.15, prio: 9, norand: true }]);
     out.push([t, '@boom', { bus: 'sfx', f: 50, vel: G * 0.35, dur: 0.8, verb: 0.25 }]);
   });
   // the shots that land: struck plate, ring, and the armour burning through
@@ -577,18 +577,14 @@ function duelCues() {
   out.push([HERO_HIT_T + 0.04, '@msArmorHit', { vel: G * 1.0, hold: 0.8, pan: -0.25 }]);            // into his pauldron
   out.push([HERO_HIT_T + 0.04, '@sparkBurst', { vel: G * 0.7, pan: -0.25 }]);
   // the charge: both light every thruster at once (the quick-boost edges below take over from the first jinks)
-  // the draw + load (duel.js heroDraw / the enemy's draw): a heavy slap on the grab, a thruster puff on the rip, the spent
-  // pac's clamp chain + vent hiss, the fresh one slammed home (clack-CLACK), the lock-in whine; its mount release,
+  // the draw (duel.js heroDraw / the enemy's draw): a heavy slap on the grab, a thruster puff on the rip, a lock-on whine
+  // as both hands bring it onto the target; its mount release,
   // a tick on its eye glint, a 3-step rising whine, the vents' hiss
   out.push([170.05, '@msBoost', { vel: G * 0.7, dur: 1.2, pan: -0.1 }]);
   const ld = (t, name, o) => out.push([t, name, { at: 'hit', prio: 9, norand: true, ...o }]);   // (reload_* : Freesound CC0 samples)
   ld(HERO_GRAB, 'reload_grab', { rate: 0.8, gain: G * 0.8, pan: -0.2 });
   out.push([170.45, '@msBoost', { vel: G * 0.45, dur: 0.15, pan: -0.2 }]);
-  ld(HERO_EJECT, 'reload_eject', { rate: 0.85, gain: G * 0.9, pan: -0.15 });
-  ld(HERO_EJECT + 0.03, 'reload_hiss', { rate: 0.8, gain: G * 0.45, pan: -0.15 });
-  ld(HERO_LOAD, 'reload_slam', { rate: 0.8, gain: G * 1.0, pan: -0.1 });
-  out.push([HERO_LOAD, '@sparkBurst', { vel: G * 0.35, pan: -0.1 }]);
-  ld(HERO_LOCK, 'reload_whine', { at: 0, dur: 0.7, fadeOut: 0.2, rate: 1.1, gain: G * 0.55, pan: -0.1 });
+  ld(HERO_SNAP1 - 0.05, 'reload_whine', { at: 0, dur: 0.7, fadeOut: 0.2, rate: 1.1, gain: G * 0.5, pan: -0.1 });   // (no reload: a lock-on whine as it settles on the target)
   out.push([HERO_SNAP0, '@msBoost', { vel: G * 0.35, dur: 0.12, pan: -0.1 }]);
   ld(ENEMY_GRAB, 'enemy_draw', { rate: 0.85, gain: G * 0.8, pan: 0.2 });
   out.push([ENEMY_EYE + 0.02, '@beep', { f: 2600, dur: 0.05, vel: 0.35, pan: 0.2 }]);
@@ -609,7 +605,12 @@ function duelCues() {
   // buzz held across the pass (Freesound CC0 'bzzzzzzzzzzpht', FartMuffin) + hot metal searing under it (CC0
   // 'ShovelSizzle8_mod', rabban625), its tail ringing on as the halves part
   out.push([CUT_T - 0.012, 'saber_cut', { at: 'hit', gain: G * 1.1, pan: 0.15, prio: 9, norand: true }]);
-  out.push([CUT_T - 0.01, '@msScrape', { vel: G * 1.6, dur: FD(CUT_T - 0.01, CUT_SPLIT + 0.01), pan: 0.15 }]);   // steel grinding as the blade drags through
+  // the blade dragging through: Pixabay 'Squeak Metal PS-019' (AudioPapkin) reshaped — pitched down into a groaning
+  // shriek (rate 0.55) with a slower, deeper copy under it (0.38) and a faster one on top (0.8) for the tearing edge
+  { const d = FD(CUT_T - 0.01, CUT_SPLIT + 0.01) + 0.6;
+    out.push([CUT_T - 0.01, 'scrape_squeak', { rate: 0.55, gain: G * 1.3, dur: d, fadeOut: 0.5, pan: 0.15, prio: 9, norand: true }]);
+    out.push([CUT_T - 0.008, 'scrape_squeak', { rate: 0.38, gain: G * 1.0, dur: d, fadeOut: 0.6, pan: 0.05, prio: 8, norand: true }]);
+    out.push([CUT_T - 0.005, 'scrape_squeak', { at: 0.6, rate: 0.8, gain: G * 0.45, dur: d * 0.7, fadeOut: 0.4, pan: 0.25, prio: 7, norand: true }]); }
   out.push([CUT_T + 0.004, 'cut_sizzle', { at: 'hit', gain: G * 0.55, pan: 0.2, prio: 8, norand: true }]);
   out.push([CUT_T, '@boom', { bus: 'sfx', f: 32, vel: G, dur: 2.0, verb: 0.4 }]);
   out.push([193.95, '@beamSaberRetract', { vel: 0.7 * G, dur: 0.5 }]);
@@ -676,6 +677,8 @@ function duelCues() {
   out.push([TRANS_SHOT + 0.02, 'heavy_beam', { rate: 0.6, dur: FD2(TRANS_SHOT, TRANS_PASS), fadeOut: 0.15, gain: G * 1.0, prio: 9, norand: true }]);
   // he cuts it in half with his saber: ignite, the swing, the cut (a clash + sizzle), both halves whipping past, retract
   out.push([TRANS_PASS - 0.35, '@beamSaberIgnite', { vel: 0.8 * G }]);
+  out.push([THROW0, 'whoosh:a', { at: 0.3, dur: 0.9, rate: 0.7, gain: G * 0.55, pan0: -0.1, pan1: -0.7, prio: 7, norand: true }]);   // the rifle tossed aside …
+  out.push([CATCH_T, 'reload_grab', { at: 'hit', rate: 0.85, gain: G * 0.8, pan: -0.2, prio: 8, norand: true }]);                      // … and slapped back into his hand
   out.push([TRANS_PASS - 0.06, '@beamSaberSwing', { vel: G, dur: 0.4 }]);
   out.push([TRANS_PASS, '@beamSaberClash', { vel: G * 1.3, grind: 1.6 }]);   // full-power blade
   out.push([TRANS_PASS, '@boom', { bus: 'sfx', f: 34, vel: G * 0.8, dur: 1.6, verb: 0.4 }]);

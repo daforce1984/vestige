@@ -108,6 +108,7 @@ SPEC = {
     'sfx16_beam':     dict(seg=(0.0, 2.8), st=False, kind='one', hit=0.01, fo=0.6),    # the transforming-rifle shot ('Sfx16 - Beam', Yarzur_ofc)
     'saber_cut':      dict(seg=(0.0, 2.56), st=False, kind='one', hit=0.02, fo=0.4),   # the pass-cut, melting through ('bzzzzzzzzzzpht', FartMuffin, CC0)
     'cut_sizzle':     dict(seg=(0.0, 3.0), st=False, kind='one', hit=0.1, fo=1.2),     # hot metal searing under it ('ShovelSizzle8_mod', rabban625, CC0)
+    'scrape_squeak':  dict(seg=(0.12, 4.0), st=False, kind='one', hit=0.2, fo=0.6),    # the pass-cut's metal groan, pitched down at runtime ('Squeak Metal PS-019', AudioPapkin)
     # ---- 2026-09-30: the draw/load (Freesound CC0 previews)
     'reload_grab':    dict(seg=(0.36, 0.95), st=False, kind='one', hit=0.44, fo=0.2),   # hand slaps onto the rifle ('A heavy battle rifle being dropped…', take 1)
     'reload_eject':   dict(seg=(2.25, 3.2), st=False, kind='one', hit=2.30, fo=0.12),   # spent pac out: a chain of heavy clamp hits ('MechanicalClamp', Skullsmasha)

@@ -595,6 +595,13 @@
    "kind": "one",
    "hit": 0.05,
    "dur": 0.62
+  },
+  "scrape_squeak": {
+   "file": "scrape_squeak.mp3",
+   "ch": 1,
+   "kind": "one",
+   "hit": 0.08,
+   "dur": 3.88
   }
  }
 }

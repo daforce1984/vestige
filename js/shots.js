@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, heroRifleThrow, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -712,6 +712,7 @@ export function drawGundam(R, t, s, opts = {}) {
   e.hidden = { rifle: 1, saber_hilt: weapon === 'saber' || s.saberL ? 0 : 1 };   // (the built-in rifle replaced by hero_rifle, drawn on its node)
   if (weapon === 'rifle' && !s.fpv) { const rw = R.partWorld('gundam', e, 'rifle'); if (rw) { M.fromTRS(_hrS, [0, 0, 0], [0, 0, 0, 1], 1); _hrS[0] = HERO_RIFLE_S[0]; _hrS[5] = HERO_RIFLE_S[1]; _hrS[10] = HERO_RIFLE_S[2];
     const g = R.add('hero_rifle', M.mul(new Float32Array(16), rw, _hrS)); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }
+  if (weapon === 'thrown' && !s.fpv) { const m = heroRifleThrow(t); if (m) { const g = R.add('hero_rifle', m); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }   // tossed aside for the saber cut
   if (weapon === 'back' && !s.fpv) { const tw = R.partWorld('gundam', e, 'torso'); if (tw) { const g = R.add('hero_rifle', M.mul(new Float32Array(16), tw, heroBackMount())); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }   // slung on his back
   if (s.fpv) {
     e.hidden = { rifle: 1, head: 1, torso: 1, backpack: 1, pelvis: 1, arm_L_upper: 1, arm_R_upper: 1, hand_L: 1, hand_R: 1 };   // POV: forearms + articulated hands
@@ -763,7 +764,7 @@ export function drawGundam(R, t, s, opts = {}) {
     if (mz) { R.glow(mz, 0.6 + 3.2 * q, [0.8 * q, 2.2 * q, 3.2 * q], 0.35); R.light(mz, 60, [0.4, 0.8, 1], 12 * q); }
     e.matOverride.core = { ...e.matOverride.core, emissive: e.matOverride.core.emissive.map((v) => v * (1 + 6 * q)) };
   }
-  if (t >= 170 && t < 200 && !s.fpv) { heavyDamage(R, t, e, 0); meltHole(e, 'hero', t); drawLoad(R, t); }
+  if (t >= 170 && t < 200 && !s.fpv) { heavyDamage(R, t, e, 0); meltHole(e, 'hero', t); }   // (drawLoad: the reload was cut)
   GUN.gundam = e;
   return e;
 }
@@ -1095,8 +1096,8 @@ function rifleShot(R, t, t0, from, to, hit = false) {
   const speed = 5000;
   const head = Math.min(1, (lt * speed) / L), tail = Math.min(1, Math.max(0, ((lt - 0.12) * speed) / L));
   const a = lerpv(from, to, tail), b = lerpv(from, to, head), kk = 1 - 0.6 * sat((lt - 0.05) / 0.25);
-  if (head > tail) { R.beam(a, b, 0.75 * kk + 0.2, [0.9 * kk, 2.0 * kk, 2.9 * kk], 1, 20, 0.6, 0.8); R.beam(a, b, 2.2, [0.5 * kk, 1.1 * kk, 1.6 * kk], 0.04, 3, 2, 0.6); }   // cyan like his core and the magnum (white core kept low)
-  if (lt < 0.12) { R.glow(from, 4 * (1 - lt / 0.12), [0.9, 2.0, 2.9], 0.5); R.light(from, 50, [0.4, 0.8, 1], 3); }
+  if (head > tail) { R.beam(a, b, 1.5 * kk + 0.4, [0.9 * kk, 2.0 * kk, 2.9 * kk], 1, 20, 0.6, 0.8); R.beam(a, b, 4.4, [0.5 * kk, 1.1 * kk, 1.6 * kk], 0.04, 3, 2, 0.6); }   // a HEAVY beam, twice the old bolt's thickness; cyan like his core (white core kept low)
+  if (lt < 0.16) { R.glow(from, 7 * (1 - lt / 0.16), [0.9, 2.0, 2.9], 0.5); R.light(from, 60, [0.4, 0.8, 1], 4); }
   if (hit && head >= 1) hitFlash(R, t, t0 + L / speed, to, 6, [1, 0.6, 0.8]);
 }
 

@@ -745,3 +745,12 @@ Loudness is measured with EBU R128 (ffmpeg `ebur128`); gain is capped at −1 dB
 - gain capped by -1.0 dBFS sample peak
 - Applied gain: +2.7 dB
 
+## scrape_squeak.mp3
+- Source: **Squeak Metal PS-019** by **AudioPapkin**, https://pixabay.com/sound-effects/film-special-effects-squeak-metal-ps-019-389409/
+- Source file: `sfx_src/scrape_squeak.mp3`, sha256 `8cfe7519dd31efe1fa9a9ba225dc1f004bb019488f0e35e4ac98e043a9254c2e`
+- trimmed to 0.12–4.00 s of the source
+- mono (runtime panning)
+- 3 ms fade-in, tail trimmed below −62 dB, fade-out (0.60 s)
+- normalised to -14.0 LUFS max short-term
+- Applied gain: +0.5 dB
+
