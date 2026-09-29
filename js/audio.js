@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
+import { DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -413,7 +413,7 @@ export const SAMPLE_CUES = [
   // launch run: an enemy ion bolt screams in, Sigma rolls out of its way (duel.js DODGE 166.65) — no parry
   [166.03, 'laser_cannon:s2', { dur: 1.2, fadeOut: 0.5, rate: 0.7, gain: 0.5, far: 0.55, pan: 0.3, prio: 7, norand: true }],
   [166.35, 'flyby_fast', { rate: 0.8, gain: 0.8, pan0: 0.1, pan1: 0.5, dur: 0.5, fadeOut: 0.2, prio: 8, norand: true }],   // incoming
-  [166.5, 'hl_thruster', { dur: 0.6, fadeOut: 0.3, rate: 1.3, gain: 0.8, pan: -0.3, prio: 8, norand: true }],             // he rolls out of it
+  [166.5, '@msBoost', { vel: 0.85, dur: 0.45, pan: -0.3 }],                                                            // he slips sideways out of it
   [166.66, 'flyby_fast', { rate: 0.9, gain: 1.0, pan0: 0.4, pan1: -0.7, dur: 0.6, fadeOut: 0.25, prio: 9, norand: true }],     // it roars past the empty space
   [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar
   [262.05,'servo',     { rate: 0.5, gain: 0.9, prio: 8, norand: true }],
@@ -537,7 +537,7 @@ function duelCues() {
   for (const e of EV) {
     const st = e.strength ?? 0.7, pan = e.on === 'enemy' ? R(0.15, 0.45) : e.on === 'hero' ? R(-0.45, -0.15) : R(-0.15, 0.15);
     if (e.shotDir && !e.cut) continue;                                 // beam hits on the shield: their own cues (below)
-    if (!e.shotDir && (e.type === 'clash' || e.type === 'block' || e.type === 'hit' || (e.type === 'shake' && swing(e)))) {
+    if (!e.shotDir && !e.slash && (e.type === 'clash' || e.type === 'block' || e.type === 'hit' || (e.type === 'shake' && swing(e)))) {
       out.push([e.t - R(0.1, 0.2), r() < 0.5 ? 'whoosh:a' : 'whoosh:b',
         { at: 0.55, dur: 0.6, fadeOut: 0.2, rate: R(1.7, 2.1), gain: G * (0.45 + 0.35 * st), pan: -pan, prio: 7, norand: true }]);
     }
@@ -553,7 +553,6 @@ function duelCues() {
       out.push([e.t, 'debris_impact', { at: 0.8, dur: 1.6, fadeOut: 0.6, lp: 1800, gain: G * 0.5 * st, pan, prio: 8, norand: true }]);
       out.push([e.t, '@boom', { bus: 'sfx', f: 38, vel: G * 0.8 * st, dur: 1.4, verb: 0.3 }]);
       out.push([e.t, '@crunch', { vel: G * st, pan }]);
-      out.push([e.t + 0.08, 'servo', { rate: R(1.2, 1.4), dur: 0.6, fadeOut: 0.2, gain: G * 0.45, pan, prio: 6 }]);
       if (e.cut) {                                                     // the kill: armour torn open, a huge iron clang
         out.push([e.t, 'metal_crush', { at: 'hit', rate: 0.8, gain: G * 1.1, pan, prio: 9, norand: true }]);
         out.push([e.t + 0.02, 'metal_door', { at: 'hit', rate: 0.72, gain: G * 1.0, pan: pan * 0.5, prio: 9, norand: true }]);
@@ -565,27 +564,29 @@ function duelCues() {
     }
     if (e.hitstop > 0) out.push([e.t + 0.005, '@freezeSting', { dur: e.hitstop, vel: G * (0.4 + 0.4 * st) }]);
   }
-  // ---- hero beam rifle: heavy report + low boom; the reversal shot tears off its wing, the charged last shot is a magnum
-  DUEL_RIFLE.forEach((t, i) => {
-    const kill = false;
-    out.push([t, 'beam_blast1', { at: 2.15, dur: 0.8, fadeOut: 0.3, rate: kill ? 0.8 : 1.1, gain: G * (kill ? 1.3 : 0.9), pan: -0.15, prio: 9, duck: kill ? 2 : 0.6, duckDb: DUEL_DUCK_DB, norand: true }]);
-    out.push([t, 'laser_shot', { gain: G * (kill ? 0.9 : 0.75), rate: kill ? 0.7 : R(0.9, 1.0), pan: -0.15, prio: 8, norand: true }]);
-    out.push([t, '@boom', { bus: 'sfx', f: kill ? 34 : 55, vel: G * (kill ? 0.95 : 0.5), dur: kill ? 1.6 : 1.0, verb: 0.3 }]);
-  });
-  // the shield torn off its arm: a crunch of metal, sparks, a ring
-  out.push([SHIELD_HIT_T + 0.03, 'metal_knock', { at: 'hit', rate: 0.75, gain: G * 1.0, pan: 0.3, prio: 9, duck: 0.8, duckDb: DUEL_DUCK_DB, norand: true }]);
-  out.push([SHIELD_HIT_T + 0.03, '@sparkBurst', { vel: G * 0.8, pan: 0.3 }]);
-  out.push([SHIELD_HIT_T + 0.03, '@metalRing', { vel: G * 0.6, f0: 300, dec: 1.2, pan: 0.3 }]);
+  // ---- MECH SFX: procedural voices modelled on CC0 references (audio-synth.js msShot / msBoost / msArmorHit / msPass)
+  // his beam rifle: crack, the falling zap, the sine punch, a gritty body
+  DUEL_RIFLE.forEach((t) => out.push([t, '@msShot', { vel: G * R(0.85, 0.95), k: R(0.98, 1.04), pan: -0.15 }]));
+  // the shots that land: struck plate, ring, and the armour burning through
+  out.push([SHIELD_HIT_T + 0.03, '@msArmorHit', { vel: G * 1.0, f: 180, burn: 0.8, pan: 0.3 }]);   // the shield torn off its arm
+  out.push([SHIELD_HIT_T + 0.03, '@sparkBurst', { vel: G * 0.6, pan: 0.3 }]);
+  out.push([THIGH_T + 0.03, '@msArmorHit', { vel: G * 0.95, f: 210, burn: 1.2, pan: 0.3 }]);       // through its thigh
+  out.push([HERO_HIT_T + 0.04, '@msArmorHit', { vel: G * 1.0, f: 230, burn: 1.1, pan: -0.25 }]);   // into his pauldron
+  out.push([HERO_HIT_T + 0.04, '@sparkBurst', { vel: G * 0.7, pan: -0.25 }]);
+  // the charge: both light every thruster at once (the quick-boost edges below take over from the first jinks)
+  out.push([170.05, '@msBoost', { vel: G * 0.9, dur: 1.3, pan: -0.15 }]);
+  out.push([170.35, '@msBoost', { vel: G * 0.45, dur: 1.1, pan: 0.35 }]);
+  for (const t of [173.1, 174.8]) out.push([t - 0.03, '@msBoost', { vel: G * 0.75, dur: 0.3, pan: -0.2 }]);
   // THE FINISH: the rifle slung (a servo clunk), the saber lit, the SANDEVISTAN (time folds: a deep inhaling whoomp,
   // the world's sound smeared low by the master slow-mo), the pass-cut (buzz + sizzle + armour parting), retract
   const FD = (a, b) => filmT(b) - filmT(a);                          // cue lengths in film seconds (the bullet time stretches them)
-  out.push([191.18, 'servo', { rate: 1.1, dur: 0.5, fadeOut: 0.2, gain: G * 0.6, pan: -0.2, prio: 7, norand: true }]);
+  out.push([191.18, 'metal_knock', { at: 'hit', rate: 1.1, gain: G * 0.35, pan: -0.2, prio: 7, norand: true }]);   // the rifle locks on his back
   out.push([SANDE0 - 0.04, '@beamSaberIgnite', { vel: 0.9 * G }]);
   out.push([SANDE0 - 0.02, 'power_down', { rate: 0.45, gain: G * 0.9, prio: 9, duck: 1.5, norand: true }]);   // time folding in
   out.push([SANDE0, '@boom', { bus: 'sfx', f: 30, vel: G * 0.8, dur: 2.2, verb: 0.45 }]);
   out.push([SANDE0 + 0.02, '@beamSaberHum', { dur: FD(SANDE0, 194.1), vel: 0.75 * G, fadeIn: 0.1, fadeOut: 0.3,
     swings: [[FD(SANDE0, CUT_T - 0.08), 1, 0.5]] }]);
-  for (const t of [191.47, 191.66, 191.86]) out.push([t - 0.02, 'whoosh:b', { at: 0.55, dur: 0.7, fadeOut: 0.3, rate: 0.7, gain: G * 0.7, pan: -0.3, prio: 8, norand: true }]);   // each leg of the dash
+  for (const t of [191.47, 191.66, 191.86]) out.push([t - 0.02, '@msBoost', { vel: G * 0.8, dur: 0.25, pan: -0.3 }]);   // each leg of the dash
   out.push([CUT_T - 0.06, '@beamSaberSwing', { vel: G, dur: 0.5 }]);
   out.push([CUT_T, '@beamSaberClash', { vel: G, grind: 0.9 }]);
   out.push([CUT_T, 'metal_crush', { at: 'hit', rate: 0.7, gain: G * 1.0, pan: 0.2, prio: 9, norand: true }]);
@@ -630,8 +631,7 @@ function duelCues() {
       const t = S[i].t, b = val(i, 'boost'), b0 = val(i - 10, 'boost');
       if (b >= 0.85 && b - b0 >= 0.3 && t - lastDash > 0.6) {
         lastDash = t;
-        out.push([t - 0.05, 'hl_thruster', { loop: true, dur: 0.9, rate: R(1.15, 1.35), gain: G * 0.6, fadeIn: 0.04, fadeOut: 0.5, pan, prio: 7, norand: true }]);
-        out.push([t - 0.1, 'whoosh:b', { at: 0.55, dur: 0.7, fadeOut: 0.25, rate: R(1.3, 1.6), gain: G * 0.5, pan, prio: 6, norand: true }]);
+        out.push([t - 0.04, '@msBoost', { vel: G * (name === 'hero' ? R(0.7, 0.85) : R(0.5, 0.65)), dur: R(0.25, 0.4), pan }]);
       }
     }
     // (no servo / footstep rattle on pose changes: under the AMBAC limb motion it read as a constant "drrrr")
@@ -643,21 +643,18 @@ function duelCues() {
   // ---- VANGUARD's beam rifle: a sharp report (pitched lower than Sigma's) + a low thump; the bolts that pass near him
   //      whip past; its jump (179.3) and the quick-boosts come from the per-mech boost edges above
   for (const ts of SERAPH_SHOTS) {
-    out.push([ts, 'beam_blast1', { at: 2.15, dur: 0.8, fadeOut: 0.3, rate: 0.85, gain: G * 0.75, pan: 0.3, prio: 8, duck: 0.5, duckDb: DUEL_DUCK_DB, norand: true }]);
-    out.push([ts, 'laser_shot', { gain: G * 0.6, rate: 0.72, pan: 0.3, prio: 7, norand: true }]);
-    out.push([ts, '@boom', { bus: 'sfx', f: 48, vel: G * 0.35, dur: 0.7, verb: 0.25 }]);
-    out.push([ts + 0.03, 'flyby_fast', { rate: 1.3, gain: G * 0.45, pan0: 0.4, pan1: -0.6, dur: 0.35, fadeOut: 0.15, prio: 7, norand: true }]);
+    out.push([ts, '@msShot', { vel: G * 0.75, k: 0.8, pan: 0.3 }]);                          // its heavier rifle, pitched down
+    if (Math.abs(ts - HERO_HIT_T) > 0.1) out.push([ts, '@msPass', { vel: G * 0.55, tp: 0.12, ratio: R(1.8, 2.6), f: R(1600, 2000), pan0: 0.5, pan1: -0.7 }]);   // it whips past him
   }
-  out.push([179.3, 'hl_thruster', { dur: 1.3, fadeOut: 0.7, rate: 0.95, gain: G * 0.7, pan0: 0.3, pan1: 0.5, prio: 7, norand: true }]);   // the boost-jump
-  // his 178.7 splashes off its shield: a hard ring + sizzle (no tearing metal)
-  out.push([BLOCK_T + 0.03, '@metalRing', { vel: G * 0.7, f0: 520, dec: 0.8, pan: 0.3 }]);
-  out.push([BLOCK_T + 0.03, '@sizzle', { vel: G * 0.6, pan: 0.3 }]);
+  out.push([179.3, '@msBoost', { vel: G * 0.75, dur: 1.0, pan: 0.35 }]);                     // the boost-jump
+  // his 178.7 splashes off its shield: the plate rings, the face burns (the hole stays)
+  out.push([BLOCK_T + 0.03, '@msArmorHit', { vel: G * 0.85, f: 260, burn: 0.9, pan: 0.3 }]);
   out.push([BLOCK_T + 0.03, '@sparkBurst', { vel: G * 0.6, pan: 0.3 }]);
   // ---- the finale: full power along the line it laid on him — he has slipped it; it roars past him
   out.push([FINALE_T - 0.35, 'charge_up', { at: 0, dur: 0.4, fadeOut: 0.05, rate: 1.3, gain: G * 0.8, pan: 0.2, prio: 8, norand: true }]);
-  out.push([FINALE_T, 'beam', { at: 'hit', gain: G * 1.2, rate: 1.05, prio: 9, duck: 3, norand: true }]);
+  out.push([FINALE_T, '@msShot', { vel: G * 1.2, k: 0.62 }]);
   out.push([FINALE_T, 'heavy_beam', { rate: 0.85, dur: FINALE_END - FINALE_T + 0.6, fadeOut: 0.3, gain: G * 1.1, prio: 9, norand: true }]);
-  out.push([FINALE_T + 0.05, 'flyby_fast', { rate: 0.8, gain: G * 0.7, pan0: 0.5, pan1: -0.5, dur: 0.6, fadeOut: 0.25, prio: 8, norand: true }]);
+  out.push([FINALE_T, '@msPass', { vel: G * 0.9, tp: 0.1, ratio: 3.2, f: 1500, pan0: 0.5, pan1: -0.6 }]);   // it roars past him
   out.push([FINALE_T, '@boom', { bus: 'sfx', f: 38, vel: G * 0.7, dur: 1.2, verb: 0.3 }]);
   return out;
 }

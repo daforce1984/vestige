@@ -1815,6 +1815,119 @@ function breath(E, t, p) {
   perc(gg.gain, t + ti + 0.05, vel * 0.08, to / 3, 0.05);
 }
 
+// ================================================================ v10: MECH SFX (procedural, no samples)
+// Reference analysis (CC0 recordings in assets/sfx_src/mech_ref, see the README there; numpy/scipy, 2026-09-29):
+//  • HEAVY ENERGY SHOT: attack 5–35 ms, peak 80–225 ms, 13–45 dB/s, 55–90 % of the energy < 600 Hz, > 6 kHz ≤ 3 %.
+//    Centroid ~1 kHz for 50 ms, 0.6 kHz to 400 ms, 0.1 kHz by 0.8 s. The punch is a pure sine DROP 211 → 164 (46 ms)
+//    → 103 (121) → 79 (196) → 50 Hz (τ ≈ 0.12 s); crack partials 1.78 / 3.6 kHz; a ~100 Hz (or 174 Hz) body with a
+//    17–30 Hz amplitude grit (depth 0.5–0.85).
+//  • QUICK BOOST: a low thump (0–125 ms, 75 → 50 Hz rumble + partials ~200–270 Hz), then a hiss at −10 dB whose
+//    centroid sweeps 3 → 9 kHz then down (a pure boost: 4.8 → 2.0 kHz over 400 ms), 42–60 dB/s; sustained burns are a
+//    0.3–0.6 kHz roar with 25 Hz AM (depth 0.3) and ~45 crackle pops/s.
+//  • ARMOUR HIT: 3 kHz click, plate modes base × [1, 1.67, 3.61, 4.78] (211 Hz: −6/0/−8/−10 dB, T60 1.7/0.8/1.0/0.6 s),
+//    1.3 / 1.66 kHz modes (T60 0.8 s), a 4 kHz ring (T60 1.9 s), a 50 Hz thud (T60 0.7 s); the burn after it is dense
+//    noise centred 10–11 kHz, fading in over 180 ms, 25 dB/s; an arc adds 15–20 crackles/s above 6 kHz.
+//  • PASS-BY: a whistle that holds ~1.8 kHz and drops by 1.4–1.8× (stylised up to 4×) in ~200 ms at the pass; level
+//    +18–20 dB in the last 100–300 ms, −20 dB within 0.1 s after; noise centroid 6.4 → 1.4 kHz within 80 ms.
+// msShot: a mobile-suit beam rifle report. p.k = pitch scale (VANGUARD's heavier rifle < 1), p.vel, p.pan
+function msShot(E, t, p) {
+  const vel = p.vel ?? 0.9, k = p.k ?? 1, stop = t + 2.2;
+  const v = new Voice(E, 'sfx', { verb: 0.45, pan: p.pan ?? 0 });
+  // crack: band noise + two bright partials, ~12 ms
+  const n = v.noise('white', t, t + 0.2), nb = v.f('bandpass', 1800 * k, 1.2), ng = v.g(0);
+  n.connect(nb); nb.connect(ng); ng.connect(v.out);
+  perc(ng.gain, t, vel * 1.6, 0.014, 0.001);
+  const cg = v.g(0); cg.connect(v.out);
+  for (const [f, a] of [[1780, 0.5], [3600, 0.22]]) { const o = v.osc('sine', f * k, t, t + 0.3), og = v.g(a); o.connect(og); og.connect(cg); }
+  perc(cg.gain, t, vel * 1.1, 0.02, 0.001);
+  // the zap: a saw falling 1.4 kHz → 180 Hz through a tracking band (the beam 'bshuun')
+  const z = v.osc('sawtooth', 1400 * k, t, t + 0.6), zb = v.f('bandpass', 1600 * k, 2.5), zg = v.g(0);
+  sweep(z.frequency, t, 1400 * k, t + 0.22, 180 * k); sweep(zb.frequency, t, 1600 * k, t + 0.25, 300 * k);
+  z.connect(zb); zb.connect(zg); zg.connect(v.out);
+  perc(zg.gain, t, vel * 0.9, 0.09, 0.002);
+  // the punch: sine drop 210 → 49 Hz, lightly driven
+  const s = v.osc('sine', 210 * k, t, stop), sp = v.g(1.5), sh = v.ws('soft'), sg = v.g(0);
+  s.frequency.setValueAtTime(210 * k, t); s.frequency.setTargetAtTime(49 * k, t, 0.12);
+  s.connect(sp); sp.connect(sh); sh.connect(sg); sg.connect(v.out);
+  perc(sg.gain, t, vel * 0.5, 0.35, 0.005);
+  // body: detuned saws ~100 Hz through a closing lowpass, with a ~22 Hz grit on its level
+  const lp = v.f('lowpass', 3500, 0.9), bg = v.g(0), am = v.g(0.5), bd = v.g(1);
+  sweep(lp.frequency, t, 3500, t + 0.1, 600); sweep(lp.frequency, t + 0.1, 600, t + 0.8, 150);
+  for (const dt of [-7, 7]) v.osc('sawtooth', 98 * k, t, stop, dt).connect(lp);
+  lp.connect(bd); bd.connect(bg); bg.connect(v.out);
+  const lfo = v.osc('square', 22, t, stop); lfo.connect(am); am.connect(bd.gain); bd.gain.value = 0.5;
+  bg.gain.setValueAtTime(0, t); bg.gain.linearRampToValueAtTime(vel * 1.1, t + 0.015); bg.gain.setTargetAtTime(0, t + 0.02, 0.3);
+  // air: dark rumble tail
+  const r = v.noise('brown', t, stop), rl = v.f('lowpass', 400, 0.7), rg = v.g(0);
+  r.connect(rl); rl.connect(rg); rg.connect(v.out);
+  perc(rg.gain, t, vel * 0.3, 0.4, 0.01);
+}
+// msBoost: a quick-boost burst — thump, a hiss sweeping down, a short crackling roar. p.dur = burn length (s)
+function msBoost(E, t, p) {
+  const vel = p.vel ?? 0.8, dur = p.dur ?? 0.35, stop = t + dur + 1.2;
+  const v = new Voice(E, 'sfx', { verb: 0.3, pan: p.pan ?? 0 });
+  const th = v.osc('sine', 75, t, stop), tg = v.g(0);
+  th.frequency.setValueAtTime(75, t); th.frequency.setTargetAtTime(50, t, 0.3);
+  th.connect(tg); tg.connect(v.out);
+  perc(tg.gain, t, vel * 0.45, 0.12, 0.01);
+  const tb = v.noise('brown', t, stop), tl = v.f('lowpass', 300, 0.7), tbg = v.g(0);
+  tb.connect(tl); tl.connect(tbg); tbg.connect(v.out);
+  perc(tbg.gain, t, vel * 0.5, 0.12, 0.01);
+  const h = v.noise('white', t, stop), hp = v.f('highpass', 1500, 0.7), hb = v.f('bandpass', 6000, 0.7), hg = v.g(0);
+  sweep(hb.frequency, t, 6000, t + 0.35, 2500); hb.frequency.setTargetAtTime(1800, t + 0.35, dur);
+  h.connect(hp); hp.connect(hb); hb.connect(hg); hg.connect(v.out);
+  hg.gain.setValueAtTime(0, t); hg.gain.linearRampToValueAtTime(vel * 1.1, t + 0.04);
+  hg.gain.setValueAtTime(vel * 1.1, t + 0.04 + dur * 0.5); hg.gain.setTargetAtTime(0, t + 0.04 + dur * 0.5, 0.17);
+  const rr = v.noise('brown', t, stop), rl = v.f('lowpass', 500, 0.8), ra = v.g(1), rg = v.g(0), lfo = v.osc('sine', 25, t, stop), lg = v.g(0.3);
+  sweep(rl.frequency, t, 500, t + dur + 0.3, 300);
+  lfo.connect(lg); lg.connect(ra.gain); ra.gain.value = 0.7;
+  rr.connect(rl); rl.connect(ra); ra.connect(rg); rg.connect(v.out);
+  envAR(rg.gain, t + 0.03, dur, 0.06, 0.35, vel * 0.55);
+  const c = v.noise('crackle', t, stop, 1.1), ch = v.f('highpass', 2000, 0.7), cg = v.g(0);
+  c.connect(ch); ch.connect(cg); cg.connect(v.out);
+  envAR(cg.gain, t + 0.04, dur, 0.05, 0.3, vel * 0.22);
+}
+// msArmorHit: a beam landing on armour — click, struck plate, a long ring, then the burn-through sizzle / arc
+function msArmorHit(E, t, p) {
+  const vel = p.vel ?? 0.9, base = p.f ?? 200, burn = p.burn ?? 1, stop = t + 3;
+  const v = new Voice(E, 'sfx', { verb: 0.5, pan: p.pan ?? 0 });
+  const c = v.noise('white', t, t + 0.1), chp = v.f('highpass', 3000, 0.7), cg = v.g(0);
+  c.connect(chp); chp.connect(cg); cg.connect(v.out);
+  perc(cg.gain, t, vel * 0.6, 0.015, 0.001);
+  for (const [m, a, t60] of [[1, 0.5, 1.7], [1.67, 1, 0.8], [3.61, 0.4, 1.0], [4.78, 0.32, 0.6], [1300 / base, 0.18, 0.8], [1660 / base, 0.18, 0.8], [4000 / base, 0.25, 1.9]]) {
+    const o = v.osc('sine', base * m * R(0.99, 1.01), t, stop), g = v.g(0);
+    o.connect(g); g.connect(v.out);
+    perc(g.gain, t, vel * 0.4 * a, t60 / 6.9, 0.002);
+  }
+  const th = v.osc('sine', 50, t, stop), tg = v.g(0);
+  th.connect(tg); tg.connect(v.out);
+  perc(tg.gain, t, vel * 0.35, 0.1, 0.005);
+  if (burn > 0) {
+    const n = v.noise('white', t, stop), hp = v.f('highpass', 2000, 0.7), pk = v.f('peaking', 6000, 1), g = v.g(0);
+    pk.gain.value = 4;
+    n.connect(hp); hp.connect(pk); pk.connect(g); g.connect(v.out);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vel * 0.2 * burn, t + 0.17); g.gain.setTargetAtTime(0, t + 0.18, 0.35 * burn);
+    const a = v.noise('crackle', t, stop, 0.4), ah = v.f('highpass', 6000, 0.7), ag = v.g(0);
+    a.connect(ah); ah.connect(ag); ag.connect(v.out);
+    perc(ag.gain, t + 0.02, vel * 0.35 * burn, 0.4 * burn, 0.01);
+  }
+}
+// msPass: a beam bolt whipping past. p.tp = time of the pass after t, p.ratio = pitch drop, p.pan0 / p.pan1
+function msPass(E, t, p) {
+  const vel = p.vel ?? 0.6, tp = t + (p.tp ?? 0.12), f = p.f ?? 1800, ratio = p.ratio ?? 2.2, t0 = Math.max(t, tp - 0.3), stop = tp + 1.2;
+  const v = new Voice(E, 'sfx', { verb: 0.3, pan: p.pan0 ?? -0.8, mp: true });
+  const g = v.g(0); g.connect(v.out);
+  const o = v.osc('sine', f, t0, stop), og = v.g(0.6);
+  o.frequency.setValueAtTime(f, tp - 0.05); o.frequency.setTargetAtTime(f / ratio, tp - 0.05, 0.08);
+  o.connect(og); og.connect(g);
+  const n = v.noise('white', t0, stop), nb = v.f('bandpass', 5500, 1.2), ng = v.g(1);
+  nb.frequency.setValueAtTime(5500, tp); nb.frequency.setTargetAtTime(1400, tp, 0.04);
+  n.connect(nb); nb.connect(ng); ng.connect(g);
+  g.gain.setValueAtTime(vel * 0.018, t0); g.gain.exponentialRampToValueAtTime(vel * 0.6, tp);
+  g.gain.exponentialRampToValueAtTime(vel * 0.06, tp + 0.1); g.gain.setTargetAtTime(0, tp + 0.1, 0.35);
+  v.panRamp(p.pan0 ?? -0.8, p.pan1 ?? 0.8, tp - 0.15, tp + 0.15);
+}
+
 // ================================================================ v9: BEAM SABER (procedural, no samples)
 // Reference analysis (CC0 recordings in assets/sfx_src/saber_ref, see the README there; numpy/scipy, 2026-09):
 //  • HUM: steady motor hum, f0 80.9 Hz (sd 0.6 Hz, ~1 Hz drift) / 83–86 Hz in a second loop, ~97–100 Hz in the swing
@@ -1971,4 +2084,6 @@ export const INSTR = {
   beep, breath,
   // v9 beam saber (procedural)
   beamSaberIgnite, beamSaberHum, beamSaberSwing, beamSaberRetract, beamSaberClash,
+  // v10 mech SFX (procedural)
+  msShot, msBoost, msArmorHit, msPass,
 };
