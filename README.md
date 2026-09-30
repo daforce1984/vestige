@@ -72,6 +72,12 @@ python3 tools/serve.py 8791
 | 코드 작성 | Claude Code (Claude Opus 5.5) |
 | 3D 모델 | Blender 5.2 (Python 스크립트로 절차 생성) |
 | 메카 원본 | ATLAS/09(시그마), RONIN/04(적 메카), Ramon Linares, **CC0** |
+| 적 모함 | "Space Battleship Aquamarine", Kai Xiang, **CC BY 4.0** (수정: 폴리곤 감소, 단색화 등) |
+| 시그마 소총 | "Futuristic Sci-Fi Rifle", Janis Zeps, **CC BY 4.0** (수정) |
+| 적 메카 소총 | "NANITE SYSTEMS Assault Rifle", Frostoise, **CC BY-NC-SA 4.0** (수정본도 CC BY-NC-SA 4.0) |
+| 적 전투기 | "Spaceship", Jefferson Frenay, **CC BY-NC-ND 4.0** (형식 변환만, 변경 없음) |
+| 아군 전투기 | "Light Fighter Spaceship", Kerem Kavalci, **Sketchfab Standard** (영상 안에서만 사용, 단독 재배포 불가) |
+| 적 메카 | "3D Mech Asset", TryoutIndie.Dev, **MIT** |
 | 지구 텍스처 | © Solar System Scope, **CC BY 4.0** |
 | 대사 음성 | ElevenLabs v3 (영어 대사, 한국어 자막) |
 | 음악 | MiniMax Music 3 (ComfyUI로 생성) |
@@ -79,7 +85,7 @@ python3 tools/serve.py 8791
 | 폰트 | Google Fonts: Rajdhani, Noto Serif KR, Share Tech Mono |
 | 테스트 | Chrome DevTools Protocol (보이는 Chrome 탭 하나만 사용) |
 
-팬 트리뷰트 작품이며, 디자인은 모두 이 프로젝트용으로 새로 만들었습니다.
+팬 트리뷰트 작품이며 **비상업** 작품입니다. 위의 서드파티 모델들은 이 저장소의 다른 부분과 별개로 각자의 라이선스를 따르며, 원본 파일은 저장소에 포함하지 않습니다. 자세한 저작자, 출처, 라이선스 링크, 변경 내역은 `assets/THIRD_PARTY_MODELS.md`에 있습니다.
 
 ## 폴더 구조
 

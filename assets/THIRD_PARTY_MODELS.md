@@ -1,0 +1,19 @@
+# Third-party 3D models
+
+These models are **not** covered by anything else in this repository. Each stays under its own licence, below. The
+original downloads are *not* in the repository (their licences don't allow redistributing them as they are); only the
+converted files the film loads are, and each of those is covered by the licence of the model it came from. The
+conversion script is `tools/build_rifles.py` (+ `blender/decimate_glb.py`), which reads the originals from the
+git-ignored `assets/src/`.
+
+VESTIGE is a **non-commercial** fan work: it is never sold, and nothing in it may be used commercially. The NC models
+below require this.
+
+| File(s) in this repository | Model · author · source | Licence | Changes |
+|---|---|---|---|
+| `assets/dreadnought_game.glb`, `assets/tex/dreadnought_game_albedo.png`, `assets/tex/dreadnought_game_orm.png` (the enemy dreadnought) | "Space Battleship Aquamarine" by **Kai Xiang** (kirikom9000) — https://sketchfab.com/3d-models/space-battleship-aquamarine-c508be042d9a4d358359623f6be34bc3 | CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/ | **Modified:** display plane removed; polygon count reduced (113k → 51k triangles); centred and rescaled; textures packed into one atlas, recoloured in the renderer to a single steel grey with weaker emissive; engine emitter discs and a weapon-emitter point added. |
+| `assets/rifle2_game.glb`, `assets/tex/rifle2_game_albedo.png`, `assets/tex/rifle2_game_orm.png` (Sigma's rifle) | "Futuristic Sci-Fi Rifle" by **Janis Zeps** (zeps9001) — https://sketchfab.com/3d-models/futuristic-sci-fi-rifle-9b94a2933cc346a4ad4791bcd8c9af32 | CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/ | **Modified:** re-posed onto the hand, rescaled, materials merged and textures packed into one atlas (emissive mask added from its green inlays). |
+| `assets/rifle1_game.glb`, `assets/tex/rifle1_game_albedo.png`, `assets/tex/rifle1_game_orm.png` (VANGUARD's rifle) | "NANITE SYSTEMS Assault Rifle" by **Frostoise** — https://sketchfab.com/3d-models/nanite-systems-assault-rifle-74952e495dde4942a51fa6e2569cae03 | CC BY-NC-SA 4.0 — https://creativecommons.org/licenses/by-nc-sa/4.0/ | **Modified:** re-posed onto the hand, rescaled, materials merged and textures packed into one atlas. **These three adapted files are themselves licensed under CC BY-NC-SA 4.0.** |
+| `assets/spaceship_game.glb`, `assets/tex/spaceship_game_albedo.png`, `assets/tex/spaceship_game_orm.png` (every enemy fighter) | "Spaceship" by **Jefferson Frenay** (MrTeckmachin) — https://sketchfab.com/3d-models/spaceship-1d2f6d0c373e497c83e7846ec3f5fad6 | CC BY-NC-ND 4.0 — https://creativecommons.org/licenses/by-nc-nd/4.0/ | **Not modified** — only the technical conversion the licence permits (§2(a)(4)): re-centred / uniformly rescaled and its own texture set repacked into the renderer's format. No geometry, texture content or design change; its engine glow is drawn by the renderer at a point given in `js/main.js`. |
+| `assets/light_fighter_game.glb`, `assets/tex/light_fighter_game_albedo.png`, `assets/tex/light_fighter_game_orm.png` (our fighters) | "LIGHT FIGHTER SPACESHIP – FREE –" by **Kerem Kavalci** (Keremz) — https://sketchfab.com/3d-models/light-fighter-spaceship-free-51616ef53af84fe595c5603cd3e0f3e1 | Sketchfab Standard — https://sketchfab.com/licenses | Converted for use in the film (rescaled, textures packed, engine emitter discs added). Used only as part of this film; **not** offered for download or reuse on its own — do not extract it from this repository. |
+| `assets/enemy_ms.glb` + its textures (VANGUARD) | "3D Mech Asset" by **TryoutIndie.Dev** — https://tryoutindiedev.itch.io/3d-mech-asset | MIT — `assets/LICENSE-tryout-mech.txt` | See `assets/CREDITS.md`. |

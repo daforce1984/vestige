@@ -3,7 +3,9 @@ Each is re-posed into its hand's rifle frame (origin at the pistol grip, scaled 
 material, and its textures packed into one atlas pair:
   assets/tex/<name>_albedo.png  RGB albedo, A = emissive mask (glows in the shader)
   assets/tex/<name>_orm.png     R = AO, G = roughness, B = metal (glTF metallic-roughness channels)
-usage: uv run --with pygltflib --with numpy --with pillow tools/build_rifles.py"""
+usage: uv run --with pygltflib --with numpy --with pillow tools/build_rifles.py
+The user-supplied source models live in assets/src/ (not in the repository: their licences don't allow redistributing
+them as they are — see assets/THIRD_PARTY_MODELS.md)."""
 import os, sys, numpy as np
 from PIL import Image
 from pygltflib import GLTF2, Scene, Node, Mesh, Primitive, Attributes, Buffer, BufferView, Accessor, Material, PbrMetallicRoughness
@@ -75,19 +77,19 @@ def emis_green(g, blob, mt, alb):   # rifle2: no emissive map — its glowing in
 
 # (2026-09-30: the user swapped them — Sigma carries rifle2, VANGUARD rifle1)
 # Sigma: rifle2, muzzle toward +z, top +y = already his rifle frame (+Z barrel, +Y top); grip stub on the origin
-build('rifle2.glb', 'rifle2_game', np.array([0, 0.12, -1.6]), np.eye(3), 4.125, 1024, emis_green)   # (×2.75, then 1.5× bigger on request)
+build('src/rifle2.glb', 'rifle2_game', np.array([0, 0.12, -1.6]), np.eye(3), 4.125, 1024, emis_green)   # (×2.75, then 1.5× bigger on request)
 # VANGUARD: rifle1 (bullpup), muzzle toward −z, top +y → its rifle part frame (barrel −Y, top +Z): (x, y, z) → (−x, z, y)
-build('rifle1.glb', 'rifle1_game', np.array([0, -0.85, -1.23]), np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]), 0.9, 768, emis_tex)   # (the stock ends at its shoulder)
+build('src/rifle1.glb', 'rifle1_game', np.array([0, -0.85, -1.23]), np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]), 0.9, 768, emis_tex)   # (the stock ends at its shoulder)
 # the enemy fighters (every enemy_fighter* variant): assets/spaceship.glb (user-supplied), nose +z already; centred, ×0.95, its
 # one texture set packed the same way (red lights in the emissive map), an 'engine' disc on the rear nozzle
-build('spaceship.glb', 'spaceship_game', np.array([0, 1.67, 0]), np.eye(3), 0.95, 1024, emis_tex, engines=[(0, 2.45, -5.14, 0.35)])
+build('src/spaceship.glb', 'spaceship_game', np.array([0, 1.67, 0]), np.eye(3), 0.95, 1024, emis_tex)   # (CC BY-NC-ND: a technical conversion only — no geometry added; its engine emitter is given in js/main.js)
 # our fighters (every interceptor variant): assets/light_fighter.glb (user-supplied, Kerem Kavalci, Sketchfab Standard), nose +z;
 # centred, ×0.75 to the old interceptor's length, its two texture sets packed into one atlas, engine discs on the rear block
-build('light_fighter.glb', 'light_fighter_game', np.array([0, 1.4, 0]), np.eye(3), 0.75, 1024, emis_tex, engines=[(-0.58, 1.8, -5.58, 0.12), (0.58, 1.8, -5.58, 0.12)])
+build('src/light_fighter.glb', 'light_fighter_game', np.array([0, 1.4, 0]), np.eye(3), 0.75, 1024, emis_tex, engines=[(-0.58, 1.8, -5.58, 0.12), (0.58, 1.8, -5.58, 0.12)])
 # the enemy dreadnought: assets/space_battleship_aquamarine.glb (user-supplied; Kai Xiang, CC BY 4.0), bow +z; its display
 # plane (lambert1) dropped, centred and ×2.53 to the old hull's length (x1.65 more in the scene), seven texture sets in a
 # 3×3 wrapped atlas (its UVs tile), engine discs on its eight rear nozzles, lance_emitter at the bow cannon's muzzle
 _N = [(x, 16.9, -56.75, r) for (x, r) in [(10.6, 2.9), (16.0, 2.4), (20.1, 1.8), (23.6, 1.4)] for x in (x, -x)]
-# (source: blender/decimate_glb.py on assets/space_battleship_aquamarine.glb at 0.45 → assets/src/aquamarine_dec.glb, 113k → 51k triangles)
+# (source: blender/decimate_glb.py on assets/src/space_battleship_aquamarine.glb at 0.45 → assets/src/aquamarine_dec.glb, 113k → 51k triangles)
 build('src/aquamarine_dec.glb', 'dreadnought_game', np.array([0, 18.6, 17.6]), np.eye(3), 2.53, 768, emis_tex,
       engines=[(x, y, z, r) for (x, y, z, r) in _N], wrap=True, skip=('lambert1',), empties={'lance_emitter': (0, 11.25, 103.6)})
