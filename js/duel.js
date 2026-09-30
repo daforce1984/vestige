@@ -570,22 +570,28 @@ export const ULT_M = 480;   // (ten times the first cut: a sky full of them)
 let _sw = null;
 export function ultSwarm() {
   if (_sw) return _sw;
+  // after the reference (Macross Delta, the missile volley at 9:31): VOLLEYS — 8 salvos of 60 leave the ports together
+  // and fly as a flock (thin parallel trails sweeping round in one long arc), then peel apart and come curling in at him
+  // from every side; 1 in 3 bursts where he's just been, the rest whip past through the space he left
   const B = ultBeams(), HP = (c) => add(heroRawPos(circusStory(c)), [0, 9, 0]);
   const order = Array.from({ length: ULT_M }, (_, k) => k).sort((a, b) => hsh(a * 3.7 + 1) - hsh(b * 3.7 + 1));
+  const NV = 8, PER = ULT_M / NV, p0c = B.reduce((acc, b) => add(acc, scl(b.p0, 1 / B.length)), [0, 0, 0]);
+  const e = enemyRaw_(FINALE_T), fE = nrm([e.fwd[0], 0, e.fwd[2]]), sE = [fE[2], 0, -fE[0]];
   _sw = [];
   for (let k = 0; k < ULT_M; k++) {
-    const r = order.indexOf(k), b = B[r % ULT_N], h = (n) => hsh(k * 7.31 + n), d0 = nrm(sub(b.p1, b.p0));   // (ports fire in turn)
-    const side = nrm(V.cross([0, 0, 0], d0, [0, 1, 0])), upd = V.cross([0, 0, 0], side, d0);
-    const d = nrm(add(d0, add(scl(side, (h(2) - 0.5) * 1.2), scl(upd, (h(3) - 0.5) * 1.0))));
-    const lc = 0.05 + r * (CIRCUS_END - 1.9) / (ULT_M - 1);                              // a RIPPLE: one after another, like a multiple rocket launcher …
-    const sc = lc + 1.25 + 0.5 * h(18);                                                   // … each on him ~1.5 s later (strikes evenly spread)
-    const pk = add(b.p0, scl(d, 18 + 30 * h(1)));                                          // the kink: out of the port, then the hairpin
-    const { sd: sdC } = chaseAxes(), sgn = h(5) < 0.5 ? -1 : 1;
-    const hit = k % 4 === 0, off = hit ? [(h(5) - 0.5) * 10, (h(6) - 0.5) * 8, (h(17) - 0.5) * 10] : add(scl(sdC, sgn * (150 + 150 * h(19))), [0, (h(6) - 0.5) * 220, 0]);   // misses: way off to the side, out of the long lens
-    const p3 = add(HP(sc - (0.06 + 0.22 * h(4))), off);   // a hit: a beat too late, into the air he's only just left; a miss: well wide of him (out of the long lens)
-    const pm = HP(lc + 0.45 * (sc - lc)), p1 = add(pk, add(scl(d, -8 - 10 * h(15)), scl(nrm(sub(pm, pk)), V.dist(pk, pm) * 0.3)));
-    const p2 = add(add(HP(lc + 0.75 * (sc - lc)), [(h(7) - 0.5) * 120, (h(8) - 0.4) * 70, (h(9) - 0.5) * 120]), hit ? [0, 0, 0] : scl(off, 0.9));   // chasing where he goes (a miss: its whole run well wide)
-    _sw.push({ p0: b.p0, pk, p1, p2, p3, lc, sc, ti: circusStory(lc), ta: circusStory(sc), R: 10 + 18 * h(12), turns: 1.2 + 2.0 * h(13), ph: 2 * Math.PI * h(14), uk: 0.05 + 0.03 * h(16), port: r % ULT_N, hit });   // (7 in 8 go wide and fly on)
+    const r = order.indexOf(k), v = Math.floor(r / PER), i = r % PER, b = B[i % ULT_N], h = (n) => hsh(k * 7.31 + n), hv = (n) => hsh(v * 17.3 + n);
+    const lc = 0.1 + v * (CIRCUS_END - 2.6) / (NV - 1) + i * 0.004;                     // salvo v: 60 out of the ports in a quarter second
+    const sc = lc + 1.8 + 1.0 * (i / PER) + 0.12 * h(18);                                // … arriving over a second, one after another
+    // the flock: one shared swing for the salvo (up and out of its back, round to one side), each missile a lane in it
+    const dV = nrm(add(add(scl(fE, -0.6), [0, 0.9, 0]), scl(sE, (hv(1) - 0.5) * 2.2)));
+    const lane = add(scl(sE, (h(2) - 0.5) * 18), [0, (h(3) - 0.5) * 14, 0]);
+    const q1 = add(add(p0c, scl(dV, 220 + 60 * hv(2))), lane);
+    // then each peels off onto its own line in at him, from all round
+    const th = 2 * Math.PI * h(4), ph = Math.acos(1.6 * h(5) - 0.8), dirk = [Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.sin(ph) * Math.sin(th)];
+    const hit = k % 3 === 0, tgt = HP(sc - (hit ? 0.05 + 0.2 * h(6) : 0));
+    const p2 = add(add(HP(sc - 0.35), scl(dirk, 130 + 60 * h(7))), scl(lane, 0.5));
+    const p3 = hit ? add(tgt, [(h(8) - 0.5) * 8, (h(9) - 0.5) * 6, (h(10) - 0.5) * 8]) : add(tgt, scl(dirk, -(25 + 20 * h(11))));   // a miss crosses past him and on
+    _sw.push({ p0: b.p0, q1, p2, p3, lc, sc, ti: circusStory(lc), ta: circusStory(sc), port: i % ULT_N, hit, volley: v });
   }
   return _sw;
 }
@@ -596,16 +602,8 @@ export function missilePosC(m, c) {
     if (!m.vEnd) m.vEnd = scl(sub(missilePosC(m, m.sc), missilePosC(m, m.sc - 0.02)), 50);
     return add(m.p3, scl(m.vEnd, c - m.sc));
   }
-  const u = Math.min(1, (c - m.lc) / (m.sc - m.lc)), uu = u * (0.55 + 0.45 * u);   // quick off the port, smooth all the way
-  const q1 = add(m.pk, scl(sub(m.pk, m.p0), 0.8));                                   // one smooth curve: out past the kink point and swinging round
-  const bz = (x) => { const v = 1 - x; return add(add(scl(m.p0, v * v * v), scl(q1, 3 * v * v * x)), add(scl(m.p2, 3 * v * x * x), scl(m.p3, x * x * x))); };
-  const P = bz(uu), T = nrm(sub(bz(Math.min(1, uu + 0.01)), bz(Math.max(0, uu - 0.01))));
-  const e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0])), e2 = V.cross([0, 0, 0], T, e1);
-  const env = smooth(0, 0.25, u) * (1 - Math.pow(u, 6));
-  const a = m.ph + 2 * Math.PI * m.turns * u;                                          // big sweeping S-curves …
-  const jA = 7 * smooth(0.45, 0.7, u) * Math.sqrt(Math.max(0, 1 - u)) * 1.8, fq = 0.9 + 0.7 * hsh(m.ph * 3.1);   // … and, closing in, a slow smooth weave onto him (soft arcs)
-  const jx = jA * Math.sin(2 * Math.PI * fq * c + m.ph), jy = jA * 0.8 * Math.sin(2 * Math.PI * fq * 1.31 * c + m.ph * 1.7);
-  return add(P, add(scl(e1, m.R * env * Math.cos(a) + jx), scl(e2, m.R * env * Math.sin(a) + jy)));
+  const u = Math.min(1, (c - m.lc) / (m.sc - m.lc)), x = u * (0.45 + 0.55 * u), v = 1 - x;   // quick off the port, one smooth sweep
+  return add(add(scl(m.p0, v * v * v), scl(m.q1, 3 * v * v * x)), add(scl(m.p2, 3 * v * x * x), scl(m.p3, x * x * x)));
 }
 export const missilePos = (m, t) => missilePosC(m, circusClock(t));
 // Sigma's shots: 178.7 is taken on the shield; 183.25 tears the shield off; the charged 192.35 goes through its chest
@@ -1930,8 +1928,8 @@ export const DUEL_CAMS = [
       const c = circusClock(t), H0 = hp(190.9), E0 = ep(190.9), f = nrm(flat(sub(E0, H0), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
       const H = up(hp(t), 8), Hl = up(hp(circusStory(Math.max(0, c - 0.18))), 8);
       const pos = add(add(H0, chaseAxes().camOff), scl(sub(H, H0), 0.3));   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
-      const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(0.4, 1.2, c), tgt = lrp(up(E0, 6), add(lrp(Hl, H, 0.6), scl(vRun, 9 * smooth(1.2, 2.2, c))), onHim);   // (leading him: room ahead on the left)
-      const fov = lerp(30, 4.5, smooth(0.5, 1.6, c)) + 0.5 * Math.sin(c * 0.9) * smooth(2, 3, c);
+      const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(1.0, 2.2, c), tgt = lrp(up(E0, 6), add(lrp(Hl, H, 0.6), scl(vRun, 9 * smooth(1.2, 2.2, c))), onHim);   // (leading him: room ahead on the left)
+      const fov = lerp(34, 4.5, smooth(1.4, 2.6, c)) + 0.5 * Math.sin(c * 0.9) * smooth(2, 3, c);
       return { pos, target: tgt, fov, handheld: 0.05, baseShake: 0.02 }; } },
   { t0: CIRCUS_C1, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
     return { pos: add(add(Pm, scl(D_L, -150)), [0, 12, 0]), target: pan(Pm, up(hp(t), 2), 0.85), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },
