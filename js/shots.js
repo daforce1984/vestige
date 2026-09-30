@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, heroRifleThrow, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -702,6 +702,20 @@ function meltHole(e, who, t, part) {
   }
 }
 const _hrS = new Float32Array(16);
+// the beam-saber hilt on his left hip (duel.js SABER_MOUNT_*): a hilt-only copy of him placed so its hilt sits where his
+// hand picks it up at SD_GRAB (the same torso-local pose, so the draw grabs it exactly off the mount)
+let _hhL = null, _hhHide = null;
+function drawHipHilt(R, e) {
+  if (!_hhHide) { _hhHide = {}; for (const p of R.models.gundam.parts) if (p.name !== 'saber_hilt') _hhHide[p.name] = 1; }
+  const Hn = R.partWorld('gundam', e, 'saber_hilt'), Hh = R.partWorld('gundam', e, 'hand_L'), Tw = R.partWorld('gundam', e, 'torso'); if (!Hn || !Hh || !Tw) return;
+  if (!_hhL) {   // torso-local hilt matrix at the grab: inv(torso) · hand_L · (hand → hilt)
+    const fk = duelFK(duelHero(SD_GRAB), 'gundam'), hToHilt = M.mul(new Float32Array(16), M.invert(new Float32Array(16), Hh), Hn);
+    _hhL = M.mul(new Float32Array(16), M.invert(new Float32Array(16), fk.torso), M.mul(new Float32Array(16), fk.hand_L, hToHilt));
+  }
+  const Mm = M.mul(new Float32Array(16), Tw, _hhL), Mc = M.mul(new Float32Array(16), Mm, M.mul(new Float32Array(16), M.invert(new Float32Array(16), Hn), e.m));
+  const c = R.add('gundam', Mc); if (!c) return;
+  c.pose = e.pose; c.hidden = _hhHide; c.seed = e.seed; c.wear = e.wear; c.texSet = e.texSet;
+}
 export function drawGundam(R, t, s, opts = {}) {
   if (!s.vis) return null;
   if ((s.sande || 0) > 0.01 && !s.fpv) drawAfterimages(R, t, s);
@@ -709,7 +723,9 @@ export function drawGundam(R, t, s, opts = {}) {
   if (!e) return null;
   e.pose = s.pose; e.damage = s.damage; e.seed = 5.5; e.wear = 1; e.texSet = R.texLoaded & 1 ? 1 : 0;
   const weapon = s.weapon || (t < 258.3 ? 'rifle' : t < 270.2 ? 'none' : 'saber');
-  e.hidden = { rifle: 1, saber_hilt: weapon === 'saber' || s.saberL ? 0 : 1 };   // (the built-in rifle replaced by hero_rifle, drawn on its node)
+  const hiltHand = weapon === 'saber' || s.saberL || s.hiltL;
+  e.hidden = { rifle: 1, saber_hilt: hiltHand ? 0 : 1 };   // (the built-in rifle replaced by hero_rifle, drawn on its node)
+  if (!hiltHand && !s.fpv && t > 150 && t < 191.26) drawHipHilt(R, e);   // otherwise the hilt hangs on his left hip
   if (weapon === 'rifle' && !s.fpv) { const rw = R.partWorld('gundam', e, 'rifle'); if (rw) { M.fromTRS(_hrS, [0, 0, 0], [0, 0, 0, 1], 1); _hrS[0] = HERO_RIFLE_S[0]; _hrS[5] = HERO_RIFLE_S[1]; _hrS[10] = HERO_RIFLE_S[2];
     const g = R.add('hero_rifle', M.mul(new Float32Array(16), rw, _hrS)); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }
   if (weapon === 'thrown' && !s.fpv) { const m = heroRifleThrow(t); if (m) { const g = R.add('hero_rifle', m); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }   // tossed aside for the saber cut

@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { THROW0, CATCH_T, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
+import { THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, inSkip, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -676,7 +676,9 @@ function duelCues() {
   out.push([TRANS_SHOT, '@boom', { bus: 'sfx', f: 26, vel: G * 0.9, dur: 2.0, verb: 0.4 }]);
   out.push([TRANS_SHOT + 0.02, 'heavy_beam', { rate: 0.6, dur: FD2(TRANS_SHOT, TRANS_PASS), fadeOut: 0.15, gain: G * 1.0, prio: 9, norand: true }]);
   // he cuts it in half with his saber: ignite, the swing, the cut (a clash + sizzle), both halves whipping past, retract
-  out.push([TRANS_PASS - 0.35, '@beamSaberIgnite', { vel: 0.8 * G }]);
+  out.push([SD_GRAB, 'reload_grab', { at: 'hit', rate: 1.3, gain: G * 0.55, pan: -0.2, prio: 8, norand: true }]);   // his hand closes on the hilt
+  out.push([SD_OUT, '@beamSaberIgnite', { vel: 0.9 * G }]);                                                                  // ripped out: the blade lights
+  out.push([SD_HOLSTER, 'reload_slam', { at: 'hit', rate: 1.4, gain: G * 0.4, pan: -0.2, prio: 7, norand: true }]);        // back on the hip
   out.push([THROW0, 'whoosh:a', { at: 0.3, dur: 0.9, rate: 0.7, gain: G * 0.55, pan0: -0.1, pan1: -0.7, prio: 7, norand: true }]);   // the rifle tossed aside …
   out.push([CATCH_T, 'reload_grab', { at: 'hit', rate: 0.85, gain: G * 0.8, pan: -0.2, prio: 8, norand: true }]);                      // … and slapped back into his hand
   out.push([TRANS_PASS - 0.06, '@beamSaberSwing', { vel: G, dur: 0.4 }]);
