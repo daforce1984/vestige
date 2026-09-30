@@ -2763,6 +2763,7 @@ export function frame(R, film) {
   }
   s.fn(ctx);
   if (WIDE_SHOTS.has(s.name)) wideTreatment(ctx);
+  if (t >= 120 && t < 150.6) { ctx.post.motionBlur = 0; ctx.post.shakeBlur = 0; }   // the fighters' dogfight (120–150.6): crisp, no motion blur
   // from scene 5 on (the fleet assembles, 40 s) the same MOON hangs in the background of every exterior shot — nothing
   // else; its place in the frame is fixed per shot (from the shot's mid-point camera) on the sunward side
   if (moonDir && ctx.world && !ctx.hangar && !(ctx.env.planet && ctx.env.planet.earth) && !ctx.env.interior) {

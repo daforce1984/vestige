@@ -121,7 +121,7 @@ export class Renderer {
         { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-        ...[9, 10, 11, 12, 13, 14].map((b) => ({ binding: b, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } })),   // the rifles (texSet 3 / 4)
+        ...[9, 10, 11, 12, 13, 14, 15, 16].map((b) => ({ binding: b, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } })),   // the rifles (texSet 3 / 4)
       ],
     });
     const meshLayout = dev.createPipelineLayout({ bindGroupLayouts: [this.meshBGL] });
@@ -217,7 +217,7 @@ export class Renderer {
 
     // model textures: [hero albedo, hero orm, enemy albedo, enemy orm, hero rifle albedo(+emissive in A), orm, enemy rifle albedo, orm]; 1x1 placeholders until loaded
     this.texSmp = dev.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 });
-    this.modelTex = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(() => dev.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT }));
+    this.modelTex = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(() => dev.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT }));
     this._makeMeshBG();
     this.shadowBG = dev.createBindGroup({
       layout: this.shadowBGL,

@@ -76,3 +76,6 @@ build('rifle1.glb', 'rifle1_game', np.array([0, -0.85, -1.23]), np.array([[-1, 0
 # the enemy fighters (every enemy_fighter* variant): assets/spaceship.glb (user-supplied), nose +z already; centred, ×0.95, its
 # one texture set packed the same way (red lights in the emissive map), an 'engine' disc on the rear nozzle
 build('spaceship.glb', 'spaceship_game', np.array([0, 1.67, 0]), np.eye(3), 0.95, 1024, emis_tex, engines=[(0, 2.45, -5.14, 0.35)])
+# our fighters (every interceptor variant): assets/light_fighter.glb (user-supplied, Kerem Kavalci, Sketchfab Standard), nose +z;
+# centred, ×0.75 to the old interceptor's length, its two texture sets packed into one atlas, engine discs on the rear block
+build('light_fighter.glb', 'light_fighter_game', np.array([0, 1.4, 0]), np.eye(3), 0.75, 1024, emis_tex, engines=[(-0.58, 1.8, -5.58, 0.12), (0.58, 1.8, -5.58, 0.12)])

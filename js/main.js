@@ -9,7 +9,7 @@ const MODELS = [
   { name: 'mothership', detail: 4.5, prepass: true, hullDetail: true },   // layered greebles: depth prepass keeps close-ups at 24 fps
   { name: 'ion_frigate', detail: 0.9 },
   { name: 'assault_frigate', detail: 0.8 },
-  { name: 'interceptor', detail: 0 }, { name: 'interceptor_b', detail: 0 }, { name: 'interceptor_c', detail: 0 },
+  ...['interceptor', 'interceptor_b', 'interceptor_c'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })),   // our fighters: assets/light_fighter.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_frigate', detail: 0.9 },
   { name: 'enemy_dreadnought', detail: 2.4, scale: 1.65, venator: { paint: 10, paint2: 11, mech: 12, olive: 12, ring: 13, yellow: 14 } },   // a little bigger than our flagship; its armour in the Venator style (shaders.js venatorHull)
   ...['enemy_fighter', 'enemy_fighter_b', 'enemy_fighter_c'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256 })),   // every enemy fighter: assets/spaceship.glb (user-supplied) via tools/build_rifles.py
@@ -26,7 +26,7 @@ const MODELS = [
   { name: 'bay_props', detail: 0.3, keep: ['crate0', 'crate1', 'container', 'barrel', 'tank', 'panel0', 'panel1', 'rib', 'cable', 'toolcart', 'seat', 'person0', 'person1', 'person2', 'person3'] },
   { name: 'dread_lance', detail: 0, scale: 1.65 },                     // tools/make_dread_lance.py (same ×1.65 as the dreadnought)
   { name: 'moon', detail: 0 },
-  { name: 'ion_frigate_lod', detail: 0 }, { name: 'assault_frigate_lod', detail: 0 }, { name: 'interceptor_lod', detail: 0 }, { name: 'interceptor_b_lod', detail: 0 }, { name: 'interceptor_c_lod', detail: 0 }, ...['enemy_fighter_lod', 'enemy_fighter_b_lod', 'enemy_fighter_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256 })), { name: 'enemy_frigate_lod', detail: 0 },   // blender/make_lods.py (distance LOD)                                        // tools/make_moon.py
+  { name: 'ion_frigate_lod', detail: 0 }, { name: 'assault_frigate_lod', detail: 0 }, ...['interceptor_lod', 'interceptor_b_lod', 'interceptor_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })), ...['enemy_fighter_lod', 'enemy_fighter_b_lod', 'enemy_fighter_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256 })), { name: 'enemy_frigate_lod', detail: 0 },   // blender/make_lods.py (distance LOD)                                        // tools/make_moon.py
   { name: 'wound_rim', detail: 0 },                                   // tools/make_wound_rim.py
   { name: 'asteroids', detail: 0, keep: ['ast0', 'ast1', 'ast2', 'ast3', 'ast4', 'ast5'] },   // tools/make_asteroids.py
   { name: 'debris', detail: 0.6, keep: ['rock0', 'rock1', 'rock2', 'rock3', 'hull0', 'hull1', 'hull2', 'hull3'] },
@@ -254,7 +254,7 @@ async function boot() {
   try {
     await R.init();
     status.textContent = '모델 로딩…';
-    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
+    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png', 'assets/tex/light_fighter_game_albedo.png', 'assets/tex/light_fighter_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
     {   // the dreadnought's Venator-style repaint: its lights and lit strips burn blue-white instead of green / orange
       const dm = R.models.enemy_dreadnought, E = { lime: [0.25, 0.55, 1.3], engine: [0.5, 0.85, 1.6], window: [0.75, 0.85, 1.0] };
       if (dm) for (const m of dm.materials) if (E[m.name]) { m.emissive = E[m.name]; m.base = [0.1, 0.12, 0.16]; }
