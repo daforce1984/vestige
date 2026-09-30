@@ -880,12 +880,18 @@ function guardIK(s, tw) {   // the shield raised in front of its head, its face 
   s.pose.shield = s.pose.shield.map((v) => v * k);
 }
 const TWO_HAND = (tw) => (1 - smooth(178.4, 178.55, tw) * (1 - smooth(179.05, 179.25, tw))) * (1 - smooth(183.25, 183.3, tw) * (1 - smooth(183.8, 184.1, tw))) * smooth(SHIELD_HIT_T + 0.3, SHIELD_HIT_T + 0.55, tw);   // (one-handed while the shield is on its left forearm: the rifle went through it)
-const HAND_TO_RIFLE = () => sub(PIV.enemy_ms.rifle, PIV.enemy_ms.hand_R);
+const HAND_TO_RIFLE = () => ENEMY_HOLE;
+// VANGUARD's fist: the centre of its hole (hand-local, measured from the mesh — the fingers curl round hand Z) = where its
+// rifle's grip sits; its left fist (mirrored) takes the handguard from below, palm up, knuckle line along the barrel
+export const ENEMY_HOLE = [0.82, -0.29, -0.36];
+const ENEMY_HOLE_L = [-0.82, -0.29, -0.36], E_SUP_R = [0, 0, -1, 1, 0, 0, 0, -1, 0], E_FORE = [0, -1.75, 0.35];   // (hand X = rifle −Z, hand Y = rifle X, hand Z = the barrel −Y)
+const E_POCKET = [-2.7, 4.7, 1.0], E_STOCK = 4.4;   // the right shoulder's pocket (torso frame) and how far ahead of it the grip sits along the line of fire
 function aim2H(s, target, k, kL, gripL = [-0.35, 3.9, 2.3]) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   let fk = duelFK(s, 'enemy_ms');
-  const grip = M.transformPoint([0, 0, 0], fk.torso, gripL);
+  const pocket = M.transformPoint([0, 0, 0], fk.torso, lrp(E_POCKET, gripL, gripL[1] < 2 ? 1 : 0)), d0 = nrm(sub(target, pocket));   // shouldered: the stock's butt at its right shoulder, the grip out ahead of it on the line of fire (hip fire: at the hip)
+  const grip = gripL[1] < 2 ? pocket : add(add(pocket, scl(d0, E_STOCK)), scl(nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0])), -1.0));
   const d = nrm(sub(target, grip)), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
   const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
   const b = VAN_BARREL, u0 = GUN_UP.enemy_ms, u = nrm(sub(u0, scl(b, V.dot(u0, b)))), x = V.cross([0, 0, 0], u, b);
@@ -894,8 +900,8 @@ function aim2H(s, target, k, kL, gripL = [-0.35, 3.9, 2.3]) {
   const hr = HAND_TO_RIFLE();
   armIK(s, fk, 'enemy_ms', 'R', sub(grip, r3v(Rw, hr)), Rw);
   fk = duelFK(s, 'enemy_ms');
-  const fore = M.transformPoint([0, 0, 0], fk.rifle, scl(VAN_MUZZLE, 0.2));
-  armIK(s, fk, 'enemy_ms', 'L', sub(fore, r3v(Rw, hr)), Rw);
+  { const Rr = r3(fk.rifle), HwL = r3mul(Rr, E_SUP_R), PL = sub(M.transformPoint([0, 0, 0], fk.rifle, E_FORE), r3v(HwL, ENEMY_HOLE_L));   // the left fist under the handguard
+    armIK(s, fk, 'enemy_ms', 'L', PL, HwL); }
   for (const p in keep) { const w = p.includes('_L') || p === 'hand_L' ? k * kL : k; s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], w)); }
 }
 // ---------------- Sigma's aim: laid on the target round each shot. Misses go just past (it quick-boosts); 178.7 lands on
@@ -1233,9 +1239,9 @@ function enemyState_(t) {
     holdWrist(s, tw, [...SERAPH_SHOTS, ...ENEMY_BURST], _wristE, (x) => enemyRaw_(x));
     if (kick > 0) {                                                        // the recoil: the arm (wrist + rifle as one) thrown up
       kickArm(s, 'enemy_ms', Math.atan(kick) * ak);
-      if (kL > 0) { const fk = duelFK(s, 'enemy_ms'), Rw = r3(fk.hand_R), fore = M.transformPoint([0, 0, 0], fk.rifle, scl(VAN_MUZZLE, 0.2));
+      if (kL > 0) { const fk = duelFK(s, 'enemy_ms'), Rr = r3(fk.rifle), HwL = r3mul(Rr, E_SUP_R);
         const o = { arm_L_upper: s.pose.arm_L_upper.slice(), arm_L_lower: s.pose.arm_L_lower.slice(), hand_L: (s.pose.hand_L || [0, 0, 0]).slice() };
-        armIK(s, fk, 'enemy_ms', 'L', sub(fore, r3v(Rw, HAND_TO_RIFLE())), Rw);   // the left hand stays on the fore-end
+        armIK(s, fk, 'enemy_ms', 'L', sub(M.transformPoint([0, 0, 0], fk.rifle, E_FORE), r3v(HwL, ENEMY_HOLE_L)), HwL);   // the left fist stays under the handguard
         for (const p in o) s.pose[p] = [0, 1, 2].map((c) => lerp(o[p][c], s.pose[p][c], kL)); }
     }
   }
@@ -1270,10 +1276,10 @@ const PARENT = { ms_root: null, pelvis: 'ms_root', torso: 'ms_root', head: 'tors
 const FK_ORDER = Object.keys(PARENT);
 // assets/gundam.glb node translations (glTF): rifle ← hand_R, rifle_muzzle ← rifle; barrel = rifle local +Z.
 // (re-check with: python3 -c "…" in blender/DUEL_NOTES.md if the rifle is re-modelled; sanity check compares them)
-export const RIFLE_T = [-0.10266, -0.84395, 0.50666];   // (raised 2026-09-29: the grip in the fist, not the receiver under it)
+export const RIFLE_T = [0.62, -0.9, 0.81];   // the grip's centre = the centre of his fist's hole (measured from the hand mesh: the fingers curl round hand-local Z)
 export const MUZZLE_T = [0, 1.88, 12.94];   // the rifle's muzzle (assets/rifle2_game.glb, tools/build_rifles.py: grip at the origin)
 export const HERO_RIFLE_S = [1, 1, 1];     // its scale on the hand (blender/build_hero_rifle.py builds it at size: ~25 m, twice the old one)
-export const RIFLE_Q = [-0.130526, 0, 0, 0.991445];   // the rifle node's rotation on hand_R (assets/gundam.glb): the grip raked 15° like a pistol grip
+export const RIFLE_Q = [0.62932, 0, 0, 0.77715];   // 78° about hand X: the grip runs through the fist (along hand Z, index → little finger), the rifle's top on the index side, the barrel along the forearm raised 12° (a pistol grip's angle) — the wrist stays straight
 // VANGUARD's rifle (assets/enemy_ms.glb): rifle_muzzle in the rifle part's frame; the barrel runs from the grip pivot to it
 export const VAN_MUZZLE = [0, -3.16, 1.23];            // the enemy rifle (rifle part frame; assets/rifle1_game.glb, tools/build_rifles.py)
 const VAN_BARREL = [0, -1, 0];
@@ -1311,9 +1317,9 @@ export function duelFK(s, model) {
     out.muzzleDir = nrm(M.transformDir([0, 0, 0], out.rifle, [0, 0, 1]));
   }
   if (model === 'enemy_ms') {   // VANGUARD: its rifle is a posed part on hand_R; muzzle + barrel direction from the rifle frame
-    const r = s.pose.rifle || [0, 0, 0], pr = piv.rifle, ph = piv.hand_R;
+    const r = s.pose.rifle || [0, 0, 0];
     Q.fromEuler(q, r[0], r[1], r[2]);
-    out.rifle = M.mul(M.new(), out.hand_R, M.fromTRS(M.new(), [pr[0] - ph[0], pr[1] - ph[1], pr[2] - ph[2]], q, 1));
+    out.rifle = M.mul(M.new(), out.hand_R, M.fromTRS(M.new(), ENEMY_HOLE, q, 1));   // (its grip in the middle of the fist: ENEMY_HOLE)
     out.muzzle = M.transformPoint([0, 0, 0], out.rifle, VAN_MUZZLE);
     out.muzzleDir = nrm(M.transformDir([0, 0, 0], out.rifle, VAN_BARREL));
     const sr = s.pose && s.pose.shield;                             // the shield part rides the forearm (pivot at the elbow), swivelling on its mount
@@ -1420,7 +1426,7 @@ const HERO_GRIP = [-4.3, 2.3, 4.6];                     // torso frame
 // (HERO_WRIST); from the rifle's wanted world rotation Rr the forearm's rotation follows exactly (Rf = Rr·(Rh0·Rq)⁻¹),
 // so the barrel lands exactly on the target; then only the shoulder turns, swinging the elbow so the grip comes as
 // close as the arm allows to where it is wanted
-const HERO_WRIST = [95, 0, 0];
+const HERO_WRIST = [0, 0, 0];   // (straight: the rifle's angle is in its grip, RIFLE_Q, not in a bent wrist)
 let _rh0 = null; const RH0 = () => _rh0 || (_rh0 = r3(M.fromTRS(M.new(), [0, 0, 0], Q.fromEuler([0, 0, 0, 1], ...HERO_WRIST.map((v) => v * DEG)), 1)));
 function heroArmPlace(s, fk, gripDes, Rr) {
   const T = r3(fk.torso), piv = PIV.gundam, vU = sub(piv.arm_R_lower, piv.arm_R_upper), vF = sub(piv.hand_R, piv.arm_R_lower);
@@ -1462,7 +1468,7 @@ function heroAim2H(s, target, k) {
 // (HERO_LOAD), the strip lights in two steps (HERO_LOCK); it snaps down onto the target (HERO_SNAP0 → 1, a little
 // overshoot) and he holds dead still while his eye flares
 export const HERO_GRAB = 170.28, HERO_EJECT = 170.95, HERO_LOAD = 171.55, HERO_LOCK = 171.75, HERO_SNAP0 = 170.72, HERO_SNAP1 = 171.05, HERO_FLARE = 172.4;   // (no reload any more: HERO_EJECT/LOAD/LOCK unused)
-const HERO_FORE = [0, -0.5, 7.5], HERO_REAR = [1.6, -1.0, 1.85], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
+const HERO_FORE = [0, 0.15, 5.0], HERO_REAR = [1.6, -1.0, 1.85], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
 // the back mount (torso frame): grip behind his right shoulder, the barrel slung diagonally down across his back to
 // the left hip, its flank against the pack — carried like this from the launch until he rips it off at HERO_GRAB
 const HERO_BACK_G = [-3.0, 4.8, -3.4], HERO_BACK_D = [0.55, -0.78, -0.28];
@@ -1507,12 +1513,12 @@ function heroLeftWrist(fk, tw, Rw) {   // wrist target: the pac off the hip → 
   const hip = M.transformPoint([0, 0, 0], fk.torso, HERO_HIP), rear = M.transformPoint([0, 0, 0], fk.rifle, HERO_REAR), fore = M.transformPoint([0, 0, 0], fk.rifle, HERO_FORE);
   return sub(fore, r3v(Rw, HERO_LH));   // (straight onto the fore-end as the rifle comes down: the weight ramps in)
 }
-function heroLeft(s, tw) {
+function heroLeft(s, tw) {   // the left hand onto the fore-end (GRIPS support grip, on the rifle as the right hand holds it)
   const k = heroLeftW(tw); if (k <= 0) return;
+  const fk = duelFK(s, 'gundam'), g = GRIPS().hero_rifle.two[1], tg = gripTarget(g, M.transformPoint([0, 0, 0], fk.rifle, [0, 0, 0]), r3(fk.rifle));
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
-  const fk = duelFK(s, 'gundam'), Rw = r3(fk.hand_R);
-  armIK(s, fk, 'gundam', 'L', heroLeftWrist(fk, tw, Rw), Rw);
+  armIK(s, fk, 'gundam', 'L', tg.P, tg.Hw);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
 // ---------------------------------------------------------------- WEAPON GRIPS
@@ -1521,6 +1527,8 @@ function heroLeft(s, tw) {
 // Weapon frames: hero_rifle = its node on hand_R (origin at the grip, +Z down the barrel, +Y its top); saber = the hilt
 // point (origin where the blade leaves the hilt's base grip, +Z along the blade).
 const r3I = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+const HOLE_L = [-0.62, -0.9, 0.81];                   // the left fist's hole (mirror of RIFLE_T)
+const SUP_R = [0, -1, 0, 1, 0, 0, 0, 0, 1];            // support hand in the rifle frame: hand X = rifle −Y (palm up to it), hand Y = rifle X, hand Z (knuckle line) = the barrel
 const handIn = (T, Rq) => ({ p: scl(r3v(r3T(Rq), T), -1), R: r3T(Rq) });   // hand frame inside a weapon mounted on it at (T, Rq)
 let _grips = null;
 export function GRIPS() {
@@ -1528,7 +1536,7 @@ export function GRIPS() {
   const rq = RQ3(), main = { side: 'R', ...handIn(RIFLE_T, rq) };
   const sab = { side: 'L', ...handIn(SABER_GRIP_T, r3I) };
   _grips = {
-    hero_rifle: { one: main, two: [main, { side: 'L', p: sub(HERO_FORE, r3v(r3T(rq), HERO_LH)), R: r3T(rq) }] },   // (support: the left hand on the fore-end, wrist turned like the gun hand)
+    hero_rifle: { one: main, two: [main, { side: 'L', p: sub(HERO_FORE, r3v(SUP_R, HOLE_L)), R: SUP_R }] },   // (support: the left fist under the fore-end, its knuckle line along the barrel, palm up)
     saber: { one: sab, two: [sab, { side: 'R', p: add(sab.p, [0, 0, -SABER_HANDS]), R: r3I }] },                    // (the right hand just below the left on the hilt)
   };
   return _grips;

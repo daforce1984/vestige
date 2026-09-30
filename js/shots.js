@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { RIFLE_T, RIFLE_Q, ENEMY_HOLE, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, filmT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -738,7 +738,8 @@ export function drawGundam(R, t, s, opts = {}) {
   const hiltHand = weapon === 'saber' || s.saberL || s.hiltL;
   e.hidden = { rifle: 1, saber_hilt: hiltHand ? 0 : 1 };   // (the built-in rifle replaced by hero_rifle, drawn on its node)
   if (!hiltHand && !s.fpv && t > 150 && t < 191.26) drawHipHilt(R, e);   // otherwise the hilt hangs on his left hip
-  if (weapon === 'rifle' && !s.fpv) { const rw = R.partWorld('gundam', e, 'rifle'); if (rw) { M.fromTRS(_hrS, [0, 0, 0], [0, 0, 0, 1], 1); _hrS[0] = HERO_RIFLE_S[0]; _hrS[5] = HERO_RIFLE_S[1]; _hrS[10] = HERO_RIFLE_S[2];
+  // in hand: on hand_R through the grip frame in duel.js (RIFLE_T / RIFLE_Q) — the same one the IK solves for
+  if (weapon === 'rifle' && !s.fpv) { const rw = M.mul(new Float32Array(16), R.partWorld('gundam', e, 'hand_R'), M.fromTRS(new Float32Array(16), RIFLE_T, RIFLE_Q, 1)); if (rw) { M.fromTRS(_hrS, [0, 0, 0], [0, 0, 0, 1], 1); _hrS[0] = HERO_RIFLE_S[0]; _hrS[5] = HERO_RIFLE_S[1]; _hrS[10] = HERO_RIFLE_S[2];
     const g = R.add('hero_rifle', M.mul(new Float32Array(16), rw, _hrS)); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }
   if (weapon === 'thrown' && !s.fpv) { const m = heroRifleThrow(t); if (m) { const g = R.add('hero_rifle', m); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }   // tossed aside for the saber cut
   if (weapon === 'back' && !s.fpv) { const tw = R.partWorld('gundam', e, 'torso'); if (tw) { const g = R.add('hero_rifle', M.mul(new Float32Array(16), tw, heroBackMount())); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }   // slung on his back
@@ -830,7 +831,8 @@ const _wing = {}, _wT = new Float32Array(16), _wA = new Float32Array(16), _wB = 
 const RIFLE_DROP_T = 190.8, _rif = {}, _rT = new Float32Array(16), _rA = new Float32Array(16), _rB = new Float32Array(16), _rQ = [0, 0, 0, 1];
 // VANGUARD's rifle (assets/rifle2_game.glb) drawn on the rifle part of an enemy_ms pose (m, pose); `pre` shifts it in world
 function enemyRifleAt(R, m, pose, pre) {
-  const rw = Float32Array.from(R.partWorld('enemy_ms', { m, pose, stretch: 0 }, 'rifle'));
+  const r = pose.rifle || [0, 0, 0], hw = R.partWorld('enemy_ms', { m, pose, stretch: 0 }, 'hand_R');   // on its fist through the same grip frame as duel.js (ENEMY_HOLE)
+  const rw = M.mul(new Float32Array(16), hw, M.fromTRS(new Float32Array(16), ENEMY_HOLE, Q.fromEuler([0, 0, 0, 1], r[0], r[1], r[2]), 1));
   const g = R.add('enemy_rifle', pre ? M.mul(new Float32Array(16), pre, rw) : rw);
   if (g) { g.seed = 10; g.wear = 0.4; g.texSet = R.texLoaded & 64 ? 4 : 0; }
   return g;
