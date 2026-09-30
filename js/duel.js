@@ -149,6 +149,8 @@ L.flyAim = W(L.aimRifle, { leg_L_upper: [-20, 0, 10], leg_L_lower: [50, 0, 0], l
 L.dodgeAimL = W(L.flyAim, { torso: [5, 20, -15], head: [0, -15, 8], _body: [0, 15, 22] });
 L.dodgeAimR = W(L.flyAim, { torso: [5, -20, 15], head: [0, 15, -8], _body: [0, -15, -22] });
 L.dodgeUpAim = W(L.flyAim, { leg_L_upper: [-80, 0, 10], leg_L_lower: [110, 0, 0], leg_R_upper: [-70, 0, -10], leg_R_lower: [120, 0, 0], _body: [-20, 0, 0] });
+L.catchFly = W(L.flyAim, { torso: [0, -10, 0], head: [0, 20, 0], leg_L_upper: [14, 0, 6], leg_L_lower: [22, 0, 0], leg_R_upper: [26, 0, -6], leg_R_lower: [30, 0, 0], _body: [26, 0, 0] });   // flying through for the rifle: stretched out, legs trailing, eyes on it
+for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) for (let c = 0; c < 3; c++) L.catchFly[PIDX[p] + c] = L.flight[PIDX[p] + c];   // (the empty left arm at his side)
 L.aimUp = W(L.aimRifle, { torso: [-15, 0, 0], head: [-30, 0, 0], leg_L_upper: [-30, 0, 10], leg_L_lower: [60, 0, 0], leg_R_upper: [10, 0, -8], leg_R_lower: [70, 0, 0], _body: [-25, 0, 0] });
 L.flee = W(L.flight, { head: [-20, 0, 0], arm_R_upper: [-20, 0, -20], arm_R_lower: [-40, 0, 0], hand_R: [60, 0, 0] });
 L.brace = W(L.aimRifle, { torso: [10, -12, 0], arm_L_upper: [-70, -35, -10], arm_L_lower: [-60, 0, 0], hand_L: [10, 0, 0],
@@ -750,7 +752,7 @@ const heroPose = poseTrack([
   [179.85, L.aimUp, 'io'], [180.1, L.dodgeAimR, 'io'], [180.4, L.aimUp, 'io'], [180.75, L.aimRifle, 'io'],
   [181.3, L.dodgeAimL, 'out'], [181.75, L.aimRifle, 'io'], [182.05, L.dodgeAimR, 'out'], [182.45, L.aimRifle, 'io'],
   [182.75, L.dodgeAimL, 'out'], [183.3, L.aimRifle, 'io'],
-  [183.9, L.flyAim, 'io'], [185.3, L.flyAim], [185.55, L.dodgeUpAim, 'out'], [185.9, L.flyAim, 'io'],
+  [183.9, L.flyAim, 'io'], [185.3, L.flyAim], [185.55, L.catchFly, 'io'], [185.95, L.catchFly], [186.2, L.flyAim, 'io'],
   [186.4, L.dodgeAimR, 'out'], [186.8, L.flyAim, 'io'], [188.3, L.flyAim],
   [189.2, L.aimRifle, 'io'], [190.72, L.aimRifle], [190.93, L.flee, 'io'], [191.09, L.flee], [191.17, L.stow, 'io'],   // (the Itano-circus run: flat out in flight) [SANDE0, L.sandeDash, 'io'],
   [191.95, L.sandeDash], [CUT_T - 0.04, L.iaiWind, 'io'], [CUT_T + 0.03, L.iaiMid, 'in'], [192.3, L.iaiEnd, 'out'],
@@ -885,7 +887,7 @@ function aim2H(s, target, k, kL, gripL = [-0.35, 3.9, 2.3]) {
 }
 // ---------------- Sigma's aim: laid on the target round each shot. Misses go just past (it quick-boosts); 178.7 lands on
 // the shield (it blocks), 183.25 on the shield (torn off), the charged shot on its chest
-const HERO_AIM = (tw) => { let k = (tw >= HERO_SNAP1 ? 1 : 0) * (1 - smooth(190.9, 190.93, tw));   // (off for the Itano-circus run)   // (before HERO_SNAP1: heroDraw places it)
+const HERO_AIM = (tw) => { let k = (tw >= HERO_SNAP1 ? 1 : 0) * (1 - smooth(190.9, 190.93, tw)) * (1 - smooth(THROW0, THROW0 + 0.1, tw) * (1 - smooth(CATCH_T + 0.05, CATCH_T + 0.3, tw)));   // (nothing to aim while the rifle is out of his hand)   // (off for the Itano-circus run)   // (before HERO_SNAP1: heroDraw places it)
   for (const ts of HERO_SHOTS) k = Math.max(k, smooth(ts - 0.4, ts - 0.2, tw) * (1 - smooth(ts + 0.12, ts + 0.3, tw)));
   return Math.min(1, k); };
 const MISS = [[0, 6], [6, 1], null, [-6, 4], [2, -6], [6, 3], null, [-7, 0], [5, -5], [-5, 5]];   // [side, up] (m) across the line of fire
@@ -1128,7 +1130,7 @@ function duelHero_(t) {
   s.boost = Math.max(heroBoost(tw), ck);
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
-  { if (tw >= HERO_GRAB - 0.16 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); heroLeft(s, tw); transTwist(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
+  { if (tw >= HERO_GRAB - 0.16 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); catchReach(s, tw); heroLeft(s, tw); transTwist(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
   slashIK(s, tw);                                                   // the pass-cut: the blade swept exactly through its waist
   hitReact('hero', tw, s, 'gundam');
   // hand-over to the old aftermath formula (identical at t = 200)
@@ -1662,12 +1664,32 @@ function saberRightGrip(s, tw) {   // the right hand joins below the left once t
   armIK(s, fk, 'gundam', 'R', sub(hiltR, r3v(Hw, [0, -1.2, 0.6])), Hw);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
-function throwFling(s, tw) {   // the right arm: wound in across his chest, then flung out hard to his right — the rifle leaves at THROW0
-  if (tw < THROW0 - 0.07 || tw > THROW0 + 0.14) return;
-  const a = tw < THROW0 - 0.02 ? 35 * smooth(THROW0 - 0.07, THROW0 - 0.02, tw) : tw < THROW0 ? lerp(35, -80, smooth(THROW0 - 0.02, THROW0, tw)) : lerp(-80, -95, smooth(THROW0, THROW0 + 0.05, tw)) * (1 - smooth(THROW0 + 0.06, THROW0 + 0.14, tw));
+function throwFling(s, tw) {   // the right arm: wound in across his chest, then flung out straight to his right, arm at full stretch — the rifle leaves at THROW0
+  if (tw < THROW0 - 0.07 || tw > THROW0 + 0.17) return;
+  const wind = smooth(THROW0 - 0.07, THROW0 - 0.025, tw), out = smooth(THROW0 - 0.025, THROW0 + 0.004, tw), rel = smooth(THROW0 + 0.08, THROW0 + 0.17, tw), k = wind * (1 - rel);
+  if (k <= 0) return;
   s.pose = { ...s.pose };
-  const fk = duelFK(s, 'gundam'), ax = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 0, 1]));
-  s.pose.arm_R_upper = euler3(r3mul(r3T(r3(fk.torso)), r3mul(r3axis(ax, a * DEG), r3(fk.arm_R_upper))));
+  const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
+  const fk = duelFK(s, 'gundam'), pv = PIV.gundam, T = r3(fk.torso);
+  const fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0]));
+  const S = M.transformPoint([0, 0, 0], fk.torso, sub(pv.arm_R_upper, pv.torso)), L = V.dist(pv.arm_R_lower, pv.arm_R_upper) + V.dist(pv.hand_R, pv.arm_R_lower);
+  const W = add(S, scl(nrm(add(add(scl(rt, -0.7), scl(fw, 0.9)), scl(upv, -0.15))), 0.55 * L));   // wound in across the chest
+  const O = add(S, scl(nrm(add(add(rt, scl(fw, 0.2)), scl(upv, 0.12))), 1.1 * L));             // flung out: the arm dead straight, out to his right
+  const P = lrp(W, O, out), o = nrm(sub(P, S)), y = scl(o, -1), z = nrm(sub(fw, scl(o, V.dot(fw, o)))), x = V.cross([0, 0, 0], y, z);
+  armIK(s, fk, 'gundam', 'R', P, [...x, ...y, ...z]);
+  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+}
+function catchReach(s, tw) {   // the right arm reached out wide to his right, open for the rifle coming back in; it drops into the hand and the arm comes back round to aim
+  const k = smooth(SD_HOLSTER - 0.05, SD_HOLSTER + 0.1, tw) * (1 - smooth(CATCH_T + 0.03, CATCH_T + 0.25, tw)); if (k <= 0) return;
+  s.pose = { ...s.pose };
+  const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
+  const fk = duelFK(s, 'gundam'), pv = PIV.gundam, T = r3(fk.torso);
+  const fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0]));
+  const S = M.transformPoint([0, 0, 0], fk.torso, sub(pv.arm_R_upper, pv.torso)), L = V.dist(pv.arm_R_lower, pv.arm_R_upper) + V.dist(pv.hand_R, pv.arm_R_lower);
+  const o = nrm(add(add(rt, scl(fw, 0.55)), scl(upv, 0.2))), P = add(S, scl(o, 0.97 * L));
+  const y = scl(o, -1), z = nrm(sub(fw, scl(o, V.dot(fw, o)))), x = V.cross([0, 0, 0], y, z);
+  armIK(s, fk, 'gundam', 'R', P, [...x, ...y, ...z]);
+  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
 const transCutW = (tw) => smooth(SD_OUT + 0.045, SD_GUARD - 0.005, tw) * (1 - smooth(TRANS_PASS + 0.3, TRANS_PASS + 0.5, tw));   // (its held start pose IS the wind-up: raised → wound up → cut, one line)
 let _tcut = null;
@@ -1682,14 +1704,15 @@ function transCutRef() {   // the blade's line onto the ball at the pass (from w
 }
 export const transCutAxis = () => { const r = transCutRef(); return r && !r.pending ? r.a : [1, 0, 0]; };
 function transTwist(s, tw) {   // the body: wound round to his right for the draw-back, uncoiling hard through the cut
-  const wind = smooth(SD_GUARD - 0.06, SD_SWEEP, tw), cut = smooth(SD_SWEEP, TRANS_PASS + 0.12, tw), rel = smooth(TRANS_PASS + 0.2, TRANS_PASS + 0.5, tw);
+  const wind = smooth(SD_GUARD - 0.06, SD_SWEEP, tw), cut = smooth(TRANS_PASS - 0.008, TRANS_PASS + 0.016, tw), rel = smooth(TRANS_PASS + 0.2, TRANS_PASS + 0.5, tw);
   const yaw = (-50 * wind * (1 - cut) + 45 * cut) * (1 - rel);   // (a big wind-up and a full follow-through) if (Math.abs(yaw) < 0.01) return;
   s.pose = { ...s.pose }; const t0 = s.pose.torso || [0, 0, 0]; s.pose.torso = [t0[0], t0[1] + yaw * DEG, t0[2]];
 }
+export const SWING_PRE = 0.007, SWING_POST = 0.014;   // the swing: a blur — 0.07 s on screen into the ball, 0.14 s on through
 function transCutIK(s, tw) {
   const k = transCutW(tw); if (k <= 0) return;
   const ref = transCutRef(); if (!ref || ref.pending) return;
-  const u = tw - TRANS_PASS, x = u < 0 ? clamp(-u / 0.02, 0, 1) : clamp(u / 0.05, 0, 1);
+  const u = tw - TRANS_PASS, x = u < 0 ? clamp(-u / SWING_PRE, 0, 1) : clamp(u / SWING_POST, 0, 1);
   const ang = Math.sign(u) * (1 - (1 - x) * (1 - x)) * 110 * DEG;   // held out far right, whipped across (fastest through the ball) to far left
   const dir = rotAxis(ref.base, ref.a, ang), upv = nrm(V.cross([0, 0, 0], dir, ref.a)), xv = V.cross([0, 0, 0], upv, dir), Hw = [...xv, ...upv, ...dir];
   s.pose = { ...s.pose };
@@ -1945,23 +1968,21 @@ export const DUEL_CAMS = [
   { t0: 184.42, t1: 184.475, roll: 0.03, name: 'D15b head-on to it — it fires the charged shot straight out of frame at him', slowmo: true, fn: (t, u) => {
       const T = 184.42, e = enemyRaw_(T), fk = duelFK(e, 'enemy_ms'), C = partPoint(fk, 'torso', [0, 2.5, 0]), f = nrm(flat(sub(hp(T), ep(T)), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
       return { pos: add(add(add(C, scl(f, 46 - 4 * u)), scl(sd, 11)), [0, 3, 0]), target: add(C, [0, 1, 0]), fov: 40, handheld: 0.04, baseShake: 0.03 }; } },   // in front of it, just off its line of fire
-  { t0: 184.475, t1: 184.57, roll: -0.05, name: 'D15b2 back behind it, looking at him — the charged shot boring away toward him', slowmo: true, fn: (t, u) => {
-      const T = 184.475, c = ots(ep(T), hp(T), { right: 1, back: 26, lift: 9, fov: 42, side: 11 });
+  { t0: 184.475, t1: 184.522, roll: -0.05, name: 'D15b2 back behind it, looking at him — the charged shot boring away toward him', slowmo: true, fn: (t, u) => {
+      const T = 184.475, c = ots(ep(T), hp(T), { right: -1, back: 30, lift: 16, fov: 42, side: 14 });
       return { pos: c.pos, target: lrp(transHead(Math.max(t, TRANS_SHOT)), up(hp(t), 6), 0.35 + 0.3 * u), fov: 42, handheld: 0.05, baseShake: 0.03 }; } },
   { t0: 184.57, t1: 184.8, roll: 0.06, name: 'D15s on him, 3/4 front — he flings the rifle away, rips the saber off his hip, lights it and takes it up overhead in both hands', slowmo: true, fn: (t, u) => {
       const H = up(hp(t), 7), f = nrm(flat(sub(ep(184.57), hp(184.57)), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
       return { pos: add(add(add(H, scl(f, 40 - 4 * u)), scl(sd, -17 + 6 * u)), [0, 1 + 4 * u, 0]), target: add(H, [0, -1.5 + 4.5 * u, 0]), fov: 44, handheld: 0.04 }; } },   // (the ball still on its way: it's behind the lens)
   { t0: 184.8, t1: 184.93, name: 'D15c behind the light-ball — it bores in at his cockpit (slow motion)', slowmo: true, fn: (t, u) => { const P = transPath(), h = transHead(t), T = nrm(sub(transHead(t + 0.01), h)), e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0]));
     return { pos: add(add(sub(h, scl(T, 26)), scl(e1, 8)), [0, 4, 0]), target: lrp(add(h, scl(T, 20)), P.p3, 0.6), fov: 46, handheld: 0.03, baseShake: 0.03 }; } },
-  { t0: 184.93, t1: 185.25, roll: 0.05, name: 'D15d high above him — one big swing right to left, the full-power blade smashes the light-ball apart', slowmo: true, fn: (t, u) => { const P = transPath(), sd = nrm(V.cross([0, 0, 0], P.dirIn, [0, 1, 0]));
-    return { pos: add(add(add(up(hp(t), 8), scl(P.dirIn, 16)), scl(sd, 4)), [0, 44, 0]), target: add(up(hp(t), 6), scl(P.dirIn, -10)), fov: 56, handheld: 0.03, baseShake: 0.04 }; } },   // high above and behind him looking down: the flat swing reads as one big arc across the frame, right to left
+  { t0: 184.93, t1: 185.25, roll: 0.05, name: 'D15d low in front of him — one big swing right to left, the full-power blade smashes the light-ball apart', slowmo: true, fn: (t, u) => { const P = transPath(), sd = nrm(V.cross([0, 0, 0], P.dirIn, [0, 1, 0]));
+    return { pos: add(add(add(up(hp(t), 6), scl(P.dirIn, -30)), scl(sd, -16)), [0, -9, 0]), target: lrp(up(hp(t), 7), P.p3, 0.4), fov: 50, handheld: 0.03, baseShake: 0.04 }; } },   // high above and behind him looking down: the flat swing reads as one big arc across the frame, right to left
   { t0: 185.2, t1: CATCH_T - 0.12, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
   { t0: CATCH_T - 0.12, t1: CATCH_T + 0.05, roll: 0.08, name: 'D16c beside him, full figure — he flies through and snatches the rifle out of the air as it comes back in (bullet time)', slowmo: true, fn: (t, u) => {
-      const h = duelHero(t), fk = duelFK(h, 'gundam'), Hd = partPoint(fk, 'hand_R'),   // (riding with his hand)
-           T = r3(fk.torso), fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0]));
-      const B = up(h.pos, 7);
-      return { pos: add(add(add(B, scl(fw, 14)), scl(rt, 44 - 4 * u)), scl(upv, 4)), target: add(lrp(B, Hd, 0.4), scl(rt, 4 * (1 - u))), fov: 44, handheld: 0.04 }; } },   // out to his right, his whole body in frame: he flies on through and snatches the rifle as it comes back in
+      const T = r3(duelFK(duelHero(CATCH_T - 0.05), 'gundam').torso), fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0])), B = up(hp(t), 6);
+      return { pos: add(add(add(B, scl(fw, 36 - 3 * u)), scl(rt, 28)), scl(upv, 7)), target: add(B, scl(rt, 5)), fov: 42, handheld: 0.04 }; } },   // out ahead of him and to his right (his body's frame, fixed): the whole figure, the arm flung out wide and the rifle dropping into it   // out to his right, his whole body in frame: he flies on through and snatches the rifle as it comes back in
   { t0: CATCH_T + 0.05, t1: 186.4, roll: 0.2, name: 'D16 fly-by — he tears past the lens (rifle back in hand)', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
   { t0: 186.4, t1: 187.45, roll: -0.16, name: 'D17 fly-by — it quick-boosts aside', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));

@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -777,6 +777,15 @@ export function drawGundam(R, t, s, opts = {}) {
     R.beam(a, tip, 1.5 * pw, [col[0] * k, col[1] * k, col[2] * k], 0.04 * pw, 3, 2, 0.8);
     R.light(lerpv(a, tip, 0.5), 40 * pw, bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 4 * k * pw);
     GUN.saber = [a, tip];
+    if (s.saberL && t > TRANS_PASS - SWING_PRE - 0.002 && t < TRANS_PASS + SWING_POST + 0.02) {   // the swing's afterimage: a fan of fading blades along the path it just swept
+      const fk0 = duelFK(duelHero(t), 'gundam').hand_L, inv = M.invert(M.new(), fk0), la = M.transformPoint([0, 0, 0], inv, a), ld = M.transformDir([0, 0, 0], inv, dir);
+      for (let i = 1; i <= 14; i++) {
+        const hm = duelFK(duelHero(t - i * 0.0012), 'gundam').hand_L, ga = M.transformPoint([0, 0, 0], hm, la), gd = V.norm([0, 0, 0], M.transformDir([0, 0, 0], hm, ld));
+        if (V.dist(madd(ga, gd, 13), tip) < 0.6 * i) continue;   // (no smear where it hadn't moved)
+        const f = Math.pow(1 - i / 15, 1.6) * k;
+        R.beam(ga, madd(ga, gd, 13 * k), 0.9 * pw, [col[0] * f, col[1] * f, col[2] * f], 0.1 * f * pw, 4, 1.5, 0.8);
+      }
+    }
     if (!s.fpv && k > 0.5) gripHand(R, e, 'L', 0);   // a closed fist round the hilt
   } else GUN.saber = null;
   // the rifle charges for the last shot: the muzzle gathers light, the glow strips (and his core) flood with power
