@@ -63,6 +63,17 @@
   #scenetag b { font-size: 20px; color: #fff; letter-spacing: .08em; }
   #scenetag span { display: block; margin-top: 4px; color: #9fd0ff; }
   #scenetag em { display: block; margin-top: 2px; font-style: normal; color: #7f93ad; font-size: 11px; }
+  #scenetag.on { pointer-events: auto; }
+  #scenetag { max-width: 560px; }
+  #scenetag .snd { margin-top: 8px; max-height: 46vh; overflow-y: auto; border-top: 1px solid rgba(140,190,255,.25); padding-top: 6px; min-width: 300px; }
+  #scenetag .snd i { display: block; font-style: normal; color: #7f93ad; font-size: 11px; margin-bottom: 4px; }
+  #scenetag .row { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+  #scenetag .row button { flex: none; width: 24px; height: 20px; padding: 0; border: 1px solid rgba(140,190,255,.45); border-radius: 3px; background: rgba(20,40,70,.8); color: #cfe3ff; cursor: pointer; font-size: 10px; }
+  #scenetag .row button:hover { background: rgba(60,110,170,.9); }
+  #scenetag .row code { cursor: copy; color: #e6f1ff; font: 12px 'Share Tech Mono', ui-monospace, monospace; }
+  #scenetag .row code:hover { text-decoration: underline; }
+  #scenetag .row code.ok { color: #7dffb0; }
+  #scenetag .row small { margin-left: auto; color: #7f93ad; font-size: 10px; white-space: nowrap; }
   body.idle, body.idle * { cursor: none !important; }
   body.idle #progress { opacity: 0; }
 </style>

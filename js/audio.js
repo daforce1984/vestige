@@ -711,8 +711,8 @@ function duelCues() {
   for (let k = 0; k < 8; k++) out.push([FINALE_T + 0.01 + 0.035 * k, 'missile', { rate: R(0.85, 1.25), gain: G * 0.55, pan: R(-0.8, 0.8), prio: 8, norand: true }]);   // the Itano circus: a swarm of motors screaming off
   out.push([FINALE_T + 0.02, 'hl_beam', { loop: true, rate: 1.4, dur: FD(FINALE_T, 191.12), fadeIn: 0.2, fadeOut: 0.4, gain: G * 0.45, prio: 7 }]);   // the swarm's roar under the whole circus
   ultSwarm().forEach((m, k) => {                                     // the circus: each wave screaming off, the strikes one after another
-    if (k % 2 === 0) out.push([m.ta, k % 4 ? 'expl_metal' : 'hl_explosion', { rate: R(0.85, 1.2), gain: G * 0.5, pan: R(-0.7, 0.7), prio: 8, norand: true }]);
-    if (k % 16 < 6 && k >= 16) out.push([m.ti, 'missile', { rate: R(0.85, 1.25), gain: G * 0.45, pan: R(-0.8, 0.8), prio: 7, norand: true }]);
+    if (m.hit && k % 8 === 0) out.push([m.ta, k % 16 ? 'expl_metal' : 'hl_explosion', { rate: R(0.85, 1.2), gain: G * 0.5, pan: R(-0.7, 0.7), prio: 8, norand: true }]);
+    if (m.lc < 1.6 ? k % 6 === 0 : k % 40 === 0) out.push([m.ti, 'missile', { rate: R(0.85, 1.25), gain: G * 0.45, pan: R(-0.8, 0.8), prio: 7, norand: true }]);
   });
   return out;
 }
@@ -1315,6 +1315,39 @@ export default class Score {
   }
 
   stop() { this._pausedAt = this.time; this._halt(); }
+
+  // ---------------------------------------------------------------- scene sound list (paused scene info panel)
+  /** every sound that plays in film window [f0, f1): one entry per name — {key, name, kind, file, t, n, e} */
+  soundsIn(f0, f1) {
+    const out = new Map();
+    for (const e of this.events) {
+      const d = e.p.dur || e.p.ref?.meta?.dur || 0;
+      if (e.t >= f1 || e.t + Math.max(d, 0.05) < f0) continue;
+      let name, kind, file;
+      if (e.type === 'voiceLine') { name = e.p.id; kind = 'voice'; file = 'assets/voice/' + e.p.id + '.mp3'; }
+      else if (e.type === 'stem') { name = e.p.ref?.file || 'stem'; kind = 'music'; file = 'assets/music/' + name; }
+      else if (e.p.ref?.meta) { name = e.p.ref.name; kind = 'sfx'; file = 'assets/sfx/' + e.p.ref.meta.file; }
+      else if (e.p.ref?.file) { name = e.p.ref.file; kind = 'music'; file = 'assets/music/' + name; }
+      else { name = '@' + e.type; kind = 'synth'; file = 'js/audio-synth.js (INSTR.' + e.type + ')'; }
+      const key = kind + ':' + name, o = out.get(key);
+      if (o) o.n++; else out.set(key, { key, name, kind, file, t: e.t, n: 1, e, into: Math.max(0, f0 - e.t) });
+    }
+    return [...out.values()].sort((a, b) => a.t - b.t);
+  }
+  /** audition one entry of soundsIn() right now (works while paused); long beds/stems play ≤ 8 s from the scene start */
+  async preview(item) {
+    const ctx = this.ctx; if (!ctx) return;
+    if (ctx.state !== 'running') await ctx.resume().catch(() => {});
+    const e = item.e, ref = e.p.ref;
+    if (ref && !ref.buf) {
+      try { if (ref.bytes) ref.buf = await ctx.decodeAudioData(ref.bytes.slice(0)); } catch (err) { console.warn('[audio] preview decode failed', item.name, err); return; }
+    }
+    if (!this.sess) this.sess = this._newSession();
+    if (this._prevVoices) for (const src of this._prevVoices) { try { src.stop(); } catch (err) { /* ok */ } }
+    const before = new Set(this.active), d = e.p.dur || ref?.meta?.dur || 3, long = d > 8 || item.kind === 'music';
+    this._fire(e, ctx.currentTime + 0.05, long ? Math.min(8, d - item.into) : undefined, long ? item.into : undefined);
+    this._prevVoices = [...this.active].filter((x) => !before.has(x));   // (so the next click cuts this one off)
+  }
 
   setVolume(v) {
     this._vol = Math.max(0, +v || 0);

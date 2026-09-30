@@ -116,8 +116,29 @@ function showSceneTag() {
   const ft = now(), sc = sceneAt(storyT(ft)), i = SCENE_ORDER.indexOf(sc);
   const mm = Math.floor(ft / 60), ss = (ft % 60).toFixed(1).padStart(4, '0');
   sceneTag.innerHTML = `<b>SCENE ${i + 1}</b> / ${SCENE_ORDER.length}<span>${sc.name}</span><em>${mm}:${ss}  (story ${storyT(ft).toFixed(2)} s)</em>`;
+  // the sounds used in this scene: ▶ auditions it, clicking the name copies it
+  const f0 = filmT(sc.t0), f1 = filmT(sc.t1), list = score && score.soundsIn ? score.soundsIn(f0, f1) : [];
+  if (list.length) {
+    const box = document.createElement('div'); box.className = 'snd';
+    box.innerHTML = `<i>SOUNDS (${list.length}) — ▶ play · click a name to copy</i>`;
+    for (const it of list) {
+      const row = document.createElement('div'); row.className = 'row';
+      const pl = document.createElement('button'); pl.textContent = '▶'; pl.title = 'play ' + it.file;
+      pl.onclick = (ev) => { ev.stopPropagation(); score.preview(it); };
+      const nm = document.createElement('code'); nm.textContent = it.name; nm.title = it.file + ' — click to copy';
+      nm.onclick = (ev) => { ev.stopPropagation(); copyText(it.name).then(() => { nm.classList.add('ok'); setTimeout(() => nm.classList.remove('ok'), 700); }); };
+      const meta = document.createElement('small'); meta.textContent = `${it.kind}${it.n > 1 ? ' ×' + it.n : ''} · +${Math.max(0, it.t - f0).toFixed(2)}s`;
+      row.append(pl, nm, meta); box.appendChild(row);
+    }
+    sceneTag.appendChild(box);
+  }
   sceneTag.classList.add('on');
 }
+function copyText(txt) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(txt).catch(() => fallbackCopy(txt));
+  return Promise.resolve(fallbackCopy(txt));
+}
+function fallbackCopy(txt) { const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) { /* ok */ } ta.remove(); }
 // ←/→: one scene (camera cut) at a time
 function stepScene(dir) {
   const st = storyT(now());
