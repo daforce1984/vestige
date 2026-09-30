@@ -1941,9 +1941,12 @@ export const DUEL_CAMS = [
     return { pos: at(E, -12, 16, -8, T), target: pan(up(E, 2), up(ep(t), 2), 0.7), fov: 40, handheld: 0.05 }; } },
   { t0: 183.9, t1: 184.42, name: 'D15a CU — its rifle transforms and charges', slowmo: true, fn: (t, u) => { const F = enemyRifleFrame(t), c = add(F.p, scl(F.dir, 3.5));
     return { pos: add(add(add(c, scl(F.side, 12 - 2 * u)), scl(F.up, 1.5)), scl(F.dir, 3.5 - 1 * u)), target: add(c, scl(F.dir, 0.5 * u)), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },   // out beside the barrel, ahead of it
-  { t0: 184.42, t1: 184.57, roll: 0.03, name: 'D15b head-on to it — it fires the charged shot straight out of frame at him', slowmo: true, fn: (t, u) => {
+  { t0: 184.42, t1: 184.475, roll: 0.03, name: 'D15b head-on to it — it fires the charged shot straight out of frame at him', slowmo: true, fn: (t, u) => {
       const T = 184.42, e = enemyRaw_(T), fk = duelFK(e, 'enemy_ms'), C = partPoint(fk, 'torso', [0, 2.5, 0]), f = nrm(flat(sub(hp(T), ep(T)), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
       return { pos: add(add(add(C, scl(f, 46 - 4 * u)), scl(sd, 11)), [0, 3, 0]), target: add(C, [0, 1, 0]), fov: 40, handheld: 0.04, baseShake: 0.03 }; } },   // in front of it, just off its line of fire
+  { t0: 184.475, t1: 184.57, roll: -0.05, name: 'D15b2 back behind it, looking at him — the charged shot boring away toward him', slowmo: true, fn: (t, u) => {
+      const T = 184.475, c = ots(ep(T), hp(T), { right: 1, back: 26, lift: 9, fov: 42, side: 11 });
+      return { pos: c.pos, target: lrp(transHead(Math.max(t, TRANS_SHOT)), up(hp(t), 6), 0.35 + 0.3 * u), fov: 42, handheld: 0.05, baseShake: 0.03 }; } },
   { t0: 184.57, t1: 184.8, roll: 0.06, name: 'D15s on him, 3/4 front — he flings the rifle away, rips the saber off his hip, lights it and takes it up overhead in both hands', slowmo: true, fn: (t, u) => {
       const H = up(hp(t), 7), f = nrm(flat(sub(ep(184.57), hp(184.57)), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
       return { pos: add(add(add(H, scl(f, 40 - 4 * u)), scl(sd, -17 + 6 * u)), [0, 1 + 4 * u, 0]), target: add(H, [0, -1.5 + 4.5 * u, 0]), fov: 44, handheld: 0.04 }; } },   // (the ball still on its way: it's behind the lens)
@@ -1953,10 +1956,11 @@ export const DUEL_CAMS = [
     return { pos: add(add(add(P.p3, scl(sd, 30)), scl(P.dirIn, 6)), [0, -4, 0]), target: lrp(P.p3, up(hp(t), 6), 0.45), fov: 40, handheld: 0.03, baseShake: 0.04 }; } },
   { t0: 185.2, t1: CATCH_T - 0.12, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
-  { t0: CATCH_T - 0.12, t1: CATCH_T + 0.05, roll: 0.08, name: 'D16c CU his right hand — the rifle comes tumbling back in and he snatches it out of the air (bullet time)', slowmo: true, fn: (t, u) => {
+  { t0: CATCH_T - 0.12, t1: CATCH_T + 0.05, roll: 0.08, name: 'D16c beside him, full figure — he flies through and snatches the rifle out of the air as it comes back in (bullet time)', slowmo: true, fn: (t, u) => {
       const h = duelHero(t), fk = duelFK(h, 'gundam'), Hd = partPoint(fk, 'hand_R'),   // (riding with his hand)
            T = r3(fk.torso), fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0]));
-      return { pos: add(add(add(Hd, scl(fw, 3)), scl(rt, 15 - 2 * u)), scl(upv, 2)), target: add(Hd, scl(rt, 2 * (1 - u))), fov: 38, handheld: 0.03 }; } },   // out to his right, level with the hand held out in front: the rifle comes in past the lens into it
+      const B = up(h.pos, 7);
+      return { pos: add(add(add(B, scl(fw, 14)), scl(rt, 44 - 4 * u)), scl(upv, 4)), target: add(lrp(B, Hd, 0.4), scl(rt, 4 * (1 - u))), fov: 44, handheld: 0.04 }; } },   // out to his right, his whole body in frame: he flies on through and snatches the rifle as it comes back in
   { t0: CATCH_T + 0.05, t1: 186.4, roll: 0.2, name: 'D16 fly-by — he tears past the lens (rifle back in hand)', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
   { t0: 186.4, t1: 187.45, roll: -0.16, name: 'D17 fly-by — it quick-boosts aside', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));
