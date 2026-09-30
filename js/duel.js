@@ -1956,13 +1956,24 @@ export const DUEL_CAMS = [
     return { pos: add(add(add(C, scl(f, -10 + 2 * u)), scl(sd, 14 - 3 * u)), [0, 6 - u, 0]), target: add(C, [0, 1, 0]), fov: 40, handheld: 0.03, baseShake: 0.03 }; } },   // close, 3/4 from behind and above: its head and the ports on its back
   // THE ITANO CIRCUS — ONE TAKE on a long lens from far off: it opens on the launch, whips onto him and zooms right in,
   // then rides him the whole run (the operator a beat behind), the missiles bursting along the line he's just left
-  { t0: 190.7, t1: CIRCUS_C1, name: 'D21 the Itano circus, one take — long lens from far off, tracking him through the swarm', slowmo: true, fn: (t, u) => {
+  { t0: 190.7, t1: circusStory(5.0), name: 'D21 the Itano circus, one take — long lens from far off, tracking him through the swarm', slowmo: true, fn: (t, u) => {
       const c = circusClock(t), H0 = hp(190.9), E0 = ep(190.9), f = nrm(flat(sub(E0, H0), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
       const H = up(hp(t), 8), Hl = up(hp(circusStory(Math.max(0, c - 0.35))), 8);   // (the operator a good third of a second behind him)
       const Hc = up(hp(circusStory(Math.max(0, c - 0.6))), 8), pos = add(add(H0, chaseAxes().camOff), scl(sub(Hc, H0), 0.55));   // the camera itself dragged along after him, well behind   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
       const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(1.0, 2.2, c), tgt = lrp(up(E0, 6), lrp(Hl, H, 0.25), onHim);   // barely keeping up with him: he pulls toward the edge of frame   // (leading him: room ahead on the left)
       const fov = lerp(38, 16, smooth(1.4, 2.6, c)) + 1.5 * Math.sin(c * 0.9) * smooth(2, 3, c);   // pulled well back
       return { pos, target: tgt, fov, handheld: 0.12, baseShake: 0.04 }; } },   // (a rougher hand: the operator straining after him)
+  // … and the back half cut up: on his tail, then head-on as he comes at the lens with it all behind him, then wide
+  { t0: circusStory(5.0), t1: circusStory(6.4), roll: 0.1, name: 'D21b on his tail — the swarm closing, bursts right behind him', slowmo: true, fn: (t, u) => {
+      const c = circusClock(t), H = up(hp(t), 8), Hl = up(hp(circusStory(c - 0.25)), 8), v = nrm(add(sub(H, Hl), [1e-4, 0, 0])), sd = nrm(V.cross([0, 0, 0], v, [0, 1, 0]));
+      return { pos: add(add(add(Hl, scl(v, -95)), scl(sd, 30)), [0, 34, 0]), target: add(H, scl(v, 40)), fov: 46, handheld: 0.12, baseShake: 0.06 }; } },
+  { t0: circusStory(6.4), t1: circusStory(7.8), roll: -0.12, name: 'D21c head-on, low — he comes at the lens with the whole swarm behind him', slowmo: true, fn: (t, u) => {
+      const c = circusClock(t), H = up(hp(t), 8), T0 = circusStory(6.4), T1 = circusStory(7.8), P0 = hp(T0), P1 = hp(T1), v = nrm(sub(P1, P0)), sd = nrm(V.cross([0, 0, 0], v, [0, 1, 0]));
+      const base = add(add(add(P1, scl(v, 90)), scl(sd, 30 - 20 * u)), [0, -25, 0]);   // parked ahead of where he's going, sliding a little
+      return { pos: base, target: add(H, scl(v, -30 * (1 - u))), fov: 40 - 8 * u, handheld: 0.1, baseShake: 0.05 }; } },
+  { t0: circusStory(7.8), t1: CIRCUS_C1, roll: 0.06, name: 'D21d wide from the side — the line of bursts strung out behind him', slowmo: true, fn: (t, u) => {
+      const c = circusClock(t), H = up(hp(t), 8), Hl = up(hp(circusStory(c - 0.4)), 8), T0 = circusStory(7.8), P0 = hp(T0), v = nrm(sub(hp(CIRCUS_C1), P0)), sd = nrm(V.cross([0, 0, 0], v, [0, 1, 0]));
+      return { pos: add(add(P0, scl(sd, -340)), [0, 60, 0]), target: lrp(Hl, H, 0.3), fov: 26, handheld: 0.08, baseShake: 0.03 }; } },
   { t0: CIRCUS_C1, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
     return { pos: add(add(Pm, scl(D_L, -150)), [0, 12, 0]), target: pan(Pm, up(hp(t), 2), 0.85), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },
   // the approach to the cut, from high over its shoulder, looking down across the line of the pass
