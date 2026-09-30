@@ -203,9 +203,9 @@ export const CUES = [
   // ---------------- ACT V
   [262,   'wellHum',    { dur: 16, vel: 0.5 }],
   [262,   'growl',      { dur: 1.9, vel: 0.9 }],
-  [266.0, '@beamSaberIgnite', { vel: 1 }],            // the blade at ten times its output
-  [266.05, '@beamSaberHum', { dur: 4.2, vel: 0.9, fadeIn: 0.1, fadeOut: 0.3 }],
-  [267.1, '@beamSaberSwing', { vel: 1, dur: 0.45 }],   // the lunge
+  [266.0, 'beamSaberIgnite', { vel: 1 }],            // the blade at ten times its output
+  [266.05, 'beamSaberHum', { dur: 4.2, vel: 0.9, fadeIn: 0.1, fadeOut: 0.3 }],
+  [267.1, 'beamSaberSwing', { vel: 1, dur: 0.45 }],   // the lunge
   [267.42, 'shieldHit', { vel: 1, pan: 0 }],
   [267.44, 'shieldStrain', { dur: 0.55, f0: 700, f1: 1800, vel: 0.6 }],
   [267.42,'tear',       { dur: 0.58, vel: 0.95 }],   // the blade burning through

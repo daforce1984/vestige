@@ -228,5 +228,95 @@
    }
   ],
   "note": "2026-09-30: the duel score as fast metal (user: 전투 배경음악은 Metal로 비트 빠르게); replaces G_duel_fast in manifest.json. Generated with MiniMax Music 3 on the local ComfyUI."
+ },
+ {
+  "id": "N_alert",
+  "dur": 48,
+  "caption": "Global Metadata: Instrumental cinematic sci-fi action score, hybrid orchestra with synths and heavy drums, 160 BPM, C minor, urgent, dread-filled and escalating, for a fleet caught in a trap as a colossal enemy dreadnought appears.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no screaming, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: Starts instantly on the first beat with a violent low brass stab and a fast alarm-like string ostinato, pulsing sixteenth-note synth bass, fast ticking percussion. At about 10 seconds: massive war drums and taiko enter, dissonant brass clusters and huge braams as the giant warship emerges. From about 25 seconds: a relentless accelerating crescendo, rising string runs, snare rolls and timpani, building tension to a gigantic final orchestral hit at the very end. Fast, driving, no slow sections, no fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "N_alert_t1",
+  "seed": 20260930201,
+  "takes": [
+   {
+    "take": "N_alert_t1",
+    "seed": 20260930201,
+    "flac": "minimax_music_00031.flac",
+    "sha256": "5464024d1498e3e08bb84ee64a4935e8681c617026b32620e4990712051c2fc6",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the trap sprung → the dreadnought → the ion charge (story 63–120). Generated with MiniMax Music 3 on the local ComfyUI."
+ },
+ {
+  "id": "N_battle",
+  "dur": 42,
+  "caption": "Global Metadata: Instrumental epic space fleet battle score, hybrid orchestral metal, 172 BPM, D minor, furious and heroic, for a desperate space battle with fighters and frigates exploding, ending as a hero mecha launches from the carrier.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no screaming, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: Starts instantly at full power on the first beat: pounding double-kick drums and taiko, fast staccato string ostinatos, distorted guitar power chords, heroic horns and trombones trading a fierce battle theme, cinematic impacts. Relentless momentum all the way. At about 22 seconds: a heroic rising brass fanfare over the drums as the hero launches, then even bigger to the end. Fast, no breakdown, no slowing down, no fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "N_battle_t1",
+  "seed": 20260930211,
+  "takes": [
+   {
+    "take": "N_battle_t1",
+    "seed": 20260930211,
+    "flac": "minimax_music_00032.flac",
+    "sha256": "7a33ac047645df44ac0fd99c001b9b5c499cc01035ac84ef041ec6a3791ff1a1",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the fleet battle → Sigma launches (120–163.1). Generated with MiniMax Music 3 on the local ComfyUI."
+ },
+ {
+  "id": "N_lance",
+  "dur": 16,
+  "caption": "Global Metadata: Instrumental cinematic sci-fi suspense score, hybrid orchestra and synths, 150 BPM, B minor, a superweapon charging to fire.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no screaming, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: Starts instantly: a fast pulsing synth arpeggio and ticking hi-hats over a low drone, rising string tremolo and a Shepard-tone-like riser getting higher and louder, taiko hits accelerating, brass swelling, building unbearable tension, ending on a colossal full orchestral impact hit with a deep sub-bass boom. Short and intense, no fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "N_lance_t1",
+  "seed": 20260930221,
+  "takes": [
+   {
+    "take": "N_lance_t1",
+    "seed": 20260930221,
+    "flac": "minimax_music_00033.flac",
+    "sha256": "07c6b06d633785bc4e0f943e64e547a452a04663523754f71d22d3d09ef9de9a",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the enemy lance charges and fires (hit at 9.3 s on the shot, story 216). Generated with MiniMax Music 3 on the local ComfyUI."
+ },
+ {
+  "id": "N_dive",
+  "dur": 40,
+  "caption": "Global Metadata: Instrumental cinematic sci-fi action score, hybrid orchestra and synths, 140 BPM, E minor, grim determination, for a wounded mothership and a lone mecha diving alone toward a gravity-well singularity.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no screaming, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: 0 to 8 seconds: dark, damaged and tense: low string pulses, deep sub-bass hits, distant metallic percussion. At about 8 seconds: a determined heroic motif on low horns over a fast driving string ostinato and pounding drums as the mecha launches into the dive. From about 20 seconds: an accelerating, warping crescendo, rising synth risers, faster and faster drums, choir-like synth pads swelling, huge and intense to the very end. No fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "N_dive_t1",
+  "seed": 20260930231,
+  "takes": [
+   {
+    "take": "N_dive_t1",
+    "seed": 20260930231,
+    "flac": "minimax_music_00034.flac",
+    "sha256": "dcb239dd37309e969c862ebca58edbcf99a7d2df517a24a7d439bd3dfb14d0c5",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the wound → the dive into the well (218–262). Generated with MiniMax Music 3 on the local ComfyUI."
+ },
+ {
+  "id": "N_climax",
+  "dur": 56,
+  "caption": "Global Metadata: Instrumental epic climax score, hybrid orchestral metal, 168 BPM, D minor, feral, explosive and triumphant, for a berserk mecha smashing through an energy shield with a giant beam sword, destroying a singularity core, and a fleet firing its main gun to destroy an enemy dreadnought.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no screaming, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: Starts instantly at full power: savage pounding drums and double kick, distorted down-tuned guitar riffs, furious staccato strings, snarling low brass. At about 4 seconds: a gigantic brass and drum hit, then the heroic battle theme on horns over relentless drums. At about 20 seconds: a massive blast and a short roaring low drone, then the whole orchestra and band rebuild fast into a triumphant heroic fanfare, driving to a huge victorious final chord at the very end. Fast, no slow sections, no fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "N_climax_t1",
+  "seed": 20260930241,
+  "takes": [
+   {
+    "take": "N_climax_t1",
+    "seed": 20260930241,
+    "flac": "minimax_music_00035.flac",
+    "sha256": "4382510e09c8bbf38b7e0f08edea02b8f131df774acc6cecc982d5a2c4592ae4",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — berserk → the ten-times saber through the barrier (hit at 3.95 s on the thrust, story 267.42) → the core → the counterattack (262–323). Generated with MiniMax Music 3 on the local ComfyUI."
  }
 ]
