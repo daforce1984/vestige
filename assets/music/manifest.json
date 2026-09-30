@@ -18,8 +18,8 @@
   "t": 120.0,
   "gain": 1.318,
   "fadeIn": 0.05,
-  "fadeOut": 1.2,
-  "end": 169.8
+  "fadeOut": 0.3,
+  "end": 163.1
  },
  {
   "file": "G_duel_metal.mp3",
@@ -27,11 +27,11 @@
   "t": 0,
   "end": 195.969,
   "offset": 0.0,
-  "hitStory": 170.0,
+  "hitStory": 163.1,
   "hitFile": 0.0,
   "endStory": 191.3,
   "gain": 1.0,
-  "fadeIn": 0.1,
+  "fadeIn": 0.02,
   "fadeOut": 0.35
  },
  {
