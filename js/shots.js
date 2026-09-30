@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -836,7 +836,7 @@ function drawDroppedRifle(R, t) {
 function shieldScorch(e, t) {
   const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0) return;   // (the line reaches it ~8 ms after the event)
   const g = easeOut(sat(lt / 0.15));
-  e.dmgC = B.local; e.dmgR = 1.5 * (0.3 + 0.7 * g); e.dmgPart = 'shield'; e.damage = Math.max(e.damage || 0, 0.55 * g);   // patchy soot, cracks glowing
+  e.dmgC = blockLocalAt(t); e.dmgR = 1.5 * (0.3 + 0.7 * g); e.dmgPart = 'shield'; e.damage = Math.max(e.damage || 0, 0.55 * g);   // patchy soot, cracks glowing
 }
 // …and the shot's energy spreads out over its face from the hit in every direction and dies away: a ragged ring
 // racing out across the plate, radial pixel streaks skating flat along it, motes shed from the front fading behind
@@ -882,6 +882,17 @@ function drawBlockSplash(R, t) {
       R.arc(onFace(a, 0.3), onFace(a, rr * 0.95), 0.28, [0.8, 1.8, 3.2], 0.7 * rk, 880 + i, 20);
     }
   }
+  // 6. the gouge the beam dragged across the plate: the track (kept in the shield's frame, so it rides with it) glowing
+  //    white-hot where it's fresh, cooling to red behind
+  { const P = blockPath();
+    let pa = null, ta = 0;
+    for (const x of P) {
+      if (x.t > t) break;
+      const q = madd(M.transformPoint([0, 0, 0], F.S, x.local), nF, 0.6);
+      if (pa) { const age = t - x.t, hh = Math.exp(-age * 1.4), w2 = sat(hh * 1.6);
+        if (hh > 0.02) R.beam(pa, q, 0.35 + 0.25 * hh, [4 * hh, (0.6 + 2.2 * w2) * hh, (0.1 + 1.2 * w2 * w2) * hh], 0.35, 5, 0, 0.3); }
+      pa = q; ta = x.t;
+    } }
   // 5. sparks spitting off the struck spot while it's hot — laid out in the plate's own frame, so they ride with the shield
   for (let i = 0; i < 70; i++) {
     const born = 0.6 * hash(i + 950), L = 0.12 + 0.2 * hash(i + 951), sl = lt - born; if (sl < 0 || sl > L || born > 0.05 + 1.2 * heat) continue;
@@ -1519,6 +1530,10 @@ function drawHeroFire(R, t) {
     if (t < sh.t - 0.01 || t > sh.t + 0.9) continue;
     const lt = t - sh.t;
     if (!sh.kill) {
+      if (sh.block) {                                                  // the block: a live ray from his muzzle, cut off where it meets the plate
+        const bh = blockHitAt(t), from = bh ? bh.from : sh.from, to = bh && bh.inside ? bh.p : bh ? V.add([0, 0, 0], bh.from, V.scale([0, 0, 0], bh.dir, 1500)) : sh.to;
+        rifleShot(R, t, sh.t, from, to, false); continue;
+      }
       rifleShot(R, t, sh.t, sh.from, sh.to, false);   // (no flash ball on the wing hit: the sparks + light carry it)
       continue;
     }

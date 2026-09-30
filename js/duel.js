@@ -1743,8 +1743,36 @@ let _bs = null;
 export const BLOCK_SPOT = () => _bs || (_bs = (() => { const e = DUEL_EVENTS.find((x) => x.block), fk = duelFK(enemyRaw_(e.t), 'enemy_ms'); return { t: e.t, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk.shield), e.pos) }; })());
 export function blockFrame(t) {
   const st = enemyRaw_(t); if (!st) return null;
-  const fk = duelFK(st, 'enemy_ms'), B = BLOCK_SPOT();
-  return { p: M.transformPoint([0, 0, 0], fk.shield, B.local), n: nrm(M.transformDir([0, 0, 0], fk.shield, [1, 0, 0])), up: nrm(M.transformDir([0, 0, 0], fk.shield, [0, 1, 0])) };
+  const fk = duelFK(st, 'enemy_ms');
+  return { p: M.transformPoint([0, 0, 0], fk.shield, blockLocalAt(t)), S: fk.shield, n: nrm(M.transformDir([0, 0, 0], fk.shield, [1, 0, 0])), up: nrm(M.transformDir([0, 0, 0], fk.shield, [0, 1, 0])) };
+}
+// THE BLOCK, done properly: the beam is a ray from his muzzle (as it moves with his recoil) and it stops where it meets
+// the struck face of the (enlarged) shield; the path it drags across the plate is kept in the shield's own frame
+export const bigShieldScale = (t) => { const up = smooth(178.42, 178.52, t), wide = smooth(178.48, 178.6, t), back = smooth(179.1, 179.35, t); return { sy: 1 + (up - back * up), sz: 1 + (wide - back * wide) }; };
+const BLOCK_C0 = BLOCK_T + 0.012, BLOCK_C1 = BLOCK_T + 0.26;   // the beam in contact with the plate
+let _bside = 0;
+function blockFaceX(t) {   // the local x of the struck (outer) face of the enlarged plate, the side turned to him
+  if (!_bside) { const m = duelMuzzle(BLOCK_T), fk = duelFK(enemyRaw_(BLOCK_T), 'enemy_ms'), oL = M.transformPoint([0, 0, 0], M.invert(M.new(), fk.shield), m.pos); _bside = oL[0] < SHIELD_C[0] ? -1 : 1; }
+  const th = 1 + 0.3 * (bigShieldScale(t).sy - 1);
+  return SHIELD_C[0] + ((_bside < 0 ? 0.55 : 1.83) - SHIELD_C[0]) * th;
+}
+/** the beam's contact point on the plate at t (shield frame): it drags diagonally down across the face with a waver */
+export function blockLocalAt(t) {
+  const u = smooth(BLOCK_C0, BLOCK_C1, t) * 0.85 + sat((t - BLOCK_C0) / (BLOCK_C1 - BLOCK_C0)) * 0.15, { sy, sz } = bigShieldScale(Math.min(t, BLOCK_C1));
+  return [blockFaceX(Math.min(t, BLOCK_C1)), SHIELD_C[1] + sy * (2.3 - 4.6 * u), SHIELD_C[2] + sz * (-0.95 + 1.7 * u + 0.25 * Math.sin(u * 9.5))];
+}
+export function blockHitAt(t) {
+  const m = duelMuzzle(t), st = enemyRaw_(t); if (!m || !st) return null;
+  const fk = duelFK(st, 'enemy_ms'), S = fk.shield, local = blockLocalAt(t), p = M.transformPoint([0, 0, 0], S, local);
+  return { p, local, inside: t >= BLOCK_C0 - 0.012 && t <= BLOCK_C1, n: nrm(M.transformDir([0, 0, 0], S, [_bside, 0, 0])), from: m.pos, dir: nrm(sub(p, m.pos)) };
+}
+let _bpath = null;
+/** the beam's track across the plate: [{t, local}] (shield frame) */
+export function blockPath() {
+  if (_bpath) return _bpath;
+  _bpath = [];
+  for (let t = BLOCK_C0; t <= BLOCK_C1 + 1e-6; t += 0.004) _bpath.push({ t, local: blockLocalAt(t) });
+  return _bpath;
 }
 /** world position + unit direction of the hero's rifle muzzle at story time t */
 export function duelMuzzle(t) {
