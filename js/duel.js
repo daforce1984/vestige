@@ -563,7 +563,7 @@ export function circusOffset(t) {
   // ONE WAY: he breaks off to his side and keeps running that way, accelerating (~520 m out by the end), a slow rise and
   // fall on it and small jinks; the one take ends on him out there and the cut (D22) hides his return to his mark
   const g = Math.pow(sat((c - 0.35) / (CIRCUS_END - 0.35)), 1.3), jk = smooth(0.35, 1.2, c);
-  const x = 520 * g + 10 * Math.sin(2.6 * c) * jk, y = 90 * Math.sin(Math.PI * g) + 7 * Math.sin(3.3 * c + 1) * jk, z = 0;
+  const x = 1040 * g + 14 * Math.sin(2.6 * c) * jk, y = 160 * Math.sin(Math.PI * g) + 9 * Math.sin(3.3 * c + 1) * jk, z = 0;   // (twice the speed: ~1 km out by the end)
   return add(add(scl(sd, x), [0, y, 0]), scl(f, z));
 }
 export const ULT_M = 480;   // (ten times the first cut: a sky full of them)
@@ -1931,9 +1931,9 @@ export const DUEL_CAMS = [
   { t0: 190.7, t1: CIRCUS_C1, name: 'D21 the Itano circus, one take — long lens from far off, tracking him through the swarm', slowmo: true, fn: (t, u) => {
       const c = circusClock(t), H0 = hp(190.9), E0 = ep(190.9), f = nrm(flat(sub(E0, H0), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
       const H = up(hp(t), 8), Hl = up(hp(circusStory(Math.max(0, c - 0.35))), 8);   // (the operator a good third of a second behind him)
-      const pos = add(add(H0, chaseAxes().camOff), scl(sub(H, H0), 0.3));   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
-      const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(1.0, 2.2, c), tgt = lrp(up(E0, 6), lrp(Hl, H, 0.2), onHim);   // barely keeping up with him: he pulls toward the edge of frame   // (leading him: room ahead on the left)
-      const fov = lerp(36, 13, smooth(1.4, 2.6, c)) + 1.2 * Math.sin(c * 0.9) * smooth(2, 3, c);   // pulled well back
+      const Hc = up(hp(circusStory(Math.max(0, c - 0.6))), 8), pos = add(add(H0, chaseAxes().camOff), scl(sub(Hc, H0), 0.55));   // the camera itself dragged along after him, well behind   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
+      const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(1.0, 2.2, c), tgt = lrp(up(E0, 6), lrp(Hl, H, 0.25), onHim);   // barely keeping up with him: he pulls toward the edge of frame   // (leading him: room ahead on the left)
+      const fov = lerp(38, 16, smooth(1.4, 2.6, c)) + 1.5 * Math.sin(c * 0.9) * smooth(2, 3, c);   // pulled well back
       return { pos, target: tgt, fov, handheld: 0.12, baseShake: 0.04 }; } },   // (a rougher hand: the operator straining after him)
   { t0: CIRCUS_C1, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
     return { pos: add(add(Pm, scl(D_L, -150)), [0, 12, 0]), target: pan(Pm, up(hp(t), 2), 0.85), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },

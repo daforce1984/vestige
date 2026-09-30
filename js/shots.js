@@ -1303,13 +1303,13 @@ const _ultBack = [0, 3.4, -2.0];
 // (hundreds of these go off in the circus; the generic explosion()'s blown-out centre stacked into a white wall)
 function missileBurst(R, lt, p, size, seed, lit) {
   if (lt < 0 || lt > 0.8) return;
-  if (lt < 0.07) { const f = 1 - lt / 0.07; R.glow(p, size * (0.3 + 0.3 * f), [2.2 * f, 1.2 * f, 2 * f], 0.25); }
+  if (lt < 0.07) { const f = 1 - lt / 0.07; R.glow(p, size * (0.3 + 0.3 * f), [3.3 * f, 1.8 * f, 3 * f], 0.25); }
   for (let j = 0; j < 3; j++) {
     const d0 = j * 0.04, life = 0.5 + 0.25 * hash(seed + j * 3.1), a = (lt - d0) / life; if (a < 0 || a > 1) continue;
     const q = madd(p, randDir([0, 0, 0], seed * 7.7 + j * 2.3), size * 0.35 * j * (0.4 + 0.6 * a));
-    R.fireball(q, size * (0.3 + 0.55 * easeOut(Math.min(1, a * 1.6))) * (j ? 0.7 : 1), a, hash(seed + j) * 50 + j, [1, 0.5, 0.85], j ? 0.45 : 0.6);   // (pink-tinted: an energy round going off)
+    R.fireball(q, size * (0.3 + 0.55 * easeOut(Math.min(1, a * 1.6))) * (j ? 0.7 : 1), a, hash(seed + j) * 50 + j, [1, 0.5, 0.85], j ? 0.68 : 0.9);   // (pink-tinted: an energy round going off)
   }
-  if (lit && lt < 0.3) R.light(p, size * 10, [1, 0.4, 0.75], 6 * (1 - lt / 0.3));
+  if (lit && lt < 0.3) R.light(p, size * 10, [1, 0.4, 0.75], 9 * (1 - lt / 0.3));
 }
 function drawUlt(R, t) {
   if (t < 189.8 || t > 191.9) return;
@@ -1368,7 +1368,7 @@ function drawUlt(R, t) {
       if (c - m.lc < 0.12) { const f = 1 - (c - m.lc) / 0.12; R.glow(m.p0, 1.2 + 1.5 * f, [3 * f, 1 * f, 2.4 * f], 0.35); }   // the pop out of the port
       if (i % 5 === 0 && c - m.lc < 1.0) { const a = (c - m.lc) / 1.0; R.glow(m.p0, 2 + 7 * easeOut(a), [0.22 * (1 - a), 0.2 * (1 - a), 0.26 * (1 - a)], 0.9); }   // the launch smoke puffing off the ports
     } else if (m.hit && c - m.sc < 0.8) {                                        // THE STRIKE: one after another, each a fireball on his heels
-      missileBurst(R, c - m.sc, m.p3, 6 + 4.5 * hash(i + 3), 610 + i, i % 6 === 0);   // (big: the lens is right on them)
+      missileBurst(R, c - m.sc, m.p3, 9 + 6.75 * hash(i + 3), 610 + i, i % 6 === 0);   // (x1.5 the blast)   // (big: the lens is right on them)
     }
   }
 
