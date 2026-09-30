@@ -58,6 +58,6 @@ def emis_green(g, blob, mt, alb):   # rifle2: no emissive map — its glowing in
 
 # (2026-09-30: the user swapped them — Sigma carries rifle2, VANGUARD rifle1)
 # Sigma: rifle2, muzzle toward +z, top +y = already his rifle frame (+Z barrel, +Y top); grip stub on the origin
-build('rifle2.glb', 'rifle2_game', np.array([0, 0.12, -1.6]), np.eye(3), 2.75, 1024, emis_green)
+build('rifle2.glb', 'rifle2_game', np.array([0, 0.12, -1.6]), np.eye(3), 4.125, 1024, emis_green)   # (×2.75, then 1.5× bigger on request)
 # VANGUARD: rifle1 (bullpup), muzzle toward −z, top +y → its rifle part frame (barrel −Y, top +Z): (x, y, z) → (−x, z, y)
 build('rifle1.glb', 'rifle1_game', np.array([0, -0.85, -1.23]), np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]), 1.4, 768, emis_tex)

@@ -1271,7 +1271,7 @@ const FK_ORDER = Object.keys(PARENT);
 // assets/gundam.glb node translations (glTF): rifle ← hand_R, rifle_muzzle ← rifle; barrel = rifle local +Z.
 // (re-check with: python3 -c "…" in blender/DUEL_NOTES.md if the rifle is re-modelled; sanity check compares them)
 export const RIFLE_T = [-0.10266, -0.84395, 0.50666];   // (raised 2026-09-29: the grip in the fist, not the receiver under it)
-export const MUZZLE_T = [0, 1.25, 8.63];   // the rifle's muzzle (assets/rifle2_game.glb, tools/build_rifles.py: grip at the origin)
+export const MUZZLE_T = [0, 1.88, 12.94];   // the rifle's muzzle (assets/rifle2_game.glb, tools/build_rifles.py: grip at the origin)
 export const HERO_RIFLE_S = [1, 1, 1];     // its scale on the hand (blender/build_hero_rifle.py builds it at size: ~25 m, twice the old one)
 export const RIFLE_Q = [-0.130526, 0, 0, 0.991445];   // the rifle node's rotation on hand_R (assets/gundam.glb): the grip raked 15° like a pistol grip
 // VANGUARD's rifle (assets/enemy_ms.glb): rifle_muzzle in the rifle part's frame; the barrel runs from the grip pivot to it
@@ -1411,7 +1411,7 @@ const aimRifle = (s, target, k) => layRifle(s, 'gundam', target, k);
 // SIGMA'S HOLD (after DOOM's shotgun): the rifle is PLACED — grip at the right of his chest, a little forward, the stock
 // back along the forearm to the right shoulder, the barrel on the target, its top toward his chest's up — and the right
 // arm solved onto the grip by IK (the left comes onto the fore-end: heroLeft). No more arm-out pistol aim.
-const HERO_GRIP = [-2.7, 2.7, 2.8];                     // torso frame
+const HERO_GRIP = [-4.3, 2.3, 4.6];                     // torso frame
 // HIS GUN ARM, THE WRIST LOCKED (the rifle 100 % with the forearm): the hand is held at one fixed angle on the forearm
 // (HERO_WRIST); from the rifle's wanted world rotation Rr the forearm's rotation follows exactly (Rf = Rr·(Rh0·Rq)⁻¹),
 // so the barrel lands exactly on the target; then only the shoulder turns, swinging the elbow so the grip comes as
@@ -1431,11 +1431,16 @@ function heroArmPlace(s, fk, gripDes, Rr) {
 }
 let _rq = null; const RQ3 = () => _rq || (_rq = r3(M.fromTRS(M.new(), [0, 0, 0], RIFLE_Q, 1)));
 const styleW = (tw, list, styles, want) => { let w = 0; list.forEach((ts, i) => { const st = Array.isArray(styles) ? styles[i] : styles[ts]; if (st === want) w = Math.max(w, smooth(ts - 0.45, ts - 0.25, tw) * (1 - smooth(ts + 0.25, ts + 0.5, tw))); }); return w; };
-const HERO_GRIP_HIP = [-2.9, 0.9, 2.3];
+const HERO_GRIP_HIP = [-4.4, 0.6, 3.8];
 function heroAim2H(s, target, k) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const tw = warp(s._t), wHip = styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip');
+  {   // the body turns into the shot: the target brought round to just right of his chest line, so the rifle is out beside him, never across his chest
+    const f0 = duelFK(s, 'gundam'), tl = r3v(r3T(r3(f0.torso)), sub(target, partPoint(f0, 'torso'))), az = Math.atan2(tl[0], tl[2]);
+    const yaw = clamp(az + 0.25, -1.5, 1.5) * k, t0 = s.pose.torso || [0, 0, 0];
+    s.pose.torso = [t0[0], t0[1] + yaw, t0[2]];
+  }
   const fk = duelFK(s, 'gundam'), grip = M.transformPoint([0, 0, 0], fk.torso, lrp(HERO_GRIP, HERO_GRIP_HIP, wHip));
   const d = nrm(sub(target, grip)), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
   const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
@@ -1453,7 +1458,7 @@ function heroAim2H(s, target, k) {
 // (HERO_LOAD), the strip lights in two steps (HERO_LOCK); it snaps down onto the target (HERO_SNAP0 → 1, a little
 // overshoot) and he holds dead still while his eye flares
 export const HERO_GRAB = 170.28, HERO_EJECT = 170.95, HERO_LOAD = 171.55, HERO_LOCK = 171.75, HERO_SNAP0 = 170.72, HERO_SNAP1 = 171.05, HERO_FLARE = 172.4;   // (no reload any more: HERO_EJECT/LOAD/LOCK unused)
-const HERO_FORE = [0, -0.4, 5.0], HERO_REAR = [1.6, -1.0, 1.85], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
+const HERO_FORE = [0, -0.5, 7.5], HERO_REAR = [1.6, -1.0, 1.85], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
 // the back mount (torso frame): grip behind his right shoulder, the barrel slung diagonally down across his back to
 // the left hip, its flank against the pack — carried like this from the launch until he rips it off at HERO_GRAB
 const HERO_BACK_G = [-3.0, 4.8, -3.4], HERO_BACK_D = [0.55, -0.78, -0.28];
@@ -1724,23 +1729,29 @@ function throwFling(s, tw) {   // the right arm: wound in across his chest, then
   const fk = duelFK(s, 'gundam'), pv = PIV.gundam, T = r3(fk.torso);
   const fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0]));
   const S = M.transformPoint([0, 0, 0], fk.torso, sub(pv.arm_R_upper, pv.torso)), L = V.dist(pv.arm_R_lower, pv.arm_R_upper) + V.dist(pv.hand_R, pv.arm_R_lower);
-  const W = add(S, scl(nrm(add(add(scl(rt, -0.7), scl(fw, 0.9)), scl(upv, -0.15))), 0.55 * L));   // wound in across the chest
+  const W = add(S, scl(nrm(add(add(scl(rt, -0.2), scl(fw, 1.0)), scl(upv, -0.1))), 0.6 * L));   // wound in, in front of him (not across the chest: the rifle would go through it)
   const O = add(S, scl(nrm(add(add(rt, scl(fw, 0.2)), scl(upv, 0.12))), 1.1 * L));             // flung out: the arm dead straight, out to his right
   const P = lrp(W, O, out), o = nrm(sub(P, S)), y = scl(o, -1), z = nrm(sub(fw, scl(o, V.dot(fw, o)))), x = V.cross([0, 0, 0], y, z);
   armIK(s, fk, 'gundam', 'R', P, [...x, ...y, ...z]);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
-function catchReach(s, tw) {   // the right arm reached out wide to his right, the hand already set to take the rifle UPRIGHT, barrel ahead (GRIPS)
-  const k = smooth(SD_HOLSTER - 0.05, SD_HOLSTER + 0.1, tw) * (1 - smooth(CATCH_T + 0.03, CATCH_T + 0.25, tw)); if (k <= 0) return;
-  const fk = duelFK(s, 'gundam'), c = catchFrame(fk);
+// THE CATCH: one arm thrown up, open, toward the rifle coming in from ahead and above as he flies at it; he snatches it
+// out of the air (the grip lands in the hand the right way round — GRIPS) and yanks it down and back into his aim
+const CATCH_YANK = 0.07;
+function catchReach(s, tw) {
+  const k = smooth(SD_HOLSTER - 0.05, SD_HOLSTER + 0.12, tw) * (1 - smooth(CATCH_T + CATCH_YANK, CATCH_T + 0.3, tw)); if (k <= 0) return;
+  const fk = duelFK(s, 'gundam'), c = catchFrame(fk, sat((tw - CATCH_T) / CATCH_YANK));
   gripIK(s, fk, 'gundam', 'hero_rifle', 'one', c.Wp, c.Wr, k);
 }
-/** the rifle as he wants to catch it (torso-relative): its grip out at arm's length to his right, barrel ahead, top up */
-function catchFrame(fk) {
+/** the rifle in his hand around the catch (torso-relative): up out ahead of his right shoulder at arm's length, barrel ahead
+ *  and a little up (y = 0), then yanked down and back beside him, level (y = 1) */
+function catchFrame(fk, y = 0) {
   const pv = PIV.gundam, T = r3(fk.torso), fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0]));
   const S = M.transformPoint([0, 0, 0], fk.torso, sub(pv.arm_R_upper, pv.torso)), L = V.dist(pv.arm_R_lower, pv.arm_R_upper) + V.dist(pv.hand_R, pv.arm_R_lower);
-  const D = nrm(add(fw, scl(rt, 0.12))), U = nrm(sub(upv, scl(D, V.dot(upv, D)))), X = V.cross([0, 0, 0], U, D), Wr = [...X, ...U, ...D];
-  const Hw = r3mul(Wr, GRIPS().hero_rifle.one.R), P = add(S, scl(nrm(add(add(rt, scl(fw, 0.5)), scl(upv, 0.15))), 0.95 * L));   // the hand out at 95 % reach
+  const e = y * y * (3 - 2 * y);
+  const D = nrm(add(fw, scl(upv, 0.35 * (1 - e)))), U = nrm(sub(upv, scl(D, V.dot(upv, D)))), X = V.cross([0, 0, 0], U, D), Wr = [...X, ...U, ...D];
+  const o = nrm(lrp(add(add(scl(rt, 0.45), scl(upv, 0.75)), scl(fw, 0.55)), add(add(scl(rt, 0.8), scl(upv, -0.15)), scl(fw, 0.6)), e));
+  const Hw = r3mul(Wr, GRIPS().hero_rifle.one.R), P = add(S, scl(o, lerp(0.97, 0.8, e) * L));
   return weaponAtHand(GRIPS().hero_rifle.one, P, Hw);
 }
 const transCutW = (tw) => smooth(SD_OUT + 0.045, SD_GUARD - 0.005, tw) * (1 - smooth(TRANS_PASS + 0.3, TRANS_PASS + 0.5, tw));   // (its held start pose IS the wind-up: raised → wound up → cut, one line)
@@ -1784,29 +1795,35 @@ function m2q(m) {   // column-major r3 → quaternion [x, y, z, w]
   if (e > i) { const S = Math.sqrt(1 + e - a - i) * 2; return [(d + b) / S, 0.25 * S, (h + f) / S, (g - c) / S]; }
   const S = Math.sqrt(1 + i - a - e) * 2; return [(g + c) / S, (h + f) / S, 0.25 * S, (b - d) / S];
 }
-/** the thrown rifle's world matrix at t (null outside the throw) */
+/** the thrown rifle's world matrix at t (null outside the throw). Laid out RELATIVE to him (his flight carries it): flung
+ *  out to his right, drifting up and ahead of him, then he flies in at it — it comes in fast from ahead and above, still
+ *  turning over, and meets his raised hand (the path ends exactly on the rifle in his hand at CATCH_T) */
 export function heroRifleThrow(t) {
   if (t <= THROW0 || t >= CATCH_T) return null;
   if (!_thr) {
-    const f0 = duelFK(duelHero(THROW0), 'gundam'), f1 = duelFK(duelHero(CATCH_T), 'gundam');
-    const right = scl(nrm(M.transformDir([0, 0, 0], f0.torso, [1, 0, 0])), -1), upv = nrm(M.transformDir([0, 0, 0], f0.torso, [0, 1, 0]));
-    _thr = { p0: M.transformPoint([0, 0, 0], f0.rifle, [0, 0, 0]), p1: M.transformPoint([0, 0, 0], f1.rifle, [0, 0, 0]), q0: m2q(r3(f0.rifle)), q1: m2q(r3(f1.rifle)), right, up: upv };
+    const h0 = duelHero(THROW0), h1 = duelHero(CATCH_T), f0 = duelFK(h0, 'gundam'), f1 = duelFK(h1, 'gundam');
+    const T1 = r3(f1.torso), fw = nrm(r3v(T1, [0, 0, 1])), rt = scl(nrm(r3v(T1, [1, 0, 0])), -1), upv = nrm(r3v(T1, [0, 1, 0]));
+    const r0 = sub(M.transformPoint([0, 0, 0], f0.rifle, [0, 0, 0]), h0.pos), r3_ = sub(M.transformPoint([0, 0, 0], f1.rifle, [0, 0, 0]), h1.pos);
+    const r1 = add(add(add(r0, scl(rt, 42)), scl(upv, 12)), scl(fw, 6)), r2 = add(add(add(r3_, scl(fw, 60)), scl(upv, 26)), scl(rt, 12));
+    _thr = { r: [r0, r1, r2, r3_], q0: m2q(r3(f0.rifle)), q1: m2q(r3(f1.rifle)) };
   }
-  // on FILM time (the draw runs in bullet time, the rifle mustn't hang there): hurled far out in a second, drifting,
-  // swinging back in at the end to meet his hand
-  const dF = filmT(t) - filmT(THROW0), DF = filmT(CATCH_T) - filmT(THROW0), u = sat(dF / DF), e = u * u * (3 - 2 * u);
-  const out = (1 - Math.exp(-dF * 1.8)) * (1 - smooth(DF - 1.6, DF, dF));
-  const p = add(add(lrp(_thr.p0, _thr.p1, e), scl(_thr.right, 65 * out)), scl(_thr.up, 16 * out));
-  const q = Q.slerp([0, 0, 0, 1], _thr.q0, _thr.q1, e);
+  const dF = filmT(t) - filmT(THROW0), DF = filmT(CATCH_T) - filmT(THROW0), u = sat(dF / DF);
+  const K = [0, 0.3, 0.68, 1], R = _thr.r;   // Catmull-Rom through the four relative points (the last leg left fast: the snatch)
+  const seg = u < K[1] ? 0 : u < K[2] ? 1 : 2, lu = (u - K[seg]) / (K[seg + 1] - K[seg]);
+  const P0 = R[Math.max(0, seg - 1)], P1 = R[seg], P2 = R[seg + 1], P3 = R[Math.min(3, seg + 2)];
+  const cr = (a, b, c, d, x) => 0.5 * (2 * b + (-a + c) * x + (2 * a - 5 * b + 4 * c - d) * x * x + (-a + 3 * b - 3 * c + d) * x * x * x);
+  const rel = [0, 1, 2].map((i) => cr(P0[i], P1[i], P2[i], P3[i], seg === 0 ? 1 - (1 - lu) * (1 - lu) : lu));
+  const p = add(add(heroRawPos(warp(t)), transDodge(warp(t))), rel);
+  const e = u * u * (3 - 2 * u), q = Q.slerp([0, 0, 0, 1], _thr.q0, _thr.q1, e);
   const m = M.fromTRS(new Float32Array(16), p, q, 1);
-  const sp = 4 * Math.PI * e, c = Math.cos(sp), sn = Math.sin(sp);   // two full end-over-end turns about its own x (back in the hand the right way up)
+  const sp = 4 * Math.PI * (1 - Math.pow(1 - u, 1.7)), c = Math.cos(sp), sn = Math.sin(sp);   // two turns end over end, slowing as it comes in (back the right way up)
   const rx = new Float32Array([1, 0, 0, 0, 0, c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1]);
   return M.mul(new Float32Array(16), m, rx);
 }
 /** the middle of his rifle at t: tumbling through the air (the throw) or in his hand */
 function rifleCentre(t) {
   const m = heroRifleThrow(t) || duelFK(duelHero(t), 'gundam').rifle;
-  return M.transformPoint([0, 0, 0], m, [0, 1, 3]);
+  return M.transformPoint([0, 0, 0], m, [0, 1.5, 4.5]);
 }
 /** the light-ball's position at t: along the curve to the pass, then straight on */
 export function transHead(t) {
