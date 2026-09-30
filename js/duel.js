@@ -1271,12 +1271,12 @@ const FK_ORDER = Object.keys(PARENT);
 // assets/gundam.glb node translations (glTF): rifle ← hand_R, rifle_muzzle ← rifle; barrel = rifle local +Z.
 // (re-check with: python3 -c "…" in blender/DUEL_NOTES.md if the rifle is re-modelled; sanity check compares them)
 export const RIFLE_T = [-0.10266, -0.84395, 0.50666];   // (raised 2026-09-29: the grip in the fist, not the receiver under it)
-export const MUZZLE_T = [0, 1.96, 21.48];   // the rifle's muzzle (blender/build_hero_rifle.py: the long thin Beretta-style barrel)
+export const MUZZLE_T = [0, 2.61, 6.66];   // the rifle's muzzle (assets/rifle1_game.glb, tools/build_rifles.py: grip at the origin)
 export const HERO_RIFLE_S = [1, 1, 1];     // its scale on the hand (blender/build_hero_rifle.py builds it at size: ~25 m, twice the old one)
 export const RIFLE_Q = [-0.130526, 0, 0, 0.991445];   // the rifle node's rotation on hand_R (assets/gundam.glb): the grip raked 15° like a pistol grip
 // VANGUARD's rifle (assets/enemy_ms.glb): rifle_muzzle in the rifle part's frame; the barrel runs from the grip pivot to it
-export const VAN_MUZZLE = [0.4134, -8.6024, 0.7292];            // the enemy rifle (rifle part frame)
-const VAN_BARREL = nrm([0.1296, -0.9892, 0.0678]);
+export const VAN_MUZZLE = [0, -8.63, 1.25];            // the enemy rifle (rifle part frame; assets/rifle2_game.glb, tools/build_rifles.py)
+const VAN_BARREL = [0, -1, 0];
 export function msMatrixOf(s, out = M.new()) {
   const f = nrm(s.fwd);
   const yaw = Math.atan2(f[0], f[2]);
@@ -1453,7 +1453,7 @@ function heroAim2H(s, target, k) {
 // (HERO_LOAD), the strip lights in two steps (HERO_LOCK); it snaps down onto the target (HERO_SNAP0 → 1, a little
 // overshoot) and he holds dead still while his eye flares
 export const HERO_GRAB = 170.28, HERO_EJECT = 170.95, HERO_LOAD = 171.55, HERO_LOCK = 171.75, HERO_SNAP0 = 170.72, HERO_SNAP1 = 171.05, HERO_FLARE = 172.4;   // (no reload any more: HERO_EJECT/LOAD/LOCK unused)
-const HERO_FORE = [0, -0.7, 4.5], HERO_REAR = [1.6, -1.0, 1.85], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
+const HERO_FORE = [0, 0.6, 3.5], HERO_REAR = [1.6, -1.0, 1.85], HERO_HIP = [2.7, -1.4, 0.6], HERO_LH = [0.10266, -0.84395, 0.50666];
 // the back mount (torso frame): grip behind his right shoulder, the barrel slung diagonally down across his back to
 // the left hip, its flank against the pack — carried like this from the launch until he rips it off at HERO_GRAB
 const HERO_BACK_G = [-3.0, 4.8, -3.4], HERO_BACK_D = [0.55, -0.78, -0.28];
@@ -1806,7 +1806,7 @@ export function heroRifleThrow(t) {
 /** the middle of his rifle at t: tumbling through the air (the throw) or in his hand */
 function rifleCentre(t) {
   const m = heroRifleThrow(t) || duelFK(duelHero(t), 'gundam').rifle;
-  return M.transformPoint([0, 0, 0], m, [0, 0, 8]);
+  return M.transformPoint([0, 0, 0], m, [0, 1, -2]);
 }
 /** the light-ball's position at t: along the curve to the pass, then straight on */
 export function transHead(t) {

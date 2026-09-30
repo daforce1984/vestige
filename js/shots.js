@@ -739,9 +739,9 @@ export function drawGundam(R, t, s, opts = {}) {
   e.hidden = { rifle: 1, saber_hilt: hiltHand ? 0 : 1 };   // (the built-in rifle replaced by hero_rifle, drawn on its node)
   if (!hiltHand && !s.fpv && t > 150 && t < 191.26) drawHipHilt(R, e);   // otherwise the hilt hangs on his left hip
   if (weapon === 'rifle' && !s.fpv) { const rw = R.partWorld('gundam', e, 'rifle'); if (rw) { M.fromTRS(_hrS, [0, 0, 0], [0, 0, 0, 1], 1); _hrS[0] = HERO_RIFLE_S[0]; _hrS[5] = HERO_RIFLE_S[1]; _hrS[10] = HERO_RIFLE_S[2];
-    const g = R.add('hero_rifle', M.mul(new Float32Array(16), rw, _hrS)); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }
-  if (weapon === 'thrown' && !s.fpv) { const m = heroRifleThrow(t); if (m) { const g = R.add('hero_rifle', m); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }   // tossed aside for the saber cut
-  if (weapon === 'back' && !s.fpv) { const tw = R.partWorld('gundam', e, 'torso'); if (tw) { const g = R.add('hero_rifle', M.mul(new Float32Array(16), tw, heroBackMount())); if (g) { g.seed = 5.5; g.wear = 0.6; g.damage = s.damage; } } }   // slung on his back
+    const g = R.add('hero_rifle', M.mul(new Float32Array(16), rw, _hrS)); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }
+  if (weapon === 'thrown' && !s.fpv) { const m = heroRifleThrow(t); if (m) { const g = R.add('hero_rifle', m); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }   // tossed aside for the saber cut
+  if (weapon === 'back' && !s.fpv) { const tw = R.partWorld('gundam', e, 'torso'); if (tw) { const g = R.add('hero_rifle', M.mul(new Float32Array(16), tw, heroBackMount())); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }   // slung on his back
   if (s.fpv) {
     e.hidden = { rifle: 1, head: 1, torso: 1, backpack: 1, pelvis: 1, arm_L_upper: 1, arm_R_upper: 1, hand_L: 1, hand_R: 1 };   // POV: forearms + articulated hands
     drawPovHands(R, t, e, s);
@@ -828,6 +828,13 @@ function drawBreakup(R, t, idx) {
 const _wing = {}, _wT = new Float32Array(16), _wA = new Float32Array(16), _wB = new Float32Array(16), _wQ = [0, 0, 0, 1];
 // its rifle, flung away as it opens up for the ultimate: the rifle part alone, frozen at the release, spinning off
 const RIFLE_DROP_T = 190.8, _rif = {}, _rT = new Float32Array(16), _rA = new Float32Array(16), _rB = new Float32Array(16), _rQ = [0, 0, 0, 1];
+// VANGUARD's rifle (assets/rifle2_game.glb) drawn on the rifle part of an enemy_ms pose (m, pose); `pre` shifts it in world
+function enemyRifleAt(R, m, pose, pre) {
+  const rw = Float32Array.from(R.partWorld('enemy_ms', { m, pose, stretch: 0 }, 'rifle'));
+  const g = R.add('enemy_rifle', pre ? M.mul(new Float32Array(16), pre, rw) : rw);
+  if (g) { g.seed = 10; g.wear = 0.4; g.texSet = R.texLoaded & 64 ? 4 : 0; }
+  return g;
+}
 function drawDroppedRifle(R, t) {
   if (!_rif.m) {
     const s0 = enemyMS2(RIFLE_DROP_T), s1 = enemyMS2(RIFLE_DROP_T + 0.05);
@@ -843,9 +850,7 @@ function drawDroppedRifle(R, t) {
   M.mul(_rA, _rT, _rif.m);
   Q.fromEuler(_rQ, lt * 1.4, lt * 0.5, -lt * 2.1);
   M.fromTRS(_rB, d, _rQ, 1);
-  const w = R.add('enemy_ms', M.mul(new Float32Array(16), _rB, _rA));
-  if (!w) return;
-  w.pose = _rif.pose; w.hidden = _rif.hide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
+  enemyRifleAt(R, M.mul(new Float32Array(16), _rB, _rA), _rif.pose);
 }
 // the block (his 178.7 shot on the shield): no hole — the face is scorched black round the splash (renderer damage
 // sphere on the shield part only), with glowing cracks cooling in it
@@ -1150,6 +1155,8 @@ function drawEnemyMS(R, t, s, idx) {
   if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
   if (idx === 2 && transK(t) > 0.001) drawRails(R, t, s);
   if (idx === 2 && t >= RIFLE_DROP_T) { e.hidden = { ...(e.hidden || {}), rifle: 1 }; drawDroppedRifle(R, t); }
+  if (!(e.hidden && e.hidden.rifle)) enemyRifleAt(R, e.m, s.pose);   // its own rifle model in place of the built-in one
+  e.hidden = { ...(e.hidden || {}), rifle: 1 };
   const fn = idx === 1 ? enemyMS1 : enemyMS2;
   const ebk = sat(((s.boost ?? 0.5) - 0.6) / 0.4);   // quick-boosts: the nozzles flare
   engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE.map((c) => c * 1.3), 1.3 * (1 + 0.9 * ebk), s.thr ?? 0.8, 2.4 + 2.2 * ebk, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
@@ -1474,8 +1481,7 @@ function drawRails(R, t, s) {
   for (const sd of [-1, 1]) {
     const off = V.add([0, 0, 0], V.scale([0, 0, 0], F.up, sd * 1.35 * k), V.scale([0, 0, 0], F.dir, 1.6 * k));   // the rails open up and down like jaws, sliding forward
     M.fromTRS(_rT2, off, [0, 0, 0, 1], 1);
-    const w = R.add('enemy_ms', M.mul(new Float32Array(16), _rT2, _rM2)); if (!w) continue;
-    w.pose = s.pose; w.hidden = _railHide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
+    enemyRifleAt(R, _rM2, s.pose, _rT2);
     // the rail's inner edge glows with the charge
     const c = t < TRANS_SHOT ? sat((t - TRANS0 - 0.2) / (TRANS_SHOT - TRANS0 - 0.2)) : Math.exp(-(t - TRANS_SHOT) * 5);
     if (c > 0.02) {

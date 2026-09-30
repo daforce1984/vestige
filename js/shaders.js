@@ -331,6 +331,10 @@ fn crushW(w: vec3f, inst: Inst) -> vec3f {
 @group(0) @binding(6) var texM1: texture_2d<f32>;
 @group(0) @binding(7) var texA2: texture_2d<f32>;
 @group(0) @binding(8) var texM2: texture_2d<f32>;
+@group(0) @binding(9) var texA3: texture_2d<f32>;    // Sigma's rifle (albedo, A = emissive mask)
+@group(0) @binding(10) var texM3: texture_2d<f32>;
+@group(0) @binding(11) var texA4: texture_2d<f32>;   // VANGUARD's rifle
+@group(0) @binding(12) var texM4: texture_2d<f32>;
 
 struct VO {
   @builtin(position) @invariant pos: vec4f,
@@ -650,6 +654,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // baked PBR textures (sampled in uniform control flow, selected below)
   let tA1 = textureSample(texA1, texSmp, i.uv); let tM1 = textureSample(texM1, texSmp, i.uv);
   let tA2 = textureSample(texA2, texSmp, i.uv); let tM2 = textureSample(texM2, texSmp, i.uv);
+  let tA3 = textureSample(texA3, texSmp, i.uv); let tM3 = textureSample(texM3, texSmp, i.uv);
+  let tA4 = textureSample(texA4, texSmp, i.uv); let tM4 = textureSample(texM4, texSmp, i.uv);
   let faceN = normalize(cross(dpdx(i.wp), dpdy(i.wp)));           // facet normal for crumpled metal
   let cut = cutAway(i, inst);
   var tornEdge = cut.x;
@@ -669,9 +675,12 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   var metal = inst.base.w;
   let texSet = i32(inst.extra.x);
   var texAO = 1.0;
+  var texGlow = vec3f(0.0);
   if (texSet > 0 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01) {
-    let ta = select(tA2, tA1, texSet == 1); let tm = select(tM2, tM1, texSet == 1);
+    var ta = select(tA2, tA1, texSet == 1); var tm = select(tM2, tM1, texSet == 1);
+    if (texSet == 3) { ta = tA3; tm = tM3; } else if (texSet == 4) { ta = tA4; tm = tM4; }
     base = pow(ta.rgb, vec3f(2.2)); texAO = tm.r; rough = tm.g; metal = tm.b;
+    if (texSet >= 3) { texGlow = pow(ta.rgb, vec3f(2.2)) * ta.a * 14.0; }   // the rifles' emissive inlays, bright
     if (texSet == 1) {                                   // Sigma: matte paint, and the chipped bare metal is scuffed, not a mirror
       rough = max(rough, mix(0.72, 0.5, metal));
       metal = metal * 0.75;
@@ -756,7 +765,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     base = mix(base, base * vec3f(0.75, 0.55, 0.4), exp(-pow((dc - 1.0) / 0.2, 2.0)) * step(0.8, hsh.x) * wear * 0.5);
     rough = mix(rough, 0.95, scorch);
   }
-  var emis = inst.emis.rgb * inst.p1.z;
+  var emis = inst.emis.rgb * inst.p1.z + texGlow;
   // molten armour cut face (texSet = -2, assets/wound_rim.glb; heat in p1.z): white-hot rolled lip, glowing runs and
   // drips flowing down the ~9 m cut face, a dark cooling slag crust breaking up the glow deeper in
   if (texSet == -2) {
