@@ -987,13 +987,35 @@ export function halfCentre(t, half) {
   return M.transformPoint([0, 0, 0], m, [0, half > 0 ? 14.5 : 7, 0]);
 }
 const _halfM = { 1: new Float32Array(16), [-1]: new Float32Array(16) };
+// the blade's plane (its torso-local y = CUT_Y at CUT_T) carried into EVERY part's own frame: whatever it passes through
+// — torso, arms, the backpack and its boosters, anything — is cut; each half keeps its own side of it
+let _cutPlanes = null;
+function cutPlanes(R) {
+  if (_cutPlanes) return _cutPlanes;
+  const model = R.models.enemy_ms; if (!model) return null;
+  const s0 = enemyMS2(CUT_T); if (!s0) return null;
+  const ent = { m: msMatrix(new Float32Array(16), s0), pose: s0.pose, stretch: 0 }, W = {};
+  R._partMatrices(model, ent);
+  model.parts.forEach((p, i) => { W[p.name] = Float32Array.from(model.partWorld[i]); });
+  const tp = [[0, CUT_Y, 0], [1, CUT_Y, 0], [0, CUT_Y, 1]].map((q) => M.transformPoint([0, 0, 0], W.torso, q));
+  const upW = M.transformPoint([0, 0, 0], W.torso, [0, CUT_Y + 1, 0]);
+  _cutPlanes = {};
+  for (const p of model.parts) {
+    if (p.name === '__root' || p.name === 'ms_root') continue;
+    const inv = M.invert(M.new(), W[p.name]), [a, b, c] = tp.map((q) => M.transformPoint([0, 0, 0], inv, q)), u = M.transformPoint([0, 0, 0], inv, upW);
+    let n = V.norm([0, 0, 0], V.cross([0, 0, 0], V.sub([0, 0, 0], b, a), V.sub([0, 0, 0], c, a)));
+    if (V.dot(n, V.sub([0, 0, 0], u, a)) < 0) n = V.scale(n, n, -1);   // (+n: toward the upper half)
+    _cutPlanes[p.name] = [n[0], n[1], n[2], V.dot(n, a)];
+  }
+  return _cutPlanes;
+}
 // the blade's first touch: from here the two halves are drawn in place (lt = 0) so the melt band runs along the real armour
 const CUT_SEAM_T = CUT_T - 0.012;
 function drawHalves(R, t, s) {
   const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, lt = s.cutK;
   const up = R.models.enemy_ms.parts, hideUp = {}, hideLo = {};
-  for (const p of up) { if (LOWER[p.name]) hideUp[p.name] = 1; else if (!SPLIT[p.name]) hideLo[p.name] = 1; }
-  const CA = cutArms();
+  for (const p of up) { if (LOWER[p.name]) hideUp[p.name] = 1; else if (!SPLIT[p.name]) hideLo[p.name] = 1; }   // (the break-up chunks)
+  const CP = cutPlanes(R), flip = (q) => [-q[0], -q[1], -q[2], -q[3]];
   for (const half of [1, -1]) {
     const tb = half > 0 ? HALF_BLAST.upper : HALF_BLAST.lower;
     const hide = { ...(half > 0 ? hideUp : hideLo), shield: 1, rifle: 1 };
@@ -1007,11 +1029,11 @@ function drawHalves(R, t, s) {
     const e = R.add('enemy_ms', halfMatrix(new Float32Array(16), s, half, lt));
     if (!e) continue;
     e.pose = s.pose; e.seed = 10; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0; e.damage = s.damage;
-    e.hidden = hide;
-    meltHole(e, 'enemy', t, 'leg_R_upper');
+    e.hidden = CP ? (half > 0 ? { shield: 1, rifle: 1, pelvis: 1, leg_L_upper: 1, leg_L_lower: 1, foot_L: 1, leg_R_upper: 1, leg_R_lower: 1, foot_R: 1 } : { shield: 1, rifle: 1 }) : hide;   // every part drawn in both halves, each clipped to its side of the blade's plane (the hips and legs, wholly below it, only in the lower)
+    if (half < 0 || !CP) meltHole(e, 'enemy', t, 'leg_R_upper');   // (the melt hole replaces that part's clip: the lower half only)
     e.clipInv = false; e.clipHeat = -(0.5 + 1.6 * Math.exp(-lt * 1.0)) * (0.35 + 0.65 * sat((t - CUT_SEAM_T) / (CUT_SPLIT - CUT_SEAM_T)));   // the molten rim of the cut: thick, white-hot, cooling to red (shader band; w < 0: a clean beam cut)
-    const box = (y) => (half > 0 ? [-30, y, -30, 30, 40, 30] : [-30, -40, -30, 30, y, 30]);
-    e.clipParts = { torso: box(CUT_Y), arm_L_upper: box(CA.arm_L_upper), arm_R_upper: box(CA.arm_R_upper) };
+    if (CP) { e.clipParts = {}; for (const k in CP) e.clipParts[k] = half > 0 ? CP[k] : flip(CP[k]); }
+    else { const CA = cutArms(), box = (y) => (half > 0 ? [-30, y, -30, 30, 40, 30] : [-30, -40, -30, 30, y, 30]); e.clipParts = { torso: box(CUT_Y), arm_L_upper: box(CA.arm_L_upper), arm_R_upper: box(CA.arm_R_upper) }; }
   }
   if (t < HALF_BLAST.upper) R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));   // the molten cut glows
   return null;

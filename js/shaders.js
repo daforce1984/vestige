@@ -591,7 +591,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   var tornEdge = 0.0;
   // MELT hole (clipMin.w = 2): hull wall facing +X melts open around clipMin.xyz (local), radius clipMax.x,
   // depth clipMax.y, heat clipMax.w. Below the centre the edge runs down in molten fingers.
-  if (inst.clipMin.w > 1.5 && length(vec2f(i.lp.y - inst.clipMin.y, (i.lp.z - inst.clipMin.z) * 0.62)) < inst.clipMax.x * 2.2) {   // near the hole only
+  if (inst.clipMin.w > 1.5 && inst.clipMin.w < 2.5 && length(vec2f(i.lp.y - inst.clipMin.y, (i.lp.z - inst.clipMin.z) * 0.62)) < inst.clipMax.x * 2.2) {   // near the hole only
     let r = inst.clipMax.x;
     let q = i.lp - inst.clipMin.xyz;
     // boundary shared EXACTLY with the thick molten rim mesh (tools/make_wound_rim.py): |v| < r·B(θ)
@@ -609,6 +609,12 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
       // molten runs below the hole: bright streaks that follow the fingers
       if (q.y < 0.0) { tornEdge += inst.clipMax.w * 0.5 * smoothstep(0.1, 0.9, fing / 2.2) * exp(-e / (r * 0.5)); }
     }
+  }
+  // PLANE cut (clipMin.w = 3): keep dot(lp, clipMin.xyz) >= clipMax.x (part-local); a beam blade's clean molten seam, heat |clipMax.w|
+  if (inst.clipMin.w > 2.5) {
+    let sd = dot(i.lp, inst.clipMin.xyz) - inst.clipMax.x;
+    if (sd < 0.0) { discard; }
+    tornEdge = abs(inst.clipMax.w) * (exp(-sd / 0.2) + 0.3 * exp(-sd / 0.55));
   }
   if (abs(inst.clipMin.w) > 0.5 && inst.clipMin.w < 1.5) {
     let span = inst.clipMax.xyz - inst.clipMin.xyz;
@@ -864,9 +870,9 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   }
   col += emis;
   col += inst.tint.rgb * hyper * 6.0;
-  if (inst.clipMin.w > 0.5 && inst.clipMin.w < 1.5 && inst.clipMax.w < 0.0) {   // beam-cut seam: deep molten orange, yellow-hot in the core
+  if (((inst.clipMin.w > 0.5 && inst.clipMin.w < 1.5) || inst.clipMin.w > 2.5) && inst.clipMax.w < 0.0) {   // beam-cut seam: deep molten orange, yellow-hot in the core
     col = mix(col, mix(vec3f(3.0, 0.55, 0.08), vec3f(4.2, 2.4, 0.8), clamp(tornEdge - 1.2, 0.0, 1.0)) * tornEdge, clamp(tornEdge, 0.0, 1.0)) * (0.85 + 0.15 * sin(F.camPos.w * 23.0 + i.lp.x * 3.0));
-  } else if (inst.clipMin.w > 1.5) {                                 // melt hole: red → white-hot molten rim
+  } else if (inst.clipMin.w > 1.5 && inst.clipMin.w < 2.5) {       // melt hole: red → white-hot molten rim
     col += mix(vec3f(3.2, 0.8, 0.16), vec3f(4.5, 3.0, 1.5), clamp(tornEdge - 0.9, 0.0, 1.0)) * tornEdge * (0.7 + 0.3 * sin(F.camPos.w * 17.0 + i.lp.x));
   } else {                                                           // broken-off chunk: only the torn edge smoulders dark cherry red
     col += vec3f(1.1, 0.12, 0.03) * tornEdge * tornEdge * (0.8 + 0.2 * sin(F.camPos.w * 11.0 + i.lp.x * 0.3));

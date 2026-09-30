@@ -619,6 +619,7 @@ export class Renderer {
           const cl = e.clipParts ? (e.clipParts[model.parts[d.part].name] || null) : e.clip && (!e.clipPart || model.parts[d.part].name === e.clipPart) ? e.clip : null;   // clipParts: {part: box} several parts, each its own box   // clipPart: only that part (part-local box)
           const ml = e.melt && (!e.meltPart || model.parts[d.part].name === e.meltPart) ? e.melt : null;   // [cx, cy, cz, radius, depth, heat] (model-local; meltPart: that part only, part-local)
           if (ml) { I[o + 40] = ml[0]; I[o + 41] = ml[1]; I[o + 42] = ml[2]; I[o + 43] = 2; I[o + 44] = ml[3]; I[o + 45] = ml[4]; I[o + 46] = 0; I[o + 47] = ml[5]; }
+          else if (cl && cl.length === 4) { I[o + 40] = cl[0]; I[o + 41] = cl[1]; I[o + 42] = cl[2]; I[o + 43] = 3; I[o + 44] = cl[3]; I[o + 45] = 0; I[o + 46] = 0; I[o + 47] = e.clipHeat ?? 1; }   // [nx, ny, nz, d]: a plane cut (part-local)
           else if (cl) { I[o + 40] = cl[0]; I[o + 41] = cl[1]; I[o + 42] = cl[2]; I[o + 43] = e.clipInv ? -1 : 1; I[o + 44] = cl[3]; I[o + 45] = cl[4]; I[o + 46] = cl[5]; I[o + 47] = e.clipHeat ?? 1; }
           else { I[o + 43] = 0; }
           I[o + 48] = e.texSet || 0;
