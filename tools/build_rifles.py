@@ -12,8 +12,9 @@ from glbload import load, image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 A = lambda p: os.path.join(ROOT, 'assets', p)
 
-def build(src, name, grip, R, S, cell, emissive_mask, engines=()):
+def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, skip=(), empties=None):
     prims, g, blob = load(A(src))
+    prims = [p for p in prims if g.materials[p['mat']].name not in skip]
     texOf = lambda m: g.materials[m].pbrMetallicRoughness.baseColorTexture.index
     mats = []; first = {}
     for m in sorted({p['mat'] for p in prims}):   # (materials sharing one texture set share one atlas cell)
@@ -35,7 +36,10 @@ def build(src, name, grip, R, S, cell, emissive_mask, engines=()):
     for p in prims:
         c, r = slot[first[texOf(p['mat'])]]
         P.append(S * ((p['pos'] - grip) @ R.T)); N.append(p['nrm'] @ R.T)
-        uv = p['uv'].copy(); uv[:, 0] = (c + np.clip(uv[:, 0], 0, 1)) / cols; uv[:, 1] = (r + np.clip(uv[:, 1], 0, 1)) / rows; U.append(uv)
+        uv = p['uv'].copy()
+        if wrap: uv[:, 1] = uv[:, 1] + 10.0 * (r * cols + c)   # (tiled UVs: the cell index rides in v; the shader wraps inside the cell — texSet 7)
+        else: uv[:, 0] = (c + np.clip(uv[:, 0], 0, 1)) / cols; uv[:, 1] = (r + np.clip(uv[:, 1], 0, 1)) / rows
+        U.append(uv)
         I.append(p['idx'] + base); base += len(p['pos'])
     nI = sum(len(i) for i in I)
     for (cx, cy, cz, rad) in engines:   # small 'engine' discs at the nozzles (facing back): the renderer's thruster emitters
@@ -46,7 +50,8 @@ def build(src, name, grip, R, S, cell, emissive_mask, engines=()):
     P = np.concatenate(P).astype(np.float32); N = np.concatenate(N).astype(np.float32); U = np.concatenate(U).astype(np.float32); I = np.concatenate(I).astype(np.uint32)
     data = P.tobytes() + N.tobytes() + U.tobytes() + I.tobytes()
     o = [0, len(P.tobytes()), len(P.tobytes()) + len(N.tobytes()), len(P.tobytes()) + len(N.tobytes()) + len(U.tobytes())]
-    out = GLTF2(scene=0, scenes=[Scene(nodes=[0])], nodes=[Node(name='rifle', mesh=0)],
+    em = [Node(name=k, translation=(S * ((np.array(v) - grip) @ R.T)).tolist()) for k, v in (empties or {}).items()]
+    out = GLTF2(scene=0, scenes=[Scene(nodes=list(range(1 + len(em))))], nodes=[Node(name=name, mesh=0)] + em,
         meshes=[Mesh(primitives=[Primitive(attributes=Attributes(POSITION=0, NORMAL=1, TEXCOORD_0=2), indices=3, material=0)] + ([Primitive(attributes=Attributes(POSITION=0, NORMAL=1, TEXCOORD_0=2), indices=4, material=1)] if engines else []))],
         materials=[Material(name=name, pbrMetallicRoughness=PbrMetallicRoughness(baseColorFactor=[1, 1, 1, 1], metallicFactor=1, roughnessFactor=1)),
                    Material(name='engine', emissiveFactor=[1, 0.4, 0.1], pbrMetallicRoughness=PbrMetallicRoughness(baseColorFactor=[0.3, 0.1, 0.05, 1], metallicFactor=0, roughnessFactor=0.5))],
@@ -79,3 +84,9 @@ build('spaceship.glb', 'spaceship_game', np.array([0, 1.67, 0]), np.eye(3), 0.95
 # our fighters (every interceptor variant): assets/light_fighter.glb (user-supplied, Kerem Kavalci, Sketchfab Standard), nose +z;
 # centred, ×0.75 to the old interceptor's length, its two texture sets packed into one atlas, engine discs on the rear block
 build('light_fighter.glb', 'light_fighter_game', np.array([0, 1.4, 0]), np.eye(3), 0.75, 1024, emis_tex, engines=[(-0.58, 1.8, -5.58, 0.12), (0.58, 1.8, -5.58, 0.12)])
+# the enemy dreadnought: assets/space_battleship_aquamarine.glb (user-supplied; Kai Xiang, CC BY 4.0), bow +z; its display
+# plane (lambert1) dropped, centred and ×2.53 to the old hull's length (x1.65 more in the scene), seven texture sets in a
+# 3×3 wrapped atlas (its UVs tile), engine discs on its eight rear nozzles, lance_emitter at the bow cannon's muzzle
+_N = [(x, 16.9, -56.75, r) for (x, r) in [(10.6, 2.9), (16.0, 2.4), (20.1, 1.8), (23.6, 1.4)] for x in (x, -x)]
+build('space_battleship_aquamarine.glb', 'dreadnought_game', np.array([0, 18.6, 17.6]), np.eye(3), 2.53, 768, emis_tex,
+      engines=[(x, y, z, r) for (x, y, z, r) in _N], wrap=True, skip=('lambert1',), empties={'lance_emitter': (0, 11.25, 103.6)})

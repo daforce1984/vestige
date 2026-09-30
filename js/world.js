@@ -857,7 +857,8 @@ export function debrisOnly(R, keepName) {
 }
 
 // the six crown arc terminals (horn tips) in dreadnought model space before the ×1.65 load scale — tools/make_dread_lance.py
-const DREAD_HORNS = [[4.503, 2.6, 212.5], [0, 5.2, 212.5], [-4.503, 2.6, 212.5], [-4.503, -2.6, 212.5], [0, -5.2, 212.5], [4.503, -2.6, 212.5]];
+// (2026-09-30: the Aquamarine hull — a ring of six between the tips of its twin-prong bow cannon, tools/build_rifles.py)
+const DREAD_HORNS = [[9.5, -18.6, 212], [4.7, -10.4, 212], [-4.7, -10.4, 212], [-9.5, -18.6, 212], [-4.7, -26.8, 212], [4.7, -26.8, 212]];
 // fighter variants (tools: blender/fighters_ours.py / fighters_enemy.py): three designs per side, picked by index
 export function fighterModel(enemy, k) { return (enemy ? 'enemy_fighter' : 'interceptor') + ['', '_b', '_c'][((k % 3) + 3) % 3]; }
 export function dreadEmitter(R, t, entry) {
@@ -902,7 +903,7 @@ function drawDreadnought(R, t, tmpM) {
   e.seed = 40; e.rimK = 0.3;                                      // its huge silhouette read as a glowing outline from afar
   if (hin.u < 1) { e.revealZ = hin.revealZ; e.revealDir = hin.dir; e.revealWidth = 4; e.tint = [2.5, 0.3, 0.2]; e.stretch = stretchIn(hin.u); }
   // the gravity-lance firing system (tools/make_dread_lance.py, blueprint blender/DREAD_LANCE_BLUEPRINT.svg)
-  const ln = R.add('dread_lance', e.m);
+  const ln = null;   // (the old separate lance hardware is gone: the Aquamarine carries its own twin-prong bow cannon)
   if (ln) {
     ln.seed = 41; ln.rimK = 0.3; ln.wear = 1;   // used hardware: chipped edges, grime in the crevices, streaks, scorch
     ln.revealZ = e.revealZ; ln.revealDir = e.revealDir; ln.revealWidth = e.revealWidth; ln.tint = e.tint; ln.stretch = e.stretch;
@@ -954,10 +955,10 @@ function drawDreadnought(R, t, tmpM) {
       }
       for (let j = 0; j < 6; j++) {                                                    // coil stack flash-overs to the rails
         if (ch < 0.25 + j * 0.1) continue;
-        const z = [100, 124, 148, 170, 190, 136][j] * 1.65, r = (12 - ([100, 124, 148, 170, 190, 136][j] - 100) * 0.03 + 2) * 1.65;
+        const z = [70, 100, 130, 160, 190, 115][j] * 1.65, r = 12 * 1.65;   // (along the Aquamarine's bow cannon, its axis at y −15)
         const sgn = j % 2 ? 1 : -1, ang = hash(Math.floor(t * 3 + j)) * 6.283;
-        const p0 = M.transformPoint([0, 0, 0], e.m, [Math.cos(ang) * r, Math.sin(ang) * r, z]);
-        const p1 = M.transformPoint([0, 0, 0], e.m, [0, sgn * 14 * 1.65, z + (hash(j + 3) - 0.5) * 12]);
+        const p0 = M.transformPoint([0, 0, 0], e.m, [Math.cos(ang) * r, -15 * 1.65 + Math.sin(ang) * r * 0.6, z]);
+        const p1 = M.transformPoint([0, 0, 0], e.m, [0, (-15 + sgn * 12) * 1.65, z + (hash(j + 3) - 0.5) * 12]);
         R.arc(p0, p1, 5, AC, 0.7 * ch, 71 + j, 6 + 6 * ch);
       }
       // spiral vortex contracting into the core

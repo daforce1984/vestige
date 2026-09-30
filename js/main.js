@@ -11,7 +11,7 @@ const MODELS = [
   { name: 'assault_frigate', detail: 0.8 },
   ...['interceptor', 'interceptor_b', 'interceptor_c'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })),   // our fighters: assets/light_fighter.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_frigate', detail: 0.9 },
-  { name: 'enemy_dreadnought', detail: 2.4, scale: 1.65, venator: { paint: 10, paint2: 11, mech: 12, olive: 12, ring: 13, yellow: 14 } },   // a little bigger than our flagship; its armour in the Venator style (shaders.js venatorHull)
+  { name: 'enemy_dreadnought', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game.glb', texSet: 7, texBit: 4096 },   // a little bigger than our flagship: 'Space Battleship Aquamarine' (Kai Xiang, CC BY 4.0) via tools/build_rifles.py
   ...['enemy_fighter', 'enemy_fighter_b', 'enemy_fighter_c'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256 })),   // every enemy fighter: assets/spaceship.glb (user-supplied) via tools/build_rifles.py
   { name: 'gundam', detail: 0, keep: MS_KEEP },
   { name: 'enemy_ms', detail: 0, keep: MS_KEEP },
@@ -24,7 +24,6 @@ const MODELS = [
   { name: 'mech_hand', detail: 0, keep: ['palm', 'f0_1', 'f0_2', 'f0_3', 'f1_1', 'f1_2', 'f1_3', 'f2_1', 'f2_2', 'f2_3', 'f3_1', 'f3_2', 'f3_3', 'thumbR_1', 'thumbR_2', 'thumbL_1', 'thumbL_2'] },
   { name: 'mother_bay', detail: 0, sortAxis: [1, 0, 0], prepass: true },
   { name: 'bay_props', detail: 0.3, keep: ['crate0', 'crate1', 'container', 'barrel', 'tank', 'panel0', 'panel1', 'rib', 'cable', 'toolcart', 'seat', 'person0', 'person1', 'person2', 'person3'] },
-  { name: 'dread_lance', detail: 0, scale: 1.65 },                     // tools/make_dread_lance.py (same ×1.65 as the dreadnought)
   { name: 'moon', detail: 0 },
   { name: 'ion_frigate_lod', detail: 0 }, { name: 'assault_frigate_lod', detail: 0 }, ...['interceptor_lod', 'interceptor_b_lod', 'interceptor_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })), ...['enemy_fighter_lod', 'enemy_fighter_b_lod', 'enemy_fighter_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256 })), { name: 'enemy_frigate_lod', detail: 0 },   // blender/make_lods.py (distance LOD)                                        // tools/make_moon.py
   { name: 'wound_rim', detail: 0 },                                   // tools/make_wound_rim.py
@@ -67,7 +66,7 @@ function drawTyper(t) {
   typerEl.style.opacity = t > TYPE_END ? Math.max(0, 1 - (t - TYPE_END) / TYPE_FADE).toFixed(3) : 1;
 }
 const TITLES = [
-  [371.8, 391.8, '<div class="title">VESTIGE</div><div class="tech"><b>ENGINE</b>HTML5 · raw WebGPU + WGSL (no engine / no framework) · deterministic 24 fps timeline · seek-safe choreography<br><b>RENDERING</b>4× MSAA HDR (rgba16float) · reversed-Z depth · depth prepass · shadow map · PBR metal/roughness · GPU instancing · procedural planet, atmosphere & starfield<br><b>SHADERS</b>procedural melt / fracture / crush deformation · molten torn edges · hex energy shields & containment fields · cross-billboard thrusters · hyperspace windows & stretch · gravity lensing<br><b>POST</b>bloom · depth of field · motion blur · anamorphic streaks · god rays · shader lens flare · radial blur · signal interference · filmic grade<br><b>ANIMATION</b>FK pose tracks · contact solver · damped-spring ragdoll & inertia · deterministic debris / shatter physics · spline cameras<br><b>ASSETS</b>Blender Python procedural ships & sets · CC0 ATLAS/09, RONIN/04 by Ramon Linares · Earth maps © Solar System Scope CC BY 4.0<br><b>AUDIO</b>Web Audio API mixing & synthesis · ElevenLabs v3 voices · MiniMax Music 3 via ComfyUI · SFX from Pixabay<br><b>MADE WITH</b>Claude Code (Claude Opus 5.5) · a fan tribute</div>'],
+  [371.8, 391.8, '<div class="title">VESTIGE</div><div class="tech"><b>ENGINE</b>HTML5 · raw WebGPU + WGSL (no engine / no framework) · deterministic 24 fps timeline · seek-safe choreography<br><b>RENDERING</b>4× MSAA HDR (rgba16float) · reversed-Z depth · depth prepass · shadow map · PBR metal/roughness · GPU instancing · procedural planet, atmosphere & starfield<br><b>SHADERS</b>procedural melt / fracture / crush deformation · molten torn edges · hex energy shields & containment fields · cross-billboard thrusters · hyperspace windows & stretch · gravity lensing<br><b>POST</b>bloom · depth of field · motion blur · anamorphic streaks · god rays · shader lens flare · radial blur · signal interference · filmic grade<br><b>ANIMATION</b>FK pose tracks · contact solver · damped-spring ragdoll & inertia · deterministic debris / shatter physics · spline cameras<br><b>ASSETS</b>Blender Python procedural ships & sets · CC0 ATLAS/09, RONIN/04 by Ramon Linares · Earth maps © Solar System Scope CC BY 4.0<br><b>MODELS</b>“Space Battleship Aquamarine” by Kai Xiang (CC BY 4.0, modified) · “Futuristic Sci-Fi Rifle” by Janis Zeps (CC BY 4.0, modified) · “NANITE SYSTEMS Assault Rifle” by Frostoise (CC BY-NC-SA 4.0, modified) · “Spaceship” by Jefferson Frenay (CC BY-NC-ND 4.0) · “Light Fighter Spaceship” by Kerem Kavalci (Sketchfab Standard) · “3D Mech Asset” by TryoutIndie.Dev (MIT) — all via Sketchfab / itch.io<br><b>AUDIO</b>Web Audio API mixing & synthesis · ElevenLabs v3 voices · MiniMax Music 3 via ComfyUI · SFX from Pixabay<br><b>MADE WITH</b>Claude Code (Claude Opus 5.5) · a fan tribute</div>'],
 ];
 
 const qs = new URLSearchParams(location.search);
@@ -254,10 +253,8 @@ async function boot() {
   try {
     await R.init();
     status.textContent = '모델 로딩…';
-    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png', 'assets/tex/light_fighter_game_albedo.png', 'assets/tex/light_fighter_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
-    {   // the dreadnought's Venator-style repaint: its lights and lit strips burn blue-white instead of green / orange
-      const dm = R.models.enemy_dreadnought, E = { lime: [0.25, 0.55, 1.3], engine: [0.5, 0.85, 1.6], window: [0.75, 0.85, 1.0] };
-      if (dm) for (const m of dm.materials) if (E[m.name]) { m.emissive = E[m.name]; m.base = [0.1, 0.12, 0.16]; }
+    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png', 'assets/tex/light_fighter_game_albedo.png', 'assets/tex/light_fighter_game_orm.png', 'assets/tex/dreadnought_game_albedo.png', 'assets/tex/dreadnought_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
+    {
       // our flagship after the Buzz Hound corvette: its windows, lights and engines glow teal-green
       const mm = R.models.mothership, T = { window: [0.35, 1.0, 0.75], amber: [0.3, 1.0, 0.7], blue_light: [0.25, 1.0, 0.8], engine: [0.55, 1.0, 0.9] };
       if (mm) for (const m of mm.materials) if (T[m.name]) m.emissive = T[m.name];
