@@ -1543,7 +1543,7 @@ function slashRef() {   // the blade direction onto the waist at CUT_T, levelled
 }
 const onPlane = (p, o, n) => sub(p, scl(n, V.dot(sub(p, o), n)));                 // p moved along n onto the plane (o, n)
 const rotAxis = (v, k, a) => { const c = Math.cos(a), s = Math.sin(a), kv = V.dot(k, v), x = V.cross([0, 0, 0], k, v); return [0, 1, 2].map((i) => v[i] * c + x[i] * s + k[i] * kv * (1 - c)); };
-const hiltAtTrans = (fk) => M.transformPoint([0, 0, 0], fk.torso, [1.6, 3.0, 5.4]);   // the charged-shot cut: both hands out in front of his chest, arms extended
+const hiltAtTrans = (fk, ang = 0) => M.transformPoint([0, 0, 0], fk.torso, [5 * Math.sin(ang) + 0.6, 3.1, 5 * Math.cos(ang) + 0.4]);   // the charged-shot cut: both hands swung round in front of him on an arc (ang: right −, left +), arms out
 function hiltAt(fk) {   // where the hilt is held: out to his left of the chest, a little forward, at the waist line
   const T = fk.torso;
   return add(M.transformPoint([0, 0, 0], T, [3.4, 1.2, 1.6]), [0, 0, 0]);
@@ -1623,7 +1623,11 @@ const transSaber = (tw) => smooth(SD_OUT, SD_OUT + 0.03, tw) * (1 - smooth(TRANS
 // out and the hilt goes back on the hip. Hilt poses in his torso frame: [t, position, blade direction]
 export const SD_REACH = 184.6, SD_GRAB = 184.66, SD_OUT = 184.72, SD_GUARD = 184.8, SD_SWEEP = 184.83, SD_HOLSTER0 = 185.44, SD_HOLSTER = 185.62;
 export const SABER_MOUNT_P = [2.3, -2.4, -0.6], SABER_MOUNT_D = nrm([0.25, -0.55, -0.8]);   // the hilt hanging on his left hip, emitter down-back
-const SD_KEYS = [[SD_GRAB, SABER_MOUNT_P, SABER_MOUNT_D], [SD_OUT, [1.2, 1.4, 4.2], nrm([0.05, 0.35, 1])], [SD_GUARD, [-2.6, 3.6, 1.4], nrm([-0.6, 0.3, -0.75])], [SD_SWEEP, [-2.6, 3.6, 1.4], nrm([-0.6, 0.3, -0.75])]];   // (wound up: hilt by his right side, blade back past his right shoulder)
+const SD_KEYS = [[SD_GRAB, SABER_MOUNT_P, SABER_MOUNT_D],
+  [SD_OUT, [1.8, 0.8, 4.8], nrm([0.35, -0.15, 1])],                   // lit pointing out ahead of him, away from his body
+  [SD_OUT + 0.04, [0.3, 3.2, 5.4], nrm([0.05, 0.85, 0.5])],          // carried up in front of him, blade upright
+  [SD_GUARD, [-3.9, 3.4, 2.4], nrm([-0.5, 0.7, -0.5])],              // wound up by his right shoulder, blade up and back — clear over the shoulder
+  [SD_SWEEP, [-4.1, 3.2, 2.0], nrm([-0.75, 0.45, -0.1])]];           // (onto the start of the cut's arc)
 const SH_KEYS = [[SD_HOLSTER0, [1.4, 0.4, 2.8], nrm([0.2, -0.3, 1])], [SD_HOLSTER, SABER_MOUNT_P, SABER_MOUNT_D]];
 export const hiltInHand = (tw) => tw >= SD_GRAB && tw < SD_HOLSTER;
 const saberBusy = (tw) => smooth(SD_REACH - 0.02, SD_REACH + 0.02, tw) * (1 - smooth(SD_HOLSTER + 0.02, SD_HOLSTER + 0.12, tw));
@@ -1688,7 +1692,7 @@ function transCutIK(s, tw) {
   const dir = rotAxis(ref.base, ref.a, ang), upv = nrm(V.cross([0, 0, 0], dir, ref.a)), xv = V.cross([0, 0, 0], upv, dir), Hw = [...xv, ...upv, ...dir];
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
-  const fk = duelFK(s, 'gundam'), hilt = hiltAtTrans(fk);
+  const fk = duelFK(s, 'gundam'), hilt = hiltAtTrans(fk, ang);
   armIK(s, fk, 'gundam', 'L', sub(hilt, r3v(Hw, [0, -1.2, 0.6])), Hw);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
