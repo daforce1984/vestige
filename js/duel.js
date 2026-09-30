@@ -1764,7 +1764,7 @@ function throwFling(s, tw) {   // the right arm: wound in across his chest, then
 // out of the air (the grip lands in the hand the right way round — GRIPS) and yanks it down and back into his aim
 const CATCH_YANK = 0.07;
 function catchReach(s, tw) {
-  const k = smooth(SD_HOLSTER - 0.05, SD_HOLSTER + 0.12, tw) * (1 - smooth(CATCH_T + CATCH_YANK, CATCH_T + 0.3, tw)); if (k <= 0) return;
+  const k = smooth(SD_HOLSTER - 0.05, SD_HOLSTER + 0.12, tw) * (1 - smooth(CATCH_T + CATCH_YANK, CATCH_T + 0.1, tw)); if (k <= 0) return;   // (snatched, yanked straight into his aim: he fires at 185.9)
   const fk = duelFK(s, 'gundam'), c = catchFrame(fk, sat((tw - CATCH_T) / CATCH_YANK));
   gripIK(s, fk, 'gundam', 'hero_rifle', 'one', c.Wp, c.Wr, k);
 }

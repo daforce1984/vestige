@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { RIFLE_T, RIFLE_Q, ENEMY_HOLE, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { RIFLE_T, RIFLE_Q, ENEMY_HOLE, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, filmT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -1207,9 +1207,10 @@ function e1Muzzle(tf) {                  // pure function of time (cached): the 
   }
   return p;
 }
-function rifleShot(R, t, t0, from, to, hit = false) {
+function rifleShot(R, t, t0, from, to, hit = false, mz = null) {
   const lt = t - t0;
   if (lt < 0 || lt > 0.7) return;
+  if (mz) from = mz;                                                 // the line leaves from where the muzzle IS now (it moves while the beam burns), still ending on its target
   const L = V.dist(from, to);
   // a beam-rifle LINE (the Unicorn look): the head races out at 5 km/s, the tail leaves the muzzle 0.12 s later — at
   // 60–90 m a bolt would cross in under a frame; a line reads for several frames and thins as it goes
@@ -1554,13 +1555,14 @@ function drawSeraphFire(R, t) {
       continue;
     }
     const lt = t - ts, stop = shotStop(ts), head = Math.min(stop ? stop.d : 1500, 5000 * lt + 3), tail = Math.max(0, 5000 * (lt - 0.12)), kk = 1 - 0.6 * sat((lt - 0.05) / 0.25);
+    const mNow = seraphMuzzle(t), F = mNow ? mNow.pos : L.from, E = madd(L.from, L.dir, stop ? stop.d : 1500), Ld = V.dist(F, E);   // (from its muzzle as it is now, to where the shot was going)
     if (head > tail) {                                          // a beam line, like his (see rifleShot)
-      const a = madd(L.from, L.dir, tail), b = madd(L.from, L.dir, head);
+      const a = lerpv(F, E, Math.min(1, tail / Ld)), b = lerpv(F, E, Math.min(1, head / Ld));
       R.beam(a, b, 0.75 * kk + 0.2, [SER_COL[0] * kk, SER_COL[1] * kk, SER_COL[2] * kk], 1, 20, 0.6, 0.8);
       R.beam(a, b, 2.4, [SER_COL[0] * 0.6 * kk, SER_COL[1] * 0.6 * kk, SER_COL[2] * 0.6 * kk], 0.04, 3, 2, 0.6);
     }
     const kf = Math.exp(-lt * 12);
-    if (lt < 0.25) { R.glow(L.from, 1 + 2.5 * kf, [3 * kf, 0.6 * kf, 0.9 * kf], 0.35); R.light(L.from, 60, [1, 0.3, 0.45], 6 * kf); }
+    if (lt < 0.25) { R.glow(F, 1 + 2.5 * kf, [3 * kf, 0.6 * kf, 0.9 * kf], 0.35); R.light(F, 60, [1, 0.3, 0.45], 6 * kf); }
     const g = gundamState(t); if (g && g.vis && head > tail) {   // light spilling on him as it goes past
       const d = V.sub([0, 0, 0], g.pos, L.from), u = V.dot(d, L.dir);
       if (u > tail - 20 && u < head + 20) R.light(madd(L.from, L.dir, clamp(u, tail, head)), 50, [1, 0.3, 0.45], 5);
@@ -1580,7 +1582,8 @@ function drawHeroFire(R, t) {
         const bh = blockHitAt(t), from = bh ? bh.from : sh.from, to = bh && bh.inside ? bh.p : bh ? V.add([0, 0, 0], bh.from, V.scale([0, 0, 0], bh.dir, 1500)) : sh.to;
         rifleShot(R, t, sh.t, from, to, false); continue;
       }
-      rifleShot(R, t, sh.t, sh.from, sh.to, false);   // (no flash ball on the wing hit: the sparks + light carry it)
+      const mz = duelMuzzle(t);
+      rifleShot(R, t, sh.t, sh.from, sh.to, false, mz && lt < 0.7 ? mz.pos : null);   // (no flash ball on the wing hit: the sparks + light carry it)
       continue;
     }
     // the magnum
