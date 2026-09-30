@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { THROW0, CATCH_T, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
+import { THROW0, CATCH_T, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, inSkip, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -710,9 +710,7 @@ function duelCues() {
   out.push([FINALE_T + 0.02, 'hl_beam', { loop: true, rate: 1.4, dur: FD(FINALE_T, ULT_HIT), fadeIn: 0.2, fadeOut: 0.2, gain: G * 0.5, prio: 7 }]);   // the swarm's roar under them
   out.push([ULT_HIT - 0.12, '@msPass', { vel: G * 0.9, tp: 0.1, ratio: 3.2, f: 1300, pan0: 0.5, pan1: -0.6 }]);
   out.push([ULT_HIT, '@boom', { bus: 'sfx', f: 26, vel: G * 1.0, dur: 2.6, verb: 0.45 }]);
-  out.push([ULT_HIT, 'hl_explosion', { rate: 0.8, gain: G * 1.0, prio: 9, norand: true }]);
-  out.push([ULT_HIT + 0.06, 'expl_metal', { rate: 0.85, gain: G * 0.7, pan: 0.3, prio: 8, norand: true }]);
-  out.push([ULT_HIT + 0.12, 'hl_explosion', { rate: 0.95, gain: G * 0.7, pan: -0.3, prio: 8, norand: true }]);
+  ultSwarm().forEach((m, k) => { if (k % 3 === 0) out.push([m.ta, k % 2 ? 'expl_metal' : 'hl_explosion', { rate: R(0.85, 1.15), gain: G * 0.55, pan: R(-0.7, 0.7), prio: 8, norand: true }]); });   // the strikes, one after another
   return out;
 }
 

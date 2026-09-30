@@ -1264,10 +1264,10 @@ function drawUlt(R, t) {
         }
       } else {
         const lt = t - FINALE_T;
-        if (lt < 0.12) { const f = 1 - lt / 0.12; R.glow(bp, 6 + 22 * f, [6 * f, 4 * f, 5 * f], 0.4); R.light(bp, 200, [1, 0.5, 0.7], 30 * f); }   // the white flash
-        for (const [d0, sz] of [[0, 140], [0.08, 90], [0.2, 190]]) { const l2 = lt - d0; if (l2 > 0 && l2 < 0.35) R.ripple(bp, 10 + sz * easeOut(l2 / 0.35), [0.6, 0.45, 0.55], (1 - l2 / 0.35) * 1.4); }   // shock rings
-        if (lt < 0.3) {                                              // the halo: a ring of light bursting out round the machine
-          const rr = 5 + 70 * easeOut(Math.min(1, lt / 0.25)), k = Math.pow(1 - lt / 0.3, 1.5);
+        if (lt < 0.06) { const f = 1 - lt / 0.06; R.glow(bp, 6 + 22 * f, [6 * f, 4 * f, 5 * f], 0.4); R.light(bp, 200, [1, 0.5, 0.7], 30 * f); }   // the white flash
+        for (const [d0, sz] of [[0, 140], [0.08, 90], [0.2, 190]]) { const l2 = lt - d0; if (l2 > 0 && l2 < 0.15) R.ripple(bp, 10 + sz * easeOut(l2 / 0.15), [0.6, 0.45, 0.55], (1 - l2 / 0.15) * 1.4); }   // shock rings
+        if (lt < 0.15) {                                             // the halo: a ring of light bursting out round the machine
+          const rr = 5 + 70 * easeOut(Math.min(1, lt / 0.13)), k = Math.pow(1 - lt / 0.15, 1.5);
           for (let j = 0; j < 72; j++) { const a = j / 72 * 2 * Math.PI, p = V.add([0, 0, 0], bp, V.add([0, 0, 0], V.scale([0, 0, 0], s1, Math.cos(a) * rr), V.scale([0, 0, 0], s2, Math.sin(a) * rr)));
             R.glow(p, 1.2 + 1.5 * k, [3 * k, 0.9 * k, 1.8 * k], 0.3); }
           sparkBurst(R, bp, back, lt, 811, 160, 1.6, 90, 1.2, [5, 2, 3.2]);
@@ -1275,24 +1275,31 @@ function drawUlt(R, t) {
       }
     }
   }
-  const S = ultSwarm();                                           // ITANO CIRCUS: 48 corkscrewing micro-missiles
+  const S = ultSwarm();                                           // ITANO CIRCUS: 48 missiles, each leaving a billowing smoke trail
   for (let i = 0; i < S.length; i++) {
     const m = S[i]; if (t < m.ti) continue;
-    if (t < m.ta) {
-      const head = ultMissilePos(m, t), tr = 0.17, n = 24;               // the trail: its own path over the last 0.24 s (story)
-      let pa = head;
-      for (let j = 1; j <= n; j++) {
-        const tj = t - tr * j / n; if (tj < m.ti) break;
-        const pb = ultMissilePos(m, tj), f = 1 - j / n, k = f * f;
-        R.beam(pb, pa, 0.18 + 0.22 * f, [1.6 * k + 0.25 * f, 0.9 * k + 0.2 * f, 1.3 * k + 0.25 * f], 0.5, 6, 0.8, 0.7);   // hot pink near the head → pale smoke
+    const tEnd = Math.min(t, m.ta), fade = t > m.ta ? 1 - sat((t - m.ta) / 0.35) : 1;   // trails hang on after the strike, then thin away
+    if (fade > 0.01) {
+      const n = 60; let pa = ultMissilePos(m, tEnd);
+      for (let j = 1; j <= n; j++) {                                  // the whole path since launch: thin at the motor, swelling as it ages
+        const tj = tEnd - (tEnd - m.ti) * j / n, pb = ultMissilePos(m, tj), age = t - tj;
+        const w = 0.2 + 1.0 * sat(age / 0.28), k = 0.03 * fade * (1 - 0.75 * sat(age / 0.5)) * sat((tj - m.ti) / 0.03 + 0.15);   // (dim: 48 of them overlap, and it's additive)
+        R.beam(pb, pa, w, [0.78 * k, 0.76 * k, 1.0 * k], 1, 9, 1.0, 0.3);   // pale lavender smoke, soft-edged, billowing
+        if (j <= 2 && t < m.ta) R.beam(pb, pa, 0.15, [0.8, 0.75, 0.85], 1, 12, 0, 1);   // the fresh hot core right behind the motor
         pa = pb;
       }
-      R.glow(head, 0.9, [4, 1.3, 2.4], 0.3); R.glow(head, 0.3, [5, 4, 4.5], 0.2);   // the motor: white-hot core, magenta halo
-      if (i % 8 === 0) R.light(head, 40, [1, 0.35, 0.6], 3);
-      if (t - m.ti < 0.05) R.glow(m.p0, 1.8 * (1 - (t - m.ti) / 0.05), [3, 0.8, 1.6], 0.35);   // the port flash as it leaves
-    } else if (i % 3 === 0) explosion(R, t, m.ta, m.p3, 7 + 4 * hash(i + 3), 610 + i, 'ship', 1.4);   // THE STRIKE: they close on him and burst
-    else if (t - m.ta < 0.25) { const f = 1 - (t - m.ta) / 0.25; R.glow(m.p3, 2 + 5 * f, [4 * f, 1.5 * f, 2.5 * f], 0.35); }
+    }
+    if (t < m.ta) {
+      const head = ultMissilePos(m, t);
+      R.glow(head, 0.7, [4, 2.6, 0.8], 0.3); R.glow(head, 0.25, [5, 4.5, 3], 0.2);   // the motor: a small yellow-white flame
+      if (i % 8 === 0) R.light(head, 40, [1, 0.8, 0.4], 3);
+      if (t - m.ti < 0.04) { const f = 1 - (t - m.ti) / 0.04; R.glow(m.p0, 1.2 + 1.5 * f, [3 * f, 2.2 * f, 1.2 * f], 0.35); }   // the pop out of the port
+    } else if (t - m.ta < 1.2) {                                      // THE STRIKE: one after another, each a yellow fireball on his heels
+      explosion(R, t, m.ta, m.p3, 2.2 + 1.6 * hash(i + 3), 610 + i, 'small', 1.2);   // (small: 48 of them go off inside the bullet time)
+      if (t - m.ta < 0.05) { const f = 1 - (t - m.ta) / 0.05; R.glow(m.p3, 1.5 + 3 * f, [2.5 * f, 1.7 * f, 0.5 * f], 0.35); R.light(m.p3, 50, [1, 0.7, 0.3], 5 * f); }
+    }
   }
+
 }
 // ---- THE TRANSFORMING SHOT: two rails slide out of the rifle either side (copies of the rifle part, offset along its side
 // axis and forward), crackling arcs between rails and muzzle while it charges; then a thick homing beam whose head is a
