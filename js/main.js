@@ -12,7 +12,7 @@ const MODELS = [
   { name: 'interceptor', detail: 0 }, { name: 'interceptor_b', detail: 0 }, { name: 'interceptor_c', detail: 0 },
   { name: 'enemy_frigate', detail: 0.9 },
   { name: 'enemy_dreadnought', detail: 2.4, scale: 1.65 },   // a little bigger than our flagship
-  { name: 'enemy_fighter', detail: 0 }, { name: 'enemy_fighter_b', detail: 0 }, { name: 'enemy_fighter_c', detail: 0 },
+  ...['enemy_fighter', 'enemy_fighter_b', 'enemy_fighter_c'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256 })),   // every enemy fighter: assets/spaceship.glb (user-supplied) via tools/build_rifles.py
   { name: 'gundam', detail: 0, keep: MS_KEEP },
   { name: 'enemy_ms', detail: 0, keep: MS_KEEP },
   { name: 'hero_rifle', detail: 0, url: 'assets/rifle2_game.glb' },   // Sigma's rifle: assets/rifle2.glb (user-supplied) via tools/build_rifles.py
@@ -26,7 +26,7 @@ const MODELS = [
   { name: 'bay_props', detail: 0.3, keep: ['crate0', 'crate1', 'container', 'barrel', 'tank', 'panel0', 'panel1', 'rib', 'cable', 'toolcart', 'seat', 'person0', 'person1', 'person2', 'person3'] },
   { name: 'dread_lance', detail: 0, scale: 1.65 },                     // tools/make_dread_lance.py (same ×1.65 as the dreadnought)
   { name: 'moon', detail: 0 },
-  { name: 'ion_frigate_lod', detail: 0 }, { name: 'assault_frigate_lod', detail: 0 }, { name: 'interceptor_lod', detail: 0 }, { name: 'interceptor_b_lod', detail: 0 }, { name: 'interceptor_c_lod', detail: 0 }, { name: 'enemy_fighter_lod', detail: 0 }, { name: 'enemy_fighter_b_lod', detail: 0 }, { name: 'enemy_fighter_c_lod', detail: 0 }, { name: 'enemy_frigate_lod', detail: 0 },   // blender/make_lods.py (distance LOD)                                        // tools/make_moon.py
+  { name: 'ion_frigate_lod', detail: 0 }, { name: 'assault_frigate_lod', detail: 0 }, { name: 'interceptor_lod', detail: 0 }, { name: 'interceptor_b_lod', detail: 0 }, { name: 'interceptor_c_lod', detail: 0 }, ...['enemy_fighter_lod', 'enemy_fighter_b_lod', 'enemy_fighter_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256 })), { name: 'enemy_frigate_lod', detail: 0 },   // blender/make_lods.py (distance LOD)                                        // tools/make_moon.py
   { name: 'wound_rim', detail: 0 },                                   // tools/make_wound_rim.py
   { name: 'asteroids', detail: 0, keep: ['ast0', 'ast1', 'ast2', 'ast3', 'ast4', 'ast5'] },   // tools/make_asteroids.py
   { name: 'debris', detail: 0.6, keep: ['rock0', 'rock1', 'rock2', 'rock3', 'hull0', 'hull1', 'hull2', 'hull3'] },
@@ -254,7 +254,7 @@ async function boot() {
   try {
     await R.init();
     status.textContent = '모델 로딩…';
-    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
+    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
     const tris = R.modelList.reduce((s, m) => s + m.tris, 0);
     status.textContent = `준비 완료 · ${R.modelList.length} models · ${(tris / 1000).toFixed(0)}k tris`;
     $('#start .go').disabled = false; $('#duelBtn').disabled = false;

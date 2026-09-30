@@ -335,6 +335,8 @@ fn crushW(w: vec3f, inst: Inst) -> vec3f {
 @group(0) @binding(10) var texM3: texture_2d<f32>;
 @group(0) @binding(11) var texA4: texture_2d<f32>;   // VANGUARD's rifle
 @group(0) @binding(12) var texM4: texture_2d<f32>;
+@group(0) @binding(13) var texA5: texture_2d<f32>;   // the enemy fighters
+@group(0) @binding(14) var texM5: texture_2d<f32>;
 
 struct VO {
   @builtin(position) @invariant pos: vec4f,
@@ -656,6 +658,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   let tA2 = textureSample(texA2, texSmp, i.uv); let tM2 = textureSample(texM2, texSmp, i.uv);
   let tA3 = textureSample(texA3, texSmp, i.uv); let tM3 = textureSample(texM3, texSmp, i.uv);
   let tA4 = textureSample(texA4, texSmp, i.uv); let tM4 = textureSample(texM4, texSmp, i.uv);
+  let tA5 = textureSample(texA5, texSmp, i.uv); let tM5 = textureSample(texM5, texSmp, i.uv);
   let faceN = normalize(cross(dpdx(i.wp), dpdy(i.wp)));           // facet normal for crumpled metal
   let cut = cutAway(i, inst);
   var tornEdge = cut.x;
@@ -678,7 +681,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   var texGlow = vec3f(0.0);
   if (texSet > 0 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01) {
     var ta = select(tA2, tA1, texSet == 1); var tm = select(tM2, tM1, texSet == 1);
-    if (texSet == 3) { ta = tA3; tm = tM3; } else if (texSet == 4) { ta = tA4; tm = tM4; }
+    if (texSet == 3) { ta = tA3; tm = tM3; } else if (texSet == 4) { ta = tA4; tm = tM4; } else if (texSet == 5) { ta = tA5; tm = tM5; }
     base = pow(ta.rgb, vec3f(2.2)); texAO = tm.r; rough = tm.g; metal = tm.b;
     if (texSet >= 3) { texGlow = pow(ta.rgb, vec3f(2.2)) * ta.a * 14.0; }   // the rifles' emissive inlays, bright
     if (texSet == 1) {                                   // Sigma: matte paint, and the chipped bare metal is scuffed, not a mirror

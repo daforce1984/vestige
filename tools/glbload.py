@@ -38,9 +38,10 @@ def load(f):
         M=world(i); Nm=np.linalg.inv(M[:3,:3]).T
         for p in g.meshes[n.mesh].primitives:
             pos=acc(g,blob,p.attributes.POSITION).astype(float); pos=(M[:3,:3]@pos.T).T+M[:3,3]
-            nr=acc(g,blob,p.attributes.NORMAL).astype(float); nr=(Nm@nr.T).T; nr/=np.linalg.norm(nr,axis=1,keepdims=True)+1e-12
-            uv=acc(g,blob,p.attributes.TEXCOORD_0).astype(float)
-            idx=acc(g,blob,p.indices).reshape(-1).astype(np.int64)
+            nr=acc(g,blob,p.attributes.NORMAL).astype(float) if p.attributes.NORMAL is not None else np.tile([0.,1.,0.],(len(pos),1)); nr=(Nm@nr.T).T; nr/=np.linalg.norm(nr,axis=1,keepdims=True)+1e-12
+            uv=acc(g,blob,p.attributes.TEXCOORD_0).astype(float) if p.attributes.TEXCOORD_0 is not None else np.zeros((len(pos),2))
+            if p.indices is None: p_idx=np.arange(len(pos))
+            idx=acc(g,blob,p.indices).reshape(-1).astype(np.int64) if p.indices is not None else np.arange(len(pos))
             out.append(dict(pos=pos,nrm=nr,uv=uv,idx=idx,mat=p.material))
     return out,g,blob
 def image(g,blob,i):

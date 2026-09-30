@@ -121,7 +121,7 @@ export class Renderer {
         { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-        ...[9, 10, 11, 12].map((b) => ({ binding: b, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } })),   // the rifles (texSet 3 / 4)
+        ...[9, 10, 11, 12, 13, 14].map((b) => ({ binding: b, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } })),   // the rifles (texSet 3 / 4)
       ],
     });
     const meshLayout = dev.createPipelineLayout({ bindGroupLayouts: [this.meshBGL] });
@@ -217,7 +217,7 @@ export class Renderer {
 
     // model textures: [hero albedo, hero orm, enemy albedo, enemy orm, hero rifle albedo(+emissive in A), orm, enemy rifle albedo, orm]; 1x1 placeholders until loaded
     this.texSmp = dev.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 });
-    this.modelTex = [0, 1, 2, 3, 4, 5, 6, 7].map(() => dev.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT }));
+    this.modelTex = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(() => dev.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT }));
     this._makeMeshBG();
     this.shadowBG = dev.createBindGroup({
       layout: this.shadowBGL,
@@ -351,7 +351,7 @@ export class Renderer {
     for (const { s, g } of parsed) {
       verts.set(g.verts, vo); idx.set(g.indices, io);
       const model = {
-        name: s.name, detail: s.detail ?? 1, hullClass: s.hullDetail ? { hull: 1, plate: 2, hull2: 3, greeble: 4, trim: 5 } : null, parts: g.parts, materials: g.materials, empties: g.empties, bounds: g.bounds,
+        name: s.name, detail: s.detail ?? 1, texSet: s.texSet || 0, texBit: s.texBit || 0, hullClass: s.hullDetail ? { hull: 1, plate: 2, hull2: 3, greeble: 4, trim: 5 } : null, parts: g.parts, materials: g.materials, empties: g.empties, bounds: g.bounds,
         baseVertex: vo / 8, baseIndex: io, entries: [], partIndex: {}, draws: [], prepass: !!s.prepass,
       };
       // ship engines burn BRIGHT: nozzle-face emission ×5 (HDR, so the bloom pass makes them glow); mechs keep theirs
@@ -492,7 +492,7 @@ export class Renderer {
     e.flash = 0; e.damage = 0; e.revealDir = 0; e.revealZ = 0; e.revealWidth = 1; e.emissive = 1; e.seed = model.entries.length * 7.13;
     e.tint[0] = 0.4; e.tint[1] = 0.7; e.tint[2] = 1.0;
     e.pose = null; e.hidden = null; e.matOverride = null;
-    e.dmgR = 0; e.ghost = 0; e.clip = null; e.clipHeat = 1; e.clipInv = false; e.stretch = 0; e.stretchOut = false; e.stretchAnchor = undefined; e.wear = 0; e.texSet = 0; e.crush = null; e.melt = null; e.shadeK = 1; e.soot = 0; e.hideMats = null; e.rimK = 1; e.clipPart = null; e.meltPart = null; e.dmgPart = null; e.clipParts = null;
+    e.dmgR = 0; e.ghost = 0; e.clip = null; e.clipHeat = 1; e.clipInv = false; e.stretch = 0; e.stretchOut = false; e.stretchAnchor = undefined; e.wear = 0; e.texSet = model.texSet && (this.texLoaded & model.texBit) ? model.texSet : 0; e.crush = null; e.melt = null; e.shadeK = 1; e.soot = 0; e.hideMats = null; e.rimK = 1; e.clipPart = null; e.meltPart = null; e.dmgPart = null; e.clipParts = null;
     model.entries.push(e);
     return e;
   }
