@@ -1926,11 +1926,11 @@ export const DUEL_CAMS = [
   // then rides him the whole run (the operator a beat behind), the missiles bursting along the line he's just left
   { t0: 190.7, t1: CIRCUS_C1, name: 'D21 the Itano circus, one take — long lens from far off, tracking him through the swarm', slowmo: true, fn: (t, u) => {
       const c = circusClock(t), H0 = hp(190.9), E0 = ep(190.9), f = nrm(flat(sub(E0, H0), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
-      const H = up(hp(t), 8), Hl = up(hp(circusStory(Math.max(0, c - 0.18))), 8);
+      const H = up(hp(t), 8), Hl = up(hp(circusStory(Math.max(0, c - 0.35))), 8);   // (the operator a good third of a second behind him)
       const pos = add(add(H0, chaseAxes().camOff), scl(sub(H, H0), 0.3));   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
-      const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(1.0, 2.2, c), tgt = lrp(up(E0, 6), add(lrp(Hl, H, 0.6), scl(vRun, 9 * smooth(1.2, 2.2, c))), onHim);   // (leading him: room ahead on the left)
-      const fov = lerp(34, 4.5, smooth(1.4, 2.6, c)) + 0.5 * Math.sin(c * 0.9) * smooth(2, 3, c);
-      return { pos, target: tgt, fov, handheld: 0.05, baseShake: 0.02 }; } },
+      const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(1.0, 2.2, c), tgt = lrp(up(E0, 6), lrp(Hl, H, 0.2), onHim);   // barely keeping up with him: he pulls toward the edge of frame   // (leading him: room ahead on the left)
+      const fov = lerp(36, 13, smooth(1.4, 2.6, c)) + 1.2 * Math.sin(c * 0.9) * smooth(2, 3, c);   // pulled well back
+      return { pos, target: tgt, fov, handheld: 0.12, baseShake: 0.04 }; } },   // (a rougher hand: the operator straining after him)
   { t0: CIRCUS_C1, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
     return { pos: add(add(Pm, scl(D_L, -150)), [0, 12, 0]), target: pan(Pm, up(hp(t), 2), 0.85), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },
   // the approach to the cut, from high over its shoulder, looking down across the line of the pass
