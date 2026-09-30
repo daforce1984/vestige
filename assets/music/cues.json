@@ -245,7 +245,7 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the trap sprung → the dreadnought → the ion charge (story 63–120). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the trap sprung → the dreadnought → the ion charge (story 63–120). Generated with MiniMax Music 3 on the local ComfyUI. — superseded the same day by the Z_ (Hans Zimmer style) takes."
  },
  {
   "id": "N_battle",
@@ -263,7 +263,7 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the fleet battle → Sigma launches (120–163.1). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the fleet battle → Sigma launches (120–163.1). Generated with MiniMax Music 3 on the local ComfyUI. — superseded the same day by the Z_ (Hans Zimmer style) takes."
  },
  {
   "id": "N_lance",
@@ -281,7 +281,7 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the enemy lance charges and fires (hit at 9.3 s on the shot, story 216). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the enemy lance charges and fires (hit at 9.3 s on the shot, story 216). Generated with MiniMax Music 3 on the local ComfyUI. — superseded the same day by the Z_ (Hans Zimmer style) takes."
  },
  {
   "id": "N_dive",
@@ -299,7 +299,7 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the wound → the dive into the well (218–262). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — the wound → the dive into the well (218–262). Generated with MiniMax Music 3 on the local ComfyUI. — superseded the same day by the Z_ (Hans Zimmer style) takes."
  },
  {
   "id": "N_climax",
@@ -317,6 +317,96 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — berserk → the ten-times saber through the barrier (hit at 3.95 s on the thrust, story 267.42) → the core → the counterattack (262–323). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: fast-tempo battle scores for the re-cut film (user: 빠른 템포로 … 장면에 맞는 BGM 다시 제작해) — berserk → the ten-times saber through the barrier (hit at 3.95 s on the thrust, story 267.42) → the core → the counterattack (262–323). Generated with MiniMax Music 3 on the local ComfyUI. — superseded the same day by the Z_ (Hans Zimmer style) takes."
+ },
+ {
+  "id": "Z_alert",
+  "dur": 48,
+  "caption": "Global Metadata: Instrumental epic cinematic film score in the style of Hans Zimmer (Inception, Interstellar, Dunkirk, Man of Steel): simple but epic. One short, simple repeating motif of two or three notes, built by layering and relentless ostinato rather than complex melody. Huge low brass, deep sub-bass, massive percussion, driving string ostinatos, big reverb. 132 BPM, C minor, dread and urgency: a fleet caught in a trap as a colossal enemy warship appears.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: Starts instantly with a ticking pulse and a fast sixteenth-note string ostinato on one note, a deep sub-bass pulse. At about 8 seconds: an enormous low brass braam, then the simple two-note motif on low horns. From about 18 seconds: each repetition louder, more layers, war drums, rising Shepard-tone-like tension, relentless build to a gigantic final hit at the very end. No fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "Z_alert_t1",
+  "seed": 20260930301,
+  "takes": [
+   {
+    "take": "Z_alert_t1",
+    "seed": 20260930301,
+    "flac": "minimax_music_00036.flac",
+    "sha256": "8e75884710abd62adda3f858d2a9d0588f3797d04dd75f626886219cd80dee8a",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the trap → the dreadnought → the ion charge (story 63–120). Generated with MiniMax Music 3 on the local ComfyUI."
+ },
+ {
+  "id": "Z_battle",
+  "dur": 42,
+  "caption": "Global Metadata: Instrumental epic cinematic film score in the style of Hans Zimmer (Inception, Interstellar, Dunkirk, Man of Steel): simple but epic. One short, simple repeating motif of two or three notes, built by layering and relentless ostinato rather than complex melody. Huge low brass, deep sub-bass, massive percussion, driving string ostinatos, big reverb. 140 BPM, D minor, a desperate space fleet battle, ending as a hero launches into it.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: Starts instantly at full power: pounding low percussion and taiko ostinato, fast driving string ostinato on a simple pattern, massive brass stabs on the simple motif. Relentless and heavy throughout. At about 22 seconds: the motif becomes a rising heroic brass statement over everything, bigger and bigger to the end. No breakdown, no fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "Z_battle_t1",
+  "seed": 20260930311,
+  "takes": [
+   {
+    "take": "Z_battle_t1",
+    "seed": 20260930311,
+    "flac": "minimax_music_00037.flac",
+    "sha256": "eab12c436b1ac6dd8a19552abebc5e850962c46d43eca4c6c58626da2f7f8719",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the fleet battle → Sigma launches (120–163.1). Generated with MiniMax Music 3 on the local ComfyUI."
+ },
+ {
+  "id": "Z_lance",
+  "dur": 16,
+  "caption": "Global Metadata: Instrumental epic cinematic film score in the style of Hans Zimmer (Inception, Interstellar, Dunkirk, Man of Steel): simple but epic. One short, simple repeating motif of two or three notes, built by layering and relentless ostinato rather than complex melody. Huge low brass, deep sub-bass, massive percussion, driving string ostinatos, big reverb. 120 BPM, B minor, a superweapon charging and firing.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: Starts instantly with a ticking clock pulse and a rising string tremolo on one note, a low synth drone, getting louder and higher. At about 6 seconds: one colossal braam and drum hit, then near silence for two seconds, then a massive low brass and percussion re-entry that drives to the end. No fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "Z_lance_t1",
+  "seed": 20260930321,
+  "takes": [
+   {
+    "take": "Z_lance_t1",
+    "seed": 20260930321,
+    "flac": "minimax_music_00038.flac",
+    "sha256": "19cb0c59005c7e3bb6d8de903225f2724cb8c1fa61b7044f0ff437bc0f58be7f",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the lance charges; its hit at 8.55 s on the shot (story 216). Generated with MiniMax Music 3 on the local ComfyUI."
+ },
+ {
+  "id": "Z_dive",
+  "dur": 40,
+  "caption": "Global Metadata: Instrumental epic cinematic film score in the style of Hans Zimmer (Inception, Interstellar, Dunkirk, Man of Steel): simple but epic. One short, simple repeating motif of two or three notes, built by layering and relentless ostinato rather than complex melody. Huge low brass, deep sub-bass, massive percussion, driving string ostinatos, big reverb. 126 BPM, E minor, grim determination: a wounded mothership, and a lone mecha diving toward a gravity-well singularity.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: 0 to 8 seconds: dark and quiet, low string pulses and deep sub-bass. At about 8 seconds: the simple motif on low horns over a steady driving string ostinato and big drums as the mecha launches. From about 20 seconds: an accelerating, swelling crescendo with organ-like synth pads, the motif repeated higher and louder, huge and intense to the very end. No fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "Z_dive_t1",
+  "seed": 20260930331,
+  "takes": [
+   {
+    "take": "Z_dive_t1",
+    "seed": 20260930331,
+    "flac": "minimax_music_00039.flac",
+    "sha256": "fb87dadbf9aca6bae7e8076571498e912ee1c97b2766453955936ea9a3329521",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the wound → the dive into the well (218–262). Generated with MiniMax Music 3 on the local ComfyUI."
+ },
+ {
+  "id": "Z_climax",
+  "dur": 56,
+  "caption": "Global Metadata: Instrumental epic cinematic film score in the style of Hans Zimmer (Inception, Interstellar, Dunkirk, Man of Steel): simple but epic. One short, simple repeating motif of two or three notes, built by layering and relentless ostinato rather than complex melody. Huge low brass, deep sub-bass, massive percussion, driving string ostinatos, big reverb. 132 BPM, D minor to D major, feral then triumphant: a mecha smashing through an energy shield with a giant beam sword, destroying a singularity core, and a fleet firing its main gun to destroy an enemy dreadnought.\nVocal Details: No vocals at all. No singing, no humming, no choir voices, no spoken words, no chants. Any choir-like sound is a synthesizer pad only.\nArrangement: Starts instantly at full power with pounding percussion and a furious string ostinato. At about 4 seconds: one gigantic brass and drum hit, then the simple motif on massive low brass over relentless drums. At about 20 seconds: a huge blast and a short roaring low drone, then everything rebuilds into a triumphant, noble major-key statement of the motif on horns and strings, driving to a huge final chord, then a quick fade to silence at the very end.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Outro]\n[Instrumental]\n",
+  "chosen": "Z_climax_t1",
+  "seed": 20260930341,
+  "takes": [
+   {
+    "take": "Z_climax_t1",
+    "seed": 20260930341,
+    "flac": "minimax_music_00040.flac",
+    "sha256": "136ca8245dc1a35350a3960bb22c445b2075ec47804720e27fab377e702add26",
+    "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
+   }
+  ],
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — from 5.08 s in at 262; its hit at 8.7 s on the ten-times saber thrust (267.42) → the core → the counterattack (to 323.07). Generated with MiniMax Music 3 on the local ComfyUI."
  }
 ]
