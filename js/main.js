@@ -1,6 +1,6 @@
 import { Renderer } from './renderer.js';
 import { frame, findShot, DURATION, SHOTS } from './shots.js';
-import { storyT, filmT, insertFilm } from './timemap.js';
+import { storyT, filmT, insertFilm, inSkip, TEAR_F0, TEAR_F1 } from './timemap.js';
 import { DUEL_CAMS } from './duel.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
@@ -37,7 +37,7 @@ let SUBS = [];
 async function loadSubs() {
   try {
     const d = await (await fetch('assets/voice/lines.json')).json();
-    SUBS = d.lines.map((l) => [l.filmTime ? insertFilm(l.t) : filmT(l.t), l.filmTime ? insertFilm(l.t) + (l.dur || 3) + 0.35 : Math.min(filmT(l.cut ?? 1e9), filmT(l.t) + (l.dur || 3) + 0.35), WHO[l.voice] ?? l.voice,
+    SUBS = d.lines.filter((l) => !inSkip(l.t) && !(l.filmTime && TEAR_F1 - TEAR_F0 < 2)).map((l) => [l.filmTime ? insertFilm(l.t) : filmT(l.t), l.filmTime ? insertFilm(l.t) + (l.dur || 3) + 0.35 : Math.min(filmT(l.cut ?? 1e9), filmT(l.t) + (l.dur || 3) + 0.35), WHO[l.voice] ?? l.voice,
       l.text.replace(/\[[^\]]*\]\s*/g, '').trim(), l.ko || '', l.voice === 'NARRATOR']);
   } catch (e) { console.warn('subtitles unavailable', e); }
 }

@@ -102,24 +102,27 @@ const tmpM = M.new();
 
 // ---------------- berserk choreography helpers (film 262–278)
 const SHIELD_R = 150;
-const B_HITS = [263.4, 265.0, 266.6];
+const B_HITS = [267.42];   // (2026-09-30) one blow: the beam saber at ten times its output, thrust straight through the barrier
+export const THRUST_T = 267.42, MEGA_LEN = 2.5;   // the blade tip reaches the shield; the blade 2.5× its length at full output
+const THRUST_Z = -SHIELD_R - 5 - 13 * MEGA_LEN;   // his z when the tip touches the dome (hilt ~5 m ahead of him)
 function berserkZ(t) {
   const hitZ = -SHIELD_R - 8;
   if (t < 262.8) return lerp(-260, -250, sat((t - 262) / 0.8));
-  for (let i = 0; i < 3; i++) {
-    const h = B_HITS[i], prev = i ? B_HITS[i - 1] : 262.8;
-    if (t < h) { const back = i ? -205 - i * 5 : -250; return lerp(back, hitZ, easeIn(sat((t - (h - 0.35)) / 0.35))); }  // coil, then lunge in 0.35 s
-    if (i === 2) {                                                                     // last hit: grab and tear
-      if (t < h + 0.35) return lerp(hitZ, -185, easeOut(sat((t - h) / 0.35)));
-      if (t < h + 0.6) return lerp(-185, hitZ + 1, easeIn(sat((t - h - 0.35) / 0.25)));
-      if (t < 268) return hitZ + 1 + noise1(t * 30) * 0.4;
-    }
-    if (t < h + 1.25) { const back = -205 - (i + 1) * 5; return lerp(hitZ, back, easeOut(sat((t - h) / 0.5))); }  // recoil
-  }
-  if (t < 268) return lerp(-220, hitZ + 2, easeIn(sat((t - 267.6) / 0.4)));       // last lunge breaks it
-  if (t < 270) return lerp(hitZ + 2, hitZ + 30, (t - 268) / 2);                     // through the shards
+  if (t < 267.1) return lerp(-250, -262, easeInOut(sat((t - 266.3) / 0.8)));           // the blade lit, he draws back for the thrust
+  if (t < THRUST_T) return lerp(-262, THRUST_Z, easeIn(sat((t - 267.1) / (THRUST_T - 267.1))));   // the lunge
+  if (t < 268) return lerp(THRUST_Z, THRUST_Z + 6, easeOut(sat((t - THRUST_T) / (268 - THRUST_T))));   // the blade drives in; the barrier gives
+  if (t < 270) return lerp(THRUST_Z + 6, hitZ + 30, (t - 268) / 2);                    // through the shards
   if (t < 272.95) return lerp(hitZ + 30, -36, easeIn(sat((t - 270) / 2.95)));        // accelerating ram at the core
   return -36 + 5 * easeOut(sat((t - 272.95) / 0.35)) + 1.5 * smooth(273.3, 277.5, t);  // drives in and keeps grinding (no rebound)
+}
+// the thrust: the ram's two-handed levelled grip, drawn back hard (elbows back, torso coiled), then driven straight in
+function thrustPose(t) {
+  const out = ramPose(t);
+  const wind = smooth(266.3, 267.05, t) * (1 - smooth(267.1, 267.32, t)), lunge = smooth(267.1, 267.32, t) * (1 - smooth(268.2, 269.5, t));
+  out.torso[0] -= 0.55 * wind; out.head[0] += 0.3 * wind; out.torso[0] += 0.25 * lunge;
+  for (const sd of ['L', 'R']) { out['arm_' + sd + '_lower'][0] -= 0.75 * wind; out['arm_' + sd + '_upper'][0] += 0.35 * wind; out['arm_' + sd + '_upper'][0] -= 0.15 * lunge; }
+  out.leg_L_upper[0] += 0.4 * lunge - 0.3 * wind; out.leg_R_upper[0] += 0.5 * lunge - 0.2 * wind;
+  return out;
 }
 // heavy shield strikes: each hit has its own wind-up → snap → follow-through → recovery (radians; partial poses)
 const STRIKES = [
@@ -235,7 +238,7 @@ function berserkHitK(t) { let k = 0; for (const h of [...B_HITS, 268]) if (t >= 
 function berserkJitter(t) { return 1 + berserkHitK(t) * 3; }
 export function shieldState(t) {
   // crack 0..1 grows with each hit; shattered after 268
-  let crack = 0; B_HITS.forEach((h, i) => { if (t >= h) crack = (i + 1) / 3 * 0.85; });
+  let crack = 0; B_HITS.forEach((h, i) => { if (t >= h) crack = (i + 1) / B_HITS.length * 0.85; });
   return { on: t > 261 && t < 268.05, crack, hit: berserkHitK(t), shattered: t >= 268, up: smooth(261, 262, t) };
 }
 // docking path in flagship-local space (the port launch bay is x∈[-74,-62], y∈[-17,26], z∈[22,92])
@@ -302,7 +305,7 @@ export function gundamState(t) {
   const r = gundamStateRaw(t, s);
   // the beam RIFLE from the launch to the dive; he puts it away on his back at 257.6–258.3 (over the shoulder) and
   // draws the beam SABER at 270.2 for the ram into the core
-  r.weapon = t < 170 ? 'back' : t < 258.3 ? 'rifle' : t < 270.2 ? 'none' : 'saber';
+  r.weapon = t < 170 ? 'back' : t < 258.3 ? 'rifle' : t < 265.9 ? 'none' : 'saber';
   if (t < 262) r.saber = 0;
   return r;
 }
@@ -400,23 +403,11 @@ function gundamStateRaw(t, s) {
         const a = fl[k] || [0, 0, 0], b = feral[k] || [0, 0, 0];
         s.pose[k] = [lerp(a[0], b[0], w), lerp(a[1], b[1], w), lerp(a[2], b[2], w)];
       }
-      berserkStrike(t, s.pose);
-      const tear = smooth(267.25, 268.0, t) * (1 - smooth(268.2, 268.8, t));
-      if (tear > 0 || tearU(FILM_NOW) >= 0) {
-        const pull = tearU(FILM_NOW) >= 0 ? 0.3 * tearU(FILM_NOW) + 0.7 * Math.pow(tearU(FILM_NOW), 4) : tear;
-        s.pose.arm_L_upper = [-1.8, 0.15, -0.6 + pull * 0.55]; s.pose.arm_L_lower = [-0.55 + pull * 0.3, 0, 0]; s.pose.hand_L = [0.3, HAND_YAW, 0.15];
-        s.pose.arm_R_upper = [-1.8, -0.15, 0.6 - pull * 0.55]; s.pose.arm_R_lower = [-0.55 + pull * 0.3, 0, 0]; s.pose.hand_R = [0.3, -HAND_YAW, -0.15];
-        const tu = Math.max(0, tearU(FILM_NOW));
-        const tr = (0.03 + 0.09 * tu) * (tu > 0 ? 1 : 0);
-        s.pose.torso = [0.35 + tu * 0.15, noise1(FILM_NOW * 20) * 0.08, 0];
-        for (const k of ['arm_L_upper', 'arm_R_upper', 'arm_L_lower', 'arm_R_lower', 'hand_L', 'hand_R']) {
-          const a = s.pose[k]; a[0] += noise1(FILM_NOW * 31 + k.length) * tr; a[2] += noise1(FILM_NOW * 27 + k.length * 3) * tr;
-        }
-        s.damage = Math.max(s.damage || 0, 0.25 + tu * 0.55);
-      }
+      mixPose(s.pose, thrustPose(t), smooth(265.4, 265.95, t));   // the saber in both hands: drawn back, the thrust
       if (t > 270.2) mixPose(s.pose, ramPose(t), smooth(270.2, 271.0, t));
     } else { for (const k in s.pose) delete s.pose[k]; Object.assign(s.pose, ramPose(t)); }
-    s.saber = smooth(270.3, 270.6, t);
+    s.saber = smooth(266.0, 266.25, t);
+    s.saberPow = 1 + 9 * smooth(265.98, 266.3, t) * (1 - smooth(268.3, 269.6, t));   // TEN times its output for the thrust
     s.thr = 1; s.damage = 0.15 + smooth(262, 278, t) * 0.25;
     s.berserk = smooth(262, 262.4, t) * (1 - smooth(276, 278, t));
   } else if (t < 292) {
@@ -771,10 +762,12 @@ export function drawGundam(R, t, s, opts = {}) {
   // the BEAM SABER (left hand, from the well assault on): cyan blade out of the hilt, red while berserk
   if ((weapon === 'saber' || s.saberL) && s.saber > 0) {
     const [a, , dir] = saberSegment(R, 'gundam', e, 'hand_L', 1);
-    const k = easeOut(sat(s.saber)), pw = s.saberPow || 1, tip = madd(a, dir, 13 * k);
+    const k = easeOut(sat(s.saber)), pw = s.saberPow || 1, mega = Math.max(0, (pw - 2) / 8);   // mega: 0..1 toward ten-times output
+    const th = pw <= 2 ? pw : 2 + (pw - 2) * 0.12, tip = madd(a, dir, 13 * k * (1 + (MEGA_LEN - 1) * mega));
     const col = bz > 0.05 ? [3.4, 0.5, 0.3] : [0.8, 2.2, 3.2];
-    R.beam(a, tip, 0.5 * pw, [col[0] * k, col[1] * k, col[2] * k], 0.5 * pw, 26, 1.5, 1.2);   // (pw: output — 2 = full power, twice as thick)
-    R.beam(a, tip, 1.5 * pw, [col[0] * k, col[1] * k, col[2] * k], 0.04 * pw, 3, 2, 0.8);
+    R.beam(a, tip, 0.5 * th, [col[0] * k, col[1] * k, col[2] * k], 0.5 * pw, 26, 1.5, 1.2);   // (pw: output — 2 = full power, twice as thick; 10 = the barrier thrust)
+    R.beam(a, tip, 1.5 * th, [col[0] * k, col[1] * k, col[2] * k], 0.04 * pw, 3, 2, 0.8);
+    if (mega > 0) { R.beam(a, tip, 2.2 * th, [0.3 * k * mega, 0.8 * k * mega, 1.6 * k * mega], 0.03 * pw, 2, 2.5, 1.5); R.glow(a, 3 + 5 * mega, [1.5 * mega, 3 * mega, 5 * mega], 0.5); }   // the overdriven blade: a wide corona, the hilt blazing
     R.light(lerpv(a, tip, 0.5), 40 * pw, bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 4 * k * pw);
     GUN.saber = [a, tip];
     if (s.saberL && t > TRANS_PASS - SWING_PRE - 0.002 && t < TRANS_PASS + SWING_POST + 0.02) {   // the swing's afterimage: a fan of fading blades along the path it just swept
@@ -2338,116 +2331,33 @@ shot(262, 263.3, 'B1 berserk wakes', (c) => {
   c.post.lensA = { enable: 0 };
   c.env.fill = [0.3, 0.2, 0.2, 0.5];
 });
-shot(263.3, 266.95, 'B2 clawing the shield', (c) => {
+shot(263.3, 266.95, 'B2 the blade at ten times its output', (c) => {
   c.env.sunDisc = 0.12;
-  const { t, u } = c;
+  const { t } = c;
   const g = gundamState(t);
-  // one angle per strike (cut halfway between hits): medium-close on the body so every wind-up and blow reads
-  const i = t < (B_HITS[0] + B_HITS[1]) / 2 ? 0 : t < (B_HITS[1] + B_HITS[2]) / 2 ? 1 : 2;
-  const ANG = [[-34, -12, -14, 0.10], [30, 9, -20, -0.08], [-12, 24, -30, 0.05]];   // [side, height, back, roll] from the mech
-  const [ax, ay, az, rl] = ANG[i];
-  const drift = (t - B_HITS[i]) * 1.5;
-  camLook(c, addv(g.pos, [ax + drift, ay, az - drift]), addv(g.pos, [0, 5, 8]), 40, rl);
-  const hk = berserkHitK(t);
-  shake(c, 0.2 + hk * 2.4, 16);
-  c.env.rim = [1.2, 0.35, 0.3, 1.2]; c.env.fill = [0.35, 0.3, 0.35, 0.5];
-  c.post.shakeBlur = 0.002 * berserkHitK(t);
+  // beside him, a little ahead: the hilt comes up in both hands and the blade roars out, far past its length, at the dome
+  camLook(c, addv(g.pos, [34 - (t - 265.1) * 3, 7, -10 + (t - 265.1) * 2]), addv(g.pos, [0, 5, 16]), 44, 0.06);
+  const ig = Math.exp(-Math.max(0, t - 266.0) * 5) * (t > 266.0 ? 1 : 0);
+  shake(c, 0.3 + 1.6 * ig, 16);
+  c.post.flash = 0.1 * ig;
+  c.env.rim = [0.6, 1.0, 1.9, 1.4]; c.env.fill = [0.3, 0.32, 0.4, 0.5];
   c.post.lensA = { enable: 0 };
   c.env.shadowCenter = g.pos; c.env.shadowRadius = 200;
 });
-// FIRST PERSON (≈11 s of film, see timemap.js): only the two hands in view, clawing the barrier open.
-// The machine is pushed past its limits: joints spark, armour tears off the forearms, the head camera shakes and
-// the feed breaks up (post: berserk/strain glitch).
-shot(266.95, 268.05, 'B2b POV tear', (c) => {
-  const { t, R } = c;
+// the thrust: wide and low off his left, the whole blade and the dome's face in frame — he lunges, the tip goes in and
+// the barrier cracks open from the point in one blow
+shot(266.95, 268.05, 'B2b the thrust — one blow through the barrier', (c) => {
   c.env.sunDisc = 0.12;
-  c.fpv = true;
-  const film = c.filmT;
-  const u = Math.max(0, tearU(film));                       // 0..1 across the stretched window
-  const pre = t < 267.2 ? 1 : 0;
-  const strain = pre ? 0.3 : 0.3 + 0.7 * Math.pow(u, 1.4);
-  const g = gundamState(t);
-  const f = V.norm([0, 0, 0], g.fwd);
-  // eye at the visor, looking out along the arms at the fists in the shield
-  const eyeP = madd(addv(g.pos, [0, 6.8, 0]), f, 1.2);          // at the head (hip + ~[0, 6, 2.6])
-  // aim at the fists (what the pilot is staring at): midpoint of the hands, a little beyond, plus head shake
-  const fk = duelFK({ ...g, saber: 0 }, 'gundam');              // this frame's hands (same FK as the renderer)
-  const HL = M.transformPoint([0, 0, 0], fk.hand_L, [0, 0, 0]), HR = M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]);
-  const grip = addv(madd(V.lerp([0, 0, 0], HL, HR, 0.5), f, 12), [0, 0.5, 0]);
-  const look = addv(grip, [noise1(film * 6) * 1.5 * strain, 1.5 + noise1(film * 5 + 2) * 1.2 * strain, 0]);
-  camLook(c, eyeP, look, 54 + strain * 5, noise1(film * 3.3) * 0.1 * strain);
-  // head camera shake: constant tremor + violent jolts
-  const jolt = Math.pow(Math.max(0, Math.sin(film * 2.7)), 18) + Math.pow(Math.max(0, Math.sin(film * 1.9 + 1)), 22);
-  c.cam.pos[0] += noise1(film * 37) * 0.25 * strain; c.cam.pos[1] += noise1(film * 41 + 7) * 0.25 * strain;
-  c.cam.target[0] += noise1(film * 23 + 3) * (1.2 + jolt * 5) * strain; c.cam.target[1] += noise1(film * 29 + 9) * (1.2 + jolt * 5) * strain;
-  c.post.shakeBlur = 0.001 + 0.004 * strain * (0.5 + jolt);
-  // failing feed
-  c.post.berserk = 1.0 + strain * 0.9 + jolt * 0.4;
-  c.post.redFlood = 0.22;                                   // keep the glitch, drop the red wash so the hands read
-  c.post.ca = 0.004 + strain * 0.012 + jolt * 0.01;
-  c.post.vignette = 1.3 + strain * 1.0;
-  c.post.exposure = 0.9 + jolt * 0.3;
+  const { t } = c;
+  const g = gundamState(t), P = addv(WELL, [g.pos[0] - WELL[0], g.pos[1] - WELL[1] + 4.2, -SHIELD_R]);
+  camLook(c, addv(P, [-120 + (t - 266.95) * 8, 20, -70]), addv(P, [0, -2, -34]), 44, -0.05);   // (him, the whole blade and the dome's face)
+  const hk = berserkHitK(t);
+  shake(c, 0.25 + hk * 2.6, 16);
+  c.post.flash = t > THRUST_T ? 0.2 * Math.exp(-(t - THRUST_T) * 8) : 0;
+  c.post.shakeBlur = 0.003 * hk;
+  c.env.rim = [0.6, 1.0, 1.9, 1.6]; c.env.fill = [0.3, 0.32, 0.4, 0.5];
   c.post.lensA = { enable: 0 };
-  c.env.rim = [0.7, 1.0, 1.9, 1.8]; c.env.fill = [0.1, 0.1, 0.13, 0.25];   // hands lit hard from the tear: dark armour, blue-white rims
-  c.env.ambient = 0.35;
-  // the rip: blinding energy where the fists are in the shield, arcing between the hands and up the arms
-  {
-    const hl = HL, hr = HR;
-    const core = madd(V.lerp([0, 0, 0], hl, hr, 0.5), f, 4);
-    const E = 0.45 + 0.8 * strain + 0.8 * jolt;
-    R.glow(core, 2 + 7 * u, [1.4 * E, 2.2 * E, 4 * E], 0.5);
-    R.light(core, 60, [0.55, 0.8, 1.6], 8 + 14 * strain);
-    for (const hp of [hl, hr]) {
-      R.glow(madd(hp, f, 1.5), 1.2 + 1.2 * strain, [1.5 * E, 2.4 * E, 4.2 * E], 0.45);
-      for (let k = 0; k < 3; k++) {                          // jagged arcs (re-rolled every other frame)
-        const sd = Math.floor(film * 4) * 3.1 + k * 7.7 + hp[0];
-        let prev = madd(hp, f, 1.5);
-        const target = madd(madd(hp, randDir([0, 0, 0], sd), 3 + 4 * hash(sd)), f, 2 * hash(sd + 1));
-        for (let j = 1; j <= 5; j++) {
-          const q = V.lerp([0, 0, 0], madd(hp, f, 1.5), target, j / 5);
-          const jg = randDir([0, 0, 0], sd + j * 1.3);
-          const pt = madd(q, jg, j < 5 ? 1.2 : 0);
-          R.beam(prev, pt, 0.06, [2 * E, 3 * E, 5 * E], 1, 12);
-          prev = pt;
-        }
-      }
-    }
-    // a seam of torn energy between the fists
-    R.beam(madd(hl, f, 2), madd(hr, f, 2), 0.12 + 0.35 * u, [1.2 * E, 2 * E, 3.6 * E], 1.1, 26, 2, 1);
-  }
-  if (GUN.gundam) {
-    for (const hn of ['hand_L', 'hand_R', 'arm_L_lower', 'arm_R_lower']) {
-      const hm = R.partWorld('gundam', GUN.gundam, hn);
-      const hp = M.transformPoint([0, 0, 0], hm, [0, 0, 0]);
-      const isHand = hn.startsWith('hand');
-      // sparks spraying from claws and elbow joints
-      const nsp = isHand ? 10 : Math.round(4 + 10 * u);
-      for (let k = 0; k < nsp; k++) {
-        const per = 0.16 + hash(k + hn.length) * 0.22;
-        const ph = ((film - 266.95) / per + hash(k + 5)) % 1;
-        const d = V.norm([0, 0, 0], V.add([0, 0, 0], randDir([0, 0, 0], k * 2.9 + Math.floor((film - 266.95) / per + hash(k + 5)) * 5.1 + hn.length), V.scale([0, 0, 0], f, -1.2)));
-        const p = madd(hp, d, ph * (8 + 14 * hash(k + 9)));
-        const b = (1 - ph) * (1.2 + strain * 1.8);
-        spark(R, p, 0.7 + 0.5 * (1 - ph), isHand ? [b * 0.7, b * 0.9, b * 1.3] : [b * 1.6, b * 0.9, b * 0.35]);
-      }
-      // armour plates ripping off the forearms, and smoke/fire from overloaded joints
-      if (!isHand && u > 0.25) {
-        for (let k = 0; k < 4; k++) {
-          const tb = 267.2 + (0.35 + k * 0.15 + hash(k + hn.length) * 0.1) * 10.8;
-          if (film < tb) continue;
-          const lt = film - tb;
-          const d = V.norm([0, 0, 0], V.add([0, 0, 0], randDir([0, 0, 0], k * 7.7 + hn.length), [0, 0.8, -0.6]));
-          const m = new Float32Array(16);
-          M.fromTRS(m, madd(hp, d, 1 + lt * 9), Q.fromEuler([0, 0, 0, 1], lt * 3 + k, lt * 2, lt * 4), 0.18);
-          const e = R.add('debris', m);
-          if (e) { e.hidden = debrisOnly(R, 'hull' + (k % 4)); e.damage = 0.5; }
-          if (lt < 0.25) R.glow(hp, 3, [4, 2, 0.8], 0.4);
-        }
-        R.fire(madd(hp, [0, 1, 0], 0.5), 1.2 + u * 1.5, 0.35, hn.length + Math.floor(film * 6) * 0.3, [1, 1, 1], 0.6 * u);
-      }
-      if (isHand) R.light(hp, 25, [0.6, 0.8, 1.6], 3 + 4 * strain);
-    }
-  }
+  c.env.shadowCenter = g.pos; c.env.shadowRadius = 200;
 });
 shot(268, 270, 'B3 SHATTER', (c) => {
   c.env.sunDisc = 0.12;
@@ -2888,14 +2798,28 @@ function drawShield(R, t, c) {
   const rel = V.sub([0, 0, 0], addv(g.pos, [0, 9, 0]), WELL);
   const iuv = [V.dot(rel, right) / SHIELD_R, V.dot(rel, upv) / SHIELD_R];
   const near = clamp((V.dist(cam.pos, WELL) - SHIELD_R) / 90, 0.35, 1);
-  const tear = smooth(267.25, 268.0, t);
-  let lastHit = -1; for (const h of [...B_HITS, 267.25]) if (t >= h) lastHit = h;
+  const tear = smooth(THRUST_T, 268.0, t);   // the hole the blade burns open
+  let lastHit = -1; for (const h of B_HITS) if (t >= h) lastHit = h;
   const hitAge = lastHit < 0 ? 9 : t - lastHit;
   // at 268 the whole grid lights once and dies away (the barrier collapses)
   const flash = 0;                                          // (the old whole-grid flash is replaced by the collapse wave)
   const alive = t < 268 ? sh.up : Math.exp(-Math.max(0, t - 268.9) * 4);
   const collapse = t >= 268 ? t - 268 : 0;
   R.shield(WELL, SHIELD_R, iuv, flash, t >= 268 ? 1 : tear, hitAge, [0.35, 0.7, 1.8], alive * (0.9 + tear * 0.5) * near, collapse);
+  if (t > THRUST_T && t < 268.4) {   // the tip in the barrier: a blinding point, lightning racing out across the dome from it
+    const lt = t - THRUST_T, P = addv(WELL, [g.pos[0] - WELL[0], g.pos[1] - WELL[1] + 4.2, -SHIELD_R]), k = (0.6 + 0.4 * smooth(0, 0.58, lt)) * (1 - smooth(0.58, 0.98, lt));
+    R.glow(P, 8 + 18 * k, [2.5 * k, 4 * k, 8 * k], 0.5); R.light(P, 260, [0.5, 0.8, 1.6], 30 * k);
+    if (lt < 0.5) R.ripple(P, 10 + 120 * easeOut(lt / 0.5), [0.3, 0.5, 1], (1 - lt / 0.5) * 1.5);
+    for (let a = 0; a < 16; a++) {   // jagged arcs along the surface, re-rolled every few frames, reaching further as it gives
+      const sd = a * 7.31 + Math.floor(t * 40) * 1.7, th = a / 16 * 2 * Math.PI + (hash(sd) - 0.5) * 0.4, len = (20 + 70 * hash(sd + 1)) * (0.4 + 0.6 * smooth(0, 0.58, lt));
+      let prev = P;
+      for (let j = 1; j <= 6; j++) {
+        const r = len * j / 6, q = [P[0] + Math.cos(th) * r + (hash(sd + j) - 0.5) * r * 0.25, P[1] + Math.sin(th) * r + (hash(sd + j + 9) - 0.5) * r * 0.25, 0];
+        q[2] = WELL[2] - Math.sqrt(Math.max(0, SHIELD_R * SHIELD_R - (q[0] - WELL[0]) ** 2 - (q[1] - WELL[1]) ** 2));   // (on the dome)
+        R.beam(prev, q, 0.25 * k, [2 * k, 3.2 * k, 6 * k], 1, 12); prev = q;
+      }
+    }
+  }
   if (collapse > 0 && collapse < 1.6) {
     // shock ring at the wound and glowing hex shards thrown off the dome surface
     const tp = madd(WELL, V.norm([0, 0, 0], rel), SHIELD_R);

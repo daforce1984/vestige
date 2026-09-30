@@ -203,9 +203,12 @@ export const CUES = [
   // ---------------- ACT V
   [262,   'wellHum',    { dur: 16, vel: 0.5 }],
   [262,   'growl',      { dur: 1.9, vel: 0.9 }],
-  ...[263.4, 265.0, 266.6].map((t, i) => [t, 'shieldHit', { vel: 0.8 + 0.1 * i, pan: [-0.2, 0.25, 0][i] }]),
-  ...[[263.55, 1.45, 380, 1100], [265.15, 1.45, 520, 1500], [266.75, 0.5, 700, 1300]].map(([t, dur, f0, f1], i) => [t, 'shieldStrain', { dur, f0, f1, vel: 0.35 + 0.12 * i }]),
-  [267.25,'tear',       { dur: 0.75, vel: 0.95 }],   // hands in the shield, ripping it open
+  [266.0, '@beamSaberIgnite', { vel: 1 }],            // the blade at ten times its output
+  [266.05, '@beamSaberHum', { dur: 4.2, vel: 0.9, fadeIn: 0.1, fadeOut: 0.3 }],
+  [267.1, '@beamSaberSwing', { vel: 1, dur: 0.45 }],   // the lunge
+  [267.42, 'shieldHit', { vel: 1, pan: 0 }],
+  [267.44, 'shieldStrain', { dur: 0.55, f0: 700, f1: 1800, vel: 0.6 }],
+  [267.42,'tear',       { dur: 0.58, vel: 0.95 }],   // the blade burning through
   [268,   'shatter',    { vel: 1, shards: 2, count: 46 }],
   [278,   'engulf',     { dur: 2.02, vel: 1 }],      // swallowed by the implosion light → 280 white-out
   [273,   'crunch',     { vel: 1 }],
@@ -414,9 +417,11 @@ export const SAMPLE_CUES = [
   [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar
   [262.05,'servo',     { rate: 0.5, gain: 0.9, prio: 8, norand: true }],
   [262,   'braam',     { rate: 0.85, gain: 1, prio: 9, duck: 2, norand: true }],
-  ...[263.4, 265.0, 266.6].flatMap((t, i) => [[t, 'shockwave', { dur: 1.4, fadeOut: 0.6, gain: 0.55 + 0.1 * i, rate: 1.25 - 0.06 * i, prio: 9, duck: 1.1, norand: true }]]),   // (a metal hit didn't fit an energy barrier)
-  [267.25,'metal_groan', { at: 2.9, dur: 0.8, rate: 1.25, gain: 0.8, fadeOut: 0.05, prio: 8, norand: true }],   // servo strain
-  [267.3, 'servo',     { rate: 0.7, gain: 0.8, dur: 0.7, fadeOut: 0.05, prio: 8, norand: true }],
+  [265.98, 'saber_ignite', { rate: 0.55, gain: 1.4, prio: 9, norand: true }],                       // lit at ten times its output: deep, huge
+  [266.0, 'big_beam:fire', { rate: 0.7, gain: 0.9, prio: 9, duck: 1.2, norand: true }],
+  [267.1, 'hl_thruster', { dur: 0.4, rate: 1.4, gain: 0.9, fadeOut: 0.1, prio: 8, norand: true }],   // the lunge
+  [267.42, 'shockwave', { dur: 1.4, fadeOut: 0.6, gain: 0.9, rate: 1.1, prio: 9, duck: 1.5, norand: true }],   // the tip goes in
+  [267.42, 'energy_beam2', { rate: 0.5, gain: 1.2, dur: 0.6, fadeOut: 0.1, prio: 9, norand: true }],
   [268,   'boom_cine', { gain: 1.1, prio: 9, duck: 2.5, norand: true }],               // SHATTER
   // barrier collapse: the energy dies with a deep power-down, a shock hit, and a glassy cascade as cells blow out
   [268.02, 'power_down', { rate: 0.55, gain: 1.1, prio: 9, norand: true }],
@@ -936,7 +941,7 @@ export default class Score {
       l.tf = l.filmTime ? insertFilm(l.t) : filmT(l.t);
       l.cutF = l.cut != null ? (l.filmTime ? insertFilm(l.cut) : filmT(l.cut)) : undefined;
     }
-    this.voiceLines = got.filter(Boolean).sort((a, b) => a.tf - b.tf);
+    this.voiceLines = got.filter((l) => l && !inSkip(l.t) && !(l.filmTime && TEAR_F1 - TEAR_F0 < 2)).sort((a, b) => a.tf - b.tf);   // (lines cut out of the film / written for the removed insert)
   }
 
   async _loadSamples() {
@@ -1116,13 +1121,13 @@ export default class Score {
       const base = { ref: s, resume: true, offset: s.offset || 0, gain: s.gain, fadeIn: s.fadeIn || 0, fadeOut: s.fadeOut };
       const a = s.t, b = s.t + s.dur;
       if (s.film) ev.push({ film: true, t: a, type: 'stem', p: { ...base, dur: s.dur } });   // film-time stem (the duel score)
-      else if (a < TEAR_S0 && b > TEAR_S0) {   // e.g. E_climax: play to TEAR_S0, hold through the insert, resume at TEAR_F1
+      else if (a < TEAR_S0 && b > TEAR_S0 && TEAR_F1 - TEAR_F0 > 2) {   // e.g. E_climax: play to TEAR_S0, hold through the insert, resume at TEAR_F1
         ev.push({ film: true, t: filmT(a), type: 'stem', p: { ...base, dur: TEAR_F0 - filmT(a) + 0.45, fadeOut: 0.45 } });
         ev.push({ film: true, t: TEAR_F1, type: 'stem', p: { ...base, offset: base.offset + (TEAR_S0 - a), dur: b - TEAR_S0, fadeIn: 0.02 } });
       } else ev.push({ film: true, t: filmT(a), type: 'stem', p: { ...base, dur: filmT(b) - filmT(a) } });
     });
     // first-person insert (film time)
-    for (const [t, spec, o = {}] of INSERT_CUES) {
+    if (TEAR_F1 - TEAR_F0 > 2) for (const [t, spec, o = {}] of INSERT_CUES) {   // (only while the tear is a stretched first-person insert)
       if (spec[0] === '@') { ev.push({ film: true, t, type: spec.slice(1), p: o }); continue; }
       const e = this._sampleEvent(t, spec, o, r); if (e) { e.film = true; ev.push(e); nSmp++; }
     }

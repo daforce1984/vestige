@@ -6,7 +6,7 @@
 //  2. The shield tear: a 0.8 s story moment (267.2–268.0) that plays out over 10.8 s of screen time in first person.
 // All choreography/audio tables are written in STORY time; the player clock is FILM time.
 export const TEAR_S0 = 267.2, TEAR_S1 = 268.0;          // story window
-const TEAR_LEN = 10.8;                                  // film length of the tear window
+const TEAR_LEN = TEAR_S1 - TEAR_S0;                     // film length of the tear window (2026-09-30: the first-person tear is gone — the saber goes through in one blow; no stretch)
 
 // every blow of the fight (story time): the swatted bolt (duel.js DODGE.t), then the DUEL_EVENTS clash/block/hit
 export const SLOW_HITS = [178.73, 183.28, 190.95, 192.05];   // the gunfight: the shield block, its inverted shot, the shield torn off, slipping the full-power beam, the saber cut
@@ -17,7 +17,15 @@ export const SLOW_RANGES = [[183.95, 184.5, 0.45], [184.43, 184.57, 0.04], [184.
 // story spans CUT OUT of the film (a hard cut straight across them: no film time at all) — scene 43 (its boost-jump and
 // inverted shot) removed 2026-09-30
 export const SKIP_RANGES = [[165.3, 167.4], [168.3, 169.0], [171.45, 172.35], [174.4, 176.35], [179.25, 180.45], [184.522, 184.57]];   // (+ 2026-09-30: scenes 30-37 tightened — the chase, the carnage, the aim hold, its charge (cut as soon as the muzzle comes up))
-export const inSkip = (s) => SKIP_RANGES.some(([a, e]) => s > a && s < e);
+// story spans cut out of the rest of the film (outside the duel table and the tear window): the battle scenes tightened,
+// the wide shots of the whole battlefield kept short (2026-09-30)
+export const CUT_RANGES = [
+  [70.5, 72.8], [77.9, 81.2], [85.8, 91.8], [99.0, 101.8], [107.0, 108.8], [131.2, 134.2], [139.0, 140.0],
+  [150.6, 152.0], [154.2, 155.6], [158.3, 159.2], [160.6, 162.2],
+  [195.8, 198.8], [200.0, 201.9], [212.6, 215.2], [220.5, 224.2], [242.8, 243.8], [249.0, 254.5], [259.0, 261.0], [263.3, 265.1],
+  [282.5, 286.8], [295.9, 297.3], [307.4, 308.4], [314.5, 319.8]];
+const cutBefore = (s) => CUT_RANGES.reduce((a, [x, e]) => a + Math.max(0, Math.min(s, e) - x), 0);
+export const inSkip = (s) => SKIP_RANGES.some(([a, e]) => s > a && s < e) || CUT_RANGES.some(([a, e]) => s > a && s < e);
 export const SLOW_V = 0.2;                              // picture speed while slowed
 const SLOW_POST = 0.5 * SLOW_V;                         // story seconds held slow after the contact = 0.5 s on screen
 // per-blow window (story s): full slow on [h − pre, h + post], smooth ramps rin / rout either side.
@@ -69,25 +77,40 @@ function duelS(u) {
   return (lo + hi) / 2;
 }
 
-export const TEAR_F0 = TEAR_S0 + DUEL_EXTRA;            // film time when the tear window starts
+const TF0 = TEAR_S0 + DUEL_EXTRA;                       // (uncut) film time when the tear window starts
+export const TEAR_F0 = TF0 - cutBefore(TEAR_S0);        // film time when the tear window starts
 export const TEAR_F1 = TEAR_F0 + TEAR_LEN;              // film time when the tear window ends
 export const INSERT_EXTRA = TEAR_LEN - (TEAR_S1 - TEAR_S0);   // 10.0 s
 export const STORY_DURATION = 393;   // title card holds 20 s
-export const FILM_DURATION = STORY_DURATION + DUEL_EXTRA + INSERT_EXTRA;
+export const CUT_TOTAL = cutBefore(1e9);
+export const FILM_DURATION = STORY_DURATION + DUEL_EXTRA + INSERT_EXTRA - CUT_TOTAL;
 
 // progress shape inside the tear window: a long struggle, then the barrier gives way at the end
 const shape = (u) => 0.3 * u + 0.7 * Math.pow(u, 5);
 function shapeInv(y) { let lo = 0, hi = 1; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (shape(m) < y) lo = m; else hi = m; } return (lo + hi) / 2; }
 
-export function storyT(film) {
-  if (film <= TEAR_F0) return duelS(film);
-  if (film < TEAR_F1) return TEAR_S0 + (TEAR_S1 - TEAR_S0) * shape((film - TEAR_F0) / TEAR_LEN);
+function baseStory(film) {   // (uncut film → story)
+  if (film <= TF0) return duelS(film);
+  if (film < TF0 + TEAR_LEN) return TEAR_S0 + (TEAR_S1 - TEAR_S0) * shape((film - TF0) / TEAR_LEN);
   return film - DUEL_EXTRA - INSERT_EXTRA;
 }
-export function filmT(story) {
+function baseFilm(story) {   // (story → uncut film)
   if (story <= TEAR_S0) return duelU(story);
-  if (story < TEAR_S1) return TEAR_F0 + TEAR_LEN * shapeInv((story - TEAR_S0) / (TEAR_S1 - TEAR_S0));
+  if (story < TEAR_S1) return TF0 + TEAR_LEN * shapeInv((story - TEAR_S0) / (TEAR_S1 - TEAR_S0));
   return story + DUEL_EXTRA + INSERT_EXTRA;
+}
+// the cuts in film time: [film time of the cut, uncut film seconds removed there]
+const CUT_FILM = (() => { let acc = 0; return CUT_RANGES.map(([a, e]) => { const fa = baseFilm(a) - acc, len = baseFilm(e) - baseFilm(a); acc += len; return [fa, len]; }); })();
+export const HARD_CUT_FILM = CUT_FILM.map((c) => c[0]);
+export function storyT(film) {
+  let f = film;
+  for (const [fa, len] of CUT_FILM) if (film >= fa) f += len;
+  return baseStory(f);
+}
+export function filmT(story) {
+  let f = baseFilm(story);
+  for (let i = 0; i < CUT_RANGES.length; i++) { const [a, e] = CUT_RANGES[i]; if (story > a) f -= Math.min(story, e) === e ? CUT_FILM[i][1] : baseFilm(Math.min(story, e)) - baseFilm(a); }
+  return f;
 }
 /** a time written relative to the tear insert (lines.json "filmTime", designed with the tear at 267.2) → film time */
 export const insertFilm = (t) => t - TEAR_S0 + TEAR_F0;
