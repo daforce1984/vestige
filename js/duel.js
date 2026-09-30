@@ -1489,6 +1489,39 @@ function heroLeft(s, tw) {
   armIK(s, fk, 'gundam', 'L', heroLeftWrist(fk, tw, Rw), Rw);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
+// ---------------------------------------------------------------- WEAPON GRIPS
+// Where each hand takes hold of each weapon, as the HAND's frame inside the weapon's own frame ({side, p, R}: hand pivot
+// position and hand rotation, weapon-local). One-handed: `one`; two-handed: `two` = [main hand, support hand].
+// Weapon frames: hero_rifle = its node on hand_R (origin at the grip, +Z down the barrel, +Y its top); saber = the hilt
+// point (origin where the blade leaves the hilt's base grip, +Z along the blade).
+const r3I = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+const handIn = (T, Rq) => ({ p: scl(r3v(r3T(Rq), T), -1), R: r3T(Rq) });   // hand frame inside a weapon mounted on it at (T, Rq)
+let _grips = null;
+export function GRIPS() {
+  if (_grips) return _grips;
+  const rq = RQ3(), main = { side: 'R', ...handIn(RIFLE_T, rq) };
+  const sab = { side: 'L', ...handIn(SABER_GRIP_T, r3I) };
+  _grips = {
+    hero_rifle: { one: main, two: [main, { side: 'L', p: sub(HERO_FORE, r3v(r3T(rq), HERO_LH)), R: r3T(rq) }] },   // (support: the left hand on the fore-end, wrist turned like the gun hand)
+    saber: { one: sab, two: [sab, { side: 'R', p: add(sab.p, [0, 0, -SABER_HANDS]), R: r3I }] },                    // (the right hand just below the left on the hilt)
+  };
+  return _grips;
+}
+/** where the hand must be (pivot P, rotation Hw, world) to hold `weapon` at world grip-frame (Wp, Wr) with grip g */
+export function gripTarget(g, Wp, Wr) { return { side: g.side, P: add(Wp, r3v(Wr, g.p)), Hw: r3mul(Wr, g.R) }; }
+/** the weapon's world frame (Wp, Wr) when the hand g.side is at (P, Hw) — the inverse of gripTarget */
+export function weaponAtHand(g, P, Hw) { const Wr = r3mul(Hw, r3T(g.R)); return { Wp: sub(P, r3v(Wr, g.p)), Wr }; }
+/** IK the hand(s) onto the weapon held at (Wp, Wr): mode 'one' (main hand) or 'two' (both), blended in by k */
+export function gripIK(s, fk, model, weapon, mode, Wp, Wr, k = 1) {
+  const G = GRIPS()[weapon], list = mode === 'two' ? G.two : [G.one];
+  s.pose = { ...s.pose };
+  for (const g of list) {
+    const parts = ['arm_' + g.side + '_upper', 'arm_' + g.side + '_lower', 'hand_' + g.side], keep = parts.map((q) => (s.pose[q] || [0, 0, 0]).slice());
+    const tg = gripTarget(g, Wp, Wr);
+    armIK(s, fk, model, g.side, tg.P, tg.Hw);
+    parts.forEach((q, i) => { s.pose[q] = [0, 1, 2].map((c) => lerp(keep[i][c], s.pose[q][c], k)); });
+  }
+}
 /** the spent E-pac popping out at HERO_EJECT: its rifle-frame start + the rifle frame at that moment (shots.js flies it) */
 let _ej = null;
 export function heroEject() {
@@ -1624,6 +1657,7 @@ const transSaber = (tw) => smooth(SD_OUT, SD_OUT + 0.03, tw) * (1 - smooth(TRANS
 // THE DRAW (before the cut): the rifle is flung away (THROW0), the left hand drops to the hilt on his left hip, rips it
 // out forward, the blade lights, both hands take it up overhead — then the sweep (transCutIK); afterwards the blade goes
 // out and the hilt goes back on the hip. Hilt poses in his torso frame: [t, position, blade direction]
+const SABER_GRIP_T = [0, -1.2, 0.6], SABER_HANDS = 1.7;   // the hilt in the left hand (hand-local), the right hand this far below it
 export const SD_REACH = 184.6, SD_GRAB = 184.66, SD_OUT = 184.72, SD_GUARD = 184.8, SD_SWEEP = 184.83, SD_HOLSTER0 = 185.44, SD_HOLSTER = 185.62;
 export const SABER_MOUNT_P = [2.3, -2.4, -0.6], SABER_MOUNT_D = nrm([0.25, -0.55, -0.8]);   // the hilt hanging on his left hip, emitter down-back
 const SD_KEYS = [[SD_GRAB, SABER_MOUNT_P, SABER_MOUNT_D],
@@ -1679,17 +1713,18 @@ function throwFling(s, tw) {   // the right arm: wound in across his chest, then
   armIK(s, fk, 'gundam', 'R', P, [...x, ...y, ...z]);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
-function catchReach(s, tw) {   // the right arm reached out wide to his right, open for the rifle coming back in; it drops into the hand and the arm comes back round to aim
+function catchReach(s, tw) {   // the right arm reached out wide to his right, the hand already set to take the rifle UPRIGHT, barrel ahead (GRIPS)
   const k = smooth(SD_HOLSTER - 0.05, SD_HOLSTER + 0.1, tw) * (1 - smooth(CATCH_T + 0.03, CATCH_T + 0.25, tw)); if (k <= 0) return;
-  s.pose = { ...s.pose };
-  const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
-  const fk = duelFK(s, 'gundam'), pv = PIV.gundam, T = r3(fk.torso);
-  const fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0]));
+  const fk = duelFK(s, 'gundam'), c = catchFrame(fk);
+  gripIK(s, fk, 'gundam', 'hero_rifle', 'one', c.Wp, c.Wr, k);
+}
+/** the rifle as he wants to catch it (torso-relative): its grip out at arm's length to his right, barrel ahead, top up */
+function catchFrame(fk) {
+  const pv = PIV.gundam, T = r3(fk.torso), fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0]));
   const S = M.transformPoint([0, 0, 0], fk.torso, sub(pv.arm_R_upper, pv.torso)), L = V.dist(pv.arm_R_lower, pv.arm_R_upper) + V.dist(pv.hand_R, pv.arm_R_lower);
-  const o = nrm(add(add(rt, scl(fw, 0.55)), scl(upv, 0.2))), P = add(S, scl(o, 0.97 * L));
-  const y = scl(o, -1), z = nrm(sub(fw, scl(o, V.dot(fw, o)))), x = V.cross([0, 0, 0], y, z);
-  armIK(s, fk, 'gundam', 'R', P, [...x, ...y, ...z]);
-  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+  const D = nrm(add(fw, scl(rt, 0.12))), U = nrm(sub(upv, scl(D, V.dot(upv, D)))), X = V.cross([0, 0, 0], U, D), Wr = [...X, ...U, ...D];
+  const Hw = r3mul(Wr, GRIPS().hero_rifle.one.R), P = add(S, scl(nrm(add(add(rt, scl(fw, 0.5)), scl(upv, 0.15))), 0.95 * L));   // the hand out at 95 % reach
+  return weaponAtHand(GRIPS().hero_rifle.one, P, Hw);
 }
 const transCutW = (tw) => smooth(SD_OUT + 0.045, SD_GUARD - 0.005, tw) * (1 - smooth(TRANS_PASS + 0.3, TRANS_PASS + 0.5, tw));   // (its held start pose IS the wind-up: raised → wound up → cut, one line)
 let _tcut = null;
@@ -1750,6 +1785,11 @@ export function heroRifleThrow(t) {
   const sp = 4 * Math.PI * e, c = Math.cos(sp), sn = Math.sin(sp);   // two full end-over-end turns about its own x (back in the hand the right way up)
   const rx = new Float32Array([1, 0, 0, 0, 0, c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1]);
   return M.mul(new Float32Array(16), m, rx);
+}
+/** the middle of his rifle at t: tumbling through the air (the throw) or in his hand */
+function rifleCentre(t) {
+  const m = heroRifleThrow(t) || duelFK(duelHero(t), 'gundam').rifle;
+  return M.transformPoint([0, 0, 0], m, [0, 0, 8]);
 }
 /** the light-ball's position at t: along the curve to the pass, then straight on */
 export function transHead(t) {
@@ -1978,11 +2018,12 @@ export const DUEL_CAMS = [
     return { pos: add(add(sub(h, scl(T, 26)), scl(e1, 8)), [0, 4, 0]), target: lrp(add(h, scl(T, 20)), P.p3, 0.6), fov: 46, handheld: 0.03, baseShake: 0.03 }; } },
   { t0: 184.93, t1: 185.25, roll: 0.05, name: 'D15d low in front of him — one big swing right to left, the full-power blade smashes the light-ball apart', slowmo: true, fn: (t, u) => { const P = transPath(), sd = nrm(V.cross([0, 0, 0], P.dirIn, [0, 1, 0]));
     return { pos: add(add(add(up(hp(t), 6), scl(P.dirIn, -30)), scl(sd, -16)), [0, -9, 0]), target: lrp(up(hp(t), 7), P.p3, 0.4), fov: 50, handheld: 0.03, baseShake: 0.04 }; } },   // high above and behind him looking down: the flat swing reads as one big arc across the frame, right to left
-  { t0: 185.2, t1: CATCH_T - 0.12, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
+  { t0: 185.2, t1: CATCH_T - 0.2, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
-  { t0: CATCH_T - 0.12, t1: CATCH_T + 0.05, roll: 0.08, name: 'D16c beside him, full figure — he flies through and snatches the rifle out of the air as it comes back in (bullet time)', slowmo: true, fn: (t, u) => {
-      const T = r3(duelFK(duelHero(CATCH_T - 0.05), 'gundam').torso), fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0])), B = up(hp(t), 6);
-      return { pos: add(add(add(B, scl(fw, 36 - 3 * u)), scl(rt, 28)), scl(upv, 7)), target: add(B, scl(rt, 5)), fov: 42, handheld: 0.04 }; } },   // out ahead of him and to his right (his body's frame, fixed): the whole figure, the arm flung out wide and the rifle dropping into it   // out to his right, his whole body in frame: he flies on through and snatches the rifle as it comes back in
+  { t0: CATCH_T - 0.2, t1: CATCH_T + 0.05, roll: 0.06, name: 'D16c on the rifle — it tumbles back in, he flies in and snatches it out of the air (bullet time)', slowmo: true, fn: (t, u) => {
+      const Rc = rifleCentre(t), v = nrm(sub(hp(CATCH_T + 0.05), hp(CATCH_T - 0.05))), T = r3(duelFK(duelHero(CATCH_T), 'gundam').torso);
+      const rt0 = scl(nrm(r3v(T, [1, 0, 0])), -1), rt = nrm(sub(rt0, scl(v, V.dot(rt0, v)))), upv = V.cross([0, 0, 0], v, rt);
+      return { pos: add(add(add(Rc, scl(v, 34)), scl(rt, 20)), scl(upv, -6)), target: add(Rc, scl(v, -4 * (1 - u))), fov: 40, handheld: 0.03 }; } },   // locked on the rifle, out ahead and to its outside: he comes in from behind it and takes it
   { t0: CATCH_T + 0.05, t1: 186.4, roll: 0.2, name: 'D16 fly-by — he tears past the lens (rifle back in hand)', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
   { t0: 186.4, t1: 187.45, roll: -0.16, name: 'D17 fly-by — it quick-boosts aside', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));
