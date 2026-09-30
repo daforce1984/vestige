@@ -17,6 +17,7 @@
 import { M, V, Q, sat, clamp, lerp, easeIn, easeOut, easeInOut, noise1, smooth, DEG } from './math.js';
 import { GC, POSES, blendPose, breathe, gundamLaunchPath } from './world.js';
 import { clipPose } from './motion.js';
+import { filmT, storyT } from './timemap.js';
 
 export const DUEL_T0 = 160, DUEL_T1 = 200;
 export const CP = [GC[0], GC[1] + 25, GC[2]];
@@ -536,43 +537,66 @@ export function ultBeams() {
   return _ult;
 }
 export const ultPoint = (b, u) => { const v = 1 - u; return add(add(scl(b.p0, v * v * v), scl(b.p1, 3 * v * v * u)), add(scl(b.p2, 3 * v * u * u), scl(b.p3, u * u * u))); };
-// ITANO CIRCUS (Macross Plus YF-21 vs X-9 as the reference): out of those 12 ports come 48 micro-missiles — each pops
-// out on its own fan line, snaps round in a hairpin at its kink point, then sweeps in big S-curves (own amplitude, phase)
-// across the gap, the swarm's smoke trails hanging behind in a web, before the whole lot closes on him and strikes at
-// the end (staggered round ULT_HIT, where he was)
+// ITANO CIRCUS (Macross Plus YF-21 vs X-9 as the reference) — a long chase: story C0–C1 is stretched to ~8.6 s of film
+// (timemap SLOW_RANGES) and everything in it runs on the CIRCUS CLOCK = film seconds since the launch, so it moves at
+// full speed on screen: he breaks away in a wide evasive run (circusOffset, back on his mark by the end), and three
+// waves of missiles pop out of its ports, hairpin, sweep after him in big S-curves and burst one after another on his
+// heels from ~2.6 s to the end
+export const CIRCUS_C0 = 190.9, CIRCUS_C1 = 191.1;
+const _cf0 = filmT(FINALE_T);
+export const circusClock = (t) => filmT(t) - _cf0;                  // film seconds since the launch
+export const circusStory = (c) => storyT(_cf0 + c);                 // … and back to story time
+export const CIRCUS_END = circusClock(CIRCUS_C1);
+const chaseK = (c) => smooth(0.3, 1.8, c) * (1 - smooth(CIRCUS_END - 1.8, CIRCUS_END - 0.15, c));
+let _chaseAx = null;
+function chaseAxes() {   // the frame his run is laid out in: along the line to it, sideways, up
+  if (_chaseAx) return _chaseAx;
+  const f = nrm(flat(sub(e2Pos(FINALE_T), heroPos0(FINALE_T)), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
+  return (_chaseAx = { f, sd });
+}
+/** his evasive run as an offset from his story position (zero at both ends) */
+export function circusOffset(t) {
+  const c = circusClock(t); if (c <= 0 || c >= CIRCUS_END) return [0, 0, 0];
+  const k = chaseK(c); if (k <= 0) return [0, 0, 0];
+  const { f, sd } = chaseAxes();
+  const x = 170 * Math.sin(0.62 * c) + 25 * Math.sin(2.3 * c + 1), y = 75 * Math.sin(0.95 * c + 0.6) + 12 * Math.sin(3.1 * c), z = -110 * Math.sin(0.41 * c) + 18 * Math.sin(1.7 * c + 2);
+  return scl(add(add(scl(sd, x), [0, y, 0]), scl(f, z)), k);
+}
 export const ULT_M = 48;
 let _sw = null;
 export function ultSwarm() {
   if (_sw) return _sw;
-  const B = ultBeams(), tgt0 = add(heroRawPos(SANDE0 + 0.03), [0, 9, 0]);
+  const B = ultBeams(), HP = (c) => add(heroRawPos(circusStory(c)), [0, 9, 0]);
+  const order = Array.from({ length: ULT_M }, (_, k) => k).sort((a, b) => hsh(a * 3.7 + 1) - hsh(b * 3.7 + 1));
   _sw = [];
   for (let k = 0; k < ULT_M; k++) {
     const b = B[k % ULT_N], h = (n) => hsh(k * 7.31 + n), d0 = nrm(sub(b.p1, b.p0));
     const side = nrm(V.cross([0, 0, 0], d0, [0, 1, 0])), upd = V.cross([0, 0, 0], side, d0);
     const d = nrm(add(d0, add(scl(side, (h(2) - 0.5) * 1.2), scl(upd, (h(3) - 0.5) * 1.0))));
-    const pk = add(b.p0, scl(d, 18 + 30 * h(1)));                                     // the kink: out of the port, then the hairpin
-    const ta = 191.16 + 0.3 * (k / (ULT_M - 1)) + 0.012 * (h(11) - 0.5);                // they strike one after another …
-    const vH = nrm(sub(heroRawPos(ta + 0.02), heroRawPos(ta - 0.02)));
-    const p3 = add(add(add(heroRawPos(ta), [0, 9, 0]), scl(vH, -(5 + 12 * h(4)))), [(h(5) - 0.5) * 12, (h(6) - 0.5) * 10, (h(17) - 0.5) * 12]);   // … each just behind him as he dives away
-    const toT = nrm(sub(p3, pk)), Dk = V.dist(pk, p3);
-    const p1 = add(pk, add(scl(d, -8 - 10 * h(15)), scl(toT, Dk * 0.2)));               // leaves the kink turned sharply back toward him
-    const p2 = add(lrp(pk, p3, 0.6), [(h(7) - 0.5) * 110, (h(8) - 0.35) * 70, (h(9) - 0.5) * 110]);
-    _sw.push({ p0: b.p0, pk, p1, p2, p3, ti: FINALE_T + 0.0015 * k + 0.015 * h(10), ta, R: 10 + 18 * h(12), turns: 1.0 + 1.5 * h(13), ph: 2 * Math.PI * h(14), uk: 0.07 + 0.04 * h(16), port: k % ULT_N });
+    const lc = 0.9 * Math.floor(k / 16) + 0.025 * (k % 16);                               // three waves
+    const sc = 2.6 + (CIRCUS_END - 2.95) * order.indexOf(k) / (ULT_M - 1);                // strikes one after another
+    const pk = add(b.p0, scl(d, 18 + 30 * h(1)));                                          // the kink: out of the port, then the hairpin
+    const vH = nrm(sub(HP(sc + 0.05), HP(sc - 0.05)));
+    const p3 = add(add(HP(sc), scl(vH, -(4 + 12 * h(4)))), [(h(5) - 0.5) * 14, (h(6) - 0.5) * 10, (h(17) - 0.5) * 14]);   // on his heels
+    const pm = HP(lc + 0.45 * (sc - lc)), p1 = add(pk, add(scl(d, -8 - 10 * h(15)), scl(nrm(sub(pm, pk)), V.dist(pk, pm) * 0.3)));
+    const p2 = add(HP(lc + 0.75 * (sc - lc)), [(h(7) - 0.5) * 120, (h(8) - 0.4) * 70, (h(9) - 0.5) * 120]);   // chasing where he goes
+    _sw.push({ p0: b.p0, pk, p1, p2, p3, lc, sc, ti: circusStory(lc), ta: circusStory(sc), R: 10 + 18 * h(12), turns: 1.2 + 2.0 * h(13), ph: 2 * Math.PI * h(14), uk: 0.05 + 0.03 * h(16), port: k % ULT_N });
   }
   return _sw;
 }
-/** a missile's position at story t (null before launch) */
-export function missilePos(m, t) {
-  if (t < m.ti) return null;
-  const u = Math.min(1, (t - m.ti) / (m.ta - m.ti));
+/** a missile's position at circus clock c (null before launch) */
+export function missilePosC(m, c) {
+  if (c < m.lc) return null;
+  const u = Math.min(1, (c - m.lc) / (m.sc - m.lc));
   if (u < m.uk) { const x = u / m.uk; return lrp(m.p0, m.pk, x * (2 - x) * 0.85 + x * 0.15); }   // popped straight out, braking into the kink
-  const w = (u - m.uk) / (1 - m.uk), ww = 1 - Math.pow(1 - w, 2.4);   // front-loaded: across the gap fast, then swarming round him
+  const w = (u - m.uk) / (1 - m.uk), ww = w * (0.6 + 0.4 * w);
   const bz = (x) => { const v = 1 - x; return add(add(scl(m.pk, v * v * v), scl(m.p1, 3 * v * v * x)), add(scl(m.p2, 3 * v * x * x), scl(m.p3, x * x * x))); };
   const P = bz(ww), T = nrm(sub(bz(Math.min(1, ww + 0.01)), bz(Math.max(0, ww - 0.01))));
   const e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0])), e2 = V.cross([0, 0, 0], T, e1);
-  const amp = m.R * Math.min(1, w * 4) * (1 - Math.pow(w, 10)), a = m.ph + 2 * Math.PI * m.turns * w;   // big sweeping S-curves that keep circling him until the strike
+  const amp = m.R * Math.min(1, w * 4) * (1 - Math.pow(w, 8)), a = m.ph + 2 * Math.PI * m.turns * w;   // big sweeping S-curves right up to the strike
   return add(P, add(scl(e1, amp * Math.cos(a)), scl(e2, amp * Math.sin(a))));
 }
+export const missilePos = (m, t) => missilePosC(m, circusClock(t));
 // Sigma's shots: 178.7 is taken on the shield; 183.25 tears the shield off; the charged 192.35 goes through its chest
 // how each shot is fired: 'hip' from the hip, 'aim' two-handed on the shoulder, 'snap' one arm thrown out, 'burst' three quick
 export const HERO_STYLE = ['hip', 'aim', 'aim', 'snap', 'burst', 'hip', 'aim', 'aim', 'aim', 'burst'];
@@ -949,11 +973,12 @@ const CIRC_AX = (() => { const a = [-4 - 60, 0, -26 - 28]; const l = Math.hypot(
 const circ = () => 0;   // (no standoff circling)
 // STRAFING at range (the gunfight): both slide sideways across the line of fire, opposite ways, while they trade shots
 const strafe = (tw, sgn) => { const k = smooth(176.4, 177.2, tw) * (1 - smooth(189.0, 189.8, tw)); return k > 0 ? scl(L1, sgn * 25 * k * Math.sin((tw - 176.4) * 1.15)) : [0, 0, 0]; };
-function heroRawPos(tw) {
+function heroPos0(tw) {
   if (tw < 170) return add(gundamLaunchPath(tw), dodgeOffset(tw));   // (the launch run: he jinks out of the ion bolt)
   const c = circ(tw);
   return add(add(add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), 0)), [CIRC_AX[0] * -6 * c, 1.2 * c, CIRC_AX[2] * -6 * c]), strafe(tw, 1));
 }
+const heroRawPos = (tw) => (tw > CIRCUS_C0 - 0.1 && tw < CIRCUS_C1 + 0.1 ? add(heroPos0(tw), circusOffset(tw)) : heroPos0(tw));   // (+ the Itano-circus run)
 function enemyRawPos(tw) {
   if (tw < SERAPH_HANDOFF) { const c = circ(tw); return add(add(add(e1Pos(tw), hover(tw, 7.1, 0)), [CIRC_AX[0] * 6 * c, -0.8 * c, CIRC_AX[2] * 6 * c]), add(transShove(tw), strafe(tw, -1))); }
   return add(add(e2Pos(tw), transShove(tw)), strafe(tw, -1));
@@ -1073,6 +1098,14 @@ function duelHero_(t) {
   // the dash: he faces where he is going (the cut sweeps sideways out of the left hand as he passes)
   const dk = smooth(191.1, SANDE0, tw) * (1 - smooth(192.35, 192.9, tw));
   if (dk > 0) f = nrm(lrp(f, D_U, dk));
+  const cc = circusClock(tw), ck = cc > 0 && cc < CIRCUS_END ? chaseK(cc) : 0;
+  if (ck > 0) {                                                      // the run: nose along his flight, banking hard into each turn
+    const va = sub(circusOffset(circusStory(cc + 0.04)), circusOffset(circusStory(cc - 0.04))), vb = sub(circusOffset(circusStory(cc + 0.12)), circusOffset(circusStory(cc + 0.04)));
+    const fv = nrm(add(va, scl(f, 1e-3))); f = nrm(lrp(f, nrm([fv[0], 0, fv[2]]), ck));
+    const turn = V.cross([0, 0, 0], nrm(va), nrm(vb))[1];
+    _pose[PIDX._body + 2] += ck * clamp(turn * 18, -1.1, 1.1) + ck * 2 * Math.PI * smooth(3.9, 4.6, cc);   // (+ one full barrel roll mid-run)
+    _pose[PIDX._body] += ck * clamp(-fv[1] * 1.2, -0.7, 0.7);
+  }
   _pose[PIDX._body + 2] += heroRoll(tw);
   s.eye = 1 + 2.2 * Math.exp(-Math.abs(tw - HERO_FLARE - 0.03) * 40) * (tw > HERO_FLARE - 0.03 ? 1 : 0);   // the eye flares once he is on it
   s.weapon = tw < HERO_GRAB ? 'back' : tw > THROW0 && tw < CATCH_T ? 'thrown' : tw < 191.22 || tw >= 200 ? 'rifle' : tw < 194.1 ? 'saber' : 'none';   // slung over the shoulder at 191.2
@@ -1081,7 +1114,7 @@ function duelHero_(t) {
   s.saberPow = s.saberL ? 2 : 1;                                     // full output against the charged shot: twice as thick
   s.sande = Math.max(sat((tw - SANDE0 + 0.05) / 0.1) * (1 - smooth(CUT_T - 0.05, CUT_T - 0.025, tw)), transGhost(tw));
   s.ghostFrom = tw < SANDE0 - 0.1 ? TRANS_PASS - 0.1 : SANDE0 - 0.02;   // afterimages (shots.js); gone for the close-up of the cut
-  s.boost = heroBoost(tw);
+  s.boost = Math.max(heroBoost(tw), ck);
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
   { if (tw >= HERO_GRAB - 0.16 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } heroLeft(s, tw); transCutIK(s, tw); }   // the rifle laid on its target, held upright
@@ -1821,17 +1854,22 @@ export const DUEL_CAMS = [
     return { pos: at(M, -60, -400, -70, T), target: pan(M, mid(t), 0.5), fov: 36, handheld: 0.04 }; } },
   { t0: 189.6, t1: 190.7, snap: 1.6, roll: 0.06, name: 'D20 CU on it — it gathers itself in, its back ports brightening', fn: (t, u) => { const e = enemyRaw_(t), fk = duelFK(e, 'enemy_ms'), C = partPoint(fk, 'torso', [0, 3, 0]), f = nrm(flat(sub(hp(189.6), ep(189.6)), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
     return { pos: add(add(add(C, scl(f, -10 + 2 * u)), scl(sd, 14 - 3 * u)), [0, 6 - u, 0]), target: add(C, [0, 1, 0]), fov: 40, handheld: 0.03, baseShake: 0.03 }; } },   // close, 3/4 from behind and above: its head and the ports on its back
-  { t0: 190.7, t1: 191.02, roll: 0.06, name: 'D21a behind and above it — the missiles burst out of its back in a fan', slowmo: true, fn: (t, u) => { const T = 190.7, E = ep(T), H = hp(T);
+  // THE ITANO CIRCUS (~8.6 s of film on the circus clock): five shots, the camera always moving with him
+  { t0: 190.7, t1: circusStory(1.0), roll: 0.06, name: 'D21a behind and above it — the first wave bursts out of its back', slowmo: true, fn: (t, u) => { const T = 190.7, E = ep(T), H = hp(T);
     return { pos: at(E, 95, 40, 55, T), target: pan(up(E, 4), lrp(E, H, 0.3), 0.3 + 0.3 * u), fov: 60, handheld: 0.05, baseShake: 0.03 }; } },
-  { t0: 191.02, t1: 191.14, roll: -0.08, name: 'D21b the ITANO CIRCUS — side-on, the swarm weaving its web of trails across the gap', slowmo: true, fn: (t, u) => { const T = 191.02, H = hp(T), E = ep(T), f = nrm(sub(E, H)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
-    const Mm = lrp(H, E, 0.45); return { pos: add(add(Mm, scl(sd, 230 - 30 * u)), [0, 50, 0]), target: add(Mm, [0, 4, 0]), fov: 56, handheld: 0.06, baseShake: 0.04 }; } },
-  { t0: 191.14, t1: 191.47, roll: 0.14, name: 'D21c on his tail — the missiles burst one after another right behind him, the camera whipping round him as he runs', slowmo: true, fn: (t, u) => {
-      const H = up(hp(t), 8), v = nrm(sub(hp(t + 0.02), hp(t - 0.02))), sd = nrm(V.cross([0, 0, 0], v, [0, 1, 0])), upv = V.cross([0, 0, 0], sd, v);
-      const a = -0.9 + 2.6 * easeInOut(u), r = 34 - 10 * Math.sin(Math.PI * u);           // swinging round from behind-left to his right flank, in close
-      const off = add(add(scl(v, -r * Math.cos(a)), scl(sd, r * Math.sin(a))), scl(upv, 9 - 6 * u));
-      return { pos: add(H, off), target: add(H, scl(v, 10)), fov: 66, handheld: 0.1, baseShake: 0.08 }; } },
-  // SANDEVISTAN: a locked-off camera well to the side of his line — he streaks across the frozen frame, afterimages behind
-  { t0: 191.47, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
+  { t0: circusStory(1.0), t1: circusStory(2.6), roll: -0.08, name: 'D21b side-on, wide — he breaks away, the swarm weaving its web after him', slowmo: true, fn: (t, u) => { const H = hp(t), E = ep(t), f = nrm(sub(E, H)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
+    return { pos: add(add(add(H, scl(sd, 95 - 20 * u)), scl(f, 25)), [0, 28, 0]), target: add(lrp(H, E, 0.15), [0, 4, 0]), fov: 60, handheld: 0.06, baseShake: 0.03 }; } },   // him in the foreground third, the swarm pouring off it behind
+  { t0: circusStory(2.6), t1: circusStory(4.6), roll: 0.14, name: 'D21c on his tail — the first strikes burst on his heels, the camera whipping round him', slowmo: true, fn: (t, u) => {
+      const H = up(hp(t), 8), v = nrm(sub(hp(t + 0.004), hp(t - 0.004))), sd = nrm(V.cross([0, 0, 0], v, [0, 1, 0])), upv = V.cross([0, 0, 0], sd, v);
+      const a = -1.1 + 2.8 * easeInOut(u), r = 36 - 10 * Math.sin(Math.PI * u);
+      return { pos: add(H, add(add(scl(v, -r * Math.cos(a)), scl(sd, r * Math.sin(a))), scl(upv, 9 - 5 * u))), target: add(H, scl(v, 10)), fov: 66, handheld: 0.1, baseShake: 0.08 }; } },
+  { t0: circusStory(4.6), t1: circusStory(6.4), roll: -0.1, name: 'D21d over his shoulder, looking back — the swarm pouring after him, trails tearing past', slowmo: true, fn: (t, u) => {
+      const H = up(hp(t), 9), v = nrm(sub(hp(t + 0.004), hp(t - 0.004))), sd = nrm(V.cross([0, 0, 0], v, [0, 1, 0]));
+      return { pos: add(add(add(H, scl(v, 16)), scl(sd, 9)), [0, 6, 0]), target: add(H, scl(v, -60)), fov: 74, handheld: 0.12, baseShake: 0.09 }; } },
+  { t0: circusStory(6.4), t1: 191.25, roll: 0.1, name: 'D21e orbiting him — the last of them bursting all round as he comes back onto his line', slowmo: true, fn: (t, u) => {
+      const H = up(hp(t), 8), a = 0.5 + 3.4 * u, r = 48 - 16 * u;
+      return { pos: add(H, [r * Math.cos(a), 14 - 8 * u, r * Math.sin(a)]), target: H, fov: 62, handheld: 0.09, baseShake: 0.07 }; } },
+  { t0: 191.25, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
     return { pos: add(add(Pm, scl(D_L, -150)), [0, 12, 0]), target: pan(Pm, up(hp(t), 2), 0.85), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },
   // the approach to the cut, from high over its shoulder, looking down across the line of the pass
   { t0: 191.95, t1: 192.015, name: 'D23a into the cut', slowmo: true, sande: true, fn: (t, u) => { const c = add(E_CUT, [0, 2, 0]);

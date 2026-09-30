@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, heroRifleThrow, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePos as ultMissilePos, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, heroRifleThrow, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -1240,7 +1240,7 @@ function shotStop(ts) {
 // out of it in every direction, bend round and home onto him, converging (in a chain of blasts) where he was
 const _ultBack = [0, 3.4, -2.0];
 function drawUlt(R, t) {
-  if (t < 189.8 || t > ULT_HIT + 1.6) return;
+  if (t < 189.8 || t > 191.9) return;
   const B = ultBeams();
   if (t < FINALE_T + 1.4) {                                     // THE CHARGE on its back, then THE LAUNCH: flash + halo + shock rings
     const e = enemyMS2(Math.min(t, FINALE_T)); const tm = e && e.vis ? duelFK(e, 'enemy_ms').torso : null;
@@ -1275,30 +1275,31 @@ function drawUlt(R, t) {
       }
     }
   }
-  const S = ultSwarm();                                           // ITANO CIRCUS: 48 missiles, each leaving a billowing smoke trail
+  const S = ultSwarm(), c = circusClock(t);                       // ITANO CIRCUS (film-second circus clock): 48 missiles, smoke trails
   for (let i = 0; i < S.length; i++) {
-    const m = S[i]; if (t < m.ti) continue;
-    const tEnd = Math.min(t, m.ta), fade = t > m.ta ? 1 - sat((t - m.ta) / 0.35) : 1;   // trails hang on after the strike, then thin away
+    const m = S[i]; if (c < m.lc) continue;
+    const cEnd = Math.min(c, m.sc), fade = c > m.sc ? 1 - sat((c - m.sc) / 1.2) : 1;   // trails hang on after the strike, then thin away
     if (fade > 0.01) {
-      const n = 60; let pa = ultMissilePos(m, tEnd);
-      for (let j = 1; j <= n; j++) {                                  // the whole path since launch: thin at the motor, swelling as it ages
-        const tj = tEnd - (tEnd - m.ti) * j / n, pb = ultMissilePos(m, tj), age = t - tj;
-        const w = 0.2 + 1.0 * sat(age / 0.28), k = 0.03 * fade * (1 - 0.75 * sat(age / 0.5)) * sat((tj - m.ti) / 0.03 + 0.15);   // (dim: 48 of them overlap, and it's additive)
-        R.beam(pb, pa, w, [0.78 * k, 0.76 * k, 1.0 * k], 1, 9, 1.0, 0.3);   // pale lavender smoke, soft-edged, billowing
-        if (j <= 2 && t < m.ta) R.beam(pb, pa, 0.15, [0.8, 0.75, 0.85], 1, 12, 0, 1);   // the fresh hot core right behind the motor
+      const c0 = Math.max(m.lc, cEnd - 2.2), n = 60; let pa = missilePosC(m, cEnd);
+      for (let j = 1; j <= n; j++) {                                  // its path over the last ≤2.2 s: thin at the motor, swelling as it ages
+        const cj = Math.max(m.lc, cEnd - (cEnd - c0) * j / n), pb = missilePosC(m, cj), age = c - cj;
+        const w = 0.2 + 1.0 * sat(age / 0.6), k = 0.03 * fade * (1 - sat(age / 2.2)) * sat((cj - m.lc) / 0.1 + 0.15);   // (dim: they overlap, additive)
+        R.beam(pb, pa, w, [0.78 * k, 0.76 * k, 1.0 * k], 1, 9, 1.0, 0.3);
+        if (j <= 2 && c < m.sc) R.beam(pb, pa, 0.15, [0.8, 0.75, 0.85], 1, 12, 0, 1);   // the fresh hot core right behind the motor
         pa = pb;
       }
     }
-    if (t < m.ta) {
-      const head = ultMissilePos(m, t);
+    if (c < m.sc) {
+      const head = missilePosC(m, c);
       R.glow(head, 0.7, [4, 2.6, 0.8], 0.3); R.glow(head, 0.25, [5, 4.5, 3], 0.2);   // the motor: a small yellow-white flame
       if (i % 8 === 0) R.light(head, 40, [1, 0.8, 0.4], 3);
-      if (t - m.ti < 0.04) { const f = 1 - (t - m.ti) / 0.04; R.glow(m.p0, 1.2 + 1.5 * f, [3 * f, 2.2 * f, 1.2 * f], 0.35); }   // the pop out of the port
-    } else if (t - m.ta < 1.2) {                                      // THE STRIKE: one after another, each a yellow fireball on his heels
-      explosion(R, t, m.ta, m.p3, 2.2 + 1.6 * hash(i + 3), 610 + i, 'small', 1.2);   // (small: 48 of them go off inside the bullet time)
-      if (t - m.ta < 0.05) { const f = 1 - (t - m.ta) / 0.05; R.glow(m.p3, 1.5 + 3 * f, [2.5 * f, 1.7 * f, 0.5 * f], 0.35); R.light(m.p3, 50, [1, 0.7, 0.3], 5 * f); }
+      if (c - m.lc < 0.12) { const f = 1 - (c - m.lc) / 0.12; R.glow(m.p0, 1.2 + 1.5 * f, [3 * f, 2.2 * f, 1.2 * f], 0.35); }   // the pop out of the port
+    } else if (c - m.sc < 2) {                                        // THE STRIKE: one after another, each a fireball on his heels
+      explosion(R, c, m.sc, m.p3, 2.6 + 1.8 * hash(i + 3), 610 + i, 'small', 1.2);
+      if (c - m.sc < 0.12) { const f = 1 - (c - m.sc) / 0.12; R.glow(m.p3, 1.5 + 3 * f, [2.5 * f, 1.7 * f, 0.5 * f], 0.35); R.light(m.p3, 50, [1, 0.7, 0.3], 5 * f); }
     }
   }
+
 
 }
 // ---- THE TRANSFORMING SHOT: two rails slide out of the rifle either side (copies of the rifle part, offset along its side
