@@ -335,7 +335,7 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the trap → the dreadnought → the ion charge (story 63–120). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the trap → the dreadnought → the ion charge (story 63–120). Generated with MiniMax Music 3 on the local ComfyUI. — removed from the film the same day (user: 메카 전투때말고는 새로깐 bgm들 다 제거해); the earlier stems restored."
  },
  {
   "id": "Z_battle",
@@ -353,7 +353,7 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the fleet battle → Sigma launches (120–163.1). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the fleet battle → Sigma launches (120–163.1). Generated with MiniMax Music 3 on the local ComfyUI. — removed from the film the same day (user: 메카 전투때말고는 새로깐 bgm들 다 제거해); the earlier stems restored."
  },
  {
   "id": "Z_lance",
@@ -371,7 +371,7 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the lance charges; its hit at 8.55 s on the shot (story 216). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the lance charges; its hit at 8.55 s on the shot (story 216). Generated with MiniMax Music 3 on the local ComfyUI. — removed from the film the same day (user: 메카 전투때말고는 새로깐 bgm들 다 제거해); the earlier stems restored."
  },
  {
   "id": "Z_dive",
@@ -389,7 +389,7 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the wound → the dive into the well (218–262). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — the wound → the dive into the well (218–262). Generated with MiniMax Music 3 on the local ComfyUI. — removed from the film the same day (user: 메카 전투때말고는 새로깐 bgm들 다 제거해); the earlier stems restored."
  },
  {
   "id": "Z_climax",
@@ -407,6 +407,6 @@
     "note": "chosen: no vocals (Whisper VAD: none); loudnorm -14 LUFS / TP -1.5 on export"
    }
   ],
-  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — from 5.08 s in at 262; its hit at 8.7 s on the ten-times saber thrust (267.42) → the core → the counterattack (to 323.07). Generated with MiniMax Music 3 on the local ComfyUI."
+  "note": "2026-09-30: the battle scores redone in Hans Zimmer style, simple but epic (user: 배경음악 hans zimmer style. simple but epic.) — from 5.08 s in at 262; its hit at 8.7 s on the ten-times saber thrust (267.42) → the core → the counterattack (to 323.07). Generated with MiniMax Music 3 on the local ComfyUI. — removed from the film the same day (user: 메카 전투때말고는 새로깐 bgm들 다 제거해); the earlier stems restored."
  }
 ]
