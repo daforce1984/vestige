@@ -411,7 +411,6 @@ export const SAMPLE_CUES = [
   [240,   'black_hole', { loop: true, dur: 38, gain: 1.1, fadeIn: 3, rate: 0.7, rateTo: 1.45, prio: 9, norand: true }],
   ...HB.map((t, i) => [t - 0.1, 'heartbeat:s' + (i % 3), { gain: 0.6 + 0.4 * i / HB.length, prio: 8, norand: true }]),
   // ---- WELL ASSAULT 262–273: berserk mech tears through the core's energy shield (no dialogue)
-  [181.0, 'braam2',    { at: 0.15, rate: 1.1, gain: 0.8, prio: 8, norand: true }],   // the zig-zag advance begins
   [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar
   [262.05,'servo',     { rate: 0.5, gain: 0.9, prio: 8, norand: true }],
   [262,   'braam',     { rate: 0.85, gain: 1, prio: 9, duck: 2, norand: true }],
