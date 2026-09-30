@@ -1,4 +1,4 @@
-"""Game-ready rifles from the Sketchfab GLBs the user supplied (assets/rifle1.glb → Sigma, assets/rifle2.glb → VANGUARD).
+"""Game-ready rifles from the Sketchfab GLBs the user supplied (assets/rifle2.glb → Sigma, assets/rifle1.glb → VANGUARD).
 Each is re-posed into its hand's rifle frame (origin at the pistol grip, scaled to the mech's fist), flattened to one
 material, and its textures packed into one atlas pair:
   assets/tex/<name>_albedo.png  RGB albedo, A = emissive mask (glows in the shader)
@@ -56,7 +56,8 @@ def emis_green(g, blob, mt, alb):   # rifle2: no emissive map — its glowing in
     a = np.asarray(alb, np.float32); gr = a[..., 1] - np.maximum(a[..., 0], a[..., 2])
     return Image.fromarray(np.clip((gr - 40) * 4, 0, 255).astype(np.uint8))
 
-# Sigma: bullpup, muzzle toward −z, top +y → rifle frame +Z barrel, +Y top (x, y, z) → (−x, y, −z); grip centre on the origin
-build('rifle1.glb', 'rifle1_game', np.array([0, -0.85, -1.23]), np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]]), 1.9, 768, emis_tex)
-# VANGUARD: muzzle toward +z, top +y → its rifle part frame (barrel −Y, top +Z): (x, y, z) → (x, −z, y)
-build('rifle2.glb', 'rifle2_game', np.array([0, 0.12, -1.6]), np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]]), 2.75, 1024, emis_green)
+# (2026-09-30: the user swapped them — Sigma carries rifle2, VANGUARD rifle1)
+# Sigma: rifle2, muzzle toward +z, top +y = already his rifle frame (+Z barrel, +Y top); grip stub on the origin
+build('rifle2.glb', 'rifle2_game', np.array([0, 0.12, -1.6]), np.eye(3), 2.75, 1024, emis_green)
+# VANGUARD: rifle1 (bullpup), muzzle toward −z, top +y → its rifle part frame (barrel −Y, top +Z): (x, y, z) → (−x, z, y)
+build('rifle1.glb', 'rifle1_game', np.array([0, -0.85, -1.23]), np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]), 1.4, 768, emis_tex)

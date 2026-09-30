@@ -15,8 +15,8 @@ const MODELS = [
   { name: 'enemy_fighter', detail: 0 }, { name: 'enemy_fighter_b', detail: 0 }, { name: 'enemy_fighter_c', detail: 0 },
   { name: 'gundam', detail: 0, keep: MS_KEEP },
   { name: 'enemy_ms', detail: 0, keep: MS_KEEP },
-  { name: 'hero_rifle', detail: 0, url: 'assets/rifle1_game.glb' },   // Sigma's rifle: assets/rifle1.glb (user-supplied) via tools/build_rifles.py
-  { name: 'enemy_rifle', detail: 0, url: 'assets/rifle2_game.glb' },  // VANGUARD's rifle: assets/rifle2.glb (user-supplied), drawn on its rifle part
+  { name: 'hero_rifle', detail: 0, url: 'assets/rifle2_game.glb' },   // Sigma's rifle: assets/rifle2.glb (user-supplied) via tools/build_rifles.py
+  { name: 'enemy_rifle', detail: 0, url: 'assets/rifle1_game.glb' },  // VANGUARD's rifle: assets/rifle1.glb (user-supplied), drawn on its rifle part
   { name: 'gravity_well', detail: 2.5, keep: ['ring', 'core', 'pylons'] },
   { name: 'hangar', detail: 0, metalize: true },
   { name: 'mace', detail: 0 },
@@ -254,7 +254,7 @@ async function boot() {
   try {
     await R.init();
     status.textContent = '모델 로딩…';
-    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
+    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
     const tris = R.modelList.reduce((s, m) => s + m.tris, 0);
     status.textContent = `준비 완료 · ${R.modelList.length} models · ${(tris / 1000).toFixed(0)}k tris`;
     $('#start .go').disabled = false; $('#duelBtn').disabled = false;
