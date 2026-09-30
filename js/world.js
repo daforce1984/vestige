@@ -467,51 +467,57 @@ const RIV = (() => {   // rivulet roots: the finger tips of the lower half, plus
   return out.map((q, i) => ({ ...q, seed: i * 3.7 + 1 }));
 })();
 const WALL_X = 64.2, WALL_BOT = -30;   // (1.6 m proud of the wall: over the armour plates)
+// ZERO-G MELT: molten metal beading up all round the torn rim and pulling away into space — no gravity, so nothing runs
+// down: each bead swells on the lip, necks out on a thinning strand that snaps (surface tension), then drifts off in a
+// straight line, wobbling round, cooling white-hot → orange → dull red. Beads leave in neighbouring pairs; in about half
+// the pairs the two drift into each other and MERGE into one bigger bead that shudders and pulls itself round again.
+const MELT_PAIRS = 110;
 function drawMolten(R, t, mm, r) {
   const T = t - LANCE_FIRE - 1.2;                          // the rim has to be molten first
   if (T <= 0) return;
-  const P = (x, y, z) => M.transformPoint([0, 0, 0], mm, [x, y, z]);
-  for (const q of RIV) {
-    const B = meltB(q.th), y0 = LANCE_HIT[1] + Math.sin(q.th) * r * B, z0 = LANCE_HIT[2] + Math.cos(q.th) * r * B / 0.62;
-    const heat = Math.max(0.25, 1 - T / 40) * q.w;          // the melt cools slowly
-    const col = (k) => [3.2 * k + 0.35, 1.3 * k * k + 0.08, 0.3 * k * k];   // white-hot → orange → dull red
-    // 1) the stream down the wall (only where there is wall below the rim)
-    let yb = y0;
-    if (y0 > WALL_BOT + 1) {
-      const L = Math.min(y0 - WALL_BOT, (2.5 + 1.5 * hash(q.seed)) * T);   // it creeps down (m/s)
-      yb = y0 - L;
-      const N = 9; let a = P(WALL_X, y0, z0);
-      const zAt = (f) => z0 + (Math.sin(f * 4.1 + q.seed) * 2.6 + Math.sin(f * 9.3 + q.seed * 2) * 0.9) * f;   // it meanders round the plates
-      // the stream as a chain of overlapping blobs (a beam sprite read as a laser line): thick and white-hot at the rim,
-      // thinning and reddening as it runs down
-      const n = Math.max(3, Math.ceil(L / 3));
-      for (let i = 1; i <= n; i++) {
-        const f = i / n, b = P(WALL_X, y0 - L * f, zAt(f));
-        R.beam(a, b, (1.6 - 0.8 * f) * (0.6 + 0.4 * q.w), col(heat * (1 - 0.55 * f)).map((c) => c * 1.25), 0.5, 2.2, 0, 0.2);   // soft, wide, orange (less white core)
-        a = b;
+  const P = (q) => M.transformPoint([0, 0, 0], mm, q);
+  const col = (k) => [3.2 * k + 0.35, 1.3 * k * k + 0.08, 0.3 * k * k];   // white-hot → orange → dull red
+  const heat0 = Math.max(0.25, 1 - T / 40);                                // the melt as a whole cools slowly
+  const lip = (th) => { const B = meltB(th); return [WALL_X + 1.2, LANCE_HIT[1] + Math.sin(th) * r * B, LANCE_HIT[2] + Math.cos(th) * r * B / 0.62]; };
+  const radOut = (th) => { const v = [0, Math.sin(th), Math.cos(th) / 0.62], l = Math.hypot(v[1], v[2]); return [0, v[1] / l, v[2] / l]; };
+  const NECK = 0.45;                                                       // s from swelling on the lip to the strand snapping
+  for (let j = 0; j < MELT_PAIRS; j++) {
+    const h = (n) => hash(j * 13.1 + n), per = 5 + 3 * h(1), cyc = Math.floor((T + per * h(2)) / per), a = (T + per * h(2)) % per;
+    const hc = (n) => hash(j * 13.1 + cyc * 7.7 + n);                    // (each cycle its own draw)
+    const th = 2 * Math.PI * (j + 0.6 * hc(3)) / MELT_PAIRS, dth = 0.03 + 0.03 * hc(4);
+    const merge = hc(5) < 0.5, tm = NECK + 0.8 + 0.9 * hc(6);
+    const base = [2.2 + 3.5 * hc(7), 0, 0].map((x, i) => x + radOut(th)[i] * (0.8 + 2.4 * hc(8)) + (i === 0 ? 0 : (hc(9 + i) - 0.5) * 0.9));
+    const bead = [0, 1].map((k) => {
+      const tk = th + (k ? dth : -dth), p0 = lip(tk), rd = 1.0 + 1.2 * hc(12 + k);
+      return { p0, rd, out: V.add([0, 0, 0], p0, V.scale([0, 0, 0], [1, 0, 0], 0.8)) };
+    });
+    const half = V.scale([0, 0, 0], V.sub([0, 0, 0], bead[1].p0, bead[0].p0), 0.5);
+    const sep = merge ? V.scale([0, 0, 0], half, 1 / (tm - NECK)) : V.scale([0, 0, 0], half, -0.35);   // closing on each other (or drifting apart)
+    const temp = Math.exp(-a / 3.2), fade = 1 - smooth(per - 1.2, per - 0.1, a), heat = heat0 * (0.35 + 0.65 * temp);
+    if (fade <= 0.01) continue;
+    const wob = (ph, amp, dec) => 1 + amp * Math.exp(-dec * ph) * Math.sin(ph * 17 + j);
+    for (let k = 0; k < 2; k++) {
+      const B = bead[k], sgn = k ? -1 : 1;
+      if (a < NECK) {                                                      // swelling on the lip, necking out on a strand
+        const g = a / NECK, pos = V.add([0, 0, 0], B.p0, V.scale([0, 0, 0], V.add([0, 0, 0], base, [0, 0, 0]), g * g * 0.5));
+        const q = P(pos), root = P(B.p0), rad = B.rd * (0.5 + 0.5 * g);
+        R.beam(root, q, rad * (0.9 - 0.65 * g), col(heat0).map((c) => c * 1.15), 0.5, 2.2, 0, 0.2);   // the strand thinning to the snap
+        R.glow(q, rad * 1.8, col(heat0 * 0.95), 0.45);
+        continue;
       }
-      for (let j = 0; j < 2; j++) {                                              // gobbets sliding down it: the flow reads
-        const f = (T * 0.35 + hash(q.seed + j * 5)) % 1;
-        if (f * (y0 - WALL_BOT) > L) continue;
-        R.glow(P(WALL_X + 0.3, y0 - (y0 - WALL_BOT) * f, zAt(f * (y0 - WALL_BOT) / Math.max(L, 1e-3))), 1.3 + 0.6 * q.w, col(heat * (1 - 0.4 * f)), 0.4);
+      const u = a - NECK, rel = V.add([0, 0, 0], B.p0, V.scale([0, 0, 0], base, 0.5));   // (where the strand snapped)
+      if (merge && a >= tm) {                                              // one bead now: the pair's volume, shuddering round
+        if (k) continue;
+        const um = a - tm, mid = V.add([0, 0, 0], V.add([0, 0, 0], rel, half), V.scale([0, 0, 0], base, um + (tm - NECK)));
+        const rm = Math.cbrt(bead[0].rd ** 3 + bead[1].rd ** 3), w = wob(um, 0.3, 2.5), ax = V.norm([0, 0, 0], half);
+        R.glow(P(mid), rm * 1.9 * w, col(heat), 0.45);
+        const st = 0.35 * rm * Math.exp(-2.5 * um) * Math.sin(um * 17 + j);  // the neck of the join still sloshing along the old axis
+        R.glow(P(V.add([0, 0, 0], mid, V.scale([0, 0, 0], ax, st))), rm * 1.2, col(heat * 0.9), 0.4);
+        R.glow(P(V.add([0, 0, 0], mid, V.scale([0, 0, 0], ax, -st))), rm * 1.2, col(heat * 0.9), 0.4);
+        continue;
       }
-      if (yb > WALL_BOT + 0.5) { R.glow(a, 1.6 + 1.0 * q.w, col(heat * 0.8), 0.5); continue; }   // still creeping down
-    }
-    // 2) off the edge: a strand hanging from the lip, its tip swelling into a glob that drops away and cools
-    const x0 = y0 > WALL_BOT + 1 ? WALL_X + 0.3 : WALL_X - 1.5 + (1 - Math.sin(-q.th)) * 1.5;   // (under the hole: the melted lip itself)
-    const zb = y0 > WALL_BOT + 1 ? z0 + Math.sin(3 + q.seed) * 0.8 : z0, ya = Math.min(yb, y0);
-    const per = 2.2 + 1.6 * hash(q.seed + 2), ph = ((T / per) + hash(q.seed + 4)) % 1;
-    const grow = Math.min(1, ph / 0.7), drop = Math.max(0, (ph - 0.7) / 0.3);
-    const len = (3 + 5 * hash(q.seed + 5)) * grow * q.w + 1;
-    const root = P(x0, ya, zb), tip = P(x0 + 0.4 * grow, ya - len, zb);
-    { const n = Math.max(2, Math.ceil(len / 0.8));                                               // the strand, necking in the middle
-      let pa = root;
-      for (let i = 1; i <= n; i++) { const f = i / n, rad = (1.1 * (1 - f) + 0.35 + 0.45 * f * f) * (0.6 + 0.4 * q.w), pb = V.lerp([0, 0, 0], root, tip, f);
-        R.beam(pa, pb, rad, col(heat * (0.9 - 0.35 * f)).map((c) => c * 1.25), 0.5, 2.2, 0, 0.2); pa = pb; } }
-    if (drop <= 0) R.glow(tip, 1.2 + 1.6 * grow * q.w, col(heat * 0.85), 0.5);                   // the glob swelling at its tip
-    else {                                                                                       // …let go: falls slowly, cools
-      const g = P(x0 + 0.6 + drop * 1.5, ya - len - drop * drop * 14 - drop * 4, zb + (hash(q.seed + 6) - 0.5) * drop * 3);
-      R.glow(g, (1.2 + 1.6 * q.w) * (1 - 0.4 * drop), col(heat * (0.85 - 0.6 * drop)), 0.5);
+      const pos = V.add([0, 0, 0], rel, V.scale([0, 0, 0], V.add([0, 0, 0], base, V.scale([0, 0, 0], sep, sgn)), u));
+      R.glow(P(pos), B.rd * 1.8 * wob(u, 0.14, 1.2) * fade, col(heat), 0.45);   // a free bead, pulling itself round as it drifts
     }
   }
 }
