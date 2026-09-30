@@ -1009,7 +1009,20 @@ function heroPos0(tw) {
   const c = circ(tw);
   return add(add(add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), 0)), [CIRC_AX[0] * -6 * c, 1.2 * c, CIRC_AX[2] * -6 * c]), strafe(tw, 1));
 }
-const heroRawPos = (tw) => (tw > CIRCUS_C0 - 0.1 && tw < CUT_T ? add(add(heroPos0(tw), circusOffset(tw)), circusResidual(tw)) : heroPos0(tw));   // (+ the Itano-circus run, and its momentum carried on into the dash)
+// THE CUT AS A CHARGE: he drives at the light-ball as it comes, fastest at the moment the blade meets it, and the
+// momentum carries him on forward, easing off; the offset then merges back into his own path over a second
+let _lungeDir = null;
+function transLunge(tw) {
+  const a = 184.72, p = TRANS_PASS, b = 185.35, c = 186.4; if (tw <= a || tw >= c) return [0, 0, 0];
+  if (!_lungeDir) _lungeDir = nrm(flat(sub(e2Pos(TRANS_SHOT), heroPos0(TRANS_PASS)), 0));
+  const D1 = 12, vp = 2 * D1 / (p - a), T = b - p;                   // accelerating in (D1 by the pass), then coasting to a stop
+  let x;
+  if (tw < p) { const u = (tw - a) / (p - a); x = D1 * u * u; }
+  else if (tw < b) { const q = tw - p; x = D1 + vp * q * (1 - q / (2 * T)); }
+  else x = (D1 + vp * T / 2) * (1 - smooth(b, c, tw));
+  return scl(_lungeDir, x);
+}
+const heroRawPos = (tw) => add(tw > CIRCUS_C0 - 0.1 && tw < CUT_T ? add(add(heroPos0(tw), circusOffset(tw)), circusResidual(tw)) : heroPos0(tw), transLunge(tw));   // (+ the Itano-circus run, and its momentum carried on into the dash)
 function enemyRawPos(tw) {
   if (tw < SERAPH_HANDOFF) { const c = circ(tw); return add(add(add(e1Pos(tw), hover(tw, 7.1, 0)), [CIRC_AX[0] * 6 * c, -0.8 * c, CIRC_AX[2] * 6 * c]), add(transShove(tw), strafe(tw, -1))); }
   return add(add(e2Pos(tw), transShove(tw)), strafe(tw, -1));
@@ -2076,7 +2089,8 @@ export const DUEL_CAMS = [
   { t0: 184.8, t1: 184.93, name: 'D15c behind the light-ball — it bores in at his cockpit (slow motion)', slowmo: true, fn: (t, u) => { const P = transPath(), h = transHead(t), T = nrm(sub(transHead(t + 0.01), h)), e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0]));
     return { pos: add(add(sub(h, scl(T, 26)), scl(e1, 8)), [0, 4, 0]), target: lrp(add(h, scl(T, 20)), P.p3, 0.6), fov: 46, handheld: 0.03, baseShake: 0.03 }; } },
   { t0: 184.93, t1: 185.25, roll: 0.05, name: 'D15d low in front of him — one big swing right to left, the full-power blade smashes the light-ball apart', slowmo: true, fn: (t, u) => { const P = transPath(), sd = nrm(V.cross([0, 0, 0], P.dirIn, [0, 1, 0]));
-    return { pos: add(add(add(up(hp(t), 6), scl(P.dirIn, -30)), scl(sd, -16)), [0, -9, 0]), target: lrp(up(hp(t), 7), P.p3, 0.4), fov: 50, handheld: 0.03, baseShake: 0.04 }; } },   // high above and behind him looking down: the flat swing reads as one big arc across the frame, right to left
+    const H0 = hp(184.93);   // (the camera holds its place: he charges in at the ball — and at the lens — and carries on through)
+    return { pos: add(add(add(up(H0, 6), scl(P.dirIn, -44)), scl(sd, -16)), [0, -9, 0]), target: lrp(up(hp(t), 7), P.p3, 0.4), fov: 50, handheld: 0.03, baseShake: 0.04 }; } },   // high above and behind him looking down: the flat swing reads as one big arc across the frame, right to left
   { t0: 185.2, t1: CATCH_T - 0.2, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
   { t0: CATCH_T - 0.2, t1: CATCH_T + 0.05, roll: 0.06, name: 'D16c on the rifle — it tumbles back in, he flies in and snatches it out of the air (bullet time)', slowmo: true, fn: (t, u) => {

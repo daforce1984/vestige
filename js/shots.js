@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { RIFLE_T, RIFLE_Q, ENEMY_HOLE, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { RIFLE_T, RIFLE_Q, ENEMY_HOLE, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, filmT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -691,6 +691,7 @@ function moltenBurst(R, p, n, lt, seed, count = 40, spread = 0.8, speed = 40, li
   }
 }
 // the wound (a HOLES entry) in world space at time tt: its point and outward axis, from the duel FK (= the renderer's frames)
+const inCatchCut = (t) => t > CATCH_T - 0.21 && t < CATCH_T + 0.06;   // scene 53 (D16c): the catch reads clean — no sparks or embers in it
 function woundAt(who, h, tt) {
   const s = who === 'hero' ? duelHero(tt) : duelEnemy2(tt) || duelEnemy1(tt); if (!s) return null;
   const fk = duelFK(s, who === 'hero' ? 'gundam' : 'enemy_ms'), pm = fk[h.part]; if (!pm) return null;
@@ -713,6 +714,7 @@ function meltHole(e, who, t, part) {
   R.light(p, 25, [1, 0.5, 0.2], 1.5 + 5 * Math.exp(-lt * 6));
   // (the glow rides with the part; what flies OUT of the wound doesn't: each spark / ember leaves from where the wound
   // was when it was thrown and carries on through space on its own — it no longer travels along with the machine)
+  if (inCatchCut(t)) return;                                                     // (scene 53, the rifle catch: nothing flying round him)
   const w0 = woundAt(who, h, h.t);
   sparkBurst(R, w0 ? w0.p : p, w0 ? w0.n : n, lt, 31 + h.t, 60, 0.9, 55, 0.7, [5, 2.6, 0.9]);
   for (let i = 0; i < 10; i++) {                                                   // embers still spitting out of the melt
@@ -1542,15 +1544,8 @@ function drawTransShot(R, t) {
   if (lc >= 0 && lc < 1.4) {                                           // shock ring, its light scattering off the blade and dying out
     const P = transHead(TRANS_PASS), ax = transCutAxis(), f = Math.exp(-lc * 9), dirIn = transPath().dirIn;
     R.glow(P, 1 + 3 * f, [3.5 * f, 2 * f, 3 * f], 0.3); R.light(P, 70, [1, 0.5, 0.8], 5 * f);
-    if (lc < 0.5) R.ripple(P, 3 + 35 * easeOut(lc / 0.5), [0.5, 0.4, 0.5], (1 - lc / 0.5) * 1.3);
-    const back = V.scale([0, 0, 0], dirIn, -1);
-    for (let i = 0; i < 90; i++) {                                     // the ball's energy thrown off in glowing motes
-      const L = 0.5 + 0.8 * hash(i + 1300); if (lc > L) continue;
-      const d = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 2.9 + 31), ax, (hash(i + 1301) - 0.5) * 3), back, 0.6));
-      const q = madd(P, d, (8 + 40 * hash(i + 1302)) * easeOut(sat(lc / L))), k = (1 - lc / L) * (1 - lc / L);
-      R.glow(q, 0.25 + 0.5 * hash(i + 1303), [3 * k, 0.8 * k, 1.8 * k], 0.25);
-    }
-    sparkBurst(R, P, back, lc, 921, 250, 1.8, 60, 0.7, [3.5, 1.5, 2.4]);
+    const back = V.scale([0, 0, 0], dirIn, -1);   // (no halo ring and no round motes any more: a short flash and the spark streaks)
+    if (!inCatchCut(t)) sparkBurst(R, P, back, lc, 921, 250, 1.8, 60, 0.7, [3.5, 1.5, 2.4]);
   }
 }
 function drawSeraphFire(R, t) {
@@ -2180,7 +2175,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   c.env.shadowCenter = k.focus; c.env.shadowRadius = k.shadowRadius;
   c.post.shakeBlur = k.blur;                                   // (no whole-screen flash on duel contacts: it read as flicker)
   if (c.t >= 170 && c.t < 176.4) { c.post.motionBlur = 0; c.post.shakeBlur = 0; }   // the draw + load: crisp, no motion blur
-  if (k.name.startsWith('D21')) { c.post.motionBlur = 0; c.post.shakeBlur = 0; }   // the Itano-circus one take: crisp, no motion blur
+  if (k.name.startsWith('D21') || k.name.startsWith('D16c')) { c.post.motionBlur = 0; c.post.shakeBlur = 0; }   // the Itano-circus one take and the rifle catch: crisp, no motion blur   // the Itano-circus one take: crisp, no motion blur
   if (k.name.startsWith('D12')) c.post.distort = 0;           // scene 45 (the dive): no screen distortion
                                    // (the strong fill + rim were for the mechs, which no longer take either — on the
   c.post.lensA = { enable: 0 };   // distant ships they only washed the hulls out white)   the well is far away: no background lensing (it smeared the planet into grey)
