@@ -707,7 +707,11 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     var ta = select(tA2, tA1, texSet == 1); var tm = select(tM2, tM1, texSet == 1);
     if (texSet == 3) { ta = tA3; tm = tM3; } else if (texSet == 4) { ta = tA4; tm = tM4; } else if (texSet == 5) { ta = tA5; tm = tM5; } else if (texSet == 6) { ta = tA6; tm = tM6; } else if (texSet == 7) { ta = tA7; tm = tM7; }
     base = pow(ta.rgb, vec3f(2.2)); texAO = tm.r; rough = tm.g; metal = tm.b;
-    if (texSet >= 3) { texGlow = pow(ta.rgb, vec3f(2.2)) * ta.a * 14.0; }   // the rifles' emissive inlays, bright
+    if (texSet >= 3) { texGlow = pow(ta.rgb, vec3f(2.2)) * ta.a * select(14.0, 3.0, texSet == 7) * inst.p1.z; }   // the emissive inlays, bright (the dreadnought's toned down; all follow the entry's emissive, 0 once it is wrecked)
+    if (texSet == 7) {   // the dreadnought in ONE colour: steel grey, only the texture's light/dark left in it (the panel detail stays)
+      let lum = dot(pow(ta.rgb, vec3f(2.2)), vec3f(0.2126, 0.7152, 0.0722));
+      base = vec3f(0.16, 0.165, 0.175) * (0.45 + 1.4 * sqrt(lum));
+    }
     if (texSet == 1) {                                   // Sigma: matte paint, and the chipped bare metal is scuffed, not a mirror
       rough = max(rough, mix(0.72, 0.5, metal));
       metal = metal * 0.75;

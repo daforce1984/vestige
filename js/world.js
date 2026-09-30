@@ -896,11 +896,12 @@ function drawDreadnought(R, t, tmpM) {
     }
   }
   if (t > DREAD_DIE + 0.4) {
-    if (t < EARTH_T) shatter(R, 'enemy_dreadnought', mat(M.new(), dreadPos(DREAD_DIE), [0, 0, 1]), t, DREAD_DIE, 77, [3, 3, 4], 0.7, { tint: [3, 1, 0.3] });
+    if (t < EARTH_T) shatter(R, 'enemy_dreadnought', mat(M.new(), dreadPos(DREAD_DIE), [0, 0, 1]), t, DREAD_DIE, 77, [3, 3, 4], 0.7, { tint: [3, 1, 0.3], noGlow: true });   // (its lights are dead once it goes up)
     return;
   }
   const e = R.add('enemy_dreadnought', mat(tmpM, hin.u < 1 ? hin.pos : pos, fwd));
   e.seed = 40; e.rimK = 0.3;                                      // its huge silhouette read as a glowing outline from afar
+  e.emissive = 1 - smooth(DREAD_DIE, DREAD_DIE + 0.25, t);          // its lights die as it goes up
   if (hin.u < 1) { e.revealZ = hin.revealZ; e.revealDir = hin.dir; e.revealWidth = 4; e.tint = [2.5, 0.3, 0.2]; e.stretch = stretchIn(hin.u); }
   // the gravity-lance firing system (tools/make_dread_lance.py, blueprint blender/DREAD_LANCE_BLUEPRINT.svg)
   const ln = null;   // (the old separate lance hardware is gone: the Aquamarine carries its own twin-prong bow cannon)

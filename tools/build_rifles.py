@@ -88,5 +88,6 @@ build('light_fighter.glb', 'light_fighter_game', np.array([0, 1.4, 0]), np.eye(3
 # plane (lambert1) dropped, centred and ×2.53 to the old hull's length (x1.65 more in the scene), seven texture sets in a
 # 3×3 wrapped atlas (its UVs tile), engine discs on its eight rear nozzles, lance_emitter at the bow cannon's muzzle
 _N = [(x, 16.9, -56.75, r) for (x, r) in [(10.6, 2.9), (16.0, 2.4), (20.1, 1.8), (23.6, 1.4)] for x in (x, -x)]
-build('space_battleship_aquamarine.glb', 'dreadnought_game', np.array([0, 18.6, 17.6]), np.eye(3), 2.53, 768, emis_tex,
+# (source: blender/decimate_glb.py on assets/space_battleship_aquamarine.glb at 0.45 → assets/src/aquamarine_dec.glb, 113k → 51k triangles)
+build('src/aquamarine_dec.glb', 'dreadnought_game', np.array([0, 18.6, 17.6]), np.eye(3), 2.53, 768, emis_tex,
       engines=[(x, y, z, r) for (x, y, z, r) in _N], wrap=True, skip=('lambert1',), empties={'lance_emitter': (0, 11.25, 103.6)})

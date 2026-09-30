@@ -420,6 +420,7 @@ export function shatter(R, name, base, t, t0, seed, grid = [2, 2, 3], speed = 1,
     if (opts.pose) { e.pose = opts.pose; }
     if (opts.hidden) e.hidden = opts.hidden;
     if (opts.texSet) e.texSet = opts.texSet;
+    if (opts.noGlow) e.emissive = 0;                                    // (a wreck: no lights at all)
     if (opts.noFire) continue;
     // venting fire at each chunk centre for a few seconds
     if (lt < 6 && hash(s + 7) > 0.8) {

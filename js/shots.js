@@ -2678,13 +2678,15 @@ shot(358, 393.5, 'S23 title', (c) => {
   c.env.stars = 0.6 + k2 * 0.3;
   // the sun comes up over Earth's limb: eased round from F2's sun onto the sunrise point while the camera is on the fleet
   // and the limb, its disc up for the rise (the camera passes straight through it) and gone as we turn to the title
+  // (only the DISC moves onto the sunrise point: the light and the atmosphere keep F2's sun, so Earth's limb stays blue)
   const sk = smooth(360.5, 365.5, t);
-  c.env.sunDir = V.norm([0, 0, 0], V.lerp([0, 0, 0], SUN_HOME, S, sk));
+  c.env.sunDir = SUN_HOME;
+  c.env.sunDiscDir = V.norm([0, 0, 0], V.lerp([0, 0, 0], SUN_HOME, S, sk));
   c.env.sunDisc = Math.max(1 - smooth(359, 362, t), sk) * (1 - smooth(369.6, 371.6, t));
   c.post.exposure = lerp(0.9, 0.75, smooth(362, 366.5, t));             // (a hard 0.9 -> 0.75 at 358 read as a lighting jump)
   c.post.fade = 1 - smooth(391.5, 393.3, t);
-  { const vis = sat((V.dot(dir, c.env.sunDir) - 0.82) / 0.16) * c.env.sunDisc;   // lens flare while the sun is in frame
-    c.post.flare = vis > 0.001 ? { pos: madd(pos, c.env.sunDir, 150000), intensity: 1.3 * vis } : null; }
+  { const vis = sat((V.dot(dir, c.env.sunDiscDir) - 0.82) / 0.16) * c.env.sunDisc;   // lens flare while the sun is in frame
+    c.post.flare = vis > 0.001 ? { pos: madd(pos, c.env.sunDiscDir, 150000), intensity: 1.3 * vis } : null; }
   c.post.streak = lerp(0.22, 0, smooth(362, 366.5, t));             // continuous with F2's default at the cut
   // (no god rays here: marched over bloom while the camera swings they left a hard-edged ghost disc round the sun)
   c.env.shadowCenter = motherPoint([0, 0, 0], 358, [0, 0, 0]); c.env.shadowRadius = 600;

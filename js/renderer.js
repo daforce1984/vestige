@@ -694,7 +694,8 @@ export class Renderer {
     }
     if ((env.sunDisc ?? 0) > 0.01) {
       const D = 300000, o = this.celN++ * 8;
-      cd[o] = cam.pos[0] + sd[0] * D; cd[o + 1] = cam.pos[1] + sd[1] * D; cd[o + 2] = cam.pos[2] + sd[2] * D; cd[o + 3] = D * 0.011;   // a big sun
+      const dd = env.sunDiscDir || sd;                               // (the disc can sit apart from the light: sunDiscDir)
+      cd[o] = cam.pos[0] + dd[0] * D; cd[o + 1] = cam.pos[1] + dd[1] * D; cd[o + 2] = cam.pos[2] + dd[2] * D; cd[o + 3] = D * 0.011;   // a big sun
       cd[o + 4] = 3; cd[o + 5] = 0; cd[o + 6] = 0; cd[o + 7] = 0;
     }
     if (env.sun2Dir && env.sun2Col && (env.sun2Disc ?? env.sunDisc ?? 1) > 0.01) {   // the second sun, a little smaller
