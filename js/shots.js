@@ -690,6 +690,12 @@ function moltenBurst(R, p, n, lt, seed, count = 40, spread = 0.8, speed = 40, li
     molten(R, madd(p, d, v * lt), lt / L, 6 + 14 * hash(seed + i + 90));
   }
 }
+// the wound (a HOLES entry) in world space at time tt: its point and outward axis, from the duel FK (= the renderer's frames)
+function woundAt(who, h, tt) {
+  const s = who === 'hero' ? duelHero(tt) : duelEnemy2(tt) || duelEnemy1(tt); if (!s) return null;
+  const fk = duelFK(s, who === 'hero' ? 'gundam' : 'enemy_ms'), pm = fk[h.part]; if (!pm) return null;
+  return { p: M.transformPoint([0, 0, 0], pm, h.local), n: V.norm([0, 0, 0], M.transformDir([0, 0, 0], pm, [1, 0, 0])) };
+}
 function meltHole(e, who, t, part) {
   let h = null;
   for (const x of HOLES) if (x.who === who && t >= x.t && (!part || x.part === part) && (!h || x.t > h.t)) h = x;
@@ -705,10 +711,14 @@ function meltHole(e, who, t, part) {
   if (lt < 0.12) { const f = 1 - lt / 0.12; R.glow(p, 1.5 + 5 * f, [4 * f, 2.6 * f, 1.4 * f], 0.3); }
   R.glow(p, h.r * (1.2 + 0.8 * hk), [2.6 * hk + 0.25, 0.9 * hk + 0.05, 0.25 * hk], 0.25);
   R.light(p, 25, [1, 0.5, 0.2], 1.5 + 5 * Math.exp(-lt * 6));
-  sparkBurst(R, p, n, lt, 31 + h.t, 60, 0.9, 55, 0.7, [5, 2.6, 0.9]);
+  // (the glow rides with the part; what flies OUT of the wound doesn't: each spark / ember leaves from where the wound
+  // was when it was thrown and carries on through space on its own — it no longer travels along with the machine)
+  const w0 = woundAt(who, h, h.t);
+  sparkBurst(R, w0 ? w0.p : p, w0 ? w0.n : n, lt, 31 + h.t, 60, 0.9, 55, 0.7, [5, 2.6, 0.9]);
   for (let i = 0; i < 10; i++) {                                                   // embers still spitting out of the melt
     const L = 0.35 + 0.3 * hash(i + 90), ph = ((lt / L) + hash(i + 7)) % 1, cyc = Math.floor(lt / L + hash(i + 7));
-    const d = V.norm([0, 0, 0], V.madd([0, 0, 0], n, randDir([0, 0, 0], i * 2.3 + cyc * 0.71), 0.9)), q = madd(p, d, ph * 9), b = hk * 2.5 * (1 - ph);
+    const wb = woundAt(who, h, t - ph * L) || { p, n };                             // the wound when this one was spat out
+    const d = V.norm([0, 0, 0], V.madd([0, 0, 0], wb.n, randDir([0, 0, 0], i * 2.3 + cyc * 0.71), 0.9)), q = madd(wb.p, d, ph * 9), b = hk * 2.5 * (1 - ph);
     if (b > 0.03) streak(R, madd(q, d, -0.6), q, [b * 1.6, b * 0.7, b * 0.2]);
   }
 }
