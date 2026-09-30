@@ -2653,10 +2653,16 @@ shot(358, 393.5, 'S23 title', (c) => {
   camLook(c, pos, madd(pos, dir, 1000), lerp(q.fov, 34, k0), lerp(0.04, 0.12, k0) - k2 * 0.08);
   c.world = t < 369;                                          // the fleet stays until the camera has risen well past it (no pop)
   c.env.planet = { dir: PLANET, radius: PL_R, col: [0.3, 0.5, 1.0], earth: true };
-  c.env.stars = 0.6 + k2 * 0.3; c.env.sunDisc = 1 - smooth(359, 362, t);   // continuous with F2 at the cut, fades as we turn away
+  c.env.stars = 0.6 + k2 * 0.3;
+  // the sun comes up over Earth's limb: eased round from F2's sun onto the sunrise point while the camera is on the fleet
+  // and the limb, its disc up for the rise (the camera passes straight through it) and gone as we turn to the title
+  const sk = smooth(360.5, 365.5, t);
+  c.env.sunDir = V.norm([0, 0, 0], V.lerp([0, 0, 0], SUN_HOME, S, sk));
+  c.env.sunDisc = Math.max(1 - smooth(359, 362, t), sk) * (1 - smooth(369.6, 371.6, t));
   c.post.exposure = lerp(0.9, 0.75, smooth(362, 366.5, t));             // (a hard 0.9 -> 0.75 at 358 read as a lighting jump)
   c.post.fade = 1 - smooth(391.5, 393.3, t);
-  // (no sun flare here: with the disc already faded it burst out of Earth's limb as a white glow with nothing behind it)
+  { const vis = sat((V.dot(dir, c.env.sunDir) - 0.82) / 0.16) * c.env.sunDisc;   // lens flare while the sun is in frame
+    c.post.flare = vis > 0.001 ? { pos: madd(pos, c.env.sunDir, 150000), intensity: 1.3 * vis } : null; }
   c.post.streak = lerp(0.22, 0, smooth(362, 366.5, t));             // continuous with F2's default at the cut
   // (no god rays here: marched over bloom while the camera swings they left a hard-edged ghost disc round the sun)
   c.env.shadowCenter = motherPoint([0, 0, 0], 358, [0, 0, 0]); c.env.shadowRadius = 600;
