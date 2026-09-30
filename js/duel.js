@@ -549,19 +549,21 @@ export const circusStory = (c) => storyT(_cf0 + c);                 // … and b
 export const CIRCUS_END = circusClock(CIRCUS_C1);
 const chaseK = (c) => smooth(0.3, 1.8, c) * (1 - smooth(CIRCUS_END - 1.8, CIRCUS_END - 0.15, c));
 let _chaseAx = null;
-function chaseAxes() {   // the frame his run is laid out in: along the line to it, sideways, up
+function chaseAxes() {   // the frame his run is laid out in: along the line to it, sideways, up — and run = the one take's screen-left
   if (_chaseAx) return _chaseAx;
   const f = nrm(flat(sub(e2Pos(FINALE_T), heroPos0(FINALE_T)), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
-  return (_chaseAx = { f, sd });
+  const camOff = add(add(scl(sd, -140), scl(f, 170)), [0, 330, 0]), F = nrm(scl(camOff, -1)), Rt = nrm(V.cross([0, 0, 0], F, [0, 1, 0]));
+  const run = nrm(flat(scl(Rt, -1), 0));
+  return (_chaseAx = { f, sd, camOff, run });
 }
 /** his evasive run as an offset from his story position (zero at both ends) */
 export function circusOffset(t) {
   const c = circusClock(t); if (c <= 0 || c >= CIRCUS_END) return [0, 0, 0];
-  const { f, sd } = chaseAxes();
+  const { f, run: sd } = chaseAxes();   // (runs toward the one take's screen-left)
   // ONE WAY: he breaks off to his side and keeps running that way, accelerating (~520 m out by the end), a slow rise and
   // fall on it and small jinks; the one take ends on him out there and the cut (D22) hides his return to his mark
   const g = Math.pow(sat((c - 0.35) / (CIRCUS_END - 0.35)), 1.3), jk = smooth(0.35, 1.2, c);
-  const x = 520 * g + 10 * Math.sin(2.6 * c) * jk, y = 90 * Math.sin(Math.PI * g) + 7 * Math.sin(3.3 * c + 1) * jk, z = -80 * g;
+  const x = 520 * g + 10 * Math.sin(2.6 * c) * jk, y = 90 * Math.sin(Math.PI * g) + 7 * Math.sin(3.3 * c + 1) * jk, z = 0;
   return add(add(scl(sd, x), [0, y, 0]), scl(f, z));
 }
 export const ULT_M = 480;   // (ten times the first cut: a sky full of them)
@@ -579,7 +581,7 @@ export function ultSwarm() {
     const sc = lc + 1.25 + 0.5 * h(18);                                                   // … each on him ~1.5 s later (strikes evenly spread)
     const pk = add(b.p0, scl(d, 18 + 30 * h(1)));                                          // the kink: out of the port, then the hairpin
     const { sd: sdC } = chaseAxes(), sgn = h(5) < 0.5 ? -1 : 1;
-    const hit = k % 12 === 0, off = hit ? [(h(5) - 0.5) * 10, (h(6) - 0.5) * 8, (h(17) - 0.5) * 10] : add(scl(sdC, sgn * (150 + 150 * h(19))), [0, (h(6) - 0.5) * 220, 0]);   // misses: way off to the side, out of the long lens
+    const hit = k % 4 === 0, off = hit ? [(h(5) - 0.5) * 10, (h(6) - 0.5) * 8, (h(17) - 0.5) * 10] : add(scl(sdC, sgn * (150 + 150 * h(19))), [0, (h(6) - 0.5) * 220, 0]);   // misses: way off to the side, out of the long lens
     const p3 = add(HP(sc - (0.06 + 0.22 * h(4))), off);   // a hit: a beat too late, into the air he's only just left; a miss: well wide of him (out of the long lens)
     const pm = HP(lc + 0.45 * (sc - lc)), p1 = add(pk, add(scl(d, -8 - 10 * h(15)), scl(nrm(sub(pm, pk)), V.dist(pk, pm) * 0.3)));
     const p2 = add(add(HP(lc + 0.75 * (sc - lc)), [(h(7) - 0.5) * 120, (h(8) - 0.4) * 70, (h(9) - 0.5) * 120]), hit ? [0, 0, 0] : scl(off, 0.9));   // chasing where he goes (a miss: its whole run well wide)
@@ -601,7 +603,7 @@ export function missilePosC(m, c) {
   const e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0])), e2 = V.cross([0, 0, 0], T, e1);
   const env = smooth(0, 0.25, u) * (1 - Math.pow(u, 6));
   const a = m.ph + 2 * Math.PI * m.turns * u;                                          // big sweeping S-curves …
-  const jA = 11 * smooth(0.45, 0.7, u) * Math.sqrt(Math.max(0, 1 - u)) * 1.8, fq = 2 + 1.5 * hsh(m.ph * 3.1);   // … and, closing in, quick smooth weaving to home on him
+  const jA = 7 * smooth(0.45, 0.7, u) * Math.sqrt(Math.max(0, 1 - u)) * 1.8, fq = 0.9 + 0.7 * hsh(m.ph * 3.1);   // … and, closing in, a slow smooth weave onto him (soft arcs)
   const jx = jA * Math.sin(2 * Math.PI * fq * c + m.ph), jy = jA * 0.8 * Math.sin(2 * Math.PI * fq * 1.31 * c + m.ph * 1.7);
   return add(P, add(scl(e1, m.R * env * Math.cos(a) + jx), scl(e2, m.R * env * Math.sin(a) + jy)));
 }
@@ -1927,8 +1929,8 @@ export const DUEL_CAMS = [
   { t0: 190.7, t1: CIRCUS_C1, name: 'D21 the Itano circus, one take — long lens from far off, tracking him through the swarm', slowmo: true, fn: (t, u) => {
       const c = circusClock(t), H0 = hp(190.9), E0 = ep(190.9), f = nrm(flat(sub(E0, H0), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
       const H = up(hp(t), 8), Hl = up(hp(circusStory(Math.max(0, c - 0.18))), 8);
-      const pos = add(add(add(add(H0, scl(sd, -140)), scl(f, 170)), [0, 330, 0]), scl(sub(H, H0), 0.5));   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
-      const onHim = smooth(0.4, 1.2, c), tgt = lrp(up(E0, 6), lrp(Hl, H, 0.6), onHim);
+      const pos = add(add(H0, chaseAxes().camOff), scl(sub(H, H0), 0.3));   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
+      const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(0.4, 1.2, c), tgt = lrp(up(E0, 6), add(lrp(Hl, H, 0.6), scl(vRun, 9 * smooth(1.2, 2.2, c))), onHim);   // (leading him: room ahead on the left)
       const fov = lerp(30, 4.5, smooth(0.5, 1.6, c)) + 0.5 * Math.sin(c * 0.9) * smooth(2, 3, c);
       return { pos, target: tgt, fov, handheld: 0.05, baseShake: 0.02 }; } },
   { t0: CIRCUS_C1, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);

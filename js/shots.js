@@ -1296,13 +1296,13 @@ const _ultBack = [0, 3.4, -2.0];
 // (hundreds of these go off in the circus; the generic explosion()'s blown-out centre stacked into a white wall)
 function missileBurst(R, lt, p, size, seed, lit) {
   if (lt < 0 || lt > 0.8) return;
-  if (lt < 0.07) { const f = 1 - lt / 0.07; R.glow(p, size * (0.3 + 0.3 * f), [2 * f, 1.7 * f, 1.2 * f], 0.25); }
+  if (lt < 0.07) { const f = 1 - lt / 0.07; R.glow(p, size * (0.3 + 0.3 * f), [2.2 * f, 1.2 * f, 2 * f], 0.25); }
   for (let j = 0; j < 3; j++) {
     const d0 = j * 0.04, life = 0.5 + 0.25 * hash(seed + j * 3.1), a = (lt - d0) / life; if (a < 0 || a > 1) continue;
     const q = madd(p, randDir([0, 0, 0], seed * 7.7 + j * 2.3), size * 0.35 * j * (0.4 + 0.6 * a));
-    R.fireball(q, size * (0.3 + 0.55 * easeOut(Math.min(1, a * 1.6))) * (j ? 0.7 : 1), a, hash(seed + j) * 50 + j, [1, 1, 1], j ? 0.45 : 0.6);
+    R.fireball(q, size * (0.3 + 0.55 * easeOut(Math.min(1, a * 1.6))) * (j ? 0.7 : 1), a, hash(seed + j) * 50 + j, [1, 0.5, 0.85], j ? 0.45 : 0.6);   // (pink-tinted: an energy round going off)
   }
-  if (lit && lt < 0.3) R.light(p, size * 10, [1, 0.6, 0.25], 6 * (1 - lt / 0.3));
+  if (lit && lt < 0.3) R.light(p, size * 10, [1, 0.4, 0.75], 6 * (1 - lt / 0.3));
 }
 function drawUlt(R, t) {
   if (t < 189.8 || t > 191.9) return;
@@ -1343,22 +1343,22 @@ function drawUlt(R, t) {
   const S = ultSwarm(), c = circusClock(t);                       // ITANO CIRCUS (film-second circus clock): 48 missiles, smoke trails
   for (let i = 0; i < S.length; i++) {
     const m = S[i]; if (c < m.lc) continue;
-    const life = m.hit ? m.sc : m.sc + 0.6, cEnd = Math.min(c, life), fade = c > life ? 1 - sat((c - life) / 1.2) : 1;   // trails hang on after the strike (or the miss flying off), then thin away
+    const life = m.hit ? m.sc : m.sc + 0.6, cEnd = Math.min(c, life), fade = c > life ? 1 - sat((c - life) / 0.3) : 1;   // trails hang on after the strike (or the miss flying off), then thin away
     if (fade > 0.01) {
-      const c0 = Math.max(m.lc, cEnd - 1.2), n = 40; let pa = missilePosC(m, cEnd);
-      for (let j = 1; j <= n; j++) {                                  // its path over the last ≤2.2 s: thin at the motor, swelling as it ages
+      const c0 = Math.max(m.lc, cEnd - 0.35), n = 24; let pa = missilePosC(m, cEnd);   // (short trails: gone in a third of a second)
+      for (let j = 1; j <= n; j++) {                                  // its path over the last 0.35 s: thin at the head, swelling as it fades
         const cj = Math.max(m.lc, cEnd - (cEnd - c0) * j / n), pb = missilePosC(m, cj), age = c - cj;
-        const w = 0.2 + 1.0 * sat(age / 0.6), k = 0.01 * fade * (1 - sat(age / 1.2)) * sat((cj - m.lc) / 0.1 + 0.15);   // (dim: they overlap, additive)
-        R.beam(pb, pa, w, [0.78 * k, 0.76 * k, 1.0 * k], 1, 9, 1.0, 0.3);
-        if (j <= 2 && c < m.sc) R.beam(pb, pa, 0.15, [0.8, 0.75, 0.85], 1, 12, 0, 1);   // the fresh hot core right behind the motor
+        const w = 0.2 + 0.7 * sat(age / 0.3), k = 0.02 * fade * (1 - sat(age / 0.35)) * sat((cj - m.lc) / 0.1 + 0.15);   // (dim: they overlap, additive)
+        R.beam(pb, pa, w, [1.1 * k, 0.25 * k, 0.75 * k], 1, 9, 1.0, 0.3);   // pink: they are energy rounds
+        if (j <= 2 && c < m.sc) R.beam(pb, pa, 0.15, [1.0, 0.55, 0.9], 1, 12, 0, 1);   // the hot pink core right behind the head
         pa = pb;
       }
     }
     if (c < life) {
       const head = missilePosC(m, c);
-      R.glow(head, 0.7, [4, 2.6, 0.8], 0.3); R.glow(head, 0.25, [5, 4.5, 3], 0.2);   // the motor: a small yellow-white flame
-      if (i % 40 === 0) R.light(head, 40, [1, 0.8, 0.4], 3);
-      if (c - m.lc < 0.12) { const f = 1 - (c - m.lc) / 0.12; R.glow(m.p0, 1.2 + 1.5 * f, [3 * f, 2.2 * f, 1.2 * f], 0.35); }   // the pop out of the port
+      R.glow(head, 0.7, [4, 1.2, 3], 0.3); R.glow(head, 0.25, [5, 3.4, 4.6], 0.2);   // the head: a pink energy round, white-pink core
+      if (i % 40 === 0) R.light(head, 40, [1, 0.35, 0.75], 3);
+      if (c - m.lc < 0.12) { const f = 1 - (c - m.lc) / 0.12; R.glow(m.p0, 1.2 + 1.5 * f, [3 * f, 1 * f, 2.4 * f], 0.35); }   // the pop out of the port
     } else if (m.hit && c - m.sc < 0.8) {                                        // THE STRIKE: one after another, each a fireball on his heels
       missileBurst(R, c - m.sc, m.p3, 6 + 4.5 * hash(i + 3), 610 + i, i % 6 === 0);   // (big: the lens is right on them)
     }
