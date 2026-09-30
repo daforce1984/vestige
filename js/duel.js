@@ -1946,7 +1946,13 @@ export const DUEL_CAMS = [
     return { pos: add(add(sub(h, scl(T, 26)), scl(e1, 8)), [0, 4, 0]), target: lrp(add(h, scl(T, 20)), P.p3, 0.6), fov: 46, handheld: 0.03, baseShake: 0.03 }; } },
   { t0: 184.93, t1: 185.25, roll: 0.05, name: 'D15d from the side — his full-power blade smashes the light-ball apart', slowmo: true, fn: (t, u) => { const P = transPath(), sd = nrm(V.cross([0, 0, 0], P.dirIn, [0, 1, 0]));
     return { pos: add(add(add(P.p3, scl(sd, 30)), scl(P.dirIn, 6)), [0, -4, 0]), target: lrp(P.p3, up(hp(t), 6), 0.45), fov: 40, handheld: 0.03, baseShake: 0.04 }; } },
-  { t0: 185.2, t1: 186.4, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
+  { t0: 185.2, t1: CATCH_T - 0.12, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
+    return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
+  { t0: CATCH_T - 0.12, t1: CATCH_T + 0.05, roll: 0.08, name: 'D16c CU his right hand — the rifle comes tumbling back in and he snatches it out of the air (bullet time)', slowmo: true, fn: (t, u) => {
+      const h = duelHero(t), fk = duelFK(h, 'gundam'), Hd = partPoint(fk, 'hand_R'),   // (riding with his hand)
+           T = r3(fk.torso), fw = nrm(r3v(T, [0, 0, 1])), rt = scl(nrm(r3v(T, [1, 0, 0])), -1), upv = nrm(r3v(T, [0, 1, 0]));
+      return { pos: add(add(add(Hd, scl(fw, 3)), scl(rt, 15 - 2 * u)), scl(upv, 2)), target: add(Hd, scl(rt, 2 * (1 - u))), fov: 38, handheld: 0.03 }; } },   // out to his right, level with the hand held out in front: the rifle comes in past the lens into it
+  { t0: CATCH_T + 0.05, t1: 186.4, roll: 0.2, name: 'D16 fly-by — he tears past the lens (rifle back in hand)', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
   { t0: 186.4, t1: 187.45, roll: -0.16, name: 'D17 fly-by — it quick-boosts aside', fn: (t, u) => { const P = ep(186.95), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 17)), [0, -3, 0]), target: up(ep(t), 2), fov: 48, handheld: 0.08 }; } },
