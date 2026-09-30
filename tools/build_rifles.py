@@ -72,7 +72,7 @@ def emis_green(g, blob, mt, alb):   # rifle2: no emissive map — its glowing in
 # Sigma: rifle2, muzzle toward +z, top +y = already his rifle frame (+Z barrel, +Y top); grip stub on the origin
 build('rifle2.glb', 'rifle2_game', np.array([0, 0.12, -1.6]), np.eye(3), 4.125, 1024, emis_green)   # (×2.75, then 1.5× bigger on request)
 # VANGUARD: rifle1 (bullpup), muzzle toward −z, top +y → its rifle part frame (barrel −Y, top +Z): (x, y, z) → (−x, z, y)
-build('rifle1.glb', 'rifle1_game', np.array([0, -0.85, -1.23]), np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]), 1.4, 768, emis_tex)
+build('rifle1.glb', 'rifle1_game', np.array([0, -0.85, -1.23]), np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]), 0.9, 768, emis_tex)   # (the stock ends at its shoulder)
 # the enemy fighters (every enemy_fighter* variant): assets/spaceship.glb (user-supplied), nose +z already; centred, ×0.95, its
 # one texture set packed the same way (red lights in the emissive map), an 'engine' disc on the rear nozzle
 build('spaceship.glb', 'spaceship_game', np.array([0, 1.67, 0]), np.eye(3), 0.95, 1024, emis_tex, engines=[(0, 2.45, -5.14, 0.35)])

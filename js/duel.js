@@ -1275,7 +1275,7 @@ export const MUZZLE_T = [0, 1.88, 12.94];   // the rifle's muzzle (assets/rifle2
 export const HERO_RIFLE_S = [1, 1, 1];     // its scale on the hand (blender/build_hero_rifle.py builds it at size: ~25 m, twice the old one)
 export const RIFLE_Q = [-0.130526, 0, 0, 0.991445];   // the rifle node's rotation on hand_R (assets/gundam.glb): the grip raked 15° like a pistol grip
 // VANGUARD's rifle (assets/enemy_ms.glb): rifle_muzzle in the rifle part's frame; the barrel runs from the grip pivot to it
-export const VAN_MUZZLE = [0, -4.91, 1.92];            // the enemy rifle (rifle part frame; assets/rifle1_game.glb, tools/build_rifles.py)
+export const VAN_MUZZLE = [0, -3.16, 1.23];            // the enemy rifle (rifle part frame; assets/rifle1_game.glb, tools/build_rifles.py)
 const VAN_BARREL = [0, -1, 0];
 export function msMatrixOf(s, out = M.new()) {
   const f = nrm(s.fwd);
@@ -1391,6 +1391,10 @@ function armIK(s, fk, model, side, P, Hw) {
 const GUN_UP = { gundam: [0, 1, 0], enemy_ms: [-0.0337, 0.064, 0.9974] };
 function layRifle(s, model, target, k, twist = 1) {
   s.pose = { ...s.pose };
+  if (model === 'enemy_ms' && k > 0) {   // the body turns into the shot (as his does): the target just right of its chest line, the rifle out beside it, not across it
+    const f0 = duelFK(s, model), tl = r3v(r3T(r3(f0.torso)), sub(target, partPoint(f0, 'torso'))), az = Math.atan2(tl[0], tl[2]);
+    const t0 = s.pose.torso || [0, 0, 0]; s.pose.torso = [t0[0], t0[1] + clamp(az + 0.25, -1.4, 1.4) * k, t0[2]];
+  }
   for (let it = 0; it < 3; it++) {
     let fk = duelFK(s, model);
     const d0 = fk.muzzleDir, d1 = nrm(sub(target, fk.muzzle));
