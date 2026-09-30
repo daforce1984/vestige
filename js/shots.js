@@ -2,7 +2,7 @@
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
 import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
-import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
+import { storyT, filmT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
 import {
@@ -650,6 +650,19 @@ function drawAfterimages(R, t, s) {
     const c = SANDE_COL[k % 3]; g.tint[0] = c[0]; g.tint[1] = c[1]; g.tint[2] = c[2];
   }
 }
+// BOOST SMEAR (the Itano-circus run): the machine a few film-milliseconds ago, close together and faint in its own colour —
+// a short motion-blur trail behind him only (the scene's motion blur is off in the circus)
+function drawBlurTrail(R, t, s) {
+  const K = 5, f = filmT(t);
+  for (let k = 1; k <= K; k++) {
+    const q = gundamState(storyT(f - k * 0.022)); if (!q || !q.vis) continue;
+    const g = R.add('gundam', msMatrix(new Float32Array(16), q)); if (!g) continue;
+    g.pose = q.pose; g.seed = 5.5; g.texSet = 0;
+    g.hidden = { rifle: 1, saber_hilt: 1 };
+    g.ghost = s.blurTrail * 0.42 * Math.pow(1 - (k - 1) / K, 1.4);
+    g.tint[0] = 0.9; g.tint[1] = 1.0; g.tint[2] = 1.2;
+  }
+}
 // a shot that LANDS burns a hole through the armour it hits (duel.js HOLES): the plate melts open around the hit point —
 // it opens out in a fifth of a second, white-hot at first, cooling to a dull cherry rim that stays for the rest of the fight
 // SPARK STREAKS a pixel wide (not round dots): the ribbon radius is set from the distance to the camera
@@ -717,6 +730,7 @@ function drawHipHilt(R, e) {
 export function drawGundam(R, t, s, opts = {}) {
   if (!s.vis) return null;
   if ((s.sande || 0) > 0.01 && !s.fpv) drawAfterimages(R, t, s);
+  if ((s.blurTrail || 0) > 0.01 && !s.fpv) drawBlurTrail(R, t, s);
   const e = R.add('gundam', msMatrix(tmpM, s));
   if (!e) return null;
   e.pose = s.pose; e.damage = s.damage; e.seed = 5.5; e.wear = 1; e.texSet = R.texLoaded & 1 ? 1 : 0;
