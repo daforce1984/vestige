@@ -1296,7 +1296,7 @@ function drawUlt(R, t) {
     const m = S[i]; if (c < m.lc) continue;
     const cEnd = Math.min(c, m.sc), fade = c > m.sc ? 1 - sat((c - m.sc) / 1.2) : 1;   // trails hang on after the strike, then thin away
     if (fade > 0.01) {
-      const c0 = Math.max(m.lc, cEnd - 2.2), n = 60; let pa = missilePosC(m, cEnd);
+      const c0 = Math.max(m.lc, cEnd - 2.2), n = 90; let pa = missilePosC(m, cEnd);
       for (let j = 1; j <= n; j++) {                                  // its path over the last ≤2.2 s: thin at the motor, swelling as it ages
         const cj = Math.max(m.lc, cEnd - (cEnd - c0) * j / n), pb = missilePosC(m, cj), age = c - cj;
         const w = 0.2 + 1.0 * sat(age / 0.6), k = 0.03 * fade * (1 - sat(age / 2.2)) * sat((cj - m.lc) / 0.1 + 0.15);   // (dim: they overlap, additive)

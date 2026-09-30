@@ -588,19 +588,16 @@ export function ultSwarm() {
 /** a missile's position at circus clock c (null before launch) */
 export function missilePosC(m, c) {
   if (c < m.lc) return null;
-  const u = Math.min(1, (c - m.lc) / (m.sc - m.lc));
-  if (u < m.uk) { const x = u / m.uk; return lrp(m.p0, m.pk, x * (2 - x) * 0.85 + x * 0.15); }   // popped straight out, braking into the kink
-  const w = (u - m.uk) / (1 - m.uk), ww = w * (0.6 + 0.4 * w);
-  const bz = (x) => { const v = 1 - x; return add(add(scl(m.pk, v * v * v), scl(m.p1, 3 * v * v * x)), add(scl(m.p2, 3 * v * x * x), scl(m.p3, x * x * x))); };
-  const P = bz(ww), T = nrm(sub(bz(Math.min(1, ww + 0.01)), bz(Math.max(0, ww - 0.01))));
+  const u = Math.min(1, (c - m.lc) / (m.sc - m.lc)), uu = u * (0.55 + 0.45 * u);   // quick off the port, smooth all the way
+  const q1 = add(m.pk, scl(sub(m.pk, m.p0), 0.8));                                   // one smooth curve: out past the kink point and swinging round
+  const bz = (x) => { const v = 1 - x; return add(add(scl(m.p0, v * v * v), scl(q1, 3 * v * v * x)), add(scl(m.p2, 3 * v * x * x), scl(m.p3, x * x * x))); };
+  const P = bz(uu), T = nrm(sub(bz(Math.min(1, uu + 0.01)), bz(Math.max(0, uu - 0.01))));
   const e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0])), e2 = V.cross([0, 0, 0], T, e1);
-  const amp = m.R * Math.min(1, w * 4) * (1 - Math.pow(w, 8)), a = m.ph + 2 * Math.PI * m.turns * w;   // big sweeping S-curves right up to the strike
-  // terminal homing: once it's closing in it jinks hard this way and that (sharp triangle-wave zig-zags, 4-7 a second),
-  // tightening onto the point at the strike
-  const tri = (x) => 2 * Math.abs(2 * (x - Math.floor(x + 0.5))) - 1;
-  const jA = 16 * smooth(0.5, 0.72, w) * Math.sqrt(Math.max(0, 1 - w)) * 2.2, fq = 4 + 3 * hsh(m.ph * 3.1);
-  const jx = jA * tri(fq * c + m.ph), jy = jA * 0.8 * tri(fq * 1.37 * c + m.ph * 1.7);
-  return add(P, add(scl(e1, amp * Math.cos(a) + jx), scl(e2, amp * Math.sin(a) + jy)));
+  const env = smooth(0, 0.25, u) * (1 - Math.pow(u, 6));
+  const a = m.ph + 2 * Math.PI * m.turns * u;                                          // big sweeping S-curves …
+  const jA = 11 * smooth(0.45, 0.7, u) * Math.sqrt(Math.max(0, 1 - u)) * 1.8, fq = 2 + 1.5 * hsh(m.ph * 3.1);   // … and, closing in, quick smooth weaving to home on him
+  const jx = jA * Math.sin(2 * Math.PI * fq * c + m.ph), jy = jA * 0.8 * Math.sin(2 * Math.PI * fq * 1.31 * c + m.ph * 1.7);
+  return add(P, add(scl(e1, m.R * env * Math.cos(a) + jx), scl(e2, m.R * env * Math.sin(a) + jy)));
 }
 export const missilePos = (m, t) => missilePosC(m, circusClock(t));
 // Sigma's shots: 178.7 is taken on the shield; 183.25 tears the shield off; the charged 192.35 goes through its chest
@@ -1124,7 +1121,7 @@ function duelHero_(t) {
   s.boost = Math.max(heroBoost(tw), ck);
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
-  { if (tw >= HERO_GRAB - 0.16 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); heroLeft(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
+  { if (tw >= HERO_GRAB - 0.16 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); heroLeft(s, tw); transTwist(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
   slashIK(s, tw);                                                   // the pass-cut: the blade swept exactly through its waist
   hitReact('hero', tw, s, 'gundam');
   // hand-over to the old aftermath formula (identical at t = 200)
@@ -1620,7 +1617,7 @@ const transSaber = (tw) => smooth(SD_OUT, SD_OUT + 0.03, tw) * (1 - smooth(TRANS
 // out and the hilt goes back on the hip. Hilt poses in his torso frame: [t, position, blade direction]
 export const SD_REACH = 184.6, SD_GRAB = 184.66, SD_OUT = 184.72, SD_GUARD = 184.8, SD_SWEEP = 184.83, SD_HOLSTER0 = 185.44, SD_HOLSTER = 185.62;
 export const SABER_MOUNT_P = [2.3, -2.4, -0.6], SABER_MOUNT_D = nrm([0.25, -0.55, -0.8]);   // the hilt hanging on his left hip, emitter down-back
-const SD_KEYS = [[SD_GRAB, SABER_MOUNT_P, SABER_MOUNT_D], [SD_OUT, [1.2, 1.4, 4.2], nrm([0.05, 0.35, 1])], [SD_GUARD, [0.6, 6.4, 3.8], nrm([-0.1, 0.9, -0.3])], [SD_SWEEP, [0.6, 6.4, 3.8], nrm([-0.1, 0.9, -0.3])]];
+const SD_KEYS = [[SD_GRAB, SABER_MOUNT_P, SABER_MOUNT_D], [SD_OUT, [1.2, 1.4, 4.2], nrm([0.05, 0.35, 1])], [SD_GUARD, [-2.6, 3.6, 1.4], nrm([-0.6, 0.3, -0.75])], [SD_SWEEP, [-2.6, 3.6, 1.4], nrm([-0.6, 0.3, -0.75])]];   // (wound up: hilt by his right side, blade back past his right shoulder)
 const SH_KEYS = [[SD_HOLSTER0, [1.4, 0.4, 2.8], nrm([0.2, -0.3, 1])], [SD_HOLSTER, SABER_MOUNT_P, SABER_MOUNT_D]];
 export const hiltInHand = (tw) => tw >= SD_GRAB && tw < SD_HOLSTER;
 const saberBusy = (tw) => smooth(SD_REACH - 0.02, SD_REACH + 0.02, tw) * (1 - smooth(SD_HOLSTER + 0.02, SD_HOLSTER + 0.12, tw));
@@ -1668,16 +1665,21 @@ function transCutRef() {   // the blade's line onto the ball at the pass (from w
   if (!_tp || _tp.pending) return null;
   _tcut = { pending: true };
   const h = duelHero_(TRANS_PASS), fk = duelFK(h, 'gundam'), hilt = hiltAtTrans(fk), P = transHead(TRANS_PASS);
-  const base = nrm(sub(P, hilt)), a = nrm(V.cross([0, 0, 0], base, [0, 1, 0]));
+  const base = nrm(sub(P, hilt)), a = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));   // swept about his up axis: a flat cut across his front
   _tcut = { base, a, reach: V.dist(P, hilt) };
   return _tcut;
 }
 export const transCutAxis = () => { const r = transCutRef(); return r && !r.pending ? r.a : [1, 0, 0]; };
+function transTwist(s, tw) {   // the body: wound round to his right for the draw-back, uncoiling hard through the cut
+  const wind = smooth(SD_GUARD - 0.06, SD_SWEEP, tw), cut = smooth(SD_SWEEP, TRANS_PASS + 0.12, tw), rel = smooth(TRANS_PASS + 0.2, TRANS_PASS + 0.5, tw);
+  const yaw = (-38 * wind * (1 - cut) + 30 * cut) * (1 - rel); if (Math.abs(yaw) < 0.01) return;
+  s.pose = { ...s.pose }; const t0 = s.pose.torso || [0, 0, 0]; s.pose.torso = [t0[0], t0[1] + yaw * DEG, t0[2]];
+}
 function transCutIK(s, tw) {
   const k = transCutW(tw); if (k <= 0) return;
   const ref = transCutRef(); if (!ref || ref.pending) return;
   const ang = clamp((tw - TRANS_PASS) / 0.1, -1.3, 1.3) * 55 * DEG;     // from high to low, through the ball at the pass
-  const dir = rotAxis(ref.base, ref.a, -ang), upv = nrm(V.cross([0, 0, 0], dir, ref.a)), xv = V.cross([0, 0, 0], upv, dir), Hw = [...xv, ...upv, ...dir];
+  const dir = rotAxis(ref.base, ref.a, ang), upv = nrm(V.cross([0, 0, 0], dir, ref.a)), xv = V.cross([0, 0, 0], upv, dir), Hw = [...xv, ...upv, ...dir];
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const fk = duelFK(s, 'gundam'), hilt = hiltAtTrans(fk);
