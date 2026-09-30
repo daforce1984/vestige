@@ -480,6 +480,7 @@ function drawMolten(R, t, mm, r) {
   const heat0 = Math.max(0.25, 1 - T / 40);                                // the melt as a whole cools slowly
   const lip = (th) => { const B = meltB(th); return [WALL_X + 1.2, LANCE_HIT[1] + Math.sin(th) * r * B, LANCE_HIT[2] + Math.cos(th) * r * B / 0.62]; };
   const radOut = (th) => { const v = [0, Math.sin(th), Math.cos(th) / 0.62], l = Math.hypot(v[1], v[2]); return [0, v[1] / l, v[2] / l]; };
+  const core = (q, rad, k) => { if (k > 0.05) R.glow(q, rad * 0.75, [7 * k, 6.2 * k, 4.8 * k], 0.15); };   // the white-hot heart of a bead
   const NECK = 0.45;                                                       // s from swelling on the lip to the strand snapping
   for (let j = 0; j < MELT_PAIRS; j++) {
     const h = (n) => hash(j * 13.1 + n), per = 5 + 3 * h(1), cyc = Math.floor((T + per * h(2)) / per), a = (T + per * h(2)) % per;
@@ -502,7 +503,7 @@ function drawMolten(R, t, mm, r) {
         const g = a / NECK, pos = V.add([0, 0, 0], B.p0, V.scale([0, 0, 0], V.add([0, 0, 0], base, [0, 0, 0]), g * g * 0.5));
         const q = P(pos), root = P(B.p0), rad = B.rd * (0.5 + 0.5 * g);
         R.beam(root, q, rad * (0.9 - 0.65 * g), col(heat0).map((c) => c * 1.15), 0.5, 2.2, 0, 0.2);   // the strand thinning to the snap
-        R.glow(q, rad * 1.8, col(heat0 * 0.95), 0.45);
+        R.glow(q, rad * 1.8, col(heat0 * 0.95), 0.45); core(q, rad, heat0);
         continue;
       }
       const u = a - NECK, rel = V.add([0, 0, 0], B.p0, V.scale([0, 0, 0], base, 0.5));   // (where the strand snapped)
@@ -510,14 +511,14 @@ function drawMolten(R, t, mm, r) {
         if (k) continue;
         const um = a - tm, mid = V.add([0, 0, 0], V.add([0, 0, 0], rel, half), V.scale([0, 0, 0], base, um + (tm - NECK)));
         const rm = Math.cbrt(bead[0].rd ** 3 + bead[1].rd ** 3), w = wob(um, 0.3, 2.5), ax = V.norm([0, 0, 0], half);
-        R.glow(P(mid), rm * 1.9 * w, col(heat), 0.45);
+        R.glow(P(mid), rm * 1.9 * w, col(heat), 0.45); core(P(mid), rm * w, heat * temp);
         const st = 0.35 * rm * Math.exp(-2.5 * um) * Math.sin(um * 17 + j);  // the neck of the join still sloshing along the old axis
         R.glow(P(V.add([0, 0, 0], mid, V.scale([0, 0, 0], ax, st))), rm * 1.2, col(heat * 0.9), 0.4);
         R.glow(P(V.add([0, 0, 0], mid, V.scale([0, 0, 0], ax, -st))), rm * 1.2, col(heat * 0.9), 0.4);
         continue;
       }
       const pos = V.add([0, 0, 0], rel, V.scale([0, 0, 0], V.add([0, 0, 0], base, V.scale([0, 0, 0], sep, sgn)), u));
-      R.glow(P(pos), B.rd * 1.8 * wob(u, 0.14, 1.2) * fade, col(heat), 0.45);   // a free bead, pulling itself round as it drifts
+      const q = P(pos); R.glow(q, B.rd * 1.8 * wob(u, 0.14, 1.2) * fade, col(heat), 0.45); core(q, B.rd * fade, heat * temp);   // a free bead, pulling itself round as it drifts
     }
   }
 }

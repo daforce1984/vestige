@@ -367,8 +367,15 @@ function gundamStateRaw(t, s) {
     // coil for a breath, then an explosive burst to full speed (continuous: the old curve jumped back at 244.5)
     const B = 0.06, v = Math.max(0, u - B) / (1 - B), K = 18;
     const e = u < B ? 0.004 * (u / B) * (u / B) : 0.004 + 0.996 * (v - (1 - Math.exp(-K * v)) / K) / (1 - (1 - Math.exp(-K)) / K);
-    s.pos = lerpv(start, end, clamp(e, 0, 1));
-    s.fwd = V.sub([0, 0, 0], end, start);
+    // (the straight line to the well runs through the flagship's hull: he swings out wide of it — away from the wound
+    // side — and a little up, then back onto his line once he's past it)
+    const nOut = V.norm([0, 0, 0], [motherDir(240, [1, 0, 0])[0], 0, motherDir(240, [1, 0, 0])[2]]);
+    const clr = (x) => smooth(0, 0.05, x) * (1 - smooth(0.3, 0.85, x));
+    const offAt = (x) => addv(V.scale([0, 0, 0], nOut, 160 * clr(x)), [0, 50 * clr(x), 0]);
+    const ec = clamp(e, 0, 1);
+    s.pos = addv(lerpv(start, end, ec), offAt(ec));
+    { const e2 = Math.min(1, ec + 0.01), p2 = addv(lerpv(start, end, e2), offAt(e2)), d = V.sub([0, 0, 0], p2, s.pos);
+      s.fwd = V.len(d) > 1e-4 ? d : V.sub([0, 0, 0], end, start); }
     blendPose('flight', 'flight', 0, s.pose);
     s.pitch = 0.9 * smooth(240.9, 241.5, t) * (1 - smooth(258, 262, t)); s.thr = t < 241.3 ? 0.4 : 1; s.boostK = smooth(241.2, 241.45, t);
     s.roll = Math.sin(t * 0.5) * 0.05;
@@ -2248,7 +2255,7 @@ shot(240, 247, 'S16a dive start', (c) => {
   const W = motherPoint([0, 0, 0], t, LANCE_HIT);
   const aw = V.norm([0, 0, 0], V.sub([0, 0, 0], S, W));
   const cam = addv(madd(madd(S, dir, -62), aw, 30), [0, 16, 0]);
-  camLook(c, madd(cam, dir, u * 30), addv(madd(S, dir, 260), [0, 6, 0]), 48, 0.03);
+  camLook(c, madd(cam, dir, u * 30), V.lerp([0, 0, 0], addv(madd(S, dir, 260), [0, 6, 0]), addv(g.pos, [0, 6, 0]), 0.55), 48, 0.03);   // (following him out round the hull)
   handheld(c, 0.12);
   const pk = diveFX(c, t, 0.08 + u * 0.18, g);
   c.post.lensA = wellLens(c, wellMass(t) * (1 + pk * 0.3), 0, true, 1);
