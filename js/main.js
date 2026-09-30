@@ -258,6 +258,9 @@ async function boot() {
     {   // the dreadnought's Venator-style repaint: its lights and lit strips burn blue-white instead of green / orange
       const dm = R.models.enemy_dreadnought, E = { lime: [0.25, 0.55, 1.3], engine: [0.5, 0.85, 1.6], window: [0.75, 0.85, 1.0] };
       if (dm) for (const m of dm.materials) if (E[m.name]) { m.emissive = E[m.name]; m.base = [0.1, 0.12, 0.16]; }
+      // our flagship after the Buzz Hound corvette: its windows, lights and engines glow teal-green
+      const mm = R.models.mothership, T = { window: [0.35, 1.0, 0.75], amber: [0.3, 1.0, 0.7], blue_light: [0.25, 1.0, 0.8], engine: [0.55, 1.0, 0.9] };
+      if (mm) for (const m of mm.materials) if (T[m.name]) m.emissive = T[m.name];
     }
     const tris = R.modelList.reduce((s, m) => s + m.tris, 0);
     status.textContent = `준비 완료 · ${R.modelList.length} models · ${(tris / 1000).toFixed(0)}k tris`;

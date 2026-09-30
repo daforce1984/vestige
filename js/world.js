@@ -732,7 +732,7 @@ export function drawWorld(R, t, opts = {}) {
       if (winA > 0 && winC) hyperWindow(R, winC, fwd, sz[0] * 0.62 + 30, sz[1] * 0.75 + 30, HYPER_BLUE, winA);
     }
     // the wound: the hangar bay behind the melted wall, molten drips, and the bay's contents sucked out into space
-    engineGlows(R, 'mothership', me, [0.35, 0.55, 1.1], 0.6, t > 232 && t < 292 ? 1 : 0.7, 1.6);   // (after the jump code: it hides/reveals the hull)
+    engineGlows(R, 'mothership', me, [0.3, 1.1, 0.85], 0.6, t > 232 && t < 292 ? 1 : 0.7, 1.6);   // (after the jump code: it hides/reveals the hull)
     if (t > LANCE_FIRE && (me._woundVis ?? 1) > 0.02) drawWound(R, t, me);
     drawDock(R, t, me);                                          // bay doors + mouth frame always; the rig and fields inside
     // hull fires after lance

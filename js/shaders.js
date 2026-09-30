@@ -565,6 +565,23 @@ fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, side: f32) -> HD {
     // hazard band low on the forward wall (z 130…185, y −2…3)
     if (uv.y > -2.0 && uv.y < 3.5 && z > 136.0 && z < 186.0) { let st = step(0.5, fract((uv.x + uv.y) / 7.0)); paint = mix(vec3f(0.02), vec3f(0.62, 0.42, 0.05), st); pa = 1.0; }
   }
+  // after the Buzz Hound corvette: copper trim — a copper belt along the top and foot of each flank, twin copper deck
+  // inlays down the dorsal hull either side of the centreline (broken into long rounded runs) — and an off-white stripe
+  if (cls != 4.0) {
+    let copper = vec3f(0.30, 0.115, 0.04);
+    if (vertical) {
+      let belt = max(step(abs(uv.y - 43.2), 1.8), step(abs(uv.y + 11.6), 1.6));
+      if (belt > 0.0) { paint = copper; pa = 1.0; }
+      let z = -uv.x * side;
+      if (abs(uv.y - 36.0) < 0.45 && z > 130.0 && z < 300.0) { paint = vec3f(0.62, 0.63, 0.64); pa = 1.0; }   // the off-white bow stripe
+    } else {
+      let lane = abs(abs(uv.x) - 8.5);
+      let run = fract(uv.y / 46.0);
+      let seg = step(lane, 1.3) * step(0.08, run) * step(run, 0.86);
+      let capd = min(run - 0.08, 0.86 - run) * 46.0;
+      if (seg > 0.0 && (capd > 1.3 || length(vec2f(capd - 1.3, lane)) < 1.3)) { paint = copper; pa = 1.0; }
+    }
+  }
   if (pa > 0.0) {
     pa *= 0.9;
   }
@@ -692,7 +709,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // cinematic hull detail (flagship: shade.z = material class 1 hull, 2 plate, 3 hull2, 4 greeble, 5 trim)
   let hullFlag = inst.shade.z > 0.5 && inst.shade.z < 9.5 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01;   // flagship armour (any distance)
   let hullOn = hullFlag && pwLP < 1.5;   // beyond ~1.5 m/pixel the plating is sub-pixel: skip it
-  if (hullFlag) { base = vec3f(0.092, 0.098, 0.114) * select(1.0, 1.12, inst.shade.z > 4.5); rough = 0.46; metal = 0.75; }   // every armour class: ONE gunmetal   // hull / plate / hull2: ONE gunmetal (no patchwork of materials)
+  if (hullFlag) { base = vec3f(0.072, 0.098, 0.122) * select(1.0, 1.12, inst.shade.z > 4.5); rough = 0.46; metal = 0.75; }   // slate blue-grey armour (after the Buzz Hound corvette)   // every armour class: ONE gunmetal   // hull / plate / hull2: ONE gunmetal (no patchwork of materials)
   if (hullOn) {
     let ln = normalize(i.ln); let a = abs(ln);
     var uvp: vec2f; var tU = vec3f(0.0, 0.0, 1.0); var tV = vec3f(0.0, 1.0, 0.0);
