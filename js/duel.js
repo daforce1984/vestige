@@ -1200,7 +1200,7 @@ const FK_ORDER = Object.keys(PARENT);
 // assets/gundam.glb node translations (glTF): rifle ← hand_R, rifle_muzzle ← rifle; barrel = rifle local +Z.
 // (re-check with: python3 -c "…" in blender/DUEL_NOTES.md if the rifle is re-modelled; sanity check compares them)
 export const RIFLE_T = [-0.10266, -0.84395, 0.50666];   // (raised 2026-09-29: the grip in the fist, not the receiver under it)
-export const MUZZLE_T = [0, 1.96, 17.98];   // the new rifle's muzzle (Quaternius Scifi Sniper at HERO_RIFLE_S: 24 m long)
+export const MUZZLE_T = [0, 1.96, 21.48];   // the rifle's muzzle (blender/build_hero_rifle.py: the long thin Beretta-style barrel)
 export const HERO_RIFLE_S = [1, 1, 1];     // its scale on the hand (blender/build_hero_rifle.py builds it at size: ~25 m, twice the old one)
 export const RIFLE_Q = [-0.130526, 0, 0, 0.991445];   // the rifle node's rotation on hand_R (assets/gundam.glb): the grip raked 15° like a pistol grip
 // VANGUARD's rifle (assets/enemy_ms.glb): rifle_muzzle in the rifle part's frame; the barrel runs from the grip pivot to it

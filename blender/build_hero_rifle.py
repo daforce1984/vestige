@@ -2,7 +2,7 @@
 mechanics, cyan reactor light (his chest-core rings on the receiver side and at the muzzle).
 
 Coordinates below are glTF / rifle-node space (m): grip (his fist) at the origin, barrel +Z, up +Y, +X = the side
-facing his left hand. Contract points used by js/duel.js: muzzle (0, 1.96, 17.98), fore-grip (0, -0.7, 4.5),
+facing his left hand. Contract points used by js/duel.js: muzzle (0, 1.96, 21.48), fore-grip (0, -0.7, 4.5),
 E-pac socket bottom (1.6, -1.0, 1.85), eject port (0.62, 3.6, 0.4).
 
 Usage: blender.exe -b --factory-startup --python blender/build_hero_rifle.py -- <out.glb>
@@ -135,25 +135,23 @@ box((1.95, -0.6, 1.45), (2.01, 0.4, 2.3), 'core', 0.0)                          
 # ---- vertical fore-grip (his left hand at (0, -0.7, 4.5))
 prism([(3.95, 0.7), (5.15, 0.7), (5.0, -1.85), (4.1, -1.85)], -0.42, 0.42, 'steel', 0.12, 2)
 prism([(3.9, -1.8), (5.1, -1.8), (5.05, -2.12), (3.95, -2.12)], -0.46, 0.46, 'bronze', 0.05)
-# ---- barrel shroud: faceted armour tapering to the bore, seams glowing cyan from inside
-for i, (z0, z1) in enumerate([(7.3, 9.5), (9.8, 11.9), (12.2, 14.0)]):
-    r0, r1 = 1.12 - 0.09 * i, 1.04 - 0.09 * i
-    cyl((0, BY), r0, z0, z1, 'paint', 8, 0.1, r1=r1, rot=math.pi / 8)
-    cyl((0, BY), r1 - 0.16, z1 + 0.08, z1 + 0.22, 'core', 16)
-    cyl((0, BY), r1 - 0.22, z1, z1 + 0.3, 'steel', 16)
-    for k in range(3):                                                            # vent slots on the flanks
-        zz = z0 + 0.45 + k * 0.5
-        for sx in (-1, 1):
-            box((sx * (r0 - 0.1) if sx > 0 else -(r0 + 0.005), BY - 0.3, zz), ((r0 + 0.005) if sx > 0 else -(r0 - 0.1), BY + 0.3, zz + 0.2), 'recess', 0)
-box((-0.26, BY + 0.95, 7.2), (0.26, BY + 1.18, 13.9), 'steel', 0.04)             # top rib
-# ---- the bore: steel barrel → bronze collar → faceted muzzle brake → cyan emitter ring
-cyl((0, BY), 0.5, 14.0, 16.4, 'steel', 16)
-cyl((0, BY), 0.72, 14.9, 15.3, 'bronze', 16)
-cyl((0, BY), 0.82, 16.4, 17.5, 'paint_dk', 8, 0.06, r1=0.74, rot=math.pi / 8)
-for sx in (-1, 1): box((sx * 0.62 if sx > 0 else -0.84, BY - 0.22, 16.7), (0.84 if sx > 0 else -0.62, BY + 0.22, 17.2), 'recess', 0)
-cyl((0, BY), 0.62, 17.5, 17.92, 'bronze', 16)
-cyl((0, BY), 0.48, 17.92, 17.98, 'core', 16)
-cyl((0, BY), 0.24, 17.93, 18.0, 'recess', 12)
+# ---- the slide (Beretta-style): two slim tan side plates with an open top, the thin barrel showing between them
+for sx in (-1, 1):
+    prism([(7.2, BY - 0.62), (14.4, BY - 0.5), (15.0, BY - 0.2), (15.0, BY + 0.45), (14.3, BY + 0.62), (7.2, BY + 0.72)],
+          sx * 0.36 if sx > 0 else -0.52, 0.52 if sx > 0 else -0.36, 'paint', 0.06)
+    for k in range(5):                                                             # serrations on the slide
+        box((sx * 0.5 if sx > 0 else -0.545, BY - 0.35, 8.0 + k * 0.28), (0.545 if sx > 0 else -0.5, BY + 0.45, 8.12 + k * 0.28), 'recess', 0)
+    box((sx * 0.5 if sx > 0 else -0.53, BY + 0.05, 9.0), (0.53 if sx > 0 else -0.5, BY + 0.11, 14.2), 'core', 0)   # a thin cyan seam along it
+box((-0.36, BY - 0.62, 7.2), (0.36, BY - 0.42, 14.4), 'steel', 0.03)               # the slide's floor under the barrel
+box((-0.52, BY - 0.2, 14.4), (0.52, BY + 0.45, 15.0), 'paint', 0.05)               # the nose block (the open top ends here)
+# ---- the thin barrel, running long past the slide → a slim crown with the cyan emitter
+cyl((0, BY), 0.26, 7.0, 21.2, 'steel', 16)
+cyl((0, BY), 0.34, 15.0, 15.5, 'bronze', 16)
+cyl((0, BY), 0.3, 18.2, 18.5, 'bronze', 16)
+cyl((0, BY), 0.36, 20.5, 21.3, 'paint_dk', 8, 0.03, r1=0.32, rot=math.pi / 8)
+cyl((0, BY), 0.26, 21.3, 21.42, 'bronze', 16)
+cyl((0, BY), 0.2, 21.42, 21.48, 'core', 16)
+cyl((0, BY), 0.1, 21.43, 21.5, 'recess', 12)
 ring_x((2.3, -6.2), 0.2, 0, 1.0, 1.05, 'core'); ring_x((2.3, -6.2), 0.2, 0, -1.05, -1.0, 'core')
 
 # ---- apply modifiers, join into one 'rifle' mesh at the grip
