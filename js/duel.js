@@ -536,6 +536,35 @@ export function ultBeams() {
   return _ult;
 }
 export const ultPoint = (b, u) => { const v = 1 - u; return add(add(scl(b.p0, v * v * v), scl(b.p1, 3 * v * v * u)), add(scl(b.p2, 3 * v * u * u), scl(b.p3, u * u * u))); };
+// ITANO CIRCUS: out of those 12 ports come 48 micro-missiles — each flung out on its own fan line, corkscrewing round its
+// course (own radius, turns, phase), the swarm criss-crossing in a tangle of trails before the whole lot closes on
+// him and strikes at the end (staggered round ULT_HIT, where he was)
+export const ULT_M = 48;
+let _sw = null;
+export function ultSwarm() {
+  if (_sw) return _sw;
+  const B = ultBeams(), tgt0 = B[0].p3 ? add(heroRawPos(SANDE0 + 0.03), [0, 9, 0]) : [0, 0, 0];
+  _sw = [];
+  for (let k = 0; k < ULT_M; k++) {
+    const b = B[k % ULT_N], h = (n) => hsh(k * 7.31 + n), d = nrm(sub(b.p1, b.p0));
+    const side = nrm(V.cross([0, 0, 0], d, [0, 1, 0])), upd = V.cross([0, 0, 0], side, d);
+    const L1 = V.dist(b.p0, b.p1) * (0.35 + 0.3 * h(1));
+    const p1 = add(add(b.p0, scl(d, L1)), add(scl(side, (h(2) - 0.5) * 50), scl(upd, (h(3) - 0.5) * 40)));
+    const p3 = add(tgt0, [(h(4) - 0.5) * 12, (h(5) - 0.5) * 10, (h(6) - 0.5) * 12]);
+    const p2 = add(lrp(p1, p3, 0.45), [(h(7) - 0.5) * 90, (h(8) - 0.3) * 60, (h(9) - 0.5) * 90]);
+    _sw.push({ p0: b.p0, p1, p2, p3, ti: FINALE_T + 0.0015 * k + 0.015 * h(10), ta: ULT_HIT - 0.07 + 0.14 * h(11), R: 5 + 11 * h(12), turns: 3 + 4 * h(13), ph: 2 * Math.PI * h(14), port: k % ULT_N });
+  }
+  return _sw;
+}
+/** a missile's position at story t (null before launch) */
+export function missilePos(m, t) {
+  if (t < m.ti) return null;
+  const u = Math.min(1, (t - m.ti) / (m.ta - m.ti)), uu = Math.pow(u, 0.85);   // (quick off the ports)
+  const bz = (x) => ultPoint(m, x), P = bz(uu), T = nrm(sub(bz(Math.min(1, uu + 0.01)), bz(Math.max(0, uu - 0.01))));
+  const e1 = nrm(V.cross([0, 0, 0], T, [0, 1, 0])), e2 = V.cross([0, 0, 0], T, e1);
+  const amp = m.R * Math.min(1, u * 5) * (1 - Math.pow(u, 5)), a = m.ph + 2 * Math.PI * m.turns * u;   // wide corkscrews nearly all the way in, collapsing only at the strike
+  return add(P, add(scl(e1, amp * Math.cos(a)), scl(e2, amp * Math.sin(a))));
+}
 // Sigma's shots: 178.7 is taken on the shield; 183.25 tears the shield off; the charged 192.35 goes through its chest
 // how each shot is fired: 'hip' from the hip, 'aim' two-handed on the shoulder, 'snap' one arm thrown out, 'burst' three quick
 export const HERO_STYLE = ['hip', 'aim', 'aim', 'snap', 'burst', 'hip', 'aim', 'aim', 'aim', 'burst'];
@@ -715,7 +744,6 @@ const enemyPose = poseTrack([
 ]);
 const enemyImp = impulses([
   ...SERAPH_SHOTS.map((ts) => [ts + 0.001, P({ arm_R_upper: [-12, 0, 0], torso: [-6, 0, 0], _body: [-4, 0, 0] }), 0.03, 0.45, 14]),   // recoil
-  [BLOCK_T + 0.03, P({ arm_L_upper: [18, 0, 0], torso: [-10, 0, 0], _body: [-6, 0, 0] }), 0.03, 0.5, 12],
   [TRANS_SHOT + 0.002, P({ arm_R_upper: [-30, 0, 0], arm_L_upper: [-24, 0, 0], torso: [-26, 0, 0], head: [-16, 0, 0], _body: [-24, 0, 0] }), 0.05, 0.9, 6],   // the heavy shot throws it back hard             // the shield takes it
   [FINALE_T, P({ torso: [-12, 0, 0], head: [-10, 0, 0], _body: [-8, 0, 0] }), 0.05, 0.6],                               // the beams tear out of its back
 ]);
@@ -1694,7 +1722,7 @@ export const DUEL_SHOTS = HERO_SHOTS.map((t) => { const m = duelMuzzle(t); const
   const Ln = hit ? V.dist(tgt, m.pos) : 1500; return { t, from: m.pos, dir: m.dir, to: add(m.pos, scl(m.dir, Ln)), hit, kill: false, block: t === BLOCK_T, shield: t === SHIELD_HIT_T }; })
   .concat(HERO_BURST.map((t) => { const m = duelMuzzle(t); return { t, from: m.pos, dir: m.dir, to: add(m.pos, scl(m.dir, 1500)), hit: false, kill: false }; }));
 // the reactions to the hits (the shield arm knocked back; the kill is the breakup)
-REACTS = DUEL_EVENTS.filter((e) => e.shotDir && !e.cut).map((e) => {
+REACTS = DUEL_EVENTS.filter((e) => e.shotDir && !e.cut && !e.block).map((e) => {
   const hero = !!e.heroHit, st = hero ? duelHero_(e.t) : enemyRaw_(e.t), fk = duelFK(st, hero ? 'gundam' : 'enemy_ms'), part = e.part === 'shield' ? 'arm_L_lower' : e.part;
   return { who: hero ? 'hero' : 'e2', t: e.t, part, local: M.transformPoint([0, 0, 0], M.invert(M.new(), fk[part]), e.pos), dir: e.shotDir, amp: e.block ? 0.35 : 0.6 };
 });
@@ -1785,8 +1813,10 @@ export const DUEL_CAMS = [
     return { pos: at(M, -60, -400, -70, T), target: pan(M, mid(t), 0.5), fov: 36, handheld: 0.04 }; } },
   { t0: 189.6, t1: 190.7, snap: 1.6, roll: 0.06, name: 'D20 CU on it — it gathers itself in, its back ports brightening', fn: (t, u) => { const e = enemyRaw_(t), fk = duelFK(e, 'enemy_ms'), C = partPoint(fk, 'torso', [0, 3, 0]), f = nrm(flat(sub(hp(189.6), ep(189.6)), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
     return { pos: add(add(add(C, scl(f, -10 + 2 * u)), scl(sd, 14 - 3 * u)), [0, 6 - u, 0]), target: add(C, [0, 1, 0]), fov: 40, handheld: 0.03, baseShake: 0.03 }; } },   // close, 3/4 from behind and above: its head and the ports on its back
-  { t0: 190.7, t1: 191.25, roll: 0.06, name: 'D21 behind and above it — the beams burst out and bend round onto him', slowmo: true, fn: (t, u) => { const T = 190.7, E = ep(T), H = hp(T);
-    return { pos: at(E, 95, 40, 55, T), target: pan(up(E, 4), lrp(E, H, 0.45), 0.35 + 0.4 * u), fov: 58, handheld: 0.05, baseShake: 0.03 }; } },
+  { t0: 190.7, t1: 191.02, roll: 0.06, name: 'D21a behind and above it — the missiles burst out of its back in a fan', slowmo: true, fn: (t, u) => { const T = 190.7, E = ep(T), H = hp(T);
+    return { pos: at(E, 95, 40, 55, T), target: pan(up(E, 4), lrp(E, H, 0.3), 0.3 + 0.3 * u), fov: 60, handheld: 0.05, baseShake: 0.03 }; } },
+  { t0: 191.02, t1: 191.25, roll: -0.08, name: 'D21b the ITANO CIRCUS — side-on, the corkscrewing swarm crossing the gap onto him', slowmo: true, fn: (t, u) => { const T = 191.02, H = hp(T), E = ep(T), f = nrm(sub(E, H)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
+    const Mm = lrp(H, E, 0.45); return { pos: add(add(Mm, scl(sd, 230 - 30 * u)), [0, 50, 0]), target: add(Mm, [0, 4, 0]), fov: 56, handheld: 0.06, baseShake: 0.04 }; } },
   // SANDEVISTAN: a locked-off camera well to the side of his line — he streaks across the frozen frame, afterimages behind
   { t0: 191.25, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
     return { pos: add(add(Pm, scl(D_L, -150)), [0, 12, 0]), target: pan(Pm, up(hp(t), 2), 0.85), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },

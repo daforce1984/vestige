@@ -1417,10 +1417,10 @@ fn applyLens(uv: vec2f, L: vec4f, L2: vec4f, pixDepth: f32, glow: ptr<function, 
       if (P.dof.w > 0.5) { vel *= smoothstep(0.15, 0.7, clamp(abs(pixDepth - P.dof.x) / max(P.dof.y, 1e-3), 0.0, 1.0)); }
       let jit = fract(52.9829189 * fract(dot(i.pos.xy, vec2f(0.06711056, 0.00583715)))) - 0.5;
       if (length(vel) > 0.0008) {
-        var acc = col;
+        var acc = min(col, vec3f(24.0));
         for (var k = 1; k <= 8; k++) {
           let o = (f32(k) + jit) / 8.0 * 2.0 - 1.0;
-          acc += textureSampleLevel(sceneTex, smp, uv - vel * o * 0.5, 0.0).rgb;
+          acc += min(textureSampleLevel(sceneTex, smp, uv - vel * o * 0.5, 0.0).rgb, vec3f(24.0));   // (HDR clamp: one tiny super-hot pixel smeared into 9 bloomed into a white disc)
         }
         col = acc / 9.0;
       }

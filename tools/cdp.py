@@ -167,7 +167,7 @@ def main():
             s.call('Runtime.evaluate', awaitPromise=True, expression='new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>FILM.R.device.queue.onSubmittedWorkDone().then(()=>requestAnimationFrame(()=>r(1))))))')
             time.sleep(0.2)
             r = s.call('Page.captureScreenshot', format='jpeg', quality=85)
-            fn = os.path.join(out, 't%06.1f.jpg' % float(tt))
+            fn = os.path.join(out, 't%08.3f.jpg' % float(tt))
             open(fn, 'wb').write(base64.b64decode(r['data']))
             print('saved', fn)
     elif cmd == 'click':

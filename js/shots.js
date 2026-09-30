@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, heroRifleThrow, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, heroBackMount, heroRifleThrow, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePos as ultMissilePos, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -815,25 +815,27 @@ function shieldScorch(e, t) {
   const g = easeOut(sat(lt / 0.15));
   e.dmgC = B.local; e.dmgR = 1.5 * (0.3 + 0.7 * g); e.dmgPart = 'shield'; e.damage = Math.max(e.damage || 0, 0.55 * g);   // patchy soot, cracks glowing
 }
-// …and the shot's energy breaks up into particles on it: a burst of pixel sparks skating out along the face, then a
-// slow cloud of glowing motes drifting off and fading
+// …and the shot's energy spreads out over its face from the hit in every direction and dies away: a ragged ring
+// racing out across the plate, radial pixel streaks skating flat along it, motes shed from the front fading behind
 function drawBlockSplash(R, t) {
-  const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0 || lt > 2.5) return;
+  const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0 || lt > 1.6) return;
   const F = blockFrame(t); if (!F) return;
   const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], F.n, F.up));
-  if (lt < 0.1) { const f = 1 - lt / 0.1; R.glow(F.p, 1 + 3 * f, [1.4 * f, 3 * f, 4 * f], 0.3); R.light(F.p, 30, [0.5, 0.8, 1], 4 * f); }
-  for (let i = 0; i < 60; i++) {                                     // skating out along the face (the energy splashes flat)
-    const L = 0.25 + 0.4 * hash(i + 400); if (lt > L) continue;
-    const a = 2 * Math.PI * hash(i + 401), along = V.add([0, 0, 0], V.scale([0, 0, 0], F.up, Math.cos(a)), V.scale([0, 0, 0], sd, Math.sin(a)));
-    const d = V.norm([0, 0, 0], V.madd([0, 0, 0], along, F.n, 0.15 + 0.5 * hash(i + 402))), v = 8 + 18 * hash(i + 403), q = madd(F.p, d, v * lt * (1 - 0.4 * lt / L));
-    const b = (1 - lt / L) ** 2 * 3;
-    streak(R, madd(q, d, -Math.min(v * lt, 0.7)), q, [0.7 * b, 2.0 * b, 3.0 * b]);
+  const onFace = (a, r, lift = 0.08) => madd(madd(madd(F.p, F.up, r * Math.cos(a)), sd, r * Math.sin(a)), F.n, lift);
+  if (lt < 0.15) { const f = 1 - lt / 0.15; R.glow(madd(F.p, F.n, 0.1), 0.6 + 1.2 * f, [1.4 * f, 3 * f, 4 * f], 0.3); R.light(F.p, 26, [0.5, 0.8, 1], 3 * f); }
+  const front = 0.3 + 2.1 * easeOut(sat(lt / 0.5)), fb = (1 - sat(lt / 0.6)) ** 1.3;   // a ragged ring round the hit, on the plate only
+  if (fb > 0.01) for (let i = 0; i < 40; i++) {
+    const a0 = (i / 40) * 2 * Math.PI, a1 = ((i + 1) / 40) * 2 * Math.PI, j0 = 1 + 0.18 * (hash(i + 700) - 0.5), j1 = 1 + 0.18 * (hash(((i + 1) % 40) + 700) - 0.5);
+    const b = fb * 4 * (0.6 + 0.4 * hash(i + 701));
+    R.beam(onFace(a0, front * j0), onFace(a1, front * j1), 0.1 + 0.1 * fb, [0.6 * b, 2.2 * b, 3.6 * b], 0.7, 6, 0.8, 0.7);
   }
-  for (let i = 0; i < 60; i++) {                                     // the motes: the beam's energy coming apart, drifting off
-    const L = 1.0 + 1.3 * hash(i + 500); if (lt > L) continue;
-    const d = V.norm([0, 0, 0], V.madd([0, 0, 0], F.n, randDir([0, 0, 0], i * 5.1 + 17), 0.9)), q = madd(F.p, d, (2 + 10 * hash(i + 501)) * easeOut(sat(lt / L)));
-    const k = (1 - lt / L) * (0.6 + 0.4 * Math.sin(t * 20 + i));
-    R.glow(q, 0.12 + 0.12 * hash(i + 502), [0.6 * k, 1.8 * k, 2.8 * k], 0.2);
+  for (let i = 0; i < 140; i++) {                                    // the energy coming apart: motes thrown out every way from the hit, fading
+    const L = 0.35 + 0.8 * hash(i + 710); if (lt > L) continue;
+    const a = 2 * Math.PI * (i / 140 + 0.3 * hash(i + 711)), v = 3 + 9 * hash(i + 712), lift = 0.1 + 2.5 * hash(i + 713) * hash(i + 714);
+    const r = v * lt * (1 - 0.5 * lt / L), q = madd(onFace(a, r, 0.1), F.n, lift * lt * 4);
+    const k = (1 - lt / L) ** 1.5 * (0.7 + 0.3 * Math.sin(t * 25 + i));
+    R.glow(q, 0.14 + 0.16 * hash(i + 715), [0.9 * k, 3 * k, 4.5 * k], 0.2);
+    if (i % 3 === 0 && lt < L * 0.6) R.beam(madd(q, V.norm([0, 0, 0], V.sub([0, 0, 0], q, F.p)), -Math.min(0.8, v * 0.08)), q, 0.04, [0.8 * k, 2.6 * k, 4 * k], 0.8, 6, 0.6, 0.8);
   }
 }
 // THE BLOCK: the shield unfolds to twice its size as it comes up (long axis first, then its width), holds, folds back —
@@ -1234,7 +1236,7 @@ function shotStop(ts) {
   }
   return _stop.get(ts);
 }
-// ---- its ULTIMATE (duel.js ultBeams): the back charges while it gathers itself in, then a dozen thick heavy beams burst
+// ---- its ULTIMATE (duel.js ultBeams / ultSwarm): the back charges while it gathers itself in, then an Itano circus of 48 missiles burst
 // out of it in every direction, bend round and home onto him, converging (in a chain of blasts) where he was
 const _ultBack = [0, 3.4, -2.0];
 function drawUlt(R, t) {
@@ -1263,9 +1265,9 @@ function drawUlt(R, t) {
       } else {
         const lt = t - FINALE_T;
         if (lt < 0.12) { const f = 1 - lt / 0.12; R.glow(bp, 6 + 22 * f, [6 * f, 4 * f, 5 * f], 0.4); R.light(bp, 200, [1, 0.5, 0.7], 30 * f); }   // the white flash
-        for (const [d0, sz] of [[0, 140], [0.08, 90], [0.2, 190]]) { const l2 = lt - d0; if (l2 > 0 && l2 < 0.7) R.ripple(bp, 10 + sz * easeOut(l2 / 0.7), [0.6, 0.45, 0.55], (1 - l2 / 0.7) * 1.4); }   // shock rings
-        if (lt < 1.3) {                                              // the halo: a ring of light bursting out round the machine
-          const rr = 5 + 70 * easeOut(Math.min(1, lt / 1.1)), k = Math.pow(1 - lt / 1.3, 1.5);
+        for (const [d0, sz] of [[0, 140], [0.08, 90], [0.2, 190]]) { const l2 = lt - d0; if (l2 > 0 && l2 < 0.35) R.ripple(bp, 10 + sz * easeOut(l2 / 0.35), [0.6, 0.45, 0.55], (1 - l2 / 0.35) * 1.4); }   // shock rings
+        if (lt < 0.3) {                                              // the halo: a ring of light bursting out round the machine
+          const rr = 5 + 70 * easeOut(Math.min(1, lt / 0.25)), k = Math.pow(1 - lt / 0.3, 1.5);
           for (let j = 0; j < 72; j++) { const a = j / 72 * 2 * Math.PI, p = V.add([0, 0, 0], bp, V.add([0, 0, 0], V.scale([0, 0, 0], s1, Math.cos(a) * rr), V.scale([0, 0, 0], s2, Math.sin(a) * rr)));
             R.glow(p, 1.2 + 1.5 * k, [3 * k, 0.9 * k, 1.8 * k], 0.3); }
           sparkBurst(R, bp, back, lt, 811, 160, 1.6, 90, 1.2, [5, 2, 3.2]);
@@ -1273,22 +1275,23 @@ function drawUlt(R, t) {
       }
     }
   }
-  for (let i = 0; i < B.length; i++) {
-    const b = B[i]; if (t < b.ti) continue;
-    const u = sat((t - b.ti) / (b.ta - b.ti)), head = Math.pow(u, 1.25);
-    const drain = t > b.ta ? sat((t - b.ta) / 0.09) : 0, tail = Math.max(0, head - 0.3) + drain * (1 - Math.max(0, head - 0.3));
-    if (head - tail > 0.004) {
-      const n = Math.max(2, Math.ceil((head - tail) * 22)); let pa = ultPoint(b, tail);
+  const S = ultSwarm();                                           // ITANO CIRCUS: 48 corkscrewing micro-missiles
+  for (let i = 0; i < S.length; i++) {
+    const m = S[i]; if (t < m.ti) continue;
+    if (t < m.ta) {
+      const head = ultMissilePos(m, t), tr = 0.17, n = 24;               // the trail: its own path over the last 0.24 s (story)
+      let pa = head;
       for (let j = 1; j <= n; j++) {
-        const pb = ultPoint(b, tail + (head - tail) * j / n), f = j / n;   // thick at the head, thinning back along the trail
-        serBeam(R, pa, pb, 1.1, 1.1 + 1.1 * f);
+        const tj = t - tr * j / n; if (tj < m.ti) break;
+        const pb = ultMissilePos(m, tj), f = 1 - j / n, k = f * f;
+        R.beam(pb, pa, 0.18 + 0.22 * f, [1.6 * k + 0.25 * f, 0.9 * k + 0.2 * f, 1.3 * k + 0.25 * f], 0.5, 6, 0.8, 0.7);   // hot pink near the head → pale smoke
         pa = pb;
       }
-      const hp = ultPoint(b, head); R.glow(hp, 2.2, [3, 0.6, 1], 0.35);
-      if (i % 3 === 0) R.light(hp, 60, [1, 0.3, 0.45], 5);
-    }
-    if (u < 0.08) R.glow(b.p0, 2.5 * (1 - u / 0.08), [3, 0.6, 1], 0.35);   // each beam's exit flash
-    if (i % 2 === 0 && t >= b.ta) explosion(R, t, b.ta, b.p3, 9 + 4 * hash(i + 3), 610 + i, 'ship', 1.5);   // they converge where he was
+      R.glow(head, 0.9, [4, 1.3, 2.4], 0.3); R.glow(head, 0.3, [5, 4, 4.5], 0.2);   // the motor: white-hot core, magenta halo
+      if (i % 8 === 0) R.light(head, 40, [1, 0.35, 0.6], 3);
+      if (t - m.ti < 0.05) R.glow(m.p0, 1.8 * (1 - (t - m.ti) / 0.05), [3, 0.8, 1.6], 0.35);   // the port flash as it leaves
+    } else if (i % 3 === 0) explosion(R, t, m.ta, m.p3, 7 + 4 * hash(i + 3), 610 + i, 'ship', 1.4);   // THE STRIKE: they close on him and burst
+    else if (t - m.ta < 0.25) { const f = 1 - (t - m.ta) / 0.25; R.glow(m.p3, 2 + 5 * f, [4 * f, 1.5 * f, 2.5 * f], 0.35); }
   }
 }
 // ---- THE TRANSFORMING SHOT: two rails slide out of the rifle either side (copies of the rifle part, offset along its side
