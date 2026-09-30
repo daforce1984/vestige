@@ -578,10 +578,12 @@ export function ultSwarm() {
     const lc = 0.05 + r * (CIRCUS_END - 1.9) / (ULT_M - 1);                              // a RIPPLE: one after another, like a multiple rocket launcher …
     const sc = lc + 1.25 + 0.5 * h(18);                                                   // … each on him ~1.5 s later (strikes evenly spread)
     const pk = add(b.p0, scl(d, 18 + 30 * h(1)));                                          // the kink: out of the port, then the hairpin
-    const p3 = add(HP(sc - (0.06 + 0.22 * h(4))), [(h(5) - 0.5) * 10, (h(6) - 0.5) * 8, (h(17) - 0.5) * 10]);   // a beat too late: into the air he's only just left (in the long lens with him)
+    const { sd: sdC } = chaseAxes(), sgn = h(5) < 0.5 ? -1 : 1;
+    const hit = k % 12 === 0, off = hit ? [(h(5) - 0.5) * 10, (h(6) - 0.5) * 8, (h(17) - 0.5) * 10] : add(scl(sdC, sgn * (150 + 150 * h(19))), [0, (h(6) - 0.5) * 220, 0]);   // misses: way off to the side, out of the long lens
+    const p3 = add(HP(sc - (0.06 + 0.22 * h(4))), off);   // a hit: a beat too late, into the air he's only just left; a miss: well wide of him (out of the long lens)
     const pm = HP(lc + 0.45 * (sc - lc)), p1 = add(pk, add(scl(d, -8 - 10 * h(15)), scl(nrm(sub(pm, pk)), V.dist(pk, pm) * 0.3)));
-    const p2 = add(HP(lc + 0.75 * (sc - lc)), [(h(7) - 0.5) * 120, (h(8) - 0.4) * 70, (h(9) - 0.5) * 120]);   // chasing where he goes
-    _sw.push({ p0: b.p0, pk, p1, p2, p3, lc, sc, ti: circusStory(lc), ta: circusStory(sc), R: 10 + 18 * h(12), turns: 1.2 + 2.0 * h(13), ph: 2 * Math.PI * h(14), uk: 0.05 + 0.03 * h(16), port: r % ULT_N, hit: k % 4 === 0 });   // (3 in 4 miss and fly on past)
+    const p2 = add(add(HP(lc + 0.75 * (sc - lc)), [(h(7) - 0.5) * 120, (h(8) - 0.4) * 70, (h(9) - 0.5) * 120]), hit ? [0, 0, 0] : scl(off, 0.9));   // chasing where he goes (a miss: its whole run well wide)
+    _sw.push({ p0: b.p0, pk, p1, p2, p3, lc, sc, ti: circusStory(lc), ta: circusStory(sc), R: 10 + 18 * h(12), turns: 1.2 + 2.0 * h(13), ph: 2 * Math.PI * h(14), uk: 0.05 + 0.03 * h(16), port: r % ULT_N, hit });   // (7 in 8 go wide and fly on)
   }
   return _sw;
 }
@@ -1925,9 +1927,9 @@ export const DUEL_CAMS = [
   { t0: 190.7, t1: CIRCUS_C1, name: 'D21 the Itano circus, one take — long lens from far off, tracking him through the swarm', slowmo: true, fn: (t, u) => {
       const c = circusClock(t), H0 = hp(190.9), E0 = ep(190.9), f = nrm(flat(sub(E0, H0), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
       const H = up(hp(t), 8), Hl = up(hp(circusStory(Math.max(0, c - 0.18))), 8);
-      const pos = add(add(add(add(H0, scl(sd, -120)), scl(f, -430)), [0, 60, 0]), scl(sub(H, H0), 0.5));   // well behind him, drifting half his way with him (he runs off to the side)
+      const pos = add(add(add(add(H0, scl(sd, -140)), scl(f, 170)), [0, 330, 0]), scl(sub(H, H0), 0.5));   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
       const onHim = smooth(0.4, 1.2, c), tgt = lrp(up(E0, 6), lrp(Hl, H, 0.6), onHim);
-      const fov = lerp(30, 6.5, smooth(0.5, 1.6, c)) + 0.8 * Math.sin(c * 0.9) * smooth(2, 3, c);
+      const fov = lerp(30, 4.5, smooth(0.5, 1.6, c)) + 0.5 * Math.sin(c * 0.9) * smooth(2, 3, c);
       return { pos, target: tgt, fov, handheld: 0.05, baseShake: 0.02 }; } },
   { t0: CIRCUS_C1, t1: 191.95, name: 'D22 Sandevistan', slowmo: true, sande: true, fn: (t, u) => { const Pm = lrp(D_S0, E_CUT, 0.5);
     return { pos: add(add(Pm, scl(D_L, -150)), [0, 12, 0]), target: pan(Pm, up(hp(t), 2), 0.85), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },

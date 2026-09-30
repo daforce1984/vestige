@@ -834,24 +834,61 @@ function shieldScorch(e, t) {
 // …and the shot's energy spreads out over its face from the hit in every direction and dies away: a ragged ring
 // racing out across the plate, radial pixel streaks skating flat along it, motes shed from the front fading behind
 function drawBlockSplash(R, t) {
-  const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0 || lt > 1.6) return;
+  const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0 || lt > 1.8) return;
   const F = blockFrame(t); if (!F) return;
-  const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], F.n, F.up));
-  const onFace = (a, r, lift = 0.08) => madd(madd(madd(F.p, F.up, r * Math.cos(a)), sd, r * Math.sin(a)), F.n, lift);
-  if (lt < 0.15) { const f = 1 - lt / 0.15; R.glow(madd(F.p, F.n, 0.1), 0.6 + 1.2 * f, [1.4 * f, 3 * f, 4 * f], 0.3); R.light(F.p, 26, [0.5, 0.8, 1], 3 * f); }
-  const front = 0.3 + 2.1 * easeOut(sat(lt / 0.5)), fb = (1 - sat(lt / 0.6)) ** 1.3;   // a ragged ring round the hit, on the plate only
-  if (fb > 0.01) for (let i = 0; i < 40; i++) {
-    const a0 = (i / 40) * 2 * Math.PI, a1 = ((i + 1) / 40) * 2 * Math.PI, j0 = 1 + 0.18 * (hash(i + 700) - 0.5), j1 = 1 + 0.18 * (hash(((i + 1) % 40) + 700) - 0.5);
-    const b = fb * 4 * (0.6 + 0.4 * hash(i + 701));
-    R.beam(onFace(a0, front * j0), onFace(a1, front * j1), 0.1 + 0.1 * fb, [0.6 * b, 2.2 * b, 3.6 * b], 0.7, 6, 0.8, 0.7);
+  const sh = DUEL_SHOTS.find((x) => x.block), sdir = sh ? V.norm([0, 0, 0], V.sub([0, 0, 0], sh.to, sh.from)) : F.up;
+  const nF = V.dot(F.n, sdir) > 0 ? V.scale([0, 0, 0], F.n, -1) : F.n;   // the struck face's normal, toward the shooter (not into the plate)
+  const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], nF, F.up));
+  const onFace = (a, r, lift = 0.1) => madd(madd(madd(F.p, F.up, r * Math.cos(a)), sd, r * Math.sin(a)), nF, lift + 0.55);   // (+0.55: clear of the enlarged plate's face)
+  // the shot's line skimmed onto the plate: the energy it carries goes skating off along the face that way
+  let sk = V.sub([0, 0, 0], sdir, V.scale([0, 0, 0], nF, V.dot(sdir, nF))); sk = V.len(sk) > 1e-3 ? V.norm([0, 0, 0], sk) : F.up;
+  const ska = Math.atan2(V.dot(sk, sd), V.dot(sk, F.up));
+  // 1. the struck spot glowing: white-hot, cooling through yellow and orange to a dull red
+  const heat = sat(lt / 0.03) * Math.exp(-lt * 1.6), hw = sat(heat * 1.6);
+  if (heat > 0.01) {
+    R.glow(onFace(0, 0, 0.15), 1.6 + 1.2 * heat, [6 * heat, (0.9 + 1.6 * hw) * heat, (0.05 + 0.5 * hw * hw) * heat], 0.2);   // the glowing patch (red-orange so it reads on the white plate)
+    R.glow(onFace(0, 0, 0.15), 0.8 + 0.8 * heat, [6 * heat * hw, 4.5 * heat * hw, 2.5 * heat * hw], 0.15);
+    if (lt < 0.4) R.light(F.p, 24, [1, 0.55, 0.25], 3 * heat);
   }
-  for (let i = 0; i < 140; i++) {                                    // the energy coming apart: motes thrown out every way from the hit, fading
-    const L = 0.35 + 0.8 * hash(i + 710); if (lt > L) continue;
-    const a = 2 * Math.PI * (i / 140 + 0.3 * hash(i + 711)), v = 3 + 9 * hash(i + 712), lift = 0.1 + 2.5 * hash(i + 713) * hash(i + 714);
-    const r = v * lt * (1 - 0.5 * lt / L), q = madd(onFace(a, r, 0.1), F.n, lift * lt * 4);
-    const k = (1 - lt / L) ** 1.5 * (0.7 + 0.3 * Math.sin(t * 25 + i));
-    R.glow(q, 0.14 + 0.16 * hash(i + 715), [0.9 * k, 3 * k, 4.5 * k], 0.2);
-    if (i % 3 === 0 && lt < L * 0.6) R.beam(madd(q, V.norm([0, 0, 0], V.sub([0, 0, 0], q, F.p)), -Math.min(0.8, v * 0.08)), q, 0.04, [0.8 * k, 2.6 * k, 4 * k], 0.8, 6, 0.6, 0.8);
+  // 2. the energy skating off across the plate along the shot's line: crackling arcs racing out to the edge
+  const on = sat(lt / 0.02) * (1 - sat((lt - 0.12) / 0.35));
+  if (on > 0.01) {
+    for (let j = 0; j < 4; j++) {
+      const L = Math.min(7, 1 + 45 * lt) * (0.7 + 0.3 * hash(j + 800)), a0 = ska + (hash(j + 801) - 0.5) * 0.7;
+      const a1 = a0 + (hash(j + 802) - 0.5) * 0.35, pA = onFace(a0, 0.3), pB = onFace(a1, L);
+      R.arc(pA, pB, 0.45, [0.6, 1.6, 3], 1.1 * on, 820 + j, 14);
+    }
+    R.beam(onFace(ska, 0.2), onFace(ska, Math.min(7, 1 + 45 * lt)), 0.45, [0.35 * on, 0.9 * on, 1.5 * on], 1, 8, 1.2, 1.5);   // the smeared energy under the arcs
+  }
+  // 3. a ring of crackling energy round the struck spot, spreading and crawling round over the plate
+  const rr = 0.6 + 3.2 * easeOut(sat(lt / 0.5)), rk = sat(lt / 0.03) * (1 - sat((lt - 0.25) / 0.8));
+  if (rk > 0.01) {
+    const N = 12, spin = lt * 3.2;
+    for (let i = 0; i < N; i++) {
+      if (hash(i * 3.7 + Math.floor(lt * 30)) < 0.25) continue;   // flickering: segments dropping in and out
+      const a0 = spin + (i / N) * 2 * Math.PI, a1 = spin + ((i + 1) / N) * 2 * Math.PI;
+      const j0 = 1 + 0.2 * (hash(i + 840 + Math.floor(lt * 24)) - 0.5), j1 = 1 + 0.2 * (hash(((i + 1) % N) + 840 + Math.floor(lt * 24)) - 0.5);
+      R.arc(onFace(a0, rr * j0), onFace(a1, rr * j1), 0.35, [0.7, 1.7, 3.2], 1.0 * rk, 860 + i, 18);
+    }
+    for (let i = 0; i < 5; i++) {                                   // spokes from the spot out to the ring
+      const a = spin * 0.6 + i * 1.2566 + 0.3 * hash(i + 870);
+      R.arc(onFace(a, 0.3), onFace(a, rr * 0.95), 0.28, [0.8, 1.8, 3.2], 0.7 * rk, 880 + i, 20);
+    }
+  }
+  // 5. sparks spitting off the struck spot while it's hot — laid out in the plate's own frame, so they ride with the shield
+  for (let i = 0; i < 70; i++) {
+    const born = 0.6 * hash(i + 950), L = 0.12 + 0.2 * hash(i + 951), sl = lt - born; if (sl < 0 || sl > L || born > 0.05 + 1.2 * heat) continue;
+    const a = 2 * Math.PI * hash(i + 952), v = 8 + 14 * hash(i + 953), up = 0.3 + 1.2 * hash(i + 954), r = v * sl, h = up * v * sl;
+    const q = madd(onFace(a, 0.2 + r, 0.15), nF, h), q0 = madd(onFace(a, 0.2 + Math.max(0, r - 0.5), 0.15), nF, Math.max(0, h - 0.5 * up));
+    const b = (1 - sl / L) * 3;
+    streak(R, q0, q, [b * 1.6, b * 1.0, b * 0.35]);
+  }
+  // 4. a few motes shed off the ring, fading
+  for (let i = 0; i < 40; i++) {
+    const born = 0.02 + 0.5 * hash(i + 900), L = 0.4 + 0.5 * hash(i + 901), ml = lt - born; if (ml < 0 || ml > L) continue;
+    const a = 2 * Math.PI * hash(i + 902), r0 = 0.6 + 3.2 * easeOut(sat(born / 0.5)), q = madd(onFace(a, r0 + 1.2 * ml), nF, 0.2 + 1.5 * ml);
+    const k = (1 - ml / L) * (0.7 + 0.3 * Math.sin(t * 25 + i));
+    R.glow(q, 0.14 + 0.1 * hash(i + 903), [0.8 * k, 2.4 * k, 3.8 * k], 0.2);
   }
 }
 // THE BLOCK: the shield unfolds to twice its size as it comes up (long axis first, then its width), holds, folds back —
