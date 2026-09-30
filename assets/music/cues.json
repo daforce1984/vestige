@@ -202,5 +202,31 @@
   "sources": "assets/src/music/G_duel2/<take>/ (local only, gitignored)",
   "export": "x0.891 (-1 dB), libmp3lame 224k (imageio-ffmpeg)",
   "placement": "film: G_duel_fast.mp3 0.5 s (first hit) on filmT(170.0) (the draw begins), from file 0.35 s; ends at filmT(SANDE0) with a 0.35 s fade; replaces the two G_duel copies"
+ },
+ {
+  "id": "G_duel_metal",
+  "film": true,
+  "dur": 48,
+  "caption": "Global Metadata: Instrumental heavy metal battle track, fast thrash / melodic death metal, 200 BPM, E minor (drop-D tuned), aggressive, relentless and heroic, for a high-speed giant-robot duel in space. Pure driving metal energy from the first beat to the last.\nVocal Details: No vocals at all. No singing, no screaming, no growls, no humming, no choir, no spoken words, no chants.\nArrangement: Starts instantly at full tempo on the very first beat, no silence, no intro build: blast-beat and machine-gun double-kick drums, tight snare, crash accents, heavily distorted down-tuned rhythm guitars playing fast palm-muted gallop and tremolo-picked riffs, a locked-in distorted bass guitar. At about 6 seconds: the full band slams into a soaring harmonized twin lead guitar melody over the pounding double kick, fast shredding lead fills and pinch harmonics, gang-shout-free, short stop-start stabs, then back to a relentless riff. Constant speed and aggression to the end, no breakdown, no half-time, no slowing down, no fade out.\n",
+  "lyrics": "[Intro]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n\n[Verse]\n[Instrumental]\n\n[Chorus]\n[Instrumental]\n",
+  "chosen": "G_metal_t2",
+  "seed": 20260930102,
+  "takes": [
+   {
+    "take": "G_metal_t1",
+    "seed": 20260930101,
+    "flac": "minimax_music_00028.flac",
+    "sha256": "c8ba00bbe67240f47202fca457e71562fa90a8dda51a63386b8872fb18b5153d",
+    "note": "rejected: ~2 s near-silent start"
+   },
+   {
+    "take": "G_metal_t2",
+    "seed": 20260930102,
+    "flac": "minimax_music_00029.flac",
+    "sha256": "0769c0b47cbf70857ff4f6142bef91474d34a2324452bc3f1d568be111e414f3",
+    "note": "chosen: full tempo from the first beat, no vocals (Whisper VAD: none)"
+   }
+  ],
+  "note": "2026-09-30: the duel score as fast metal (user: 전투 배경음악은 Metal로 비트 빠르게); replaces G_duel_fast in manifest.json. Generated with MiniMax Music 3 on the local ComfyUI."
  }
 ]

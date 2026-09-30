@@ -22,13 +22,13 @@
   "end": 169.8
  },
  {
-  "file": "G_duel_fast.mp3",
+  "file": "G_duel_metal.mp3",
   "film": true,
   "t": 0,
   "end": 195.969,
-  "offset": 0.35,
+  "offset": 0.0,
   "hitStory": 170.0,
-  "hitFile": 0.5,
+  "hitFile": 0.0,
   "endStory": 191.3,
   "gain": 1.0,
   "fadeIn": 0.1,
