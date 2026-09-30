@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
+import { SHIELD_CLUNKS, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, inSkip, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -586,9 +586,8 @@ function duelCues() {
   ld(HERO_SNAP1 - 0.05, 'reload_whine', { at: 0, dur: 0.7, fadeOut: 0.2, rate: 1.1, gain: G * 0.5, pan: -0.1 });   // (no reload: a lock-on whine as it settles on the target)
   out.push([HERO_SNAP0, '@msBoost', { vel: G * 0.35, dur: 0.12, pan: -0.1 }]);
   ld(ENEMY_GRAB, 'enemy_draw', { rate: 0.85, gain: G * 0.8, pan: 0.2 });
+  SHIELD_CLUNKS.forEach((t, i) => ld(t, 'reload_slam', { rate: 0.7 + 0.08 * i, gain: G * 0.8, pan: 0.3 }));   // the spare shield plates racking out: clunk-clunk
   out.push([ENEMY_EYE + 0.02, '@beep', { f: 2600, dur: 0.05, vel: 0.35, pan: 0.2 }]);
-  [0, 0.35, 0.7].forEach((d, i) => ld(ENEMY_CHARGE0 + d, 'reload_whine', { at: 0.1, dur: 0.32, fadeOut: 0.08, rate: 0.75 + 0.2 * i, gain: G * (0.45 + 0.1 * i), pan: 0.2 }));
-  ld(ENEMY_CHARGE1 - 0.05, 'reload_hiss', { rate: 0.7, gain: G * 0.5, pan: 0.2 });
   // THE FINISH: the rifle slung (a servo clunk), the saber lit, the SANDEVISTAN (time folds: a deep inhaling whoomp,
   // the world's sound smeared low by the master slow-mo), the pass-cut (buzz + sizzle + armour parting), retract
   const FD = (a, b) => filmT(b) - filmT(a);                          // cue lengths in film seconds (the bullet time stretches them)

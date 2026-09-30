@@ -1749,7 +1749,12 @@ export function blockFrame(t) {
 }
 // THE BLOCK, done properly: the beam is a ray from his muzzle (as it moves with his recoil) and it stops where it meets
 // the struck face of the (enlarged) shield; the path it drags across the plate is kept in the shield's own frame
-export const bigShieldScale = (t) => { const up = smooth(178.42, 178.52, t), wide = smooth(178.48, 178.6, t), back = smooth(179.1, 179.35, t); return { sy: 1 + (up - back * up), sz: 1 + (wide - back * wide) }; };
+// the spare plates rack out of the shield in two hard, overshooting steps each way (clunk-clunk), just before the shot hits
+const clunk = (t, t0, d = 0.018) => { const u = sat((t - t0) / d); if (u <= 0) return 0; const c = 2.6; return 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2); };
+export const SHIELD_CLUNKS = [178.625, 178.645, 178.665, 178.685];   // (after the D09 cut has settled, inside the block's bullet time)
+export const bigShieldScale = (t) => { const back = smooth(179.1, 179.35, t);
+  const sy = 1 + 0.5 * clunk(t, SHIELD_CLUNKS[0]) + 0.5 * clunk(t, SHIELD_CLUNKS[2]), sz = 1 + 0.5 * clunk(t, SHIELD_CLUNKS[1]) + 0.5 * clunk(t, SHIELD_CLUNKS[3]);
+  return { sy: 1 + (sy - 1) * (1 - back), sz: 1 + (sz - 1) * (1 - back) }; };
 const BLOCK_C0 = BLOCK_T + 0.012, BLOCK_C1 = BLOCK_T + 0.26;   // the beam in contact with the plate
 let _bside = 0;
 function blockFaceX(t) {   // the local x of the struck (outer) face of the enlarged plate, the side turned to him

@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
 import { storyT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -836,7 +836,8 @@ function drawDroppedRifle(R, t) {
 function shieldScorch(e, t) {
   const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0) return;   // (the line reaches it ~8 ms after the event)
   const g = easeOut(sat(lt / 0.15));
-  e.dmgC = blockLocalAt(t); e.dmgR = 1.5 * (0.3 + 0.7 * g); e.dmgPart = 'shield'; e.damage = Math.max(e.damage || 0, 0.55 * g);   // patchy soot, cracks glowing
+  const P = blockPath(), a0 = P.length ? P[0].local : blockLocalAt(t), a1 = blockLocalAt(t), mid = [0, 1, 2].map((i) => (a0[i] + a1[i]) / 2);
+  e.dmgC = mid; e.dmgR = 1.5 * (0.3 + 0.7 * g) + 0.5 * Math.hypot(a1[1] - a0[1], a1[2] - a0[2]);   // the soot over the whole swept track (it stays) e.dmgPart = 'shield'; e.damage = Math.max(e.damage || 0, 0.55 * g);   // patchy soot, cracks glowing
 }
 // …and the shot's energy spreads out over its face from the hit in every direction and dies away: a ragged ring
 // racing out across the plate, radial pixel streaks skating flat along it, motes shed from the front fading behind
@@ -889,7 +890,7 @@ function drawBlockSplash(R, t) {
     for (const x of P) {
       if (x.t > t) break;
       const q = madd(M.transformPoint([0, 0, 0], F.S, x.local), nF, 0.6);
-      if (pa) { const age = t - x.t, hh = Math.exp(-age * 1.4), w2 = sat(hh * 1.6);
+      if (pa) { const age = t - x.t, hh = Math.exp(-age * 2.5) * (1 - smooth(0.12, 0.4, age)), w2 = sat(hh * 1.6);   // each bit cools from when it was hit: the first-struck end goes out first
         if (hh > 0.02) R.beam(pa, q, 0.35 + 0.25 * hh, [4 * hh, (0.6 + 2.2 * w2) * hh, (0.1 + 1.2 * w2 * w2) * hh], 0.35, 5, 0, 0.3); }
       pa = q; ta = x.t;
     } }
@@ -915,8 +916,7 @@ const SHIELD_FACE = [1.351, -2.337, 0.17];
 const _bsA = new Float32Array(16), _bsB = new Float32Array(16), _bsS = new Float32Array(16), _bsI = new Float32Array(16), _bsM = new Float32Array(16);
 let _bsHide = null;
 function drawBigShield(R, e, s, t) {
-  const up = smooth(178.42, 178.52, t), wide = smooth(178.48, 178.6, t), back = smooth(179.1, 179.35, t);
-  const sy = 1 + (up - back * up), sz = 1 + (wide - back * wide); if (sy < 1.002 && sz < 1.002) return;
+  const { sy, sz } = bigShieldScale(t); if (sy < 1.002 && sz < 1.002) return;   // (duel.js: it racks out in clunky steps)
   if (!_bsHide) { _bsHide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'shield') _bsHide[p.name] = 1; }
   e.hidden = { ...(e.hidden || {}), shield: 1 };
   const Ms = R.partWorld('enemy_ms', e, 'shield');
@@ -1108,7 +1108,7 @@ function drawEnemyMS(R, t, s, idx) {
   e.pose = s.pose; e.seed = 8 + idx; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
   if (s.noRifle) e.hidden = { ...(e.hidden || {}), rifle: 1 };                // (still on its back)
   if (!s.shieldLost) { shieldScorch(e, t); drawBlockSplash(R, t); drawBigShield(R, e, s, t); }
-  if (t > ENEMY_CHARGE0 - 0.1 && t < 176.4) drawEnemyCharge(R, t);
+  // (its rifle charge no longer shown: the shot cuts away as the muzzle comes up)
   if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
   if (idx === 2 && transK(t) > 0.001) drawRails(R, t, s);
   if (idx === 2 && t >= RIFLE_DROP_T) { e.hidden = { ...(e.hidden || {}), rifle: 1 }; drawDroppedRifle(R, t); }

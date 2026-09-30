@@ -16,7 +16,7 @@ export const SLOW_HITS = [178.73, 183.28, 190.95, 192.05];   // the gunfight: th
 export const SLOW_RANGES = [[183.95, 184.5, 0.45], [184.43, 184.57, 0.04], [184.57, 184.82, 0.12], [184.8, 185.02, 0.1], [185.69, 185.84, 0.09], [190.9, 191.1, 0.0298], [191.28, 192.2, 0.4], [192.015, 192.1, 0.025]];   // (+ its rifle transforming, + the Itano circus, + the rifle caught back (185.69–185.84))
 // story spans CUT OUT of the film (a hard cut straight across them: no film time at all) — scene 43 (its boost-jump and
 // inverted shot) removed 2026-09-30
-export const SKIP_RANGES = [[165.3, 167.4], [168.3, 169.0], [171.45, 172.35], [175.4, 176.3], [179.25, 180.45]];   // (+ 2026-09-30: scenes 30-37 tightened — the chase, the carnage, the aim hold, its charge hold)
+export const SKIP_RANGES = [[165.3, 167.4], [168.3, 169.0], [171.45, 172.35], [174.4, 176.35], [179.25, 180.45]];   // (+ 2026-09-30: scenes 30-37 tightened — the chase, the carnage, the aim hold, its charge (cut as soon as the muzzle comes up))
 export const inSkip = (s) => SKIP_RANGES.some(([a, e]) => s > a && s < e);
 export const SLOW_V = 0.2;                              // picture speed while slowed
 const SLOW_POST = 0.5 * SLOW_V;                         // story seconds held slow after the contact = 0.5 s on screen
