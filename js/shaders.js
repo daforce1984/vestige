@@ -690,7 +690,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     }
   }
   // cinematic hull detail (flagship: shade.z = material class 1 hull, 2 plate, 3 hull2, 4 greeble, 5 trim)
-  let hullFlag = inst.shade.z > 0.5 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01;   // flagship armour (any distance)
+  let hullFlag = inst.shade.z > 0.5 && inst.shade.z < 9.5 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01;   // flagship armour (any distance)
   let hullOn = hullFlag && pwLP < 1.5;   // beyond ~1.5 m/pixel the plating is sub-pixel: skip it
   if (hullFlag) { base = vec3f(0.092, 0.098, 0.114) * select(1.0, 1.12, inst.shade.z > 4.5); rough = 0.46; metal = 0.75; }   // every armour class: ONE gunmetal   // hull / plate / hull2: ONE gunmetal (no patchwork of materials)
   if (hullOn) {
@@ -707,6 +707,39 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     texAO *= hd.ao;
     let wt = normalize((inst.m * vec4f(tU * hd.tilt.x + tV * hd.tilt.y, 0.0)).xyz + vec3f(1e-6));
     n = normalize(n + wt * length(hd.tilt));
+  }
+  // VENATOR-STYLE ARMOUR (the enemy dreadnought: shade.z 10 hull / 11 hull2 / 12 dark / 13 metal / 14 marking): pale grey
+  // plating in staggered courses, each plate its own tone, dark recessed insets, fine seams, and Republic-red panels —
+  // a patchy red field down the dorsal centreline and a red stripe along the flanks (model space, triplanar by facing)
+  if (inst.shade.z > 9.5 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01) {
+    let cls = inst.shade.z; let ln = normalize(i.ln); let a = abs(ln);
+    var uvp = i.lp.xy;
+    if (a.x > a.y && a.x > a.z) { uvp = i.lp.zy; } else if (a.y > a.z) { uvp = i.lp.xz; }
+    let rowH = 5.5; let ry = floor(uvp.y / rowH);
+    let pw = 9.0 + 12.0 * hash31(vec3f(ry, 3.0, 9.0));
+    let px = uvp.x + hash31(vec3f(ry, 7.0, 1.0)) * pw;
+    let cell = vec2f(floor(px / pw), ry);
+    let q = vec2f(px - cell.x * pw, uvp.y - ry * rowH);
+    let de = min(min(q.x, pw - q.x), min(q.y, rowH - q.y));
+    let h = hash31(vec3f(cell, 11.0)); let h2 = hash31(vec3f(cell, 23.0));
+    let big = hash31(vec3f(floor(uvp / vec2f(18.0, 9.0)), 5.0));
+    var c = vec3f(0.30, 0.31, 0.33) * (0.92 + 0.12 * h) * (0.95 + 0.08 * big);             // pale grey plating
+    if (cls > 10.5 && cls < 11.5) { c = c * 0.8; }
+    if (cls > 11.5 && cls < 12.5) { c = vec3f(0.035, 0.037, 0.042) * (0.8 + 0.4 * h); }   // dark machinery
+    if (cls > 12.5 && cls < 13.5) { c = vec3f(0.22, 0.225, 0.235); }
+    let inset = step(0.92, h2) * step(cls, 11.5);                                         // recessed dark panels
+    c = mix(c, vec3f(0.11, 0.115, 0.125), inset);
+    // Republic red: the dorsal field (patchy, forward of amidships), scattered red plates up top, a stripe down each flank
+    let top = step(0.55, ln.y) * step(cls, 11.5);
+    let field = top * step(abs(i.lp.x), 16.0 + 6.0 * sin(i.lp.z * 0.02)) * step(-30.0, i.lp.z) * step(0.3, h);
+    let scat = top * step(0.86, h2) * step(h2, 0.92);
+    let side = step(0.7, a.x) * step(cls, 11.5) * (1.0 - smoothstep(0.0, 0.25, abs(i.lp.y - 20.0) - 1.1)) * step(-150.0, i.lp.z);
+    let red = clamp(max(max(field, scat), side) + step(13.5, cls), 0.0, 1.0);
+    c = mix(c, vec3f(0.30, 0.012, 0.008) * (0.85 + 0.25 * h), red * (1.0 - inset));
+    let seam = 1.0 - smoothstep(0.03, 0.09 + pwLP * 1.5, de);
+    base = c * (1.0 - 0.7 * seam);
+    rough = mix(0.62, 0.45, h) + 0.2 * inset; metal = mix(0.15, 0.35, step(11.5, cls));
+    texAO *= 1.0 - 0.5 * seam - 0.25 * inset;
   }
   // procedural asteroid (texSet = -1, tools/make_asteroids.py geometry): triplanar-free 3D regolith colour + bump.
   // Model space is ~unit radius, so every frequency scales with the rock.

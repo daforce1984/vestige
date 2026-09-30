@@ -11,7 +11,7 @@ const MODELS = [
   { name: 'assault_frigate', detail: 0.8 },
   { name: 'interceptor', detail: 0 }, { name: 'interceptor_b', detail: 0 }, { name: 'interceptor_c', detail: 0 },
   { name: 'enemy_frigate', detail: 0.9 },
-  { name: 'enemy_dreadnought', detail: 2.4, scale: 1.65 },   // a little bigger than our flagship
+  { name: 'enemy_dreadnought', detail: 2.4, scale: 1.65, venator: { paint: 10, paint2: 11, mech: 12, olive: 12, ring: 13, yellow: 14 } },   // a little bigger than our flagship; its armour in the Venator style (shaders.js venatorHull)
   ...['enemy_fighter', 'enemy_fighter_b', 'enemy_fighter_c'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256 })),   // every enemy fighter: assets/spaceship.glb (user-supplied) via tools/build_rifles.py
   { name: 'gundam', detail: 0, keep: MS_KEEP },
   { name: 'enemy_ms', detail: 0, keep: MS_KEEP },
@@ -255,6 +255,10 @@ async function boot() {
     await R.init();
     status.textContent = '모델 로딩…';
     await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp')]);
+    {   // the dreadnought's Venator-style repaint: its lights and lit strips burn blue-white instead of green / orange
+      const dm = R.models.enemy_dreadnought, E = { lime: [0.25, 0.55, 1.3], engine: [0.5, 0.85, 1.6], window: [0.75, 0.85, 1.0] };
+      if (dm) for (const m of dm.materials) if (E[m.name]) { m.emissive = E[m.name]; m.base = [0.1, 0.12, 0.16]; }
+    }
     const tris = R.modelList.reduce((s, m) => s + m.tris, 0);
     status.textContent = `준비 완료 · ${R.modelList.length} models · ${(tris / 1000).toFixed(0)}k tris`;
     $('#start .go').disabled = false; $('#duelBtn').disabled = false;

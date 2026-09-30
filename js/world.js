@@ -6,6 +6,7 @@ export { explosion };
 
 export const HIIG_ENGINE = [0.55, 0.8, 1.6];
 export const ENEMY_ENGINE = [2.0, 0.55, 0.15];
+export const DREAD_ENGINE = [0.45, 0.9, 2.4];   // the dreadnought's engines burn blue (its Venator-style repaint)
 export const HYPER_BLUE = [0.35, 0.65, 1.6];
 export const HYPER_RED = [1.8, 0.25, 0.15];
 export const ION_COL = [0.3, 0.6, 1.6];
@@ -922,7 +923,7 @@ function drawDreadnought(R, t, tmpM) {
       explosion(R, t, tk, M.transformPoint([0, 0, 0], e.m, lp), 40 + k * 5, 60 + k, 'ship');
     }
   }
-  engineGlows(R, 'enemy_dreadnought', e, ENEMY_ENGINE, 1.2, 0.8);
+  engineGlows(R, 'enemy_dreadnought', e, DREAD_ENGINE, 1.2, 0.8);
   GUN.dread = e;
   // gravity lance charge & fire
   if (t > 200 && t < LANCE_FIRE + 6) {

@@ -351,7 +351,7 @@ export class Renderer {
     for (const { s, g } of parsed) {
       verts.set(g.verts, vo); idx.set(g.indices, io);
       const model = {
-        name: s.name, detail: s.detail ?? 1, texSet: s.texSet || 0, texBit: s.texBit || 0, hullClass: s.hullDetail ? { hull: 1, plate: 2, hull2: 3, greeble: 4, trim: 5 } : null, parts: g.parts, materials: g.materials, empties: g.empties, bounds: g.bounds,
+        name: s.name, detail: s.detail ?? 1, texSet: s.texSet || 0, texBit: s.texBit || 0, hullClass: s.hullDetail ? { hull: 1, plate: 2, hull2: 3, greeble: 4, trim: 5 } : s.venator || null, parts: g.parts, materials: g.materials, empties: g.empties, bounds: g.bounds,
         baseVertex: vo / 8, baseIndex: io, entries: [], partIndex: {}, draws: [], prepass: !!s.prepass,
       };
       // ship engines burn BRIGHT: nozzle-face emission ×5 (HDR, so the bloom pass makes them glow); mechs keep theirs
