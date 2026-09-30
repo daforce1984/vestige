@@ -1153,7 +1153,7 @@ function duelHero_(t) {
   s.blurTrail = cc > 0 && cc < CIRCUS_END + 0.6 ? smooth(0.2, 0.8, cc) * (1 - smooth(CIRCUS_END, CIRCUS_END + 0.6, cc)) : 0;   // boosting through the circus: a short motion-blur smear behind him (shots.js)
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
-  { if (tw >= HERO_GRAB - 0.16 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); catchReach(s, tw); heroLeft(s, tw); transTwist(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
+  { if (tw >= HERO_GRAB - 0.3 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); catchReach(s, tw); heroLeft(s, tw); transTwist(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
   slashIK(s, tw);                                                   // the pass-cut: the blade swept exactly through its waist
   hitReact('hero', tw, s, 'gundam');
   // hand-over to the old aftermath formula (identical at t = 200)
@@ -1446,11 +1446,7 @@ function heroAim2H(s, target, k) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const tw = warp(s._t), wHip = styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip');
-  {   // the body turns into the shot: the target brought round to just right of his chest line, so the rifle is out beside him, never across his chest
-    const f0 = duelFK(s, 'gundam'), tl = r3v(r3T(r3(f0.torso)), sub(target, partPoint(f0, 'torso'))), az = Math.atan2(tl[0], tl[2]);
-    const yaw = clamp(az + 0.25, -1.5, 1.5) * k, t0 = s.pose.torso || [0, 0, 0];
-    s.pose.torso = [t0[0], t0[1] + yaw, t0[2]];
-  }
+  aimYaw(s, target, k);
   const fk = duelFK(s, 'gundam'), grip = M.transformPoint([0, 0, 0], fk.torso, lrp(HERO_GRIP, HERO_GRIP_HIP, wHip));
   const d = nrm(sub(target, grip)), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
   const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
@@ -1491,20 +1487,37 @@ function drawKey(tw) {
   const L = (x, y) => [0, 1, 2].map((c) => x[c] + (y[c] - x[c]) * e);
   return { g: L(a[1], b[1]), d: L(a[2], b[2]), roll: a[3] + (b[3] - a[3]) * e };
 }
+// the body turns into the shot: the target brought round to just right of his chest line, so the rifle is out beside
+// him, never across his chest (ramped in through the draw, so it never pops when the aim takes over)
+function aimYaw(s, target, k) {
+  if (k <= 0) return;
+  const f0 = duelFK(s, 'gundam'), tl = r3v(r3T(r3(f0.torso)), sub(target, partPoint(f0, 'torso'))), az = Math.atan2(tl[0], tl[2]);
+  const t0 = s.pose.torso || [0, 0, 0]; s.pose = { ...s.pose }; s.pose.torso = [t0[0], t0[1] + clamp(az + 0.25, -1.5, 1.5) * k, t0[2]];
+}
+// THE DRAW as one continuous move (no dead stops): off the back mount, up past his right shoulder muzzle-high, swung down
+// and forward onto the target — a time-based Hermite curve through the keys (torso frame), easing only at its two ends
+const DRAW_KEYS = () => [[HERO_GRAB, HERO_BACK_G, HERO_BACK_D], [170.38, [-3.2, 5.7, -2.3], [0.25, -0.2, -0.95]], [170.52, [-3.4, 6.0, -0.4], [0.08, 0.97, -0.2]], [170.8, [-3.9, 4.2, 2.4], [0.0, 0.5, 1.0]]];   // (off the back → muzzle pointing back → up → forward: it turns over the shoulder about one axis, like a blade drawn from the back)
 function heroDraw(s, tw) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
-  const fk = duelFK(s, 'gundam'), T = r3(fk.torso), kd = drawKey(Math.min(tw, HERO_SNAP0));
-  let grip = M.transformPoint([0, 0, 0], fk.torso, kd.g), d = nrm(r3v(T, kd.d)), roll = kd.roll * DEG;
-  if (tw > HERO_SNAP0) {                                              // the snap onto the target (ease-out-back)
-    const u = easeBack(sat((tw - HERO_SNAP0) / (HERO_SNAP1 - HERO_SNAP0))), G1 = M.transformPoint([0, 0, 0], fk.torso, HERO_GRIP), d1 = nrm(sub(heroAimPoint(tw), G1));
-    grip = lrp(grip, G1, u); d = nrm(lrp(d, d1, u)); roll *= 1 - Math.min(1, u);
-  }
-  const up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0])), U0 = nrm(sub(up0, scl(d, V.dot(up0, d))));
-  const X0 = V.cross([0, 0, 0], U0, d), U = add(scl(U0, Math.cos(roll)), scl(X0, Math.sin(roll))), X = V.cross([0, 0, 0], U, d);
+  const tgt = heroAimPoint(tw);
+  aimYaw(s, tgt, smooth(170.45, HERO_SNAP1, tw));
+  const fk = duelFK(s, 'gundam'), T = r3(fk.torso), Ti = r3T(T);
+  const G1w = M.transformPoint([0, 0, 0], fk.torso, HERO_GRIP), d1 = r3v(Ti, nrm(sub(tgt, G1w)));
+  const K = [...DRAW_KEYS(), [HERO_SNAP1, HERO_GRIP, d1]];
+  const x = clamp(tw, K[0][0], K[K.length - 1][0]);
+  let i = 0; while (i < K.length - 2 && x > K[i + 1][0]) i++;
+  const tA = K[i][0], tB = K[i + 1][0], h = tB - tA, u = (x - tA) / h;
+  const herm = (c) => [0, 1, 2].map((q) => {
+    const m = (j) => (j <= 0 || j >= K.length - 1 ? 0 : (K[j + 1][c][q] - K[j - 1][c][q]) / (K[j + 1][0] - K[j - 1][0]));
+    const h00 = 2 * u * u * u - 3 * u * u + 1, h10 = u * u * u - 2 * u * u + u, h01 = -2 * u * u * u + 3 * u * u, h11 = u * u * u - u * u;
+    return h00 * K[i][c][q] + h10 * h * m(i) + h01 * K[i + 1][c][q] + h11 * h * m(i + 1);
+  });
+  const grip = M.transformPoint([0, 0, 0], fk.torso, herm(1)), d = nrm(r3v(T, nrm(herm(2))));
+  const up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0])), U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
   const Rh = r3mul([...X, ...U, ...d], r3T(RQ3()));
-  heroArmPlace(s, fk, grip, r3mul(Rh, RQ3()));                      // (the wrist locked: arm + rifle as one — see heroArmPlace)
-  const k = smooth(HERO_GRAB - 0.2, HERO_GRAB - 0.1, tw);            // the hand gets to the grip fast
+  heroArmPlace(s, fk, grip, r3mul(Rh, RQ3()));
+  const k = smooth(HERO_GRAB - 0.3, HERO_GRAB - 0.04, tw);            // the hand goes back for the grip
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
 const heroLeftW = (tw) => smooth(HERO_SNAP0, HERO_SNAP0 + 0.2, tw) * (1 - smooth(190.85, 191.05, tw)) * (1 - saberBusy(tw)) * (1 - Math.max(styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip'), styleW(tw, HERO_SHOTS, HERO_STYLE, 'snap')));   // on from the pac grab through the whole gunfight

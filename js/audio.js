@@ -701,6 +701,9 @@ function duelCues() {
   // his 178.7 splashes off its shield: the plate rings, the face burns (the hole stays)
   out.push([BLOCK_T + 0.03, 'magic_impact', { at: 'hit', gain: G * 1.1, pan: 0.3, prio: 9, norand: true }]);   // the splash on the shield: Pixabay 'Elemental Magic Spell Impact Outgoing' (front 1.1 s)
   out.push([BLOCK_T + 0.03, '@sparkBurst', { vel: G * 0.6, pan: 0.3 }]);
+  // the beam dragged across the plate: a hot electric SIZZLE for as long as it burns on the shield, fading as the face cools
+  out.push([BLOCK_T + 0.015, 'cut_sizzle', { at: 0, dur: FD(BLOCK_T + 0.015, BLOCK_T + 0.42), fadeIn: 0.03, fadeOut: 0.5, rate: 1.15, gain: G * 1.1, pan: 0.3, prio: 9, norand: true }]);
+  out.push([BLOCK_T + 0.02, '@crackle', { dur: FD(BLOCK_T + 0.02, BLOCK_T + 0.3), vel: G * 0.45, pan: 0.3 }]);
   // ---- its ULTIMATE: the back charging while it gathers in, a dozen heavy beams tearing out of it at once, their roar as
   //      they bend round onto him, and the chain of blasts where they converge (he is already gone)
   out.push([189.85, 'charge_up', { at: 0, dur: FD(189.85, FINALE_T), fadeOut: 0.05, rate: 0.75, gain: G * 0.95, pan: 0.2, prio: 8, norand: true }]);
