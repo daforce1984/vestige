@@ -40,6 +40,11 @@ function againstPlanet(c, target, dist, lift, side, fov, roll = 0, lookBias = 0.
   camLook(c, pos, look, fov, roll);
 }
 function spaceEnv(t) {
+  if (t >= EARTH_T) return {   // home: the original dark space round Earth (the warm key, near-black sky, no nebula)
+    time: t, sunDir: SUN, sunCol: [2.5, 2.12, 1.62], ambUp: [0.2, 0.25, 0.34], ambDown: [0.16, 0.11, 0.07], ambient: 1.9,
+    nebula: 0, stars: 0.8, sunDisc: 1, sun2Dir: null, sun2Col: [0.45, 0.56, 0.85],
+    sky: [0.010, 0.011, 0.013, 0.6], planet: null, shadows: true, shadowCenter: [0, 0, 0], shadowRadius: 400,
+  };
   return {
     // lighting after the concept-art reference: warm key, cool soft skylight from above, warm bounce from below,
     // slate-blue space haze instead of pure black, gentle contrast
@@ -2775,7 +2780,8 @@ export function frame(R, film) {
   }
   s.fn(ctx);
   if (WIDE_SHOTS.has(s.name)) wideTreatment(ctx);
-  if (t >= 120 && t < 150.6) { ctx.post.motionBlur = 0; ctx.post.shakeBlur = 0; }   // the fighters' dogfight (120–150.6): crisp, no motion blur
+  if (t >= 120 && t < 150.6) { ctx.post.motionBlur = 0; ctx.post.shakeBlur = 0; }
+  if (t >= EARTH_T) { ctx.post.saturation = 0.9; ctx.post.contrast = 1.08; ctx.post.gradeShadows = [0.92, 0.98, 1.06]; ctx.post.gradeHighlights = [1.08, 1.0, 0.9]; }   // (home keeps its original grade)   // the fighters' dogfight (120–150.6): crisp, no motion blur
   // from scene 5 on (the fleet assembles, 40 s) the same MOON hangs in the background of every exterior shot — nothing
   // else; its place in the frame is fixed per shot (from the shot's mid-point camera) on the sunward side
   if (moonDir && ctx.world && !ctx.hangar && !(ctx.env.planet && ctx.env.planet.earth) && !ctx.env.interior) {
