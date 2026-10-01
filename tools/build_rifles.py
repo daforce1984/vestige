@@ -14,7 +14,7 @@ from glbload import load, image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 A = lambda p: os.path.join(ROOT, 'assets', p)
 
-def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, skip=(), empties=None):
+def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, skip=(), empties=None, tex=True):
     prims, g, blob = load(A(src))
     prims = [p for p in prims if g.materials[p['mat']].name not in skip]
     texOf = lambda m: g.materials[m].pbrMetallicRoughness.baseColorTexture.index
@@ -33,7 +33,7 @@ def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, sk
         if pr.metallicRoughnessTexture is not None:
             orm.paste(image(g, blob, g.textures[pr.metallicRoughnessTexture.index].source).convert('RGB').resize((cell, cell), Image.LANCZOS), (c * cell, r * cell))
     os.makedirs(A('tex'), exist_ok=True)
-    alb.save(A(f'tex/{name}_albedo.png')); orm.save(A(f'tex/{name}_orm.png'))
+    if tex: alb.save(A(f'tex/{name}_albedo.png')); orm.save(A(f'tex/{name}_orm.png'))   # (an LOD shares its full model's atlas)
     P, N, U, I = [], [], [], []; base = 0
     for p in prims:
         c, r = slot[first[texOf(p['mat'])]]
@@ -83,9 +83,9 @@ build('src/rifle1.glb', 'rifle1_game', np.array([0, -0.85, -1.23]), np.array([[-
 # the enemy fighters (every enemy_fighter* variant): assets/spaceship.glb (user-supplied), nose +z already; centred, ×0.95, its
 # one texture set packed the same way (red lights in the emissive map), an 'engine' disc on the rear nozzle
 build('src/spaceship.glb', 'spaceship_game', np.array([0, 1.67, 0]), np.eye(3), 0.95, 1024, emis_tex)   # (CC BY-NC-ND: a technical conversion only — no geometry added; its engine emitter is given in js/main.js)
-# our fighters (every interceptor variant): assets/light_fighter.glb (user-supplied, Kerem Kavalci, Sketchfab Standard), nose +z;
+# our fighters (every interceptor variant): assets/src/light_fighter.glb decimated to 0.1 (light_fighter_dec.glb) (user-supplied, Kerem Kavalci, Sketchfab Standard), nose +z;
 # centred, ×0.75 to the old interceptor's length, its two texture sets packed into one atlas, engine discs on the rear block
-build('src/light_fighter.glb', 'light_fighter_game', np.array([0, 1.4, 0]), np.eye(3), 0.75, 1024, emis_tex, engines=[(-0.58, 1.8, -5.58, 0.12), (0.58, 1.8, -5.58, 0.12)])
+build('src/light_fighter_dec.glb', 'light_fighter_game', np.array([0, 1.4, 0]), np.eye(3), 0.75, 1024, emis_tex, engines=[(-0.58, 1.8, -5.58, 0.12), (0.58, 1.8, -5.58, 0.12)])
 # the enemy dreadnought: assets/space_battleship_aquamarine.glb (user-supplied; Kai Xiang, CC BY 4.0), bow +z; its display
 # plane (lambert1) dropped, centred and ×2.53 to the old hull's length (x1.65 more in the scene), seven texture sets in a
 # 3×3 wrapped atlas (its UVs tile), engine discs on its eight rear nozzles, lance_emitter at the bow cannon's muzzle
@@ -93,3 +93,8 @@ _N = [(x, 16.9, -56.75, r) for (x, r) in [(10.6, 2.9), (16.0, 2.4), (20.1, 1.8),
 # (source: blender/decimate_glb.py on assets/src/space_battleship_aquamarine.glb at 0.45 → assets/src/aquamarine_dec.glb, 113k → 51k triangles)
 build('src/aquamarine_dec.glb', 'dreadnought_game', np.array([0, 18.6, 17.6]), np.eye(3), 2.53, 768, emis_tex,
       engines=[(x, y, z, r) for (x, y, z, r) in _N], wrap=True, skip=('lambert1',), empties={'lance_emitter': (0, 11.25, 103.6)})
+# LODs (2026-10-01, speed): decimated sources (blender/decimate_glb.py) built onto the SAME atlas as their full models
+# light fighter: 72.7k → 7.3k triangles for the near model (above), 1.8k for the far one; dreadnought far / wreck chunks: 5.7k
+build('src/light_fighter_lod.glb', 'light_fighter_game_lod', np.array([0, 1.4, 0]), np.eye(3), 0.75, 1024, emis_tex, engines=[(-0.58, 1.8, -5.58, 0.12), (0.58, 1.8, -5.58, 0.12)], tex=False)
+build('src/aquamarine_lod.glb', 'dreadnought_game_lod', np.array([0, 18.6, 17.6]), np.eye(3), 2.53, 768, emis_tex,
+      engines=[(x, y, z, r) for (x, y, z, r) in _N], wrap=True, skip=('lambert1',), empties={'lance_emitter': (0, 11.25, 103.6)}, tex=False)

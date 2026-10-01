@@ -11,7 +11,8 @@ const MODELS = [
   { name: 'assault_frigate', detail: 0.8 },
   ...['interceptor', 'interceptor_b', 'interceptor_c'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })),   // our fighters: assets/light_fighter.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_frigate', detail: 0.9 },
-  { name: 'enemy_dreadnought', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game.glb', texSet: 7, texBit: 4096 },   // a little bigger than our flagship: 'Space Battleship Aquamarine' (Kai Xiang, CC BY 4.0) via tools/build_rifles.py
+  { name: 'enemy_dreadnought', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game.glb', texSet: 7, texBit: 4096 },
+  { name: 'enemy_dreadnought_lod', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game_lod.glb', texSet: 7, texBit: 4096 },   // far away, and its wreck chunks (5.7k triangles)   // a little bigger than our flagship: 'Space Battleship Aquamarine' (Kai Xiang, CC BY 4.0) via tools/build_rifles.py
   ...['enemy_fighter', 'enemy_fighter_b', 'enemy_fighter_c'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256, engines: [[0, 0.74, -4.89, 0.33]] })),   // every enemy fighter: assets/spaceship.glb (user-supplied) via tools/build_rifles.py
   { name: 'gundam', detail: 0, keep: MS_KEEP },
   { name: 'enemy_ms', detail: 0, keep: MS_KEEP },
@@ -24,10 +25,11 @@ const MODELS = [
   { name: 'mech_hand', detail: 0, keep: ['palm', 'f0_1', 'f0_2', 'f0_3', 'f1_1', 'f1_2', 'f1_3', 'f2_1', 'f2_2', 'f2_3', 'f3_1', 'f3_2', 'f3_3', 'thumbR_1', 'thumbR_2', 'thumbL_1', 'thumbL_2'] },
   { name: 'mother_bay', detail: 0, sortAxis: [1, 0, 0], prepass: true },
   { name: 'bay_props', detail: 0.3, keep: ['crate0', 'crate1', 'container', 'barrel', 'tank', 'panel0', 'panel1', 'rib', 'cable', 'toolcart', 'seat', 'person0', 'person1', 'person2', 'person3'] },
-  { name: 'moon', detail: 0 },
-  { name: 'ion_frigate_lod', detail: 0 }, { name: 'assault_frigate_lod', detail: 0 }, ...['interceptor_lod', 'interceptor_b_lod', 'interceptor_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })), ...['enemy_fighter_lod', 'enemy_fighter_b_lod', 'enemy_fighter_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256, engines: [[0, 0.74, -4.89, 0.33]] })), { name: 'enemy_frigate_lod', detail: 0 },   // blender/make_lods.py (distance LOD)                                        // tools/make_moon.py
+  { name: 'moon', detail: 0, drawLast: true },
+  { name: 'ion_frigate_lod', detail: 0 }, { name: 'assault_frigate_lod', detail: 0 }, ...['interceptor_lod', 'interceptor_b_lod', 'interceptor_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game_lod.glb', texSet: 6, texBit: 1024 })), ...['enemy_fighter_lod', 'enemy_fighter_b_lod', 'enemy_fighter_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256, engines: [[0, 0.74, -4.89, 0.33]] })), { name: 'enemy_frigate_lod', detail: 0 }, { name: 'ion_frigate_far', detail: 0 }, { name: 'assault_frigate_far', detail: 0 }, { name: 'enemy_frigate_far', detail: 0 },   // blender/make_lods.py (distance LOD; the light fighter's: 1.8k triangles)                                        // tools/make_moon.py
   { name: 'wound_rim', detail: 0 },                                   // tools/make_wound_rim.py
   { name: 'asteroids', detail: 0, keep: ['ast0', 'ast1', 'ast2', 'ast3', 'ast4', 'ast5'] },   // tools/make_asteroids.py
+  { name: 'asteroids_lod', detail: 0, keep: ['ast0', 'ast1', 'ast2', 'ast3', 'ast4', 'ast5'] },   // (blender/decimate_glb.py 0.15: 3k triangles a rock)
   { name: 'debris', detail: 0.6, keep: ['rock0', 'rock1', 'rock2', 'rock3', 'hull0', 'hull1', 'hull2', 'hull3'] },
 ].map((m) => ({ ...m, url: m.url || `assets/${m.name}.glb` }));
 
@@ -184,7 +186,7 @@ function updateText(film) {
 }
 
 // --------------------------------------------------------------- loop
-let fpsAcc = 0, fpsN = 0, fps = 0, lastT = performance.now();
+let fpsAcc = 0, fpsN = 0, fps = 0, lastT = performance.now(), cpuMs = 0, gpuMs = 0;   // (cpuMs: the frame's JS; gpuMs: until the GPU has finished it)
 const hud = $('#hud');
 const debug = qs.has('debug');
 // 24 fps playback: the film clock is quantized to 1/24 s frames; each frame averages `shutter`
@@ -194,7 +196,7 @@ const FPS = 24;
 let shutter = qs.has('shutter') ? Math.max(1, parseInt(qs.get('shutter'))) : 1;
 const autoShutter = false;
 let lastShot = null, lastFi = -1;
-let lastFrame = -1, gpuBusy = false, slowFrames = 0, fastFrames = 0;
+let lastFrame = -1, gpuPending = 0, slowFrames = 0, fastFrames = 0;
 function renderFilmFrame(fi) {
   const t0 = fi / FPS;
   // all shutter samples stay inside the shot that owns this frame (never blend across a cut)
@@ -212,21 +214,23 @@ function renderFilmFrame(fi) {
 function loop() {
   const tRaw = now();
   const fi = Math.floor(tRaw * FPS + 1e-6);
-  if (fi !== lastFrame && !gpuBusy) {
+  if (fi !== lastFrame && gpuPending < 2) {   // (up to 2 frames in flight: the submit→done round trip no longer caps the frame rate)
     lastFrame = fi;
     const t = fi / FPS;
     const w0 = performance.now();
     try {
       renderFilmFrame(fi);
+      cpuMs = cpuMs * 0.9 + (performance.now() - w0) * 0.1;
     } catch (e) {
       if (!loop.errs) loop.errs = 0;
       if (loop.errs++ < 5) console.error('frame error at t=' + t.toFixed(2), e);
     }
     // measure real GPU completion to adapt the shutter sample count (keeps a steady 24 fps)
-    gpuBusy = true;
+    gpuPending++;
     R.device.queue.onSubmittedWorkDone().then(() => {
-      gpuBusy = false;
+      gpuPending--;
       const ms = performance.now() - w0;
+      gpuMs = gpuMs * 0.9 + ms * 0.1;
       if (autoShutter) {
         if (ms > 36) { if (++slowFrames > 6 && shutter > 1) { shutter--; slowFrames = 0; } } else slowFrames = 0;
         if (ms < 18) { if (++fastFrames > 96 && shutter < 4) { shutter++; fastFrames = 0; } } else fastFrames = 0;
@@ -236,7 +240,8 @@ function loop() {
     const n = performance.now();
     fpsAcc += n - lastT; fpsN++; lastT = n;
     if (fpsAcc > 1000) { fps = (1000 * fpsN) / fpsAcc; fpsAcc = 0; fpsN = 0; }
-    if (debug) hud.textContent = `t=${t.toFixed(2)} f=${fi}  ${findShot(storyT(t)).name}  fps=${fps.toFixed(1)} shutter=${shutter}  draws=${R.stats.draws} inst=${R.stats.inst} spr=${R.stats.sprites}`;
+    const perf = `FPS ${fps.toFixed(1)} · frame ${gpuMs.toFixed(1)} ms (JS ${cpuMs.toFixed(1)} ms) · max ${(1000 / Math.max(gpuMs, 1)).toFixed(0)} fps`;
+    hud.textContent = debug ? `t=${t.toFixed(2)} f=${fi}  ${findShot(storyT(t)).name}  ${perf} shutter=${shutter}  draws=${R.stats.draws} inst=${R.stats.inst} spr=${R.stats.sprites}` : perf;   // (always on: the frame rate and what a frame costs)
     $('#bar').style.width = `${(100 * t) / DURATION}%`;
   }
   if (playing && stopAt !== null && tRaw >= stopAt) {         // "mech battle only": stop after the duel, back to the menu
@@ -272,7 +277,19 @@ async function boot() {
   requestAnimationFrame(loop);
   window.FILM = {
     R, get t() { return now(); }, get score() { return score; },
-    freeze(t) { frozen = t; lastFrame = -1; return t; }, unfreeze() { frozen = null; }, get shutter() { return shutter; }, set shutter(v) { shutter = v; lastFrame = -1; },
+    freeze(t) { frozen = t; lastFrame = -1; return t; },
+    // profiling: render the frame at film time `film` n times; average JS ms, ms until the GPU finished, and the counts
+    async bench(film, n = 8, mod = null) {
+      const js = [], tot = [];
+      for (let i = 0; i < n + 2; i++) {
+        await R.device.queue.onSubmittedWorkDone();
+        const w0 = performance.now(), ctx = frame(R, film); ctx.post.motionBlur = 0; if (mod) mod(ctx); R.render(ctx.cam, ctx.env, ctx.post, 0, 1);
+        const w1 = performance.now(); await R.device.queue.onSubmittedWorkDone(); const w2 = performance.now();
+        if (i >= 2) { js.push(w1 - w0); tot.push(w2 - w0); }
+      }
+      const med = (a) => +a.sort((x, y) => x - y)[a.length >> 1].toFixed(1);   // (medians: the GPU is shared, single frames spike)
+      return { film, js: med(js), total: med(tot), draws: R.stats.draws, inst: R.stats.inst, sprites: R.stats.sprites };
+    }, unfreeze() { frozen = null; }, get shutter() { return shutter; }, set shutter(v) { shutter = v; lastFrame = -1; },
     seek, pause, play: () => play(now()), shots: () => findShot(now()).name,
     stats: () => ({ ...R.stats, fps, w: R.width, h: R.height, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
   };

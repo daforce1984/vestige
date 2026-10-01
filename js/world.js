@@ -896,7 +896,7 @@ function drawDreadnought(R, t, tmpM) {
     }
   }
   if (t > DREAD_DIE + 0.4) {
-    if (t < EARTH_T) shatter(R, 'enemy_dreadnought', mat(M.new(), dreadPos(DREAD_DIE), [0, 0, 1]), t, DREAD_DIE, 77, [3, 3, 4], 0.7, { tint: [3, 1, 0.3], noGlow: true });   // (its lights are dead once it goes up)
+    if (t < EARTH_T) shatter(R, 'enemy_dreadnought_lod', mat(M.new(), dreadPos(DREAD_DIE), [0, 0, 1]), t, DREAD_DIE, 77, [3, 3, 4], 0.7, { tint: [3, 1, 0.3], noGlow: true });   // (its lights are dead once it goes up)
     return;
   }
   const e = R.add('enemy_dreadnought', mat(tmpM, hin.u < 1 ? hin.pos : pos, fwd));

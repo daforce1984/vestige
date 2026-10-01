@@ -72,10 +72,18 @@ export class Renderer {
     if (!navigator.gpu) throw new Error('WebGPU not available');
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
     if (!adapter) throw new Error('no GPU adapter');
+    const prof = new URLSearchParams(location.search).has('prof') && adapter.features.has('timestamp-query');   // ?prof: GPU time per pass
     this.device = await adapter.requestDevice({
       requiredLimits: { maxStorageBufferBindingSize: Math.min(adapter.limits.maxStorageBufferBindingSize, 256 << 20) },
+      requiredFeatures: prof ? ['timestamp-query'] : [],
     });
     const dev = this.device;
+    if (prof) {   // a query pair per pass; resolved after each frame, read back on request (R.profile())
+      this.qs = dev.createQuerySet({ type: 'timestamp', count: 64 });
+      this.qRes = dev.createBuffer({ size: 64 * 8, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
+      this.qRead = dev.createBuffer({ size: 64 * 8, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      this.qLabels = []; this.qBusy = false;
+    }
     dev.lost.then((info) => { console.error('GPU device lost:', info.message); this.lost = true; });
     dev.onuncapturederror = (e) => console.error('WebGPU error:', e.error.message);
     this.ctx = this.canvas.getContext('webgpu');
@@ -351,6 +359,7 @@ export class Renderer {
     for (const { s, g } of parsed) {
       verts.set(g.verts, vo); idx.set(g.indices, io);
       const model = {
+        radius: Math.hypot(...g.bounds.max.map((v, i) => Math.max(Math.abs(v), Math.abs(g.bounds.min[i])))) * (s.scale || 1),
         name: s.name, detail: s.detail ?? 1, texSet: s.texSet || 0, texBit: s.texBit || 0, hullClass: s.hullDetail ? { hull: 1, plate: 2, hull2: 3, greeble: 4, trim: 5 } : s.venator || null, parts: g.parts, materials: g.materials, empties: g.empties, bounds: g.bounds,
         baseVertex: vo / 8, baseIndex: io, entries: [], partIndex: {}, draws: [], prepass: !!s.prepass,
       };
@@ -386,6 +395,8 @@ export class Renderer {
       if (s.engines) model.emitPoints.engine = s.engines.map(([x, y, z, r]) => ({ part: 0, pos: [x, y, z], r }));   // thruster points given by the spec (a model we may not alter)
       vo += g.verts.length; io += g.indices.length;
     }
+    // drawLast: big background bodies (the moon) go after everything, so the depth test drops their pixels hidden behind ships
+    this.modelList.sort((a, b) => !!specs.find((s) => s.name === a.name)?.drawLast - !!specs.find((s) => s.name === b.name)?.drawLast);
     const dev = this.device;
     this.vbuf = dev.createBuffer({ size: verts.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
     dev.queue.writeBuffer(this.vbuf, 0, verts);
@@ -482,9 +493,10 @@ export class Renderer {
     // LOD: dense fleets / far ships / shatter chunks use the decimated copy (<name>_lod) beyond LOD_DIST × its length
     const lod = this.models[name + '_lod'];
     if (lod && this.camPos) {
-      const full = this.models[name], L = full ? full.bounds.max[2] - full.bounds.min[2] : 60;
+      const full = this.models[name], L = (full ? full.bounds.max[2] - full.bounds.min[2] : 60) * Math.hypot(matrix[0], matrix[1], matrix[2]);   // (its length on screen: × the matrix scale)
       const dx = matrix[12] - this.camPos[0], dy = matrix[13] - this.camPos[1], dz = matrix[14] - this.camPos[2];
-      if (dx * dx + dy * dy + dz * dz > (L * 5.5) * (L * 5.5)) name = name + '_lod';
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > (L * 3) * (L * 3)) name = this.models[name + '_far'] && d2 > (L * 12) * (L * 12) ? name + '_far' : name + '_lod';   // (3× its length: was 5.5; past 12× a ~2–3k-triangle copy, <name>_far)
     }
     const model = this.models[name];
     if (!model) return null;
@@ -597,17 +609,23 @@ export class Renderer {
       const ents = model.entries;
       if (!ents.length) continue;
       // compute part matrices for all entries -> store per entry
+      // shadow culling: entries that can reach the shadow map's area go FIRST, so the shadow pass draws only the leading
+      // instances of each draw (the rest are outside its ortho box and only cost time)
+      const sc = env.shadowCenter || [0, 0, 0], sR = (env.shadowRadius || 400) + (model.radius || 0);
+      for (const e of ents) { const dx = e.m[12] - sc[0], dy = e.m[13] - sc[1], dz = e.m[14] - sc[2]; e._sh = dx * dx + dy * dy + dz * dz < sR * sR; }
+      if (env.shadows !== false) ents.sort((a, b) => b._sh - a._sh);
       for (const e of ents) {
         this._partMatrices(model, e);
         if (!e.partM || e.partM.length < model.parts.length) e.partM = model.parts.map(() => new Float32Array(16));
         for (let p = 0; p < model.parts.length; p++) e.partM[p].set(model.partWorld[p]);
       }
       for (const d of model.draws) {
-        const first = n;
+        const first = n; let nSh = 0;
         for (const e of ents) {
           if (n >= MAX_INST) break;
           if (e.hidden && e.hidden[model.parts[d.part].name]) continue;
           if (e.hideMats && e.hideMats[d.matName]) continue;          // per-entry material hiding (e.g. craft replaced by live models)
+          if (e._sh) nSh++;
           const o = n * INST_FLOATS;
           I.set(e.partM[d.part], o);
           const mt = (e.matOverride && e.matOverride[d.matName]) || d.mat;
@@ -631,12 +649,13 @@ export class Renderer {
           I[o + 56] = e.shadeK ?? 1; I[o + 57] = e.soot || 0; I[o + 58] = model.hullClass ? (model.hullClass[d.matName] || 0) : 0; I[o + 59] = NO_RIM.has(model.name) ? -1 : e.rimK ?? 1;   // -1: no rim, no camera fill
           n++;
         }
-        if (n > first) draws.push(model.baseIndex + d.first, d.count, model.baseVertex, first, n - first, model.prepass ? 1 : 0);
+        if (n > first) draws.push(model.baseIndex + d.first, d.count, model.baseVertex, first, n - first, model.prepass ? 1 : 0, nSh);
+        if (this.triStats && n > first) this.triStats[model.name] = (this.triStats[model.name] || 0) + (d.count / 3) * (n - first);   // (FILM.R.triStats = {} to count triangles per model)
       }
     }
     if (n) dev.queue.writeBuffer(this.instBuf, 0, I, 0, n * INST_FLOATS);
     if (this.nSprites) dev.queue.writeBuffer(this.sprBuf, 0, this.sprData, 0, this.nSprites * 16);
-    this.stats.draws = draws.length / 5; this.stats.inst = n; this.stats.sprites = this.nSprites;
+    this.stats.draws = draws.length / 7; this.stats.inst = n; this.stats.sprites = this.nSprites;
 
     // ---- frame uniforms
     const f = this.frameData;
@@ -742,23 +761,28 @@ export class Renderer {
     dev.queue.writeBuffer(this.postUBO, 0, P);
 
     // ---- encode
-    const enc = dev.createCommandEncoder();
+    const enc0 = dev.createCommandEncoder();
+    const prof = this.qs && !this.qBusy;   // (profiling: every pass gets a timestamp pair, labelled in order)
+    if (prof) this.qLabels = [];
+    const enc = prof ? { beginRenderPass: (d) => { const k = this.qLabels.length; this.qLabels.push(d.label || 'pass' + k);
+      return enc0.beginRenderPass({ ...d, timestampWrites: { querySet: this.qs, beginningOfPassWriteIndex: 2 * k, endOfPassWriteIndex: 2 * k + 1 } }); }, finish: () => enc0.finish() } : enc0;
     const V_ = this.views;
-    const drawAll = (pass, only = -1) => {           // only: -1 all, 0 regular models, 1 prepass models
+    const drawAll = (pass, only = -1, shadow = false) => {           // only: -1 all, 0 regular models, 1 prepass models; shadow: the leading in-range instances only
       pass.setVertexBuffer(0, this.vbuf);
       pass.setIndexBuffer(this.ibuf, 'uint32');
       let any = false;
-      for (let k = 0; k < draws.length; k += 6) {
+      for (let k = 0; k < draws.length; k += 7) {
         if (only >= 0 && draws[k + 5] !== only) continue;
-        pass.drawIndexed(draws[k + 1], draws[k + 4], draws[k], draws[k + 2], draws[k + 3]); any = true;
+        const cnt = shadow ? draws[k + 6] : draws[k + 4]; if (!cnt) continue;
+        pass.drawIndexed(draws[k + 1], cnt, draws[k], draws[k + 2], draws[k + 3]); any = true;
       }
       return any;
     };
     if (env.shadows !== false && n) {
-      const sp_ = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: this.shadowView, depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } });
-      sp_.setPipeline(this.shadowPipe); sp_.setBindGroup(0, this.shadowBG); drawAll(sp_); sp_.end();
+      const sp_ = enc.beginRenderPass({ label: 'shadow', colorAttachments: [], depthStencilAttachment: { view: this.shadowView, depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } });
+      sp_.setPipeline(this.shadowPipe); sp_.setBindGroup(0, this.shadowBG); drawAll(sp_, -1, true); sp_.end();
     }
-    const mp = enc.beginRenderPass({
+    const mp = enc.beginRenderPass({ label: 'main',
       colorAttachments: [{ view: V_.msColor, resolveTarget: V_.hdr, loadOp: 'clear', storeOp: 'discard', clearValue: [0, 0, 0, 1] }],
       depthStencilAttachment: { view: V_.msDepth, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' },
     });
@@ -775,22 +799,22 @@ export class Renderer {
       if (drawAll(mp, 1)) { mp.setPipeline(this.meshEqPipe); drawAll(mp, 1); }
     }
     mp.end();
-    const dr = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: V_.depth1, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } });
+    const dr = enc.beginRenderPass({ label: 'depthResolve', colorAttachments: [], depthStencilAttachment: { view: V_.depth1, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } });
     dr.setPipeline(this.drPipe); dr.setBindGroup(0, this.drBG); dr.draw(3); dr.end();
-    const ep = enc.beginRenderPass({
+    const ep = enc.beginRenderPass({ label: 'sprites',
       colorAttachments: [{ view: V_.hdr, loadOp: 'load', storeOp: 'store' }, { view: V_.dist, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
       depthStencilAttachment: { view: V_.depth1, depthReadOnly: true },
     });
     if (this.nSprites) { ep.setPipeline(this.sprPipe); ep.setBindGroup(0, this.sprBG); ep.draw(6, this.nSprites); }
     ep.end();
-    const fs = (view, pipe, bg, load = false) => {
-      const p = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: load ? 'load' : 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }] });
+    const fs = (view, pipe, bg, load = false, label = 'post') => {
+      const p = enc.beginRenderPass({ label, colorAttachments: [{ view, loadOp: load ? 'load' : 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }] });
       p.setPipeline(pipe); p.setBindGroup(0, bg); p.draw(3); p.end();
     };
-    fs(V_.scene2, this.lensPipe, this.lensBG);
-    for (let i = 0; i < BLOOM_LEVELS; i++) fs(V_.bloom[i], i === 0 ? this.downPrePipe : this.downPipe, i === 0 ? this.downPreBG : this.downBG[i]);   // level 0: thresholded
-    for (let i = BLOOM_LEVELS - 1; i > 0; i--) fs(V_.bloom[i - 1], this.upPipe, this.upBG[i], true);
-    if (of <= 1) fs(this.ctx.getCurrentTexture().createView(), this.finalPipe, this.finalBG);
+    fs(V_.scene2, this.lensPipe, this.lensBG, false, 'lens');
+    for (let i = 0; i < BLOOM_LEVELS; i++) fs(V_.bloom[i], i === 0 ? this.downPrePipe : this.downPipe, i === 0 ? this.downPreBG : this.downBG[i], false, 'bloomDown' + i);   // level 0: thresholded
+    for (let i = BLOOM_LEVELS - 1; i > 0; i--) fs(V_.bloom[i - 1], this.upPipe, this.upBG[i], true, 'bloomUp' + i);
+    if (of <= 1) fs(this.ctx.getCurrentTexture().createView(), this.finalPipe, this.finalBG, false, 'final');
     else {
       const p = enc.beginRenderPass({ colorAttachments: [{ view: V_.accum, loadOp: sub === 0 ? 'clear' : 'load', storeOp: 'store', clearValue: [0, 0, 0, 0] }] });
       p.setPipeline(this.accumPipe); p.setBindGroup(0, this.accumBG); p.setBlendConstant([1 / of, 1 / of, 1 / of, 1 / of]); p.draw(3); p.end();
@@ -799,7 +823,19 @@ export class Renderer {
         q.setPipeline(this.blitPipe); q.setBindGroup(0, this.blitBG); q.draw(3); q.end();
       }
     }
+    if (prof) { const n = this.qLabels.length * 2; enc0.resolveQuerySet(this.qs, 0, n, this.qRes, 0); enc0.copyBufferToBuffer(this.qRes, 0, this.qRead, 0, n * 8); }
     dev.queue.submit([enc.finish()]);
+  }
+
+  /** ?prof only: GPU milliseconds per pass of the last frame rendered ({label: ms}) */
+  async profile() {
+    if (!this.qs) return null;
+    this.qBusy = true;
+    await this.qRead.mapAsync(GPUMapMode.READ);
+    const t = new BigInt64Array(this.qRead.getMappedRange().slice(0)); this.qRead.unmap();
+    const out = {}; this.qLabels.forEach((l, k) => { out[l] = (out[l] || 0) + Number(t[2 * k + 1] - t[2 * k]) / 1e6; });
+    this.qBusy = false;
+    return out;
   }
 
   _copyLight(i, l) {

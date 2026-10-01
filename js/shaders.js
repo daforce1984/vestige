@@ -221,7 +221,8 @@ fn skyColor(d0: vec3f) -> vec3f {
   var lglow = vec3f(0.0); var lhole = 0.0;
   var d = bendRay(d0, F.lensA, F.lensA2, &lglow, &lhole);
   d = bendRay(d, F.lensB, F.lensB2, &lglow, &lhole);
-  var col = nebula(d) * F.bg.x;
+  var col = vec3f(0.0);
+  if (F.bg.x > 0.0) { col = nebula(d) * F.bg.x; }   // (uniform branch: no nebula, no cost)
   var stars = starLayer(d, 110.0, 0.0, 0.018) * 1.0 + starLayer(d, 260.0, 3.0, 0.008) * 0.45 + starLayer(d, 620.0, 11.0, 0.005) * 0.25;
   col += stars * F.bg.y;
   // sun
@@ -423,10 +424,11 @@ fn seg7w(p: vec2f, d: i32, w: f32) -> f32 {           // 7-segment digit, p in [
 // than the moon mesh. ONE evaluation returns the analytic height gradient (for the bump), rim and ray brightness;
 // each octave only visits the 2×2×2 cells nearest the point (craters sit inside their cell).
 struct MC { g: vec3f, rim: f32, ray: f32 };
-fn moonCraters(q: vec3f, seed: f32) -> MC {
+fn moonCraters(q: vec3f, seed: f32, pw: f32) -> MC {   // pw: the pixel's footprint on the unit sphere
   var o: MC; o.g = vec3f(0.0); o.rim = 0.0; o.ray = 0.0;
   var sc = 14.0; var amp = 1.0;
   for (var oc = 0; oc < 4; oc++) {
+    if (oc > 0 && sc * pw > 0.25) { break; }                          // (craters under ~1.5 px: they only shimmer — skip the octave)
     let p = q * sc; let fl = floor(p); let off = step(vec3f(0.5), p - fl) - 1.0;
     for (var k = 0; k < 8; k++) {
       let c = fl + off + vec3f(f32(k & 1), f32((k >> 1) & 1), f32((k >> 2) & 1));
@@ -784,10 +786,13 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     // bump: height field gradient by central differences (fine pits and grit that the mesh cannot hold)
     let e = 0.004;
     let hq = fbm(q * 9.0 + 1.7, 3) * 0.6 + vnoise(q * 40.0) * 0.4;
-    let gx = (fbm((q + vec3f(e, 0.0, 0.0)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(e, 0.0, 0.0)) * 40.0) * 0.4 - hq) / e;
-    let gy = (fbm((q + vec3f(0.0, e, 0.0)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(0.0, e, 0.0)) * 40.0) * 0.4 - hq) / e;
-    let gz = (fbm((q + vec3f(0.0, 0.0, e)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(0.0, 0.0, e)) * 40.0) * 0.4 - hq) / e;
-    var gw = (inst.m * vec4f(gx, gy, gz, 0.0)).xyz;
+    var g3 = vec3f(0.0);
+    if (moonK < 0.5) {                                                 // (the moon's bump comes from its craters: this grit was ×0.2 there and cost a third of the moon's pixels)
+      g3.x = (fbm((q + vec3f(e, 0.0, 0.0)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(e, 0.0, 0.0)) * 40.0) * 0.4 - hq) / e;
+      g3.y = (fbm((q + vec3f(0.0, e, 0.0)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(0.0, e, 0.0)) * 40.0) * 0.4 - hq) / e;
+      g3.z = (fbm((q + vec3f(0.0, 0.0, e)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(0.0, 0.0, e)) * 40.0) * 0.4 - hq) / e;
+    }
+    var gw = (inst.m * vec4f(g3, 0.0)).xyz;
     gw = gw / max(length(inst.m[0].xyz), 1e-3);
     gw = gw - n * dot(gw, n);
     n = normalize(n - gw * 0.022 * (1.0 - 0.8 * moonK));
@@ -796,7 +801,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     if (moonK > 0.5) {
       // procedural crater field (4 octaves) — bump from its gradient, bright rims, a few ray systems, dark maria
       let qs = normalize(q);
-      let c0 = moonCraters(qs, 5.0);
+      let c0 = moonCraters(qs, 5.0, pwLP / max(length(q), 1e-3));
       var cg = (inst.m * vec4f(c0.g, 0.0)).xyz / max(length(inst.m[0].xyz), 1e-3);
       cg = cg - n * dot(cg, n);
       n = normalize(n - cg * 0.18);
@@ -1073,6 +1078,7 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
   var dist = vec2f(0.0);
   let tint = s.d.rgb;
   let t = F.camPos.w;
+  let pxR = 1.414 / max(length(fwidth(i.uv)), 1e-6);                  // the sprite's radius on screen in pixels (uniform flow)
   if (shape == 0) {
     // glow: core + halo
     let r = length(i.uv);
@@ -1154,15 +1160,16 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     let r2 = dot(i.uv, i.uv);
     if (r2 > 1.0) { discard; }
     let zmax = sqrt(1.0 - r2);
-    let NS = 9;
+    let NS = i32(round(mix(9.0, 5.0, smoothstep(150.0, 600.0, pxR))));   // (a ball filling the screen: its noise is far coarser than a pixel — fewer slices; the big overlapping ones were 100+ ms)
     let dz = 2.0 * zmax / f32(NS);
     var acc = vec3f(0.0); var tr = 1.0;
+    let q0 = vec3f(i.uv, 0.0) * 2.1 + vec3f(seed * 7.1, seed * 3.3, seed * 5.7 - age * 1.6);
+    let wv = vec3f(vnoise(q0 * 0.9 + 11.0), vnoise(q0 * 0.9 + 23.0), vnoise(q0 * 0.9 + 37.0)) - 0.5;   // the domain warp, once per ray (it is low-frequency: per slice it cost a third of the shader)
     for (var k = 0; k < NS; k++) {
       let z = -zmax + (f32(k) + 0.5) * dz;
       let pp = vec3f(i.uv, z);
       let rp = length(pp);
       let q = pp * 2.1 + vec3f(seed * 7.1, seed * 3.3, seed * 5.7 - age * 1.6);
-      let wv = vec3f(vnoise(q * 0.9 + 11.0), vnoise(q * 0.9 + 23.0), vnoise(q * 0.9 + 37.0)) - 0.5;
       let n = fbm(q + wv * 1.4, 3);
       let surf = 0.5 + 0.5 * n;                                            // the noisy, lumpy surface
       var d = smoothstep(surf, surf - 0.28, rp);
@@ -1171,6 +1178,7 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
       let e = d * dz;
       acc += fireRamp(temp) * max(temp, 0.05) * e * tr * 3.2;
       tr *= exp(-d * dz * 1.6);
+      if (tr < 0.03) { break; }                                            // (opaque already: the rest can't show)
     }
     col = acc * tint * s.d.a * pow(max(1.0 - age, 0.0), 0.7);
     alpha = 0.0;
