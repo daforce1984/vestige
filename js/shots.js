@@ -2218,12 +2218,15 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   if (k.name.startsWith('D12')) c.post.distort = 0;           // scene 45 (the dive): no screen distortion
                                    // (the strong fill + rim were for the mechs, which no longer take either — on the
   c.post.lensA = { enable: 0 };   // distant ships they only washed the hulls out white)   the well is far away: no background lensing (it smeared the planet into grey)
-  if (k.slowmo) { c.post.saturation = 0.75; c.post.streak = 0.45; c.post.gradeHighlights = [1.2, 1.0, 0.85]; }
-  if (k.sande) { c.post.gradeHighlights = [0.85, 1.15, 1.05]; c.post.gradeShadows = [0.95, 1.05, 1.12]; c.post.ca = 0.004; }   // SANDEVISTAN: a cold green-cyan cast, a touch of fringing
-  { // bullet time: the picture drains a little and the edges fall away while time crawls
+  // (2026-10-01: slow motion, bullet time and the Sandevistan no longer re-grade the picture — the shifts in saturation,
+  // tint, vignette and contrast made the colour jump from cut to cut; they keep only their light streaks / fringing)
+  if (k.slowmo) c.post.streak = 0.45;
+  if (k.sande) c.post.ca = 0.004;
+  { // bullet time: only the light streaks stretch while time crawls (no grade change)
     const bs = slowHit(FILM_NOW);
-    if (bs > 0) { c.post.saturation = lerp(c.post.saturation ?? 0.9, 0.62, bs); c.post.vignette = lerp(c.post.vignette ?? 0.8, 1.25, bs); c.post.contrast = lerp(c.post.contrast ?? 1.08, 1.16, bs); c.post.streak = Math.max(c.post.streak ?? 0, 0.4 * bs); }
+    if (bs > 0) c.post.streak = Math.max(c.post.streak ?? 0.22, lerp(0.22, 0.45, bs));
   }
+
   // ---- the second RONIN from above (180.9–184.4): sensor spike → a silhouette against the light → the dive
   {
     const t = c.t, R = c.R;
