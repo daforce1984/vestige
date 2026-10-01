@@ -22,8 +22,8 @@ export const SKIP_RANGES = [[165.3, 167.4], [168.3, 169.0], [171.45, 172.35], [1
 export const CUT_RANGES = [
   [70.5, 72.8], [77.9, 81.2], [85.8, 91.8], [99.0, 101.8], [107.0, 108.8], [131.2, 134.2], [139.0, 140.0],
   [150.6, 152.0], [154.2, 155.6], [158.3, 159.2], [160.6, 162.2],
-  [195.8, 198.8], [200.0, 201.9], [212.6, 215.2], [220.5, 224.2], [242.8, 243.8], [249.0, 254.5], [259.0, 261.0], [263.3, 265.1],
-  [282.5, 286.8], [295.9, 297.3], [307.4, 308.4], [314.5, 319.8]];
+  [195.8, 198.8], [200.0, 201.9], [212.6, 215.2], [220.5, 224.2], [249.0, 255.0], [263.3, 265.1],   // (2026-10-01: no jump cuts inside the dive shots — he seemed to teleport; the implosion's shockwave shown in full)
+  [295.9, 297.3], [307.4, 308.4], [314.5, 319.8]];
 const cutBefore = (s) => CUT_RANGES.reduce((a, [x, e]) => a + Math.max(0, Math.min(s, e) - x), 0);
 export const inSkip = (s) => SKIP_RANGES.some(([a, e]) => s > a && s < e) || CUT_RANGES.some(([a, e]) => s > a && s < e);
 export const SLOW_V = 0.2;                              // picture speed while slowed

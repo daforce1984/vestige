@@ -1678,7 +1678,17 @@ fn h12(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(12.9898, 78.233))) * 437
     var fl = vec3f(1.0, 0.92, 0.8) * exp(-r * 38.0) * 3.0                       // hot core
            + vec3f(1.0, 0.7, 0.42) * (exp(-r * r * 60.0) * 0.28 + exp(-r * 5.0) * 0.06)   // warm glare: soft gaussian + faint wide tail (no hard-edged disc)
            + vec3f(1.0, 0.75, 0.5) * rays * exp(-r * 9.0) * 0.35;               // starburst (short, subtle)
-    // (no chromatic ghost discs / halo ring: they read as stray fake dots of light across the frame)
+    // a real lens flare: an anamorphic streak through the sun, a faint halo ring and soft chromatic ghosts strung along
+    // the sun → centre line (soft-edged, low: they read as glass, not as stray dots)
+    fl += vec3f(0.55, 0.75, 1.0) * exp(-abs(d.y) * 220.0) * exp(-abs(d.x) * 2.2) * 0.55;
+    fl += vec3f(0.6, 0.8, 1.0) * exp(-pow((r - 0.22) / 0.012, 2.0)) * 0.035;
+    let axisG = vec2f(0.5) - sp;
+    for (var g = 0; g < 5; g++) {
+      let kg = array<f32, 5>(0.35, 0.62, 0.95, 1.3, 1.7)[g]; let rg = array<f32, 5>(0.028, 0.06, 0.018, 0.085, 0.045)[g];
+      let cg = array<vec3f, 5>(vec3f(0.9, 0.6, 0.3), vec3f(0.35, 0.7, 1.0), vec3f(1.0, 0.85, 0.5), vec3f(0.4, 1.0, 0.65), vec3f(0.8, 0.45, 1.0))[g];
+      let gd = length((uv - (sp + axisG * kg)) * asp2);
+      fl += cg * (1.0 - smoothstep(rg * 0.55, rg, gd)) * (0.6 + 0.4 * smoothstep(rg * 0.3, rg, gd)) * 0.07;
+    }
     col += fl * I;
   }
   // god rays: radial march over bloom toward light

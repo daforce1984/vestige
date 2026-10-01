@@ -312,7 +312,7 @@ export function gundamState(t) {
   const r = gundamStateRaw(t, s);
   // the beam RIFLE from the launch to the dive; he puts it away on his back at 257.6–258.3 (over the shoulder) and
   // draws the beam SABER at 270.2 for the ram into the core
-  r.weapon = t < 170 ? 'back' : t < 258.3 ? 'rifle' : t < 265.9 ? 'none' : 'saber';
+  r.weapon = t < 170 ? 'back' : t < FLING_T ? 'rifle' : t < 263 ? 'flung' : t < 265.9 ? 'none' : 'saber';   // (the rifle flung away before the well: FLING_T)
   if (t < 262) r.saber = 0;
   return r;
 }
@@ -389,9 +389,14 @@ function gundamStateRaw(t, s) {
     blendPose('flight', 'flight', 0, s.pose);
     s.pitch = 0.9 * smooth(240.9, 241.5, t) * (1 - smooth(258, 262, t)); s.thr = t < 241.3 ? 0.4 : 1; s.boostK = smooth(241.2, 241.45, t);
     s.roll = Math.sin(t * 0.5) * 0.05;
-    const st = smooth(257.6, 258.0, t) * (1 - smooth(258.3, 258.8, t));   // puts the rifle away over his shoulder onto the pack
-    if (st > 0) { s.pose.arm_R_upper = [lerp(s.pose.arm_R_upper[0], -2.7, st), lerp(s.pose.arm_R_upper[1], -0.4, st), lerp(s.pose.arm_R_upper[2], -0.3, st)];
-      s.pose.arm_R_lower = [lerp(s.pose.arm_R_lower[0], -1.6, st), 0, 0]; }
+    // he flings the rifle away before the well: the arm wound in across him, then thrown out wide to his right (it leaves
+    // the hand at FLING_T) and brought back in
+    const wd = smooth(FLING_T - 0.4, FLING_T - 0.1, t) * (1 - smooth(FLING_T - 0.1, FLING_T, t)), fl = smooth(FLING_T - 0.1, FLING_T, t) * (1 - smooth(FLING_T + 0.25, FLING_T + 0.7, t));
+    if (wd + fl > 0) {
+      const a0 = s.pose.arm_R_upper, b0 = s.pose.arm_R_lower;
+      s.pose.arm_R_upper = [lerp(lerp(a0[0], -1.3, wd), -0.5, fl), lerp(lerp(a0[1], 0.5, wd), 0, fl), lerp(lerp(a0[2], 0.4, wd), -1.45, fl)];
+      s.pose.arm_R_lower = [lerp(lerp(b0[0], -1.8, wd), -0.1, fl), 0, 0];
+    }
   } else if (t < 278) {
     // BERSERK: feral lunges into the shield (263.4 / 265.0 / 266.6), shatter 268, rush 270–272.8, slash 273
     const z = berserkZ(t);
@@ -760,6 +765,7 @@ export function drawGundam(R, t, s, opts = {}) {
   // in hand: on hand_R through the grip frame in duel.js (RIFLE_T / RIFLE_Q) — the same one the IK solves for
   if (weapon === 'rifle' && !s.fpv) { const rw = M.mul(new Float32Array(16), R.partWorld('gundam', e, 'hand_R'), M.fromTRS(new Float32Array(16), RIFLE_T, RIFLE_Q, 1)); if (rw) { M.fromTRS(_hrS, [0, 0, 0], [0, 0, 0, 1], 1); _hrS[0] = HERO_RIFLE_S[0]; _hrS[5] = HERO_RIFLE_S[1]; _hrS[10] = HERO_RIFLE_S[2];
     const g = R.add('hero_rifle', M.mul(new Float32Array(16), rw, _hrS)); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }
+  if (weapon === 'flung' && !s.fpv) { const m = flungRifle(t); if (m) { const g = R.add('hero_rifle', m); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }   // flung away before the well
   if (weapon === 'thrown' && !s.fpv) { const m = heroRifleThrow(t); if (m) { const g = R.add('hero_rifle', m); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }   // tossed aside for the saber cut
   if (weapon === 'back' && !s.fpv) { const tw = R.partWorld('gundam', e, 'torso'); if (tw) { const g = R.add('hero_rifle', M.mul(new Float32Array(16), tw, heroBackMount())); if (g) { g.seed = 5.5; g.wear = 0; g.damage = s.damage; g.texSet = R.texLoaded & 16 ? 3 : 0; } } }   // slung on his back
   if (s.fpv) {
@@ -1225,6 +1231,23 @@ function e1Muzzle(tf) {                  // pure function of time (cached): the 
     _e1m.set(tf, p);
   }
   return p;
+}
+// the rifle flung away before the well (FLING_T): from his hand at the release, out to his right and tumbling, keeping
+// only part of his speed — he dives on and leaves it behind
+export const FLING_T = 257.8;
+let _fl = null;
+function flungRifle(t) {
+  if (!_fl) {
+    const s0 = gundamState(FLING_T), fk = duelFK({ ...s0, saber: 0 }, 'gundam'), m0 = Float32Array.from(fk.rifle);
+    const vS = V.scale([0, 0, 0], V.sub([0, 0, 0], gundamState(FLING_T + 0.02).pos, gundamState(FLING_T - 0.02).pos), 25);
+    const right = V.norm([0, 0, 0], M.transformDir([0, 0, 0], fk.torso, [-1, 0, 0]));
+    _fl = { m0, p0: [m0[12], m0[13], m0[14]], v: V.madd([0, 0, 0], V.scale([0, 0, 0], vS, 0.55), right, 45) };
+  }
+  const lt = t - FLING_T; if (lt < 0) return null;
+  const m = Float32Array.from(_fl.m0), p = V.madd([0, 0, 0], _fl.p0, _fl.v, lt);
+  const spin = new Float32Array(16); M.fromTRS(spin, [0, 0, 0], Q.fromEuler([0, 0, 0, 1], lt * 4.2, lt * 1.3, lt * 0.7), 1);
+  const out = M.mul(new Float32Array(16), m, spin); out[12] = p[0]; out[13] = p[1]; out[14] = p[2];
+  return out;
 }
 function rifleShot(R, t, t0, from, to, hit = false, mz = null) {
   const lt = t - t0;
