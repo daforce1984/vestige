@@ -16,14 +16,14 @@ export const SLOW_HITS = [178.73, 183.28, 190.95, 192.05];   // the gunfight: th
 export const SLOW_RANGES = [[183.95, 184.5, 0.45], [184.43, 184.57, 0.04], [184.57, 184.82, 0.12], [184.8, 185.02, 0.1], [185.62, 185.84, 0.09], [190.9, 191.1, 0.0298], [191.28, 192.2, 0.4], [192.015, 192.1, 0.025]];   // (+ its rifle transforming, + the Itano circus, + the rifle caught back (185.69–185.84))
 // story spans CUT OUT of the film (a hard cut straight across them: no film time at all) — scene 43 (its boost-jump and
 // inverted shot) removed 2026-09-30
-export const SKIP_RANGES = [[165.3, 167.4], [168.3, 169.0], [171.45, 172.35], [174.4, 176.35], [179.25, 180.45], [184.522, 184.57]];   // (+ 2026-09-30: scenes 30-37 tightened — the chase, the carnage, the aim hold, its charge (cut as soon as the muzzle comes up))
+export const SKIP_RANGES = [[165.3, 167.4], [168.3, 169.0], [171.45, 172.4], [174.4, 176.4], [179.25, 180.45], [184.522, 184.57]];   // (+ 2026-09-30: scenes 30-37 tightened — the chase, the carnage, the aim hold, its charge (cut as soon as the muzzle comes up))
 // story spans cut out of the rest of the film (outside the duel table and the tear window): the battle scenes tightened,
 // the wide shots of the whole battlefield kept short (2026-09-30)
-export const CUT_RANGES = [
-  [70.5, 72.8], [77.9, 81.2], [85.8, 91.8], [99.0, 101.8], [107.0, 108.8], [131.2, 134.2], [139.0, 140.0],
-  [150.6, 152.0], [154.2, 155.6], [158.3, 159.2], [160.6, 162.2],
-  [195.8, 198.8], [200.0, 201.9], [212.6, 215.2], [220.5, 224.2], [249.0, 255.0], [263.3, 265.1],   // (2026-10-01: no jump cuts inside the dive shots — he seemed to teleport; the implosion's shockwave shown in full)
-  [295.9, 297.3], [307.4, 308.4], [314.5, 319.8]];
+export const CUT_RANGES = [   // (2026-10-01: every cut lands on a camera change — no jump inside a shot; spans moved to a shot's head or tail)
+  [77.8, 81.2], [85.8, 91.8], [99.0, 101.8], [108.2, 110.0], [131.2, 135.2],
+  [151.6, 153.0], [154.6, 156.0], [158.5, 161.0],
+  [195.8, 198.8], [200.0, 201.9], [212.0, 214.6], [218.0, 221.7], [249.0, 255.0], [263.3, 265.1],
+  [298.6, 300.0], [307.4, 308.4], [314.5, 320.0]];   // (the radio lines at 73, 102, 140.1, 224.6 and 292.1 play whole)
 const cutBefore = (s) => CUT_RANGES.reduce((a, [x, e]) => a + Math.max(0, Math.min(s, e) - x), 0);
 export const inSkip = (s) => SKIP_RANGES.some(([a, e]) => s > a && s < e) || CUT_RANGES.some(([a, e]) => s > a && s < e);
 export const SLOW_V = 0.2;                              // picture speed while slowed

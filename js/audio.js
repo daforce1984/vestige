@@ -376,7 +376,7 @@ export const SAMPLE_CUES = [
   // (no standoff: from 170 the two charge straight at each other — the thrusters come from duelCues)
   // ---------------- mech launch 150–161
   [151,   'servo',     { gain: 0.6, pan: -0.2, prio: 6 }],
-  [152.2, 'servo',     { gain: 0.6, pan: 0.3, rate: 0.85, prio: 6 }],
+  [151.3, 'servo',     { gain: 0.6, pan: 0.3, rate: 0.85, prio: 6 }],
   [153,   'mech_powerup', { gain: 1, prio: 8, norand: true }],
   [154.4, 'servo',     { gain: 0.6, pan: 0, rate: 1.1, prio: 6 }],
   [155,   'mech_steps:four', { gain: 0.9, prio: 7, norand: true }],
@@ -391,7 +391,7 @@ export const SAMPLE_CUES = [
   [201.5, 'charge_weapon', { bus: 'dry', rate: 0.6, gain: 1.3, prio: 10, norand: true, dur: 14.5, fadeOut: 0.05 }],
   // the lance charge must be HEARD: a long rising power whine under it (dry bus, climbs in pitch to the shot), a final spike
   [200.2, 'hl_charge2', { bus: 'dry', rate: 0.62, rateTo: 1.2, dur: 15.8, gain: 1.2, fadeIn: 2.0, fadeOut: 0.05, prio: 10, norand: true }],
-  [212.4, 'charge_up', { bus: 'dry', rate: 0.75, rateTo: 1.5, dur: 3.6, gain: 1.1, fadeIn: 0.3, fadeOut: 0.05, prio: 10, norand: true }],
+  [211.9, 'charge_up', { bus: 'dry', rate: 0.75, rateTo: 1.5, dur: 3.6, gain: 1.1, fadeIn: 0.3, fadeOut: 0.05, prio: 10, norand: true }],
   [216,   'big_beam:fire', { rate: 0.8, gain: 1.2, prio: 9, duck: 4, norand: true }],
   [216,   'expl_nuke', { gain: 1, prio: 9, norand: true }],
   [216.05,'shockwave', { gain: 0.9, prio: 9, norand: true }],

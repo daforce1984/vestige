@@ -773,7 +773,7 @@ export function drawWorld(R, t, opts = {}) {
     engineGlows(R, name, e, HIIG_ENGINE, 1, t > 108 && t < 119 ? 1 : 0.6);
     return e;
   };
-  GUN.ionEntries = [];
+  GUN.ionEntries = []; GUN.ionT = t;
   IONF.forEach((f, i) => { GUN.ionEntries[i] = place('ion_frigate', ionFrigate(t, i), f.arrive, Li, szI, f.seed, null); });
   ASF.forEach((f, i) => place('assault_frigate', assaultFrigate(t, i), f.arrive, La, szA, f.seed, null));
 
@@ -861,7 +861,10 @@ export function debrisOnly(R, keepName) {
 const DREAD_HORNS = [[9.5, -18.6, 212], [4.7, -10.4, 212], [-4.7, -10.4, 212], [-9.5, -18.6, 212], [-4.7, -26.8, 212], [4.7, -26.8, 212]];
 // fighter variants (tools: blender/fighters_ours.py / fighters_enemy.py): three designs per side, picked by index
 export function fighterModel(enemy, k) { return (enemy ? 'enemy_fighter' : 'interceptor') + ['', '_b', '_c'][((k % 3) + 3) % 3]; }
+const _dreadM = new Float32Array(16);
 export function dreadEmitter(R, t, entry) {
+  // a shot's camera asks before the dreadnought is drawn: last frame's entry was seconds old after a cut (a jump)
+  if (entry === GUN.dread && GUN.dreadT !== t) entry = { m: mat(_dreadM, dreadPos(t), [0, 0, 1]) };
   return R.emptyWorld([0, 0, 0], 'enemy_dreadnought', entry, 'lance_emitter');
 }
 
@@ -926,7 +929,7 @@ function drawDreadnought(R, t, tmpM) {
     }
   }
   engineGlows(R, 'enemy_dreadnought', e, DREAD_ENGINE, 1.2, 0.8);
-  GUN.dread = e;
+  GUN.dread = e; GUN.dreadT = t;
   // gravity lance charge & fire
   if (t > 200 && t < LANCE_FIRE + 6) {
     const em = dreadEmitter(R, t, e);
@@ -1084,10 +1087,13 @@ export const VOLLEYS = [
   [297.0, 298.7, 0, 2], [297.1, 298.6, 2, 2], [303.5, 305.2, 1, 3], [303.6, 305.1, 3, 3],
 ];
 export const VOLLEY_FAILS = (t0) => t0 < 280;
+const _ionM = new Float32Array(16);
 export function ionMuzzle(R, t, i) {
-  const e = GUN.ionEntries && GUN.ionEntries[i];
   const st = ionFrigate(t, i);
-  if (e) {
+  // this frame's entry once the fleet is placed; before that (the shot's camera runs first) the frigate's own matrix
+  // at t — never last frame's entry (after a cut it was seconds old: the first frame jumped)
+  const e = GUN.ionEntries && GUN.ionT === t && GUN.ionEntries[i] || { m: mat(_ionM, st.pos, st.fwd) };
+  {
     const p = emitWorld(R, 'ion_frigate', e, 'muzzle');
     if (p) return p;
   }

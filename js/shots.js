@@ -1952,7 +1952,7 @@ shot(63, 70, 'B1 red alert', (c) => {
   const L = modelLen(c.R, 'mothership');
   const pos = motherPoint([0, 0, 0], t, [34, 116, -L * 0.05 + u * 30]);      // standing on top of the hull (flagship v9 top ≈ 98 m)
   camLook(c, pos, lerpv(addv(WELL, [0, -900, 0]), addv(WELL, [0, -500, 0]), u), 40);
-  shake(c, t < 64.5 ? 0.35 : 0.08, 6);
+  shake(c, 0.08 + 0.27 * (1 - smooth(64.1, 64.9, t)), 6);   // (eases down: the step at 64.5 made the frame jump)
   c.env.shadowRadius = 300;
 });
 shot(70, 80, 'B2 the well switches on', (c) => {
@@ -2798,9 +2798,12 @@ function moonFor(R, s, film) {
   _moon.set(s, res);
   return res;
 }
+/** dev: render the frame at a STORY time (also inside spans the film cuts out) */
+export const frameStory = (R, story) => { STORY_AT = story; try { return frame(R, filmT(story)); } finally { STORY_AT = null; } };
+let STORY_AT = null;
 export function frame(R, film) {
   FILM_NOW = film;
-  const t = storyT(film);                                 // (includes the duel's bullet time — timemap.js)
+  const t = STORY_AT ?? storyT(film);                                 // (includes the duel's bullet time — timemap.js)
   const s = findShot(t);
   ctx.R = R; ctx.t = t; ctx.lt = t - s.t0; ctx.u = sat((t - s.t0) / (s.t1 - s.t0));
   ctx.env = spaceEnv(t); ctx.post = basePost();
