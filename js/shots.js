@@ -111,12 +111,16 @@ const tmpM = M.new();
 const SHIELD_R = 150;
 const B_HITS = [267.42];   // (2026-09-30) one blow: the beam saber at ten times its output, thrust straight through the barrier
 export const THRUST_T = 267.42, MEGA_LEN = 2.5;   // the blade tip reaches the shield; the blade 2.5× its length at full output
-const THRUST_Z = -SHIELD_R - 5 - 13 * MEGA_LEN;   // his z when the tip touches the dome (hilt ~5 m ahead of him)
+const THRUST_Z = -SHIELD_R - 5 - 13 * MEGA_LEN;
+const DIVE_END_Z = -420, CHARGE_V = 38;   // the dive hands over to the charge at 262 here, at this speed (m/s along the axis)   // his z when the tip touches the dome (hilt ~5 m ahead of him)
 function berserkZ(t) {
   const hitZ = -SHIELD_R - 8;
-  if (t < 262.8) return lerp(-260, -250, sat((t - 262) / 0.8));
-  if (t < 267.1) return lerp(-250, -262, easeInOut(sat((t - 266.3) / 0.8)));           // the blade lit, he draws back for the thrust
-  if (t < THRUST_T) return lerp(-262, THRUST_Z, easeIn(sat((t - 267.1) / (THRUST_T - 267.1))));   // the lunge
+  // ONE CHARGE from the dive to the barrier: never stopping, never backing off — he keeps driving in, accelerating, draws
+  // the blade back on the run and puts it straight through at the end of it
+  if (t < THRUST_T) {   // Hermite: leaves the dive's end at its speed, reaches the barrier at the thrust's
+    const T = THRUST_T - 262, w = sat((t - 262) / T), z0 = DIVE_END_Z, z1 = THRUST_Z, v0 = CHARGE_V, v1 = CHARGE_V * 1.2;
+    return (2 * w ** 3 - 3 * w * w + 1) * z0 + (w ** 3 - 2 * w * w + w) * T * v0 + (-2 * w ** 3 + 3 * w * w) * z1 + (w ** 3 - w * w) * T * v1;
+  }
   if (t < 268) return lerp(THRUST_Z, THRUST_Z + 6, easeOut(sat((t - THRUST_T) / (268 - THRUST_T))));   // the blade drives in; the barrier gives
   if (t < 270) return lerp(THRUST_Z + 6, hitZ + 30, (t - 268) / 2);                    // through the shards
   if (t < 272.95) return lerp(hitZ + 30, -36, easeIn(sat((t - 270) / 2.95)));        // accelerating ram at the core
@@ -125,7 +129,7 @@ function berserkZ(t) {
 // the thrust: the ram's two-handed levelled grip, drawn back hard (elbows back, torso coiled), then driven straight in
 function thrustPose(t) {
   const out = ramPose(t);
-  const wind = smooth(266.3, 267.05, t) * (1 - smooth(267.1, 267.32, t)), lunge = smooth(267.1, 267.32, t) * (1 - smooth(268.2, 269.5, t));
+  const wind = smooth(266.2, 267.0, t) * (1 - smooth(267.18, 267.36, t)), lunge = smooth(267.18, 267.36, t) * (1 - smooth(268.2, 269.5, t));   // (drawn back on the run, the thrust straight out of it)
   out.torso[0] -= 0.55 * wind; out.head[0] += 0.3 * wind; out.torso[0] += 0.25 * lunge;
   for (const sd of ['L', 'R']) { out['arm_' + sd + '_lower'][0] -= 0.75 * wind; out['arm_' + sd + '_upper'][0] += 0.35 * wind; out['arm_' + sd + '_upper'][0] -= 0.15 * lunge; }
   out.leg_L_upper[0] += 0.4 * lunge - 0.3 * wind; out.leg_R_upper[0] += 0.5 * lunge - 0.2 * wind;
@@ -372,11 +376,15 @@ function gundamStateRaw(t, s) {
   } else if (t < 262) {
     // one straight charge from the duel site to the well: no kink, he just keeps accelerating dead ahead
     const start = diveStart();
-    const end = addv(WELL, [0, -10, -260]);
+    const end = addv(WELL, [0, -10, DIVE_END_Z]);
     const u = (t - 240) / 22;
-    // coil for a breath, then an explosive burst to full speed (continuous: the old curve jumped back at 244.5)
-    const B = 0.06, v = Math.max(0, u - B) / (1 - B), K = 18;
-    const e = u < B ? 0.004 * (u / B) * (u / B) : 0.004 + 0.996 * (v - (1 - Math.exp(-K * v)) / K) / (1 - (1 - Math.exp(-K)) / K);
+    // coil for a breath, then an explosive burst to full speed (continuous: the old curve jumped back at 244.5); over its
+    // last stretch it eases to CHARGE_V so the charge at the barrier carries straight on from it (no stop at 262)
+    const B = 0.06, K = 18, eRaw = (x) => { const v = Math.max(0, x - B) / (1 - B); return x < B ? 0.004 * (x / B) * (x / B) : 0.004 + 0.996 * (v - (1 - Math.exp(-K * v)) / K) / (1 - (1 - Math.exp(-K)) / K); };
+    const U0 = 0.82, L = V.dist(start, end), s0 = (eRaw(U0 + 1e-4) - eRaw(U0 - 1e-4)) / 2e-4, s1 = CHARGE_V * 22 / L;
+    let e = eRaw(u);
+    if (u > U0) { const w = (u - U0) / (1 - U0), h = 1 - U0, e0 = eRaw(U0);
+      e = (2 * w ** 3 - 3 * w * w + 1) * e0 + (w ** 3 - 2 * w * w + w) * h * s0 + (-2 * w ** 3 + 3 * w * w) * 1 + (w ** 3 - w * w) * h * s1; }
     // (the straight line to the well runs through the flagship's hull: he swings out wide of it — away from the wound
     // side — and a little up, then back onto his line once he's past it)
     const nOut = V.norm([0, 0, 0], [motherDir(240, [1, 0, 0])[0], 0, motherDir(240, [1, 0, 0])[2]]);
@@ -400,7 +408,8 @@ function gundamStateRaw(t, s) {
   } else if (t < 278) {
     // BERSERK: feral lunges into the shield (263.4 / 265.0 / 266.6), shatter 268, rush 270–272.8, slash 273
     const z = berserkZ(t);
-    s.pos = addv(WELL, [noise1(t * 9) * 2.5 * berserkJitter(t), -6 + noise1(t * 8 + 3) * 2 * berserkJitter(t), z]);
+    const jk = smooth(262, 262.6, t);   // (the feral shake builds in: no step off the dive)
+    s.pos = addv(WELL, [noise1(t * 9) * 2.5 * berserkJitter(t) * jk, lerp(-10, -6, smooth(262, 263, t)) + noise1(t * 8 + 3) * 2 * berserkJitter(t) * jk, z]);
     s.fwd = [noise1(t * 5) * 0.08, 0, 1];
     const hit = berserkHitK(t);                         // 1 right at an impact, decays
     const feral = { torso: [0.65, noise1(t * 11) * 0.15, noise1(t * 7) * 0.1], head: [-0.55 + noise1(t * 13) * 0.2, noise1(t * 9) * 0.35, 0],
