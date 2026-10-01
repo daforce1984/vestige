@@ -43,11 +43,13 @@ function spaceEnv(t) {
   return {
     // lighting after the concept-art reference: warm key, cool soft skylight from above, warm bounce from below,
     // slate-blue space haze instead of pure black, gentle contrast
-    time: t, sunDir: SUN, sunCol: [2.5, 2.12, 1.62], ambUp: [0.2, 0.25, 0.34], ambDown: [0.16, 0.11, 0.07], ambient: 1.9,   // sunCol: the upper sun is the strong key
-    nebula: 0, stars: 0.8, sunDisc: 1,
+    // (2026-10-01, after the user's Homeworld 3 reference: a luminous blue-violet space — cool white key, a strong blue
+    // skylight so the shadow sides read blue instead of black, a nebula backdrop instead of near-black)
+    time: t, sunDir: SUN, sunCol: [2.45, 2.32, 2.12], ambUp: [0.3, 0.4, 0.66], ambDown: [0.1, 0.11, 0.22], ambient: 2.1,   // sunCol: the upper sun is the strong key
+    nebula: 1.15, stars: 0.6, sunDisc: 1,
     // a binary system: the second, blue-white sun on the far side lights what the first leaves dark (none at Earth)
-    sun2Dir: t < EARTH_T ? SUN2 : null, sun2Col: [0.45, 0.56, 0.85],   // the lower, blue-white sun: weaker than the upper one
-    sky: [0.010, 0.011, 0.013, 0.6],   // near-neutral: no blue gas in the backdrop
+    sun2Dir: t < EARTH_T ? SUN2 : null, sun2Col: [0.5, 0.68, 1.15],   // the lower, blue-white sun: weaker than the upper one
+    sky: [0.03, 0.045, 0.12, 1.0],   // deep blue-violet haze across the whole sky
     planet: null,                                    // no moon (only Earth at the end)
     shadows: true, shadowCenter: [0, 0, 0], shadowRadius: 400,
   };
@@ -55,7 +57,7 @@ function spaceEnv(t) {
 function basePost() {
   return {
     exposure: 0.9, bloom: 0.3, ca: 0.0006, grain: 0, fade: 1, flash: 0, letterbox: 1, vignette: 0.8,
-    distort: 1, streak: 0.22, saturation: 0.9, contrast: 1.08, gradeShadows: [0.92, 0.98, 1.06], gradeHighlights: [1.08, 1.0, 0.9],
+    distort: 1, streak: 0.22, saturation: 1.0, contrast: 1.0, gradeShadows: [0.84, 0.94, 1.2], gradeHighlights: [1.0, 1.0, 1.04],   // a cool, bright grade (blue shadows)
     shakeBlur: 0, lensA: null, lensB: null, godray: null,
   };
 }

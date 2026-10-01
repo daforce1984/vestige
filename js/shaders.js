@@ -158,17 +158,17 @@ fn nebula(d: vec3f) -> vec3f {
   let w = vec3f(fbm(q * 1.3, 4), fbm(q * 1.3 + 5.2, 4), fbm(q * 1.3 + 9.1, 4));
   let n = fbm(q + w * 1.8, 6);
   let band = exp(-pow(dot(d, normalize(vec3f(0.35, 0.9, -0.25))) * 2.6, 2.0));
-  let dens = smoothstep(0.35, 0.85, n) * (0.35 + 0.9 * band);
+  let dens = (0.25 + 0.75 * smoothstep(0.25, 0.85, n)) * (0.45 + 0.9 * band);   // (a luminous sky: never quite empty)
   let dust = smoothstep(0.45, 0.7, fbm(q * 3.1 + 2.0, 5));
-  let c1 = vec3f(0.10, 0.14, 0.2);
-  let c2 = vec3f(0.05, 0.2, 0.26);
-  let c3 = vec3f(0.7, 0.45, 0.25);
+  let c1 = vec3f(0.07, 0.11, 0.30);    // deep blue
+  let c2 = vec3f(0.20, 0.12, 0.36);    // violet
+  let c3 = vec3f(0.55, 0.30, 0.50);    // pink-lilac wisps
   var col = mix(c1, c2, smoothstep(0.3, 0.7, w.x));
   col = mix(col, c3, smoothstep(0.62, 0.9, n) * 0.6);
   col *= dens * (1.0 - dust * 0.75);
   col += vec3f(0.02, 0.025, 0.05) * band;
   let lum = dot(col, vec3f(0.3, 0.5, 0.2));
-  return mix(vec3f(lum), col, 0.7);
+  return mix(vec3f(lum), col, 0.9);
 }
 
 // gravitational lensing of the BACKGROUND only: bends the view ray around the lens direction.
