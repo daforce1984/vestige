@@ -1184,6 +1184,23 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     alpha = 0.0;
     dist = normalize(i.uv + 1e-5) * (1.0 - tr) * (1.0 - age) * 0.006;
     col *= softFade(i.pos, i.vz, s.b.x * 0.6);
+  } else if (shape == 15) {
+    // ENERGY ORB: the charge forming inside a gun bore — a plasma sphere with a defined edge: white-hot centre, the
+    // gun's colour through the body with slow churning bands, a brighter limb. Depth per pixel on the sphere's front
+    // surface, so the bore walls hide what is inside them. b.x = radius, b.z = seed, d.a = intensity
+    let r = length(i.uv);
+    if (r > 1.0) { discard; }
+    let zz = sqrt(1.0 - r * r);
+    let seed = s.b.z;
+    let q3 = vec3f(i.uv, zz);
+    let churn = vnoise(q3 * 3.2 + vec3f(t * 1.7, -t * 1.3, seed)) * 0.65 + vnoise(q3 * 7.5 + vec3f(-t * 2.6, t * 2.1, seed + 5.0)) * 0.35;
+    let hot = pow(zz, 2.2);                                              // the centre (seen through the depth of the ball)
+    let limb = pow(1.0 - zz, 3.0);                                       // a thin brighter rim
+    let flick = 0.9 + 0.1 * sin(t * 37.0 + seed * 3.0);
+    let edge = smoothstep(1.0, 0.94, r);
+    col = (tint * (0.35 + 0.9 * churn) * (0.45 * zz + 1.6 * limb) + vec3f(1.0, 1.0, 1.05) * hot * hot * (0.6 + 0.7 * churn)) * s.d.a * flick * edge;
+    alpha = 0.0;
+    col *= softFade(i.pos, i.vz - zz * s.b.x, max(s.b.x * 0.08, 0.05));
   } else if (shape == 7) {
     // exhaust flame: along/across falloff, turbulence growing toward the tail, white-hot core near the nozzle
     let tt = i.uv.y; let cc = abs(i.uv.x);

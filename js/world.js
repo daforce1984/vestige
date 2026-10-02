@@ -936,14 +936,13 @@ function drawDreadnought(R, t, tmpM) {
     const ch = sat((t - 200) / 16);
     const pulse = 0.8 + 0.2 * Math.sin(t * (10 + ch * 30));
     const k = t < LANCE_FIRE ? ch : Math.max(0, 1 - (t - LANCE_FIRE) / 6);
-    R.glow(em, (8 + 30 * k) * pulse, [LANCE_COL[0] * 0.9 * k, LANCE_COL[1] * 0.9 * k, LANCE_COL[2] * 0.9 * k], 0.5);   // toned down: the machinery and the arcs must read
-    R.glow(em, (3 + 12 * k), [2 * k, 2 * k, 2.6 * k], 0.3);
+    // the charge: an energy sphere inside the bow cannon's bore (aperture r ≈ 6 × 1.65 m), brightening and swelling
+    // with the charge, shrinking as it spends itself after the shot — no particles drawn in from around the ship
+    if (k > 0.004) R.orb(em, 1.2 + 7.6 * Math.pow(k, 0.8), LANCE_COL, (0.3 + 2.4 * k) * pulse, 77);
     R.light(em, 600, LANCE_COL, 6 * k);
     if (t < LANCE_FIRE) {
       const aim = V.norm([0, 0, 0], V.sub([0, 0, 0], motherPoint([0, 0, 0], t, LANCE_HIT), em));
       const u1 = V.norm([0, 0, 0], V.cross([0, 0, 0], aim, [0, 1, 0])), u2 = V.cross([0, 0, 0], u1, aim);
-      // accelerating inflow from all around
-      chargeInflow(R, t, 200, LANCE_FIRE - 200, em, 360, 200, LANCE_COL, 2.5, 13, 1.1, 77);
       // (the coil stack is real geometry now — dread_lance.glb — its apertures glow via matOverride)
       // ARC DISCHARGE (shader lightning, sprite 12): the six crown terminals arc to each other and into the core,
       // the coil stack flashes over to the guide rails; density, reach and rate climb with the charge
@@ -1127,7 +1126,7 @@ export function drainOutflow(R, t, t0, from, k, seed) {
 // another from the breech forward, arcs jump from each stage's capacitor modules onto its coils, energy pulses race
 // up the barrel, and the charge gathers into a plasma core INSIDE the muzzle bore (z ≈ 30.6). c: 0..1 charge,
 // fail: the stages die back from the muzzle and the core bleeds away (the well drains it)
-const ION_BORE = [0, 0.9, 30.6];
+const ION_BORE = [0, 0.9, 30.6], ION_BORE_MOUTH = 31.2;   // (bore r 0.93 from s 28.6, its glowing exit disc at 31.25, lip 31.5)
 export function ionCharge(R, e, t, c, fail, seed) {
   if (!e || c <= 0.005) return;
   const P = (x, y, z) => M.transformPoint([0, 0, 0], e.m, [x, y, z]);
@@ -1157,13 +1156,12 @@ export function ionCharge(R, e, t, c, fail, seed) {
     const bb = c * (1 - ph * 0.3) * 1.6;
     R.beam(P(0, 0.9, z - len), P(0, 0.9, z), 0.55 + 0.4 * c, [CC[0] * bb, CC[1] * bb, CC[2] * bb], 1, 20, 0.3, 1);
   }
-  // the plasma core forming inside the muzzle bore (it never floats in front of the gun)
-  const core = P(ION_BORE[0], ION_BORE[1], ION_BORE[2]);
-  const pk = c * (0.85 + 0.15 * Math.sin(t * (14 + 30 * c)));
-  R.glow(core, 0.8 + 2.2 * c, [2.6 * pk, 3.0 * pk, 4.0 * pk], 0.3);
-  R.glow(core, 3 + 7 * c, [0.35 * pk, 0.7 * pk, 1.8 * pk], 0.7);
+  // the charge: an energy sphere in the muzzle bore, brightening and swelling with the charge — never wider than the
+  // bore (r 0.93 m) and nothing drawn in from around the gun
+  const core = P(ION_BORE[0], ION_BORE[1], ION_BORE_MOUTH);
+  const pk = c * (0.85 + 0.15 * Math.sin(t * (14 + 30 * c))) * (fail ? 0.75 + 0.25 * Math.sin(t * 23 + seed) : 1);
+  R.orb(core, 0.12 + 0.76 * Math.pow(c, 0.8), [0.45, 0.85, 2.2], 0.25 + 2.6 * pk, seed);
   R.light(core, 60, ION_COL, 5 * c);
-  if (!fail) chargeInflow(R, t, 0, 1, core, 22 * (0.4 + 0.6 * c), 26, [0.5, 0.9, 2], 4 + 6 * c, 10, 0.25, seed, smooth(0.02, 0.35, c));   // gathered from around the crown: fades + grows in with the charge
 }
 function drawIonVolleys(R, t) {
   for (const [t0, t1, fi, ti] of VOLLEYS) {

@@ -2989,9 +2989,11 @@ function drawLanceAndCannon(R, t, c) {
     const fwd = rotY([0, 0, 0], [0, 0, 1], motherYaw(t));
     if (t < MAIN_FIRE) {
       const k = smooth(MAIN_CHARGE, MAIN_FIRE, t);
-      R.glow(mc, 10 + 60 * k, [1.5 * k, 2.5 * k, 5 * k], 1);
+      // the charge: an energy sphere inside the bore (inner r 7.2 m; it sits on the emitter ring 2.4 m inside the
+      // muzzle), brightening and swelling — never wider than the bore, nothing drawn in from around the ship
+      const pulse = 0.88 + 0.12 * Math.sin(t * (8 + 26 * k));
+      R.orb(madd(mc, fwd, -2.4), 0.8 + 6.0 * Math.pow(k, 0.8), [0.5, 0.95, 2.2], (0.3 + 2.8 * k) * pulse, 5);
       R.light(mc, 500, ION_COL, 15 * k);
-      chargeInflow(R, t, MAIN_CHARGE, MAIN_FIRE - MAIN_CHARGE, mc, 230, 160, [0.6, 1.0, 2.2], 3.5, 17, 0.8, 5);   // fast from the start, ever faster
     } else {
       const lt = t - MAIN_FIRE;
       const d = dreadPos(t);

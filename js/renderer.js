@@ -531,6 +531,7 @@ export class Renderer {
   plume(nozzle, axis, halfW, col, intensity) { this.sprite(10, nozzle, axis, halfW, col, intensity); }
   flame(nozzle, axisLen, halfWidth, col, intensity, seed = 0, speed = 1) { this.sprite(7, nozzle, axisLen, [halfWidth, seed, speed, 0], col, intensity); }
   shield(p, radius, impactUV, flash, tear, hitAge, col, intensity, collapse = 0) { this.sprite(9, p, [radius, collapse, flash, 0], [impactUV[0], impactUV[1], tear, hitAge], col, intensity); }
+  orb(p, radius, col, intensity = 1, seed = 0) { this.sprite(15, p, [radius, 0, seed, 0], Z4, col, intensity); }   // energy sphere (a charge inside a bore)
   ripple(p, radius, col, strength) { this.sprite(8, p, [radius, 0, 0, 0], Z4, col, strength); }
   haze(p, radius, strength, seed = 0) { this.sprite(6, p, [radius, seed, 0, seed], Z4, Z4, strength); }
   hyperWindow(center, axU, axV, col, intensity) { this.sprite(5, center, axU, axV, col, intensity); }
