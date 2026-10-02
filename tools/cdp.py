@@ -17,7 +17,7 @@ import json, os, sys, time, socket, subprocess, base64, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(HERE, '.cdp_tab.json')
-DEBUG_PORT, RELAY_PORT = 9011, 9012
+DEBUG_PORT, RELAY_PORT = 9411, 9412   # (9005-9104 is a Windows-reserved TCP range here: Chrome could not bind 9011)
 PROJECT_HINT = 'localhost:8791'
 WIN_PY = '/mnt/c/Users/dafor/AppData/Local/Python/bin/python.exe'
 
@@ -58,14 +58,26 @@ def win_port_listening(port):
     return out not in ('', '0')
 
 
+def test_chrome_running():
+    out = subprocess.run(['powershell.exe', '-NoProfile', '-Command',
+                          "(Get-CimInstance Win32_Process -Filter \"name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'homeworld_film' -and $_.CommandLine -notmatch '--type=' } | Measure-Object).Count"],
+                         capture_output=True, text=True).stdout.strip()
+    return out not in ('', '0')
+
+
 def ensure():
     if reachable():
         return
     if not win_port_listening(DEBUG_PORT):
+        # NEVER start it a second time: with the profile already open, chrome.bat only adds another window/tab
+        # (2026-10-03: a debug port Chrome could not bind made every cdp.py call relaunch it — 5 extra tabs)
+        if test_chrome_running():
+            sys.exit(f'ERROR: the test Chrome is running but its debug port {DEBUG_PORT} is not listening '
+                     '(reserved range? netsh int ipv4 show excludedportrange protocol=tcp) — not launching another')
         subprocess.Popen(['cmd.exe', '/c', winpath(os.path.join(HERE, 'chrome.bat'))],
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True, cwd='/mnt/c')
-        for _ in range(40):
+        for _ in range(60):
             time.sleep(1)
             if win_port_listening(DEBUG_PORT):
                 break

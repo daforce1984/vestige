@@ -936,9 +936,9 @@ function drawDreadnought(R, t, tmpM) {
     const ch = sat((t - 200) / 16);
     const pulse = 0.8 + 0.2 * Math.sin(t * (10 + ch * 30));
     const k = t < LANCE_FIRE ? ch : Math.max(0, 1 - (t - LANCE_FIRE) / 6);
-    // the charge: an energy sphere inside the bow cannon's bore (aperture r ≈ 6 × 1.65 m), brightening and swelling
+    // the charge: an energy sphere inside the bow cannon's bore, brightening and swelling
     // with the charge, shrinking as it spends itself after the shot — no particles drawn in from around the ship
-    if (k > 0.004) R.orb(em, 1.2 + 7.6 * Math.pow(k, 0.8), LANCE_COL, (0.3 + 2.4 * k) * pulse, 77);
+    if (k > 0.004) R.orb([em[0], em[1], em[2] - 6], 1.0 + 5.0 * Math.pow(k, 0.8), LANCE_COL, (0.3 + 2.4 * k) * pulse, 77);   // (6 m back inside the bore, r ≤ 6 m: it stays within the cannon's outline)
     R.light(em, 600, LANCE_COL, 6 * k);
     if (t < LANCE_FIRE) {
       const aim = V.norm([0, 0, 0], V.sub([0, 0, 0], motherPoint([0, 0, 0], t, LANCE_HIT), em));
@@ -964,16 +964,7 @@ function drawDreadnought(R, t, tmpM) {
         const p1 = M.transformPoint([0, 0, 0], e.m, [0, (-15 + sgn * 12) * 1.65, z + (hash(j + 3) - 0.5) * 12]);
         R.arc(p0, p1, 5, AC, 0.7 * ch, 71 + j, 6 + 6 * ch);
       }
-      // spiral vortex contracting into the core
-      for (let j = 0; j < 36; j++) {
-        const ph = ((t - 200) * (0.6 + 2.4 * ch) + j / 36) % 1;
-        const ang = j * 2.4 + ph * 9;
-        const r = 90 * (1 - ph);
-        const p = V.madd([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], em, u1, Math.cos(ang) * r), u2, Math.sin(ang) * r), aim, -r * 0.4);
-        R.glow(p, 1.2 + 2 * ph, [LANCE_COL[0] * 2 * ph * ch, LANCE_COL[1] * 2 * ph * ch, LANCE_COL[2] * 2 * ph * ch], 0.4);
-      }
-      // layered core: white-hot heart + violet corona, and refraction pulses at an accelerating rhythm
-      R.glow(em, 3 + 7 * ch, [2.4 * ch, 2.2 * ch, 2.8 * ch], 0.25);
+      // (no spiral vortex drawn into the core and no outer core glow: the orb in the bore carries the charge)
       const pulseP = (t - 200) * (1 + 5 * ch * ch);
       const pa = pulseP % 1;
       R.ripple(em, 20 + 90 * pa, [0.4, 0.2, 0.5], (1 - pa) * 0.9 * ch);
