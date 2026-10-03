@@ -429,11 +429,18 @@ struct MC { g: vec3f, rim: f32, ray: f32, basin: f32 };
 // ONE GIANT IMPACT BASIN (2026-10-03) on the face the camera sees (moon-local, angular radius 0.42 rad): a deep bowl with
 // a terraced inner wall, a central peak, a sharp raised rim and an ejecta blanket with long bright rays; its floor is dark
 // and smooth (filled with melt). The basin height profile, d = angle from its centre / its radius:
+// a natural crater's cross-section (d = distance / radius): a flat floor, a steep upper wall, a sharp raised rim and an
+// ejecta blanket that thins away outside; depth ≈ 1, rim ≈ +0.25 (2026-10-03)
+fn craterProf(d: f32) -> f32 {
+  let crest = 0.08 * exp(-pow((d - 1.0) / 0.06, 2.0));                          // (on both sides: continuous at the rim)
+  if (d < 1.0) { return -1.0 + 1.25 * pow(smoothstep(0.3, 1.0, d), 1.6) + crest; }
+  return 0.25 * exp(-(d - 1.0) / 0.32) + crest;
+}
 fn basinH(d: f32) -> f32 {
   var h = 0.12 * exp(-max(d - 1.0, 0.0) / 0.45) * step(1.0, d);               // ejecta blanket
   if (d < 1.0) {
     let wall = smoothstep(0.55, 1.0, d);
-    h = mix(-0.75, 0.05, wall * wall)                                          // the bowl: a flat floor, a steep wall
+    h = mix(-0.75, 0.12, wall * wall)                                          // the bowl: a flat floor, a steep wall (meets the blanket at the rim: no step)
       + 0.32 * exp(-pow(d / 0.11, 2.0));                                       // central peak
   }
   return h + 0.45 * exp(-pow((d - 1.0) / 0.075, 2.0));                          // the raised rim
@@ -441,10 +448,20 @@ fn basinH(d: f32) -> f32 {
 // THE MOON'S RELIEF as real geometry (2026-10-03): height (fraction of its radius) of the giant basin and the two coarsest
 // crater octaves — the vertex shader displaces the mesh by it, the fragment takes its normal from it (the same cells and
 // seed as moonCraters, so they line up with the finer bumped craters)
-fn moonHeight(q: vec3f) -> f32 {
+fn basinD(q: vec3f) -> f32 {   // the basin's distance measure, its outline torn irregular
   let C0 = normalize(vec3f(0.35, 0.3, 0.89));
-  let bd = acos(clamp(dot(q, C0), -1.0, 1.0)) / 0.42;
-  var h = basinH(bd) * 0.06;
+  return acos(clamp(dot(q, C0), -1.0, 1.0)) / 0.42 * (1.0 + 0.09 * (vnoise(q * 5.0 + 3.0) - 0.5) + 0.04 * (vnoise(q * 13.0 + 7.0) - 0.5));
+}
+// the relief for the NORMAL: the displaced height plus fine detail the mesh can't hold — regolith undulation, and rough,
+// blocky rubble thrown out round the basin's rim (normal-mapped only)
+fn moonHN(q: vec3f) -> f32 {
+  let bd = basinD(q);
+  let rubble = exp(-pow((bd - 1.0) / 0.35, 2.0));
+  return moonHeight(q) + 0.0016 * (fbm(q * 70.0, 3) - 0.5) + 0.0009 * (1.0 + 2.0 * rubble) * (vnoise(q * 260.0) - 0.5);
+}
+fn moonHeight(q: vec3f) -> f32 {
+  let bd = basinD(q);
+  var h = basinH(bd) * 0.06 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
   var cover = smoothstep(1.3, 1.05, bd);
   var sc = 14.0;
   for (var oc = 0; oc < 2; oc++) {
@@ -457,9 +474,9 @@ fn moonHeight(q: vec3f) -> f32 {
       let ctr = c + 0.25 + r3 * 0.5;
       let dmin = min(min(min(ctr.x - c.x, c.x + 1.0 - ctr.x), min(ctr.y - c.y, c.y + 1.0 - ctr.y)), min(ctr.z - c.z, c.z + 1.0 - ctr.z));
       let rad = dmin / 1.3 * (0.4 + 0.6 * r3.y);
-      let d = length(p - ctr) / rad;
+      let d = length(p - ctr) / rad * (1.0 + 0.2 * (vnoise(p * 2.7 + c * 1.3) - 0.5));   // (an irregular outline)
       if (d < 1.3) {
-        h += keep * (select(0.0, (d * d - 1.0) * 0.6, d < 1.0) + 0.25 * exp(-pow((d - 1.0) / 0.18, 2.0))) * rad / sc * 0.9;
+        h += keep * craterProf(d) * rad / sc * 0.42;
         cov2 = max(cov2, keep * smoothstep(1.3, 1.05, d));
       }
     }
@@ -471,8 +488,7 @@ fn moonHeight(q: vec3f) -> f32 {
 // and no smaller crater is made where a bigger one (or the basin) already is
 fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixel's footprint on the unit sphere; oc0: the first octave that bumps (the coarser ones are real displacement)
   var o: MC; o.g = vec3f(0.0); o.rim = 0.0; o.ray = 0.0; o.basin = 0.0;
-  let C0 = normalize(vec3f(0.35, 0.3, 0.89)); let R0 = 0.42;
-  let ca = clamp(dot(q, C0), -1.0, 1.0); let bd = acos(ca) / R0;
+  let bd = basinD(q);
   if (bd < 3.4) {
     o.basin = smoothstep(0.62, 0.45, bd);   // (its shape is displaced geometry now — moonHeight; no rim lines)
 
@@ -491,11 +507,10 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixe
       let ctr = c + 0.25 + r3 * 0.5;
       let dmin = min(min(min(ctr.x - c.x, c.x + 1.0 - ctr.x), min(ctr.y - c.y, c.y + 1.0 - ctr.y)), min(ctr.z - c.z, c.z + 1.0 - ctr.z));
       let rad = dmin / 1.3 * (0.4 + 0.6 * r3.y);                      // (it and its rim fit inside its own cell)
-      let dv = (p - ctr) / rad; let d = length(dv);
+      let dv = (p - ctr) / rad; let d = length(dv) * (1.0 + 0.2 * (vnoise(p * 2.7 + c * 1.3) - 0.5));
       if (d < 1.3 && d > 1e-4) {
-        // height h(d) = (d²−1)·0.6 inside + 0.25·exp(−((d−1)/0.18)²); dh/dd, chain to p (× sc/rad per unit q)
-        var dh = select(0.0, 1.2 * d, d < 1.0) - 0.25 * 2.0 * (d - 1.0) / (0.18 * 0.18) * exp(-pow((d - 1.0) / 0.18, 2.0));
-        if (oc >= oc0) { o.g += keep * amp * dh * (dv / d) * (sc / rad) * 0.02; }
+        let dh = (craterProf(d + 0.01) - craterProf(d - 0.01)) / 0.02;   // the natural profile's slope; chain to p (× sc/rad per unit q)
+        if (oc >= oc0) { o.g += keep * amp * dh * normalize(dv) * (sc / rad) * 0.016; }
         o.rim += keep * amp * 0.35 * exp(-pow((d - 1.0) / 0.25, 2.0));   // (a soft lighter apron, not a line)
         cov2 = max(cov2, keep * smoothstep(1.3, 1.05, d));
       }
@@ -889,8 +904,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
       let c0 = moonCraters(qs, 5.0, pwLP / max(length(q), 1e-3), 2);
       // the displaced relief's own normal (finite differences of moonHeight on the sphere), then the finer craters' bump
       let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
-      let eh = 0.0012; let h0 = moonHeight(qs);
-      let hx = (moonHeight(normalize(qs + t1 * eh)) - h0) / eh; let hy = (moonHeight(normalize(qs + t2 * eh)) - h0) / eh;
+      let eh = 0.0012; let h0 = moonHN(qs);
+      let hx = (moonHN(normalize(qs + t1 * eh)) - h0) / eh; let hy = (moonHN(normalize(qs + t2 * eh)) - h0) / eh;
       let nl = normalize(qs - t1 * hx - t2 * hy);
       n = normalize((inst.m * vec4f(nl, 0.0)).xyz);
       var cg = (inst.m * vec4f(c0.g, 0.0)).xyz / max(length(inst.m[0].xyz), 1e-3);
