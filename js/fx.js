@@ -185,6 +185,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       return;
     }
   }
+  if (isShip && entry.forceThrottle && entry.throttleK !== undefined) throttle *= entry.throttleK;   // (a forced drive winding down: the plume fades, the nozzle hearts stay)
   const time = R._time || 0;
   for (let i = 0; i < pts.length; i++) {
     const ep = pts[i];

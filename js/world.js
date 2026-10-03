@@ -695,7 +695,8 @@ export function drawWorld(R, t, opts = {}) {
       const pulse = 0.5 + 0.5 * Math.sin(t * 6);
       me.matOverride = { window: { base: [0.2, 0.05, 0.05], metal: 0, rough: 0.5, emissive: [3 * pulse + 0.3, 0.15, 0.1] } };
     }
-    me.forceThrottle = t > 28 && t < 41;                        // under way during the belly pass (the camera rides along)
+    me.forceThrottle = t > 28 && t < 44.5;                      // under way during the belly pass (the camera rides along)
+    me.throttleK = 1 - smooth(40.5, 44, t);                      // … then the drive winds down slowly (it cut out at 41 in scene 5)
     // ARRIVAL (Dune-style): the window unfolds at 17.5, the ship slides out slowly 19–29
     if (t < MOTHER_ARRIVE + MOTHER_EMERGE + 1.5) {
       const L = LM, fwd = [0, 0, 1], sz = modelSize(R, 'mothership');
