@@ -293,138 +293,8 @@ fn skyColor(d0: vec3f) -> vec3f {
 `;
 
 // ---------------------------------------------------------------- meshes
-export const MESH = COMMON + /* wgsl */ `
-struct Inst {
-  m: mat4x4f,
-  base: vec4f,   // rgb, metal
-  emis: vec4f,   // rgb, rough
-  p0: vec4f,     // flash, damage, detailScale, revealZ
-  p1: vec4f,     // revealDir(0 off), revealWidth, emissiveBoost, seed
-  tint: vec4f,   // reveal glow color, w unused
-  dmg: vec4f,    // damage centre (local) + radius (0 = whole object)
-  clipMin: vec4f, // fracture chunk: local AABB min, w = enable
-  clipMax: vec4f, // local AABB max, w = torn-edge heat
-  extra: vec4f,   // x = texture set (0 none, 1 hero, 2 enemy), y = crush amount, zw = crush dir xy
-  crush: vec4f,   // world-space crush centre + radius (dir z derived)
-  shade: vec4f,   // x = open-space light scale (interiors), y = soot amount
-};
-// crumple: pulls the surface in around the impact point and pushes it along the blow, with noisy folds
-fn crushW(w: vec3f, inst: Inst) -> vec3f {
-  let k = inst.extra.y;
-  if (k <= 0.0) { return w; }
-  let d = w - inst.crush.xyz;
-  let r = abs(inst.crush.w);
-  let fall = smoothstep(r, r * 0.2, length(d));
-  if (fall <= 0.0) { return w; }
-  let dz = sign(inst.crush.w) * sqrt(max(0.0, 1.0 - dot(inst.extra.zw, inst.extra.zw)));
-  let dir = vec3f(inst.extra.z, inst.extra.w, dz);
-  let fold = vec3f(vnoise(w * 0.28), vnoise(w * 0.28 + 17.0), vnoise(w * 0.28 + 31.0)) - 0.5;
-  // cup-shaped dent: strongest at the centre, rim bulges slightly outward; broad folds, no spikes
-  let bowl = fall * fall;
-  let squash = d * (1.0 - 0.45 * k * bowl) + dir * (0.4 * r * k * bowl) + fold * (r * 0.16 * k * fall);
-  return inst.crush.xyz + squash;
-}
-@group(0) @binding(1) var<storage, read> I: array<Inst>;
-@group(0) @binding(2) var shadowTex: texture_depth_2d;
-@group(0) @binding(3) var shadowSmp: sampler_comparison;
-@group(0) @binding(4) var texSmp: sampler;
-@group(0) @binding(5) var texA1: texture_2d<f32>;
-@group(0) @binding(6) var texM1: texture_2d<f32>;
-@group(0) @binding(7) var texA2: texture_2d<f32>;
-@group(0) @binding(8) var texM2: texture_2d<f32>;
-@group(0) @binding(9) var texA3: texture_2d<f32>;    // Sigma's rifle (albedo, A = emissive mask)
-@group(0) @binding(10) var texM3: texture_2d<f32>;
-@group(0) @binding(11) var texA4: texture_2d<f32>;   // VANGUARD's rifle
-@group(0) @binding(12) var texM4: texture_2d<f32>;
-@group(0) @binding(13) var texA5: texture_2d<f32>;   // the enemy fighters
-@group(0) @binding(14) var texM5: texture_2d<f32>;
-@group(0) @binding(15) var texA6: texture_2d<f32>;   // our fighters
-@group(0) @binding(16) var texM6: texture_2d<f32>;
-@group(0) @binding(17) var texA7: texture_2d<f32>;   // the enemy dreadnought (a 3×3 atlas of tiling cells: cell index in uv.y / 10)
-@group(0) @binding(18) var texM7: texture_2d<f32>;
-
-struct VO {
-  @builtin(position) @invariant pos: vec4f,
-  @location(0) wp: vec3f,
-  @location(1) n: vec3f,
-  @location(2) lp: vec3f,
-  @location(3) ln: vec3f,
-  @location(4) @interpolate(flat) ii: u32,
-  @location(5) uv: vec2f,
-};
-
-@vertex fn vs(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) uv: vec2f, @builtin(instance_index) ii: u32) -> VO {
-  let m = I[ii].m;
-  var pp = p;
-  if (i32(I[ii].extra.x) == -3) { pp = p + normalize(p) * moonHeight(normalize(p)) * length(p); }   // the moon: its relief displaced
-  let w = vec4f(crushW((m * vec4f(pp, 1.0)).xyz, I[ii]), 1.0);
-  var o: VO;
-  o.pos = F.viewProj * w;
-  o.wp = w.xyz;
-  o.n = normalize((m * vec4f(n, 0.0)).xyz);
-  o.lp = pp; o.ln = n; o.ii = ii; o.uv = uv;
-  return o;
-}
-
-// depth prepass (dense interiors): uses the regular vs; the fragment only applies the cut-away discards so holes stay open
-@fragment fn fsDepth(i: VO) -> @location(0) vec4f { let c = cutAway(i, I[i.ii]); return vec4f(c.x * 0.0); }
-
-@vertex fn vsShadow(@location(0) p: vec3f, @builtin(instance_index) ii: u32) -> @builtin(position) vec4f {
-  return F.shadowVP * vec4f(crushW((I[ii].m * vec4f(p, 1.0)).xyz, I[ii]), 1.0);
-}
-
-fn gridLines(uv: vec2f, cell: vec2f, w: f32) -> vec3f {
-  let g = uv / cell;
-  let f = abs(fract(g) - 0.5);
-  let fw = fwidth(g) * 1.2 + 1e-4;
-  let l = 1.0 - min(smoothstep(0.5 - w - fw.x, 0.5 - fw.x * 0.3, f.x) + smoothstep(0.5 - w - fw.y, 0.5 - fw.y * 0.3, f.y), 1.0);
-  return vec3f(l, floor(g));
-}
-
-fn panel(lp: vec3f, ln: vec3f, s: f32, seed: f32) -> vec3f {
-  // returns (line darkness 0..1, plate albedo variation, window mask)
-  let a = abs(ln);
-  var uv: vec2f;
-  if (a.x > a.y && a.x > a.z) { uv = lp.zy; } else if (a.y > a.z) { uv = lp.xz; } else { uv = lp.xy; }
-  let big = gridLines(uv + seed, vec2f(4.0, 2.2) * s, 0.02);
-  let small = gridLines(uv * 1.0 + seed * 3.0 + vec2f(0.37, 0.11) * s, vec2f(1.3, 0.8) * s, 0.035);
-  let id = big.yz;
-  let r = hash31(vec3f(id, seed));
-  let r2 = hash31(vec3f(small.yz, seed + 4.0));
-  let fwb = length(fwidth(uv / (vec2f(4.0, 2.2) * s)));
-  let fws = length(fwidth(uv / (vec2f(1.3, 0.8) * s)));
-  let line = max((1.0 - big.x) * (1.0 - smoothstep(0.12, 0.35, fwb)), (1.0 - small.x) * 0.45 * (1.0 - smoothstep(0.1, 0.3, fws)));
-  let vary = (r - 0.5) * 0.16 + (r2 - 0.5) * 0.06 + select(0.0, -0.12, r > 0.86);
-  return vec3f(line, vary, r2);
-}
-
-
-// ================================================================== cinematic hull detail (flagship, shade.z = class)
-// Procedural armour in METRES of model space, anti-aliased by the pixel footprint pw (no derivatives inside, so it
-// can run in non-uniform flow): staggered plate courses with sub-plates, recessed seams with bevelled raised edges,
-// rivet rows, and per-plate decals that match the material — hazard stripes, stencilled hull numbers, maintenance
-// text blocks, vent grilles, access hatches, chevrons, the fleet emblem — weathered (chipped paint, grime streaks,
-// worn bare-metal edges). Returns colour/rough/metal edits + a tangent-plane normal tilt.
-struct HD { col: vec3f, mixk: f32, rough: f32, metal: f32, tilt: vec2f, ao: f32, paint: vec3f };
-fn seg7(p: vec2f, d: i32) -> f32 { return seg7w(p, d, 0.16); }
-fn seg7w(p: vec2f, d: i32, w: f32) -> f32 {           // 7-segment digit, p in [0,1]x[0,1.8]; returns 1 inside a lit segment
-  // segment bits: a b c d e f g (top, top-right, bottom-right, bottom, bottom-left, top-left, middle)
-  var bits = array<u32, 10>(0x3Fu, 0x06u, 0x5Bu, 0x4Fu, 0x66u, 0x6Du, 0x7Du, 0x07u, 0x7Fu, 0x6Fu);
-  let m = bits[u32(clamp(d, 0, 9))];
-  var on = 0.0;
-  let hx = abs(p.x - 0.5) < 0.42; let vx0 = abs(p.x - 0.08) < w * 0.5; let vx1 = abs(p.x - 0.92) < w * 0.5;
-  if ((m & 1u) != 0u && hx && abs(p.y - 1.72) < w * 0.5) { on = 1.0; }
-  if ((m & 2u) != 0u && vx1 && p.y > 0.92 && p.y < 1.72) { on = 1.0; }
-  if ((m & 4u) != 0u && vx1 && p.y > 0.08 && p.y < 0.88) { on = 1.0; }
-  if ((m & 8u) != 0u && hx && abs(p.y - 0.08) < w * 0.5) { on = 1.0; }
-  if ((m & 16u) != 0u && vx0 && p.y > 0.08 && p.y < 0.88) { on = 1.0; }
-  if ((m & 32u) != 0u && vx0 && p.y > 0.92 && p.y < 1.72) { on = 1.0; }
-  if ((m & 64u) != 0u && hx && abs(p.y - 0.9) < w * 0.5) { on = 1.0; }
-  return on;
-}
-// procedural crater field on a unit sphere (3D cell noise), 4 octaves (cells 1/14 … 1/260 of the radius), ~10× finer
-// than the moon mesh. ONE evaluation returns the analytic height gradient (for the bump), rim and ray brightness;
-// each octave only visits the 2×2×2 cells nearest the point (craters sit inside their cell).
+// the moon's relief and craters: shared by the mesh shader (displacement) and the one-time bake (MOONBAKE)
+export const MOONFN = /* wgsl */ `
 struct MC { g: vec3f, rim: f32, ray: f32, basin: f32 };
 // ONE GIANT IMPACT BASIN (2026-10-03) on the face the camera sees (moon-local, angular radius 0.42 rad): a deep bowl with
 // a terraced inner wall, a central peak, a sharp raised rim and an ejecta blanket with long bright rays; its floor is dark
@@ -521,6 +391,179 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixe
   }
   return o;
 }
+`;
+
+// THE MOON BAKE (2026-10-04): the procedural surface into an equirect texture (rgba16float, 4096×2048) once —
+// rg = the normal's slopes along t1, t2 (the sphere's tangent basis), b = albedo (green), a = the relief height
+export const MOONBAKE = COMMON + MOONFN + /* wgsl */ `
+struct BU { a: vec4f };   // x: the moon's radius (model units), y: its seed, z: texel angle, w: width
+@group(0) @binding(0) var<uniform> U: BU;
+@vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  let p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0))[i];
+  return vec4f(p, 0.0, 1.0);
+}
+@fragment fn fs(@builtin(position) fp: vec4f) -> @location(0) vec4f {
+  let uv = fp.xy / vec2f(U.a.w, U.a.w * 0.5);
+  let lon = (uv.x - 0.5) * 6.2831853; let co = uv.y * 3.14159265;
+  let qs = vec3f(sin(co) * cos(lon), cos(co), sin(co) * sin(lon));
+  let q = qs * U.a.x * (1.0 + moonHeight(qs));
+  let seed = U.a.y;
+  // albedo (as the mesh shader had it for the moon)
+  let big = fbm(q * 2.2 + seed, 4);
+  let mid = fbm(q * 7.0 + 3.1 + seed, 3);
+  var base = mix(vec3f(0.034, 0.032, 0.03), vec3f(0.1, 0.09, 0.08), smoothstep(0.3, 0.72, big));
+  base *= mix(0.8, 1.12, mid);
+  base = mix(base, base * vec3f(1.15, 0.95, 0.8), smoothstep(0.55, 0.8, fbm(q * 3.5 + 9.0, 3)) * 0.5);
+  base += vec3f(0.025) * smoothstep(0.85, 0.92, vnoise(q * 70.0 + seed));
+  base = base * 2.3 + vec3f(0.02);
+  let c0 = moonCraters(qs, 5.0, U.a.z, 2);
+  base *= mix(1.0, 0.55, smoothstep(0.42, 0.62, fbm(qs * 1.6 + 11.0, 4)));
+  base *= 1.0 + 0.3 * clamp(c0.rim, 0.0, 1.0);
+  base *= mix(1.0, 0.5, c0.basin);
+  // the normal: the relief (finite differences of moonHN) and the finer craters' bump
+  let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
+  let eh = 0.0012; let h0 = moonHN(qs);
+  let hx = (moonHN(normalize(qs + t1 * eh)) - h0) / eh; let hy = (moonHN(normalize(qs + t2 * eh)) - h0) / eh;
+  var nl = normalize(qs - t1 * hx - t2 * hy);
+  let cg = c0.g - nl * dot(c0.g, nl);
+  nl = normalize(nl - cg * 0.18);
+  let nq = max(dot(nl, qs), 0.05);
+  return vec4f(dot(nl, t1) / nq, dot(nl, t2) / nq, base.g, moonHeight(qs));   // (a: the displacement height, for the vertex shader)
+}
+`;
+export const MESH = COMMON + MOONFN + /* wgsl */ `
+struct Inst {
+  m: mat4x4f,
+  base: vec4f,   // rgb, metal
+  emis: vec4f,   // rgb, rough
+  p0: vec4f,     // flash, damage, detailScale, revealZ
+  p1: vec4f,     // revealDir(0 off), revealWidth, emissiveBoost, seed
+  tint: vec4f,   // reveal glow color, w unused
+  dmg: vec4f,    // damage centre (local) + radius (0 = whole object)
+  clipMin: vec4f, // fracture chunk: local AABB min, w = enable
+  clipMax: vec4f, // local AABB max, w = torn-edge heat
+  extra: vec4f,   // x = texture set (0 none, 1 hero, 2 enemy), y = crush amount, zw = crush dir xy
+  crush: vec4f,   // world-space crush centre + radius (dir z derived)
+  shade: vec4f,   // x = open-space light scale (interiors), y = soot amount
+};
+// crumple: pulls the surface in around the impact point and pushes it along the blow, with noisy folds
+fn crushW(w: vec3f, inst: Inst) -> vec3f {
+  let k = inst.extra.y;
+  if (k <= 0.0) { return w; }
+  let d = w - inst.crush.xyz;
+  let r = abs(inst.crush.w);
+  let fall = smoothstep(r, r * 0.2, length(d));
+  if (fall <= 0.0) { return w; }
+  let dz = sign(inst.crush.w) * sqrt(max(0.0, 1.0 - dot(inst.extra.zw, inst.extra.zw)));
+  let dir = vec3f(inst.extra.z, inst.extra.w, dz);
+  let fold = vec3f(vnoise(w * 0.28), vnoise(w * 0.28 + 17.0), vnoise(w * 0.28 + 31.0)) - 0.5;
+  // cup-shaped dent: strongest at the centre, rim bulges slightly outward; broad folds, no spikes
+  let bowl = fall * fall;
+  let squash = d * (1.0 - 0.45 * k * bowl) + dir * (0.4 * r * k * bowl) + fold * (r * 0.16 * k * fall);
+  return inst.crush.xyz + squash;
+}
+@group(0) @binding(1) var<storage, read> I: array<Inst>;
+@group(0) @binding(2) var shadowTex: texture_depth_2d;
+@group(0) @binding(3) var shadowSmp: sampler_comparison;
+@group(0) @binding(4) var texSmp: sampler;
+@group(0) @binding(5) var texA1: texture_2d<f32>;
+@group(0) @binding(6) var texM1: texture_2d<f32>;
+@group(0) @binding(7) var texA2: texture_2d<f32>;
+@group(0) @binding(8) var texM2: texture_2d<f32>;
+@group(0) @binding(9) var texA3: texture_2d<f32>;    // Sigma's rifle (albedo, A = emissive mask)
+@group(0) @binding(10) var texM3: texture_2d<f32>;
+@group(0) @binding(11) var texA4: texture_2d<f32>;   // VANGUARD's rifle
+@group(0) @binding(12) var texM4: texture_2d<f32>;
+@group(0) @binding(13) var texA5: texture_2d<f32>;   // the enemy fighters
+@group(0) @binding(14) var texM5: texture_2d<f32>;
+@group(0) @binding(15) var texA6: texture_2d<f32>;   // our fighters
+@group(0) @binding(16) var texM6: texture_2d<f32>;
+@group(0) @binding(17) var texA7: texture_2d<f32>;   // the enemy dreadnought (a 3×3 atlas of tiling cells: cell index in uv.y / 10)
+@group(0) @binding(18) var texM7: texture_2d<f32>;
+@group(0) @binding(19) var texMoon: texture_2d<f32>;   // the moon, baked once (equirect: normal slopes rg, albedo b, height a) — MOONBAKE
+
+struct VO {
+  @builtin(position) @invariant pos: vec4f,
+  @location(0) wp: vec3f,
+  @location(1) n: vec3f,
+  @location(2) lp: vec3f,
+  @location(3) ln: vec3f,
+  @location(4) @interpolate(flat) ii: u32,
+  @location(5) uv: vec2f,
+};
+
+@vertex fn vs(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) uv: vec2f, @builtin(instance_index) ii: u32) -> VO {
+  let m = I[ii].m;
+  var pp = p;
+  if (i32(I[ii].extra.x) == -3) { let qn = normalize(p); let mu = vec2f(atan2(qn.z, qn.x) / 6.2831853 + 0.5, acos(clamp(qn.y, -1.0, 1.0)) / 3.14159265); pp = p + qn * textureSampleLevel(texMoon, texSmp, mu, 0.0).a * length(p); }   // the moon: its relief displaced (height from the bake)
+  let w = vec4f(crushW((m * vec4f(pp, 1.0)).xyz, I[ii]), 1.0);
+  var o: VO;
+  o.pos = F.viewProj * w;
+  o.wp = w.xyz;
+  o.n = normalize((m * vec4f(n, 0.0)).xyz);
+  o.lp = pp; o.ln = n; o.ii = ii; o.uv = uv;
+  return o;
+}
+
+// depth prepass (dense interiors): uses the regular vs; the fragment only applies the cut-away discards so holes stay open
+@fragment fn fsDepth(i: VO) -> @location(0) vec4f { let c = cutAway(i, I[i.ii]); return vec4f(c.x * 0.0); }
+
+@vertex fn vsShadow(@location(0) p: vec3f, @builtin(instance_index) ii: u32) -> @builtin(position) vec4f {
+  return F.shadowVP * vec4f(crushW((I[ii].m * vec4f(p, 1.0)).xyz, I[ii]), 1.0);
+}
+
+fn gridLines(uv: vec2f, cell: vec2f, w: f32) -> vec3f {
+  let g = uv / cell;
+  let f = abs(fract(g) - 0.5);
+  let fw = fwidth(g) * 1.2 + 1e-4;
+  let l = 1.0 - min(smoothstep(0.5 - w - fw.x, 0.5 - fw.x * 0.3, f.x) + smoothstep(0.5 - w - fw.y, 0.5 - fw.y * 0.3, f.y), 1.0);
+  return vec3f(l, floor(g));
+}
+
+fn panel(lp: vec3f, ln: vec3f, s: f32, seed: f32) -> vec3f {
+  // returns (line darkness 0..1, plate albedo variation, window mask)
+  let a = abs(ln);
+  var uv: vec2f;
+  if (a.x > a.y && a.x > a.z) { uv = lp.zy; } else if (a.y > a.z) { uv = lp.xz; } else { uv = lp.xy; }
+  let big = gridLines(uv + seed, vec2f(4.0, 2.2) * s, 0.02);
+  let small = gridLines(uv * 1.0 + seed * 3.0 + vec2f(0.37, 0.11) * s, vec2f(1.3, 0.8) * s, 0.035);
+  let id = big.yz;
+  let r = hash31(vec3f(id, seed));
+  let r2 = hash31(vec3f(small.yz, seed + 4.0));
+  let fwb = length(fwidth(uv / (vec2f(4.0, 2.2) * s)));
+  let fws = length(fwidth(uv / (vec2f(1.3, 0.8) * s)));
+  let line = max((1.0 - big.x) * (1.0 - smoothstep(0.12, 0.35, fwb)), (1.0 - small.x) * 0.45 * (1.0 - smoothstep(0.1, 0.3, fws)));
+  let vary = (r - 0.5) * 0.16 + (r2 - 0.5) * 0.06 + select(0.0, -0.12, r > 0.86);
+  return vec3f(line, vary, r2);
+}
+
+
+// ================================================================== cinematic hull detail (flagship, shade.z = class)
+// Procedural armour in METRES of model space, anti-aliased by the pixel footprint pw (no derivatives inside, so it
+// can run in non-uniform flow): staggered plate courses with sub-plates, recessed seams with bevelled raised edges,
+// rivet rows, and per-plate decals that match the material — hazard stripes, stencilled hull numbers, maintenance
+// text blocks, vent grilles, access hatches, chevrons, the fleet emblem — weathered (chipped paint, grime streaks,
+// worn bare-metal edges). Returns colour/rough/metal edits + a tangent-plane normal tilt.
+struct HD { col: vec3f, mixk: f32, rough: f32, metal: f32, tilt: vec2f, ao: f32, paint: vec3f };
+fn seg7(p: vec2f, d: i32) -> f32 { return seg7w(p, d, 0.16); }
+fn seg7w(p: vec2f, d: i32, w: f32) -> f32 {           // 7-segment digit, p in [0,1]x[0,1.8]; returns 1 inside a lit segment
+  // segment bits: a b c d e f g (top, top-right, bottom-right, bottom, bottom-left, top-left, middle)
+  var bits = array<u32, 10>(0x3Fu, 0x06u, 0x5Bu, 0x4Fu, 0x66u, 0x6Du, 0x7Du, 0x07u, 0x7Fu, 0x6Fu);
+  let m = bits[u32(clamp(d, 0, 9))];
+  var on = 0.0;
+  let hx = abs(p.x - 0.5) < 0.42; let vx0 = abs(p.x - 0.08) < w * 0.5; let vx1 = abs(p.x - 0.92) < w * 0.5;
+  if ((m & 1u) != 0u && hx && abs(p.y - 1.72) < w * 0.5) { on = 1.0; }
+  if ((m & 2u) != 0u && vx1 && p.y > 0.92 && p.y < 1.72) { on = 1.0; }
+  if ((m & 4u) != 0u && vx1 && p.y > 0.08 && p.y < 0.88) { on = 1.0; }
+  if ((m & 8u) != 0u && hx && abs(p.y - 0.08) < w * 0.5) { on = 1.0; }
+  if ((m & 16u) != 0u && vx0 && p.y > 0.08 && p.y < 0.88) { on = 1.0; }
+  if ((m & 32u) != 0u && vx0 && p.y > 0.92 && p.y < 1.72) { on = 1.0; }
+  if ((m & 64u) != 0u && hx && abs(p.y - 0.9) < w * 0.5) { on = 1.0; }
+  return on;
+}
+// procedural crater field on a unit sphere (3D cell noise), 4 octaves (cells 1/14 … 1/260 of the radius), ~10× finer
+// than the moon mesh. ONE evaluation returns the analytic height gradient (for the bump), rim and ray brightness;
+// each octave only visits the 2×2×2 cells nearest the point (craters sit inside their cell).
 fn boxd(p: vec2f, c: vec2f, h: vec2f) -> f32 { let d = abs(p - c) - h; return length(max(d, vec2f(0.0))) + min(max(d.x, d.y), 0.0); }
 fn hullDetail(uv: vec2f, cls: f32, seed: f32, pw: f32, side: f32) -> HD {
   let vertical = side != 0.0;
@@ -874,8 +917,19 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   }
   // procedural asteroid (texSet = -1, tools/make_asteroids.py geometry): triplanar-free 3D regolith colour + bump.
   // Model space is ~unit radius, so every frequency scales with the rock.
-  if (texSet == -1 || texSet == -3) {
-    let moonK = select(0.0, 1.0, texSet == -3);                       // -3: the moon (seen from 110 km: smoother, brighter highlands)
+  if (texSet == -3) {
+    // THE MOON from its bake (2026-10-04): the whole procedural surface (relief normal, craters, maria, regolith colour) was
+    // evaluated once into texMoon — here one texture read, plus a live regolith grain for close-ups
+    let qs = normalize(i.lp);
+    let mu = vec2f(atan2(qs.z, qs.x) / 6.2831853 + 0.5, acos(clamp(qs.y, -1.0, 1.0)) / 3.14159265);
+    let mt = textureSampleLevel(texMoon, texSmp, mu, 0.0);
+    let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
+    let gn = vnoise(qs * 2600.0) - 0.5;                                // (a live micro bump: grit under the baked detail)
+    n = normalize((inst.m * vec4f(normalize(qs + t1 * (mt.r + gn * 0.05) + t2 * (mt.g - gn * 0.04)), 0.0)).xyz);
+    base = mt.b * vec3f(1.06, 1.0, 0.93) * (0.92 + 0.16 * vnoise(qs * 900.0));
+    rough = 0.93; metal = 0.0; texAO = 1.0;
+  } else if (texSet == -1) {
+    let moonK = 0.0;
     let q = i.lp;
     let big = fbm(q * 2.2 + inst.p1.w, 4);
     let mid = fbm(q * 7.0 + 3.1 + inst.p1.w, 3);

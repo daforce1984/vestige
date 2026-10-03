@@ -2,7 +2,7 @@
 // Memory policy: every GPU buffer / texture / bind group is created at init() or on resize().
 // The frame loop only calls queue.writeBuffer() into preallocated buffers from preallocated typed arrays.
 // Resize destroys the previous size-dependent textures explicitly; dispose() tears everything down.
-import { BG, MESH, DEPTH_RESOLVE, SPRITE, LENS, BLOOM, FINAL, BLIT, CELESTIAL } from './shaders.js';
+import { BG, MESH, MOONBAKE, DEPTH_RESOLVE, SPRITE, LENS, BLOOM, FINAL, BLIT, CELESTIAL } from './shaders.js';
 import { M, V, Q } from './math.js';
 import { parseGLB } from './gltf.js';
 // mechs get no rim light and no camera-side fill light (they read as lit by the lens) — Sigma, the RONINs, the mace, the hands
@@ -142,12 +142,13 @@ export class Renderer {
         { binding: 1, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'depth' } },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'comparison' } },
-        { binding: 4, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+        { binding: 4, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
         { binding: 5, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         ...[9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((b) => ({ binding: b, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } })),   // the rifles (texSet 3 / 4)
+        { binding: 19, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },   // the moon's bake (MOONBAKE; its height displaces the mesh)
       ],
     });
     const meshLayout = dev.createPipelineLayout({ bindGroupLayouts: [this.meshBGL] });
@@ -244,6 +245,7 @@ export class Renderer {
     // model textures: [hero albedo, hero orm, enemy albedo, enemy orm, hero rifle albedo(+emissive in A), orm, enemy rifle albedo, orm]; 1x1 placeholders until loaded
     this.texSmp = dev.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 });
     this.modelTex = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map(() => dev.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT }));
+    this.moonTex = dev.createTexture({ size: [1, 1], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT });   // (placeholder until the moon is baked)
     this._makeMeshBG();
     this.shadowBG = dev.createBindGroup({
       layout: this.shadowBGL,
@@ -304,7 +306,7 @@ export class Renderer {
       layout: this.meshBGL,
       entries: [{ binding: 0, resource: { buffer: this.frameUBO } }, { binding: 1, resource: { buffer: this.instBuf } },
         { binding: 2, resource: this.shadowView }, { binding: 3, resource: this.cmpSmp }, { binding: 4, resource: this.texSmp },
-        ...this.modelTex.map((tx, k) => ({ binding: 5 + k, resource: tx.createView() }))],
+        ...this.modelTex.map((tx, k) => ({ binding: 5 + k, resource: tx.createView() })), { binding: 19, resource: this.moonTex.createView() }],
     });
   }
   /** load model textures (slot 0/1 hero albedo/orm, 2/3 enemy albedo/orm). Missing files keep the placeholder. */
@@ -608,7 +610,31 @@ export class Renderer {
    * sub/of: shutter sub-frame index and count. With of > 1, each call accumulates 1/of of the image;
    * the canvas is presented after the last sub-frame.
    */
+  /** THE MOON BAKE: its whole procedural surface evaluated once into an equirect texture (MOONBAKE), in strips (each its
+   *  own submit, so no single one holds the GPU long); the mesh shader then just reads it */
+  _bakeMoon() {
+    const m = this.models.moon, e = m && m.entries[0]; if (!e || this._moonBaked) return;
+    this._moonBaked = true;
+    const dev = this.device, W = 4096, H = 2048, b = m.bounds;
+    const radius = Math.max(...b.max.map((v, k) => Math.max(Math.abs(v), Math.abs(b.min[k])))) / 1.01;
+    const tex = dev.createTexture({ size: [W, H], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT });
+    const mod = dev.createShaderModule({ code: MOONBAKE, label: 'moonbake' });
+    const pipe = dev.createRenderPipeline({ layout: 'auto', vertex: { module: mod, entryPoint: 'vs' }, fragment: { module: mod, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] }, primitive: { topology: 'triangle-list' } });
+    const ubo = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    dev.queue.writeBuffer(ubo, 0, new Float32Array([radius, e.seed || 0, 2 * Math.PI / W, W]));
+    const bg = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubo } }] });
+    const view = tex.createView(), STRIPS = 16;
+    for (let k = 0; k < STRIPS; k++) {
+      const enc = dev.createCommandEncoder();
+      const ps = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: k ? 'load' : 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }] });
+      ps.setPipeline(pipe); ps.setBindGroup(0, bg); ps.setScissorRect(0, (k * H) / STRIPS, W, H / STRIPS); ps.draw(3); ps.end();
+      dev.queue.submit([enc.finish()]);
+    }
+    this.moonTex.destroy(); this.moonTex = tex; this._makeMeshBG();
+  }
+
   render(cam, env, post, sub = 0, of = 1) {
+    if (!this._moonBaked && this.models.moon && this.models.moon.entries.length) this._bakeMoon();   // (once, the first frame the moon is in)
     if (this.lost) return;
     if (this._needResize) { this._needResize = false; this.resize(); }
     const dev = this.device;
