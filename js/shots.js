@@ -1059,6 +1059,7 @@ function cutPlanes(R) {
 }
 // the blade's first touch: from here the two halves are drawn in place (lt = 0) so the melt band runs along the real armour
 const CUT_SEAM_T = CUT_T - 0.012;
+const CUT_LEAD = 1.0;   // m: the melt front runs this far ahead of the blade's centre line (its glowing width + the drawn hilt's offset)
 // the blade going through (until CUT_SPLIT): a point on it and the way it moves through VANGUARD (relative to its torso,
 // square to the blade) — the cut melts open only behind that front (shader: plane-cut front), not all at once
 let _bfT = null, _bf = null;
@@ -1102,7 +1103,7 @@ function drawHalves(R, t, s) {
         if (V.len(vl) < 1e-6) continue; vl = V.norm([0, 0, 0], vl);
         const b1 = V.norm([0, 0, 0], V.cross([0, 0, 0], n, Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), b2 = V.cross([0, 0, 0], n, b1);
         const ang = Math.atan2(V.dot(vl, b2), V.dot(vl, b1)), f = madd(V.scale([0, 0, 0], b1, Math.cos(ang)), b2, Math.sin(ang));
-        e.clipParts[k] = [n[0], n[1], n[2], n[3], ang, V.dot(pl, f)];
+        e.clipParts[k] = [n[0], n[1], n[2], n[3], ang, V.dot(pl, f) + CUT_LEAD];   // (led by the blade's own width: where it has gone in is already molten)
       }
     }
     else { const CA = cutArms(), box = (y) => (half > 0 ? [-30, y, -30, 30, 40, 30] : [-30, -40, -30, 30, y, 30]); e.clipParts = { torso: box(CUT_Y), arm_L_upper: box(CA.arm_L_upper), arm_R_upper: box(CA.arm_R_upper) }; }
@@ -1162,7 +1163,10 @@ function cutSection(R) {
   // when the blade crosses a point q (x, z on the plane): the side of the blade line changes while q lies within its length
   const side = (bl, q) => { const dx = bl.b[0] - bl.a[0], dz = bl.b[2] - bl.a[2]; return dx * (q[2] - bl.a[2]) - dz * (q[0] - bl.a[0]); };
   const within = (bl, q) => { const dx = bl.b[0] - bl.a[0], dz = bl.b[2] - bl.a[2], L2 = dx * dx + dz * dz, s = ((q[0] - bl.a[0]) * dx + (q[2] - bl.a[2]) * dz) / L2; return s >= -0.02 && s <= 1.02; };
-  const passT = (q) => { for (let i = 1; i < blade.length; i++) { const s0 = side(blade[i - 1], q), s1 = side(blade[i], q); if ((s0 < 0) !== (s1 < 0) && within(blade[i], q)) return blade[i - 1].t + (blade[i].t - blade[i - 1].t) * s0 / (s0 - s1); } return Infinity; };
+  // (the front is led by CUT_LEAD: the side test is taken against the blade line moved that far the way it is going)
+  const nside = (bl, q, sg) => { const dx = bl.b[0] - bl.a[0], dz = bl.b[2] - bl.a[2]; return side(bl, q) / Math.hypot(dx, dz) - sg * CUT_LEAD; };
+  const sgn = (() => { const b0 = blade[0], b1 = blade[blade.length - 1], m = [(b1.a[0] + b1.b[0]) / 2, 0, (b1.a[2] + b1.b[2]) / 2]; return side(b0, m) > 0 ? 1 : -1; })();   // which side the blade moves toward
+  const passT = (q) => { for (let i = 1; i < blade.length; i++) { const s0 = nside(blade[i - 1], q, sgn), s1 = nside(blade[i], q, sgn); if ((s0 < 0) !== (s1 < 0) && within(blade[i], q)) return blade[i - 1].t + (blade[i].t - blade[i - 1].t) * s0 / (s0 - s1); } return Infinity; };
   const pieces = [];   // each outline segment split finely, with the moment its two ends were cut
   for (const [a, b] of segs) { const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[2] - a[2]) / 0.25)); for (let i = 0; i < n; i++) { const p = lerpv(a, b, i / n), q = lerpv(a, b, (i + 1) / n); pieces.push({ p, q, tp: passT(p), tq: passT(q) }); } }
   return (_sec = { segs, blade, pieces });

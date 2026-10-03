@@ -652,7 +652,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
       let b1 = normalize(cross(n, select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), abs(n.y) < 0.9)));
       let b2 = cross(n, b1);
       let fr = dot(i.lp, cos(inst.clipMax.y) * b1 + sin(inst.clipMax.y) * b2) - inst.clipMax.z;   // > 0: not reached yet
-      heat = heat * (1.0 - smoothstep(-0.1, 0.15, fr)) * (1.0 + 2.2 * exp(-abs(fr) / 0.5));
+      heat = heat * (1.0 - smoothstep(-0.05, 0.08, fr)) * (1.0 + 2.2 * exp(-abs(fr) / 0.5));
     }
     tornEdge = heat * (exp(-sd / 0.2) + 0.3 * exp(-sd / 0.55));
   }
