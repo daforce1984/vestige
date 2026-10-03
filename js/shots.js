@@ -2378,7 +2378,7 @@ shot(207, 212, 'S13b down the barrel', (c) => {
   c.post.godray = { pos: em, intensity: 0.15 + 0.1 * u, decay: 0.955 };
   c.env.shadowRadius = 400;
 });
-shot(212, 216, 'S13c the charge peaks', (c) => {
+shot(212, 216.35, 'S13c the charge peaks', (c) => {
   const { t, u, R } = c;
   const em = GUN.dread ? dreadEmitter(R, t, GUN.dread) : dreadPos(t);
   // close on the emitter between the forks; light and particles pour in, everything trembles
@@ -2389,14 +2389,15 @@ shot(212, 216, 'S13c the charge peaks', (c) => {
   c.post.ca = 0.002 + u * 0.006;
   c.env.shadowRadius = 200;
 });
-shot(216, 218, 'S14a lance fires', (c) => {
+shot(216.35, 218, 'S14a lance fires',   // (2026-10-03: from 216.35 — the lance leaving its bow cannon is seen in S13c first)
+  (c) => {
   const { t, u } = c;
   const hit = motherPoint([0, 0, 0], t, LANCE_HIT);
   const em = GUN.dread ? dreadEmitter(c.R, t, GUN.dread) : dreadPos(t);
   const mid = lerpv(em, hit, 0.72);
   camLook(c, addv(hit, [520, 180, -700]), lerpv(hit, em, 0.25), 55, 0.1);
   shake(c, 1.4 * Math.exp(-(t - 216) * 1.2), 12);
-  c.post.flash = t < 216.2 ? 0.8 : 0;
+  c.post.flash = t < 216.5 ? 0.8 : 0;
   c.post.lensB = { enable: 1, pos: em, thetaE: 0.12, horizon: 0, swirl: 0, glow: 0 };
   c.post.shakeBlur = 0.002;
   c.env.shadowRadius = 600;
@@ -2641,7 +2642,7 @@ shot(286, 292, 'S18b fleet struck', (c) => {
   camLook(c, motherPoint([0, 0, 0], t, [-420, 90, -620 + u * 60]), motherPoint([0, 0, 0], t, [0, 0, 120]), 48, -0.04);   // steady (no shake)
   c.env.shadowRadius = 400;
 });
-shot(292, 300, 'S19a main cannon charge', (c) => {
+shot(292, 300.35, 'S19a main cannon charge', (c) => {
   const { t, u } = c;
   const mc = mainCannon(c.R, t);
   const fwd = rotY([0, 0, 0], [0, 0, 1], motherYaw(t));
@@ -2649,13 +2650,14 @@ shot(292, 300, 'S19a main cannon charge', (c) => {
   handheld(c, 0.4);
   c.env.shadowCenter = mc; c.env.shadowRadius = 260;
 });
-shot(300, 303, 'S19b FIRE', (c) => {
+shot(300.35, 303, 'S19b FIRE',   // (from 300.35: the beam leaving the muzzle is seen in S19a first)
+  (c) => {
   const { t, u } = c;
   const mc = mainCannon(c.R, t);
   const d = dreadPos(t);
   camLook(c, addv(lerpv(mc, d, 0.1), [520, 240, 60]), lerpv(mc, d, 0.4), 52, -0.1);
   shake(c, 1.6 * Math.exp(-(t - 300) * 1.5), 14);
-  c.post.flash = t < 300.2 ? 0.7 : 0;
+  c.post.flash = t < 300.5 ? 0.7 : 0;
   c.post.godray = { pos: mc, intensity: 0.35 * (0.6), decay: 0.95 };
   c.post.exposure = 0.75;
   c.post.streak = 0.6;
