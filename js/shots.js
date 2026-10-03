@@ -1247,8 +1247,8 @@ function boostTrail(R, t, who) {
   const pt = (x) => { const q = trailSample(who, x); return [q.pos[0], q.pos[1] + 4, q.pos[2]]; };
   let a = pt(t);
   for (let i = 1; i <= N; i++) {
-    const x = t - (i / N) * span, q = trailSample(who, x);
-    const b = pt(x);
+    const x = t - (i / N) * span; if (who === 'hero' && t >= 163 && x < 163) break;   // (scene 30's run is turned from 163: no line back to the unturned path)
+    const q = trailSample(who, x), b = pt(x);
     const boost = sat(((q.boost ?? 0) - 0.55) / 0.4) * sat((V.dist(a, b) / (span / N) - 25) / 40);   // only real boosts, not drift
     const f = 1 - (i - 0.5) / N, k = boost * f * f;
     if (k > 0.02) R.beam(a, b, 0.35 + 0.5 * f, [col[0] * k, col[1] * k, col[2] * k], 0.9, 10, 0, 0.3);
@@ -2294,9 +2294,8 @@ shot(159.4, 163, 'S11d fly-by', (c) => {
 });
 shot(163, 170, 'S11e chase to battle', (c) => {
   const { t, u } = c;
-  const g = gundamLaunchPath(t);
-  const g2 = gundamLaunchPath(t - 0.25);
-  const v = V.norm([0, 0, 0], V.sub([0, 0, 0], g, g2));
+  const g = gundamState(t).pos;   // (follows him on his squared-up run — duel.js scene30Pos)
+  const v = V.norm([0, 0, 0], V.sub([0, 0, 0], gundamState(Math.min(t + 0.25, 169.95)).pos, Math.min(t + 0.25, 169.95) > t + 0.01 ? g : gundamState(t - 0.25).pos));   // (his heading from where he goes next: before 163 the path is the unturned one)
   camLook(c, addv(madd(g, v, -38), [8, 10, 0]), madd(g, v, 200), 52, Math.sin(t * 0.7) * 0.15);
   c.post.dof = { focus: 40, range: 25, blur: 0.009 }; c.post.motionBlur = 2.0;
   shake(c, 0.2, 9);

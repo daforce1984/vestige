@@ -569,8 +569,12 @@ function duelCues() {
   // his beam rifle: crack, the falling zap, the sine punch, a gritty body
   HERO_BURST.forEach((t) => out.push([t, 'heavy_beam', { rate: R(0.95, 1.02), gain: G * 0.75, dur: 0.55, fadeOut: 0.3, pan: -0.15, prio: 8, norand: true }]));   // his bursts
   ENEMY_BURST.forEach((t) => out.push([t, 'energy_beam2', { at: 'hit', rate: R(0.98, 1.05), gain: G * 0.75, pan: 0.3, prio: 8, norand: true }]));   // its bursts
+  // the aimed shot the shield takes (D08b: he lays the rifle on it and fires — 2026-10-03): its report on top of the heavy
+  // beam, at the highest priority so the block's splash and sizzle can't bury it
+  out.push([BLOCK_T, 'sfx16_beam', { at: 'hit', gain: G * 1.8, pan: -0.1, prio: 10, norand: true }]);
+  out.push([BLOCK_T, 'energy_beam2', { at: 'hit', rate: 0.8, gain: G * 1.5, pan: -0.1, prio: 10, norand: true }]);
   DUEL_RIFLE.forEach((t) => {   // his HEAVY beam: the heavy_beam attack, cut short and pitched down a little, + low weight
-    out.push([t, 'heavy_beam', { rate: R(0.86, 0.92), gain: G * 1.05, dur: 1.1, fadeOut: 0.55, pan: -0.15, prio: 9, norand: true }]);
+    out.push([t, 'heavy_beam', { rate: R(0.86, 0.92), gain: G * 1.05, dur: 1.1, fadeOut: 0.55, pan: -0.15, prio: t === BLOCK_T ? 10 : 9, norand: true }]);
     out.push([t, '@boom', { bus: 'sfx', f: 50, vel: G * 0.35, dur: 0.8, verb: 0.25 }]);
   });
   // the shots that land: struck plate, ring, and the armour burning through

@@ -1015,8 +1015,21 @@ const CIRC_AX = (() => { const a = [-4 - 60, 0, -26 - 28]; const l = Math.hypot(
 const circ = () => 0;   // (no standoff circling)
 // STRAFING at range (the gunfight): both slide sideways across the line of fire, opposite ways, while they trade shots
 const strafe = (tw, sgn) => { const k = smooth(176.4, 177.2, tw) * (1 - smooth(189.0, 189.8, tw)); return k > 0 ? scl(L1, sgn * 25 * k * Math.sin((tw - 176.4) * 1.15)) : [0, 0, 0]; };
+// SCENE 30 (S11e, 163–170 — 2026-10-03): he flies straight at it, already squared up — the launch run's last stretch is
+// turned (about where it ends, at 170, so the duel picks up unchanged) to lie along the line to VANGUARD; he faces that way
+// throughout (no turn onto it), leant forward over his thrusters
+let _s30 = null;
+function scene30Pos(tw) {
+  const at = (x) => add(gundamLaunchPath(x), dodgeOffset(x));
+  if (!_s30) {
+    const P1 = at(170), P0 = at(163), fE = flat(sub(enemyRawPos(170), P1), 0), D = flat(sub(P1, P0), 0);
+    _s30 = { P1, a: Math.atan2(fE[0], fE[2]) - Math.atan2(D[0], D[2]) };
+  }
+  const { P1, a } = _s30, d = sub(at(tw), P1), c = Math.cos(a), sn = Math.sin(a);
+  return add(P1, [d[0] * c + d[2] * sn, d[1], -d[0] * sn + d[2] * c]);
+}
 function heroPos0(tw) {
-  if (tw < 170) return add(gundamLaunchPath(tw), dodgeOffset(tw));   // (the launch run: he jinks out of the ion bolt)
+  if (tw < 170) return tw >= 163 ? scene30Pos(tw) : add(gundamLaunchPath(tw), dodgeOffset(tw));   // (the launch run: he jinks out of the ion bolt)
   const c = circ(tw);
   return add(add(add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), 0)), [CIRC_AX[0] * -6 * c, 1.2 * c, CIRC_AX[2] * -6 * c]), strafe(tw, 1));
 }
@@ -1185,7 +1198,8 @@ function duelHero_(t) {
     const p2 = gundamLaunchPath(tw + 0.05), p1 = gundamLaunchPath(tw);
     const path = nrm(sub(p2, p1));
     const toE = flat(sub(enemyRawPos(tw), s.pos));
-    f = nrm(lrp(path, toE, smooth(169.3, 170.3, tw)));
+    f = tw >= 163 ? nrm(toE) : nrm(lrp(path, toE, smooth(169.3, 170.3, tw)));   // (scene 30: squared up to it from the start)
+    if (tw >= 163) _pose[PIDX._body] += 0.35 * (1 - smooth(169.6, 170.25, tw));   // leant ~20° further forward over the downward thrusters
     _pose[PIDX._body + 2] += Math.sin(tw * 0.8) * 0.1 * (1 - smooth(169, 170, tw));
   } else {
     f = flat(sub(enemyRawPos(tw), s.pos), 0.6);               // always squared up to it (strafing sideways round the ring)
@@ -1214,7 +1228,7 @@ function duelHero_(t) {
   s.saberPow = s.saberL ? 2 : 1;                                     // full output against the charged shot: twice as thick
   s.sande = Math.max(sat((tw - SANDE0 + 0.05) / 0.1) * (1 - smooth(CUT_T - 0.05, CUT_T - 0.025, tw)), transGhost(tw));
   s.ghostFrom = tw < SANDE0 - 0.1 ? TRANS_PASS - 0.1 : SANDE0 - 0.02;   // afterimages (shots.js); gone for the close-up of the cut
-  s.boost = Math.max(heroBoost(tw), ck, 1.6 * smooth(CATCH_T, CATCH_T + 0.05, tw) * (1 - smooth(CATCH_T + 0.45, CD_HOLD, tw)));   // (the catch dash: boosters flat out)
+  s.boost = Math.max(heroBoost(tw) * (tw < 170.25 ? lerp(0.35, 1, smooth(169.7, 170.25, tw)) : 1), ck, 1.6 * smooth(CATCH_T, CATCH_T + 0.05, tw) * (1 - smooth(CATCH_T + 0.45, CD_HOLD, tw)));   // (the catch dash: boosters flat out)
   s.blurTrail = cc > 0 && cc < CIRCUS_END + 0.6 ? smooth(0.2, 0.8, cc) * (1 - smooth(CIRCUS_END, CIRCUS_END + 0.6, cc)) : 0;
   if (tw > CATCH_T && tw < CD_HOLD + 0.4) s.blurTrail = Math.max(s.blurTrail, smooth(CATCH_T + 0.03, CATCH_T + 0.12, tw) * (1 - smooth(CATCH_T + 0.5, CD_HOLD + 0.4, tw)));   // the dash after the catch: the same boost smear   // boosting through the circus: a short motion-blur smear behind him (shots.js)
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
@@ -1719,7 +1733,7 @@ function slashIK(s, tw) {
 /** cheap per-time sample for the thruster trails: hip position + boost amount (no pose / IK) */
 export function trailSample(who, t) {
   const tw = warp(t);
-  return who === 'hero' ? { pos: heroRawPos(tw), boost: heroBoost(tw) } : { pos: enemyRawPos(tw), boost: enemyBoost(tw) };
+  return who === 'hero' ? { pos: heroRawPos(tw), boost: heroBoost(tw) * (tw < 170.25 ? lerp(0.35, 1, smooth(169.7, 170.25, tw)) : 1) } : { pos: enemyRawPos(tw), boost: enemyBoost(tw) };
 }
 /** VANGUARD's rifle muzzle + barrel direction at story time t (name kept from SERAPH) */
 export function seraphMuzzle(t) {
