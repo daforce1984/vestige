@@ -449,7 +449,7 @@ fn basinH(d: f32) -> f32 {
 // crater octaves — the vertex shader displaces the mesh by it, the fragment takes its normal from it (the same cells and
 // seed as moonCraters, so they line up with the finer bumped craters)
 fn basinD(q: vec3f) -> f32 {   // the basin's distance measure, its outline torn irregular
-  let C0 = normalize(vec3f(0.35, 0.3, 0.89));
+  let C0 = normalize(vec3f(0.9, 0.35, 0.3));
   return acos(clamp(dot(q, C0), -1.0, 1.0)) / 0.42 * (1.0 + 0.09 * (vnoise(q * 5.0 + 3.0) - 0.5) + 0.04 * (vnoise(q * 13.0 + 7.0) - 0.5));
 }
 // the relief for the NORMAL: the displaced height plus fine detail the mesh can't hold — regolith undulation, and rough,
