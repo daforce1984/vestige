@@ -15,7 +15,7 @@ const MODELS = [
   { name: 'enemy_dreadnought_lod', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game_lod.glb', texSet: 7, texBit: 4096 },   // far away, and its wreck chunks (5.7k triangles)   // a little bigger than our flagship: 'Space Battleship Aquamarine' (Kai Xiang, CC BY 4.0) via tools/build_rifles.py
   ...['enemy_fighter', 'enemy_fighter_b', 'enemy_fighter_c'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256, engines: [[0, 0.74, -4.89, 0.33]] })),   // every enemy fighter: assets/spaceship.glb (user-supplied) via tools/build_rifles.py
   { name: 'gundam', detail: 0, keep: MS_KEEP },
-  { name: 'enemy_ms', detail: 0, keep: MS_KEEP },
+  { name: 'enemy_ms', detail: 0, keep: MS_KEEP, keepGeo: true },
   { name: 'hero_rifle', detail: 0, url: 'assets/rifle2_game.glb' },   // Sigma's rifle: assets/rifle2.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_rifle', detail: 0, url: 'assets/rifle1_game.glb' },  // VANGUARD's rifle: assets/rifle1.glb (user-supplied), drawn on its rifle part
   { name: 'gravity_well', detail: 2.5, keep: ['ring', 'core', 'pylons'] },

@@ -386,6 +386,7 @@ export class Renderer {
       model.partWorld = g.parts.map(() => M.new());
       model.poseQ = g.parts.map(() => [0, 0, 0, 1]);
       model.tris = g.indices.length / 3;
+      if (s.keepGeo) model.geo = { verts: g.verts, indices: g.indices, parts: g.parts };   // (kept on the CPU: the waist cut's real cross-section)
       this.models[s.name] = model;
       this.modelList.push(model);
       model.emitPoints = {};

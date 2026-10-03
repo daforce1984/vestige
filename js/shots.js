@@ -660,9 +660,9 @@ function drawPovHands(R, t, ge, s) {
 // cycling green → cyan → magenta, fading with age (renderer ghost mode: screen-door translucency, rim-lit tint)
 const SANDE_COL = [[0.3, 2.2, 1.0], [0.3, 1.6, 2.4], [2.2, 0.4, 1.9]];
 function drawAfterimages(R, t, s) {
-  const K = 8;
+  const run = t > SANDE0 - 0.05 && t < CUT_T + 0.2, K = run ? 18 : 8, step = run ? 0.022 : 0.045;   // (the Sandevistan dash: a denser string of them)
   for (let k = 1; k <= K; k++) {
-    const tp = t - k * 0.045; if (tp < (s.ghostFrom ?? SANDE0 - 0.02)) break;
+    const tp = t - k * step; if (tp < (s.ghostFrom ?? SANDE0 - 0.02)) break;
     const q = gundamState(tp); if (!q || !q.vis) continue;
     const g = R.add('gundam', msMatrix(new Float32Array(16), q)); if (!g) continue;
     g.pose = q.pose; g.seed = 5.5; g.texSet = 0;
@@ -1136,38 +1136,76 @@ function cutPath() {   // sampled once: per story time, the chord's two ends as 
   return _cutPath;
 }
 const _secP = (th, lift = 0) => [CUT_E.cx + Math.cos(th) * CUT_E.rx * 1.01, CUT_Y + lift, CUT_E.cz + Math.sin(th) * CUT_E.rz * 1.01];
+// THE CUT, from the real geometry (2026-10-03): the torso mesh sliced by the cut plane gives the true outline of its waist;
+// the blade (a segment, hilt → tip, carried into the torso's frame) is swept through it frame by frame, and every point
+// of the outline melts at the moment the blade actually crosses it — the molten line runs exactly behind the blade,
+// white where it is cutting now and cooling behind; the spray leaves from where the blade meets the armour right now
+let _sec = null;
+function cutSection(R) {
+  if (_sec) return _sec;
+  const g = R.models.enemy_ms && R.models.enemy_ms.geo; if (!g) return null;
+  const part = g.parts.find((p) => p.name === 'torso'); if (!part) return null;
+  const V8 = (v) => [g.verts[v * 8], g.verts[v * 8 + 1], g.verts[v * 8 + 2]], segs = [];
+  for (const gr of part.groups) for (let k = gr.first; k + 2 < gr.first + gr.count; k += 3) {
+    const P = [V8(g.indices[k]), V8(g.indices[k + 1]), V8(g.indices[k + 2])], pts = [];
+    for (let e = 0; e < 3; e++) { const a = P[e], b = P[(e + 1) % 3], da = a[1] - CUT_Y, db = b[1] - CUT_Y;
+      if ((da < 0) !== (db < 0)) { const u = da / (da - db); pts.push([a[0] + (b[0] - a[0]) * u, CUT_Y, a[2] + (b[2] - a[2]) * u]); } }
+    if (pts.length === 2) segs.push(pts);
+  }
+  // the blade through the section, sampled in story time: (hilt, tip) in the torso's frame
+  const blade = [];
+  for (let tt = CUT_T - 0.06; tt <= CUT_SPLIT + 0.0001; tt += 0.0005) {
+    const h = duelHero(tt), e = duelEnemy2(tt); if (!h || !e) continue;
+    const H = duelFK({ ...h, saber: 1 }, 'gundam'), E = duelFK(e, 'enemy_ms'), inv = M.invert(M.new(), E.torso);
+    blade.push({ t: tt, a: M.transformPoint([0, 0, 0], inv, H.saber[0]), b: M.transformPoint([0, 0, 0], inv, madd(H.saber[0], H.saber[2], 13)) });
+  }
+  // when the blade crosses a point q (x, z on the plane): the side of the blade line changes while q lies within its length
+  const side = (bl, q) => { const dx = bl.b[0] - bl.a[0], dz = bl.b[2] - bl.a[2]; return dx * (q[2] - bl.a[2]) - dz * (q[0] - bl.a[0]); };
+  const within = (bl, q) => { const dx = bl.b[0] - bl.a[0], dz = bl.b[2] - bl.a[2], L2 = dx * dx + dz * dz, s = ((q[0] - bl.a[0]) * dx + (q[2] - bl.a[2]) * dz) / L2; return s >= -0.02 && s <= 1.02; };
+  const passT = (q) => { for (let i = 1; i < blade.length; i++) { const s0 = side(blade[i - 1], q), s1 = side(blade[i], q); if ((s0 < 0) !== (s1 < 0) && within(blade[i], q)) return blade[i - 1].t + (blade[i].t - blade[i - 1].t) * s0 / (s0 - s1); } return Infinity; };
+  const pieces = [];   // each outline segment split finely, with the moment its two ends were cut
+  for (const [a, b] of segs) { const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[2] - a[2]) / 0.25)); for (let i = 0; i < n; i++) { const p = lerpv(a, b, i / n), q = lerpv(a, b, (i + 1) / n); pieces.push({ p, q, tp: passT(p), tq: passT(q) }); } }
+  return (_sec = { segs, blade, pieces });
+}
+/** dev: the waist section and the blade's crossing times (see cutSection) */
+export const cutSectionInfo = (R) => { const S = cutSection(R); if (!S) return null; const xs = S.segs.flat(); const fin = S.pieces.filter((p) => isFinite(p.tp)); return { segs: S.segs.length, x: [Math.min(...xs.map((p) => p[0])), Math.max(...xs.map((p) => p[0]))], z: [Math.min(...xs.map((p) => p[2])), Math.max(...xs.map((p) => p[2]))], pieces: S.pieces.length, cut: fin.length, t: [Math.min(...fin.map((p) => p.tp)), Math.max(...fin.map((p) => p.tp))] }; };
 function drawCutDetail(R, t) {
   if (t < CUT_T - 0.06 || t > CUT_SPLIT + 1.2) return;
-  const P = cutPath(); if (!P.first) return;
+  const SEC = cutSection(R); if (!SEC) return;
   const e = duelEnemy2(Math.min(t, CUT_SPLIT)); if (!e || !e.vis) return;
   const E = duelFK(e, 'enemy_ms'), TW = (p) => M.transformPoint([0, 0, 0], E.torso, p);
-  const cur = [...P.out].reverse().find((q) => q.t <= t && q.th) || null;
-  const live = t < CUT_SPLIT && cur && t - cur.t < 0.004;
-  const th0 = P.first.th;
-  // the cut edges: arcs of the section from where the blade went in to where it is now, glowing hot at the front
-  if (cur && live) for (const side of [0, 1]) {   // (only while the blade is in it: after the split it hung between the halves)
-    const a0 = th0[side], a1 = cur.th[side];
-    let da = a1 - a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
-    const n = Math.max(2, Math.ceil(Math.abs(da) / 0.12));
-    let pa = TW(_secP(a0));
-    for (let i = 1; i <= n; i++) {
-      const f = i / n, pb = TW(_secP(a0 + da * f)), age = (1 - f) * Math.min(0.05, t - P.first.t) + Math.max(0, t - CUT_SPLIT);
-      const k = Math.exp(-age * 25) * 0.85 + 0.25;                                // white at the front, cooling to orange-red
-      R.beam(pa, pb, 0.3, [1.9 * k + 1.1, 0.75 * k * k + 0.22, 0.12 * k * k + 0.02], 1, 8);         // the melt line: thick, orange, white only at the front
-      R.beam(pa, pb, 0.7, [0.5 * k + 0.3, 0.08 * k + 0.03, 0.01], 0.35, 2);                          // its red glow
-      pa = pb;
-    }
+  const live = t < CUT_SPLIT;
+  // the melt line: every piece of the outline the blade has already been through, hot at the moment of cutting, cooling
+  if (live) for (const pc of SEC.pieces) {
+    if (pc.tp > t && pc.tq > t) continue;
+    let p = pc.p, q = pc.q;
+    if (pc.tp > t) p = lerpv(pc.q, pc.p, 0.5); else if (pc.tq > t) q = lerpv(pc.p, pc.q, 0.5);   // (half a piece at the cutting front)
+    const age = t - Math.min(pc.tp, pc.tq), k = Math.exp(-age * 25) * 0.85 + 0.25;   // white at the front, cooling to orange-red
+    const pa = TW(p), pb = TW(q);
+    R.beam(pa, pb, 0.22, [1.9 * k + 1.1, 0.75 * k * k + 0.22, 0.12 * k * k + 0.02], 1, 8);
+    R.beam(pa, pb, 0.6, [0.5 * k + 0.3, 0.08 * k + 0.03, 0.01], 0.35, 2);
   }
-  // at the two ends of the chord: the blade in the armour — molten spray, and plates cut loose
-  if (cur && live) for (const side of [0, 1]) {
-    const pw = TW(_secP(cur.th[side])), out = V.norm([0, 0, 0], V.sub([0, 0, 0], pw, TW([CUT_E.cx, CUT_Y, CUT_E.cz])));
-    R.glow(pw, 0.4, [2.4, 1.2, 0.4], 0.2); R.light(pw, 14, [1, 0.5, 0.2], 1.2);
-    for (let i = 0; i < 450; i++) {                                                 // molten metal thrown off in round gobbets, story-fast
-      const life = 0.012 + hash(i + side * 5000) * 0.035, ph = ((t / life) + hash(i + 3 + side * 5000)) % 1;
-      const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.1 + side * 7 + Math.floor(t / life) * 0.37), out, 1.4), D_SWEEP(), 0.8));
-      const sp = life * (140 + 220 * hash(i + 9)), q = madd(pw, sd, ph * sp);
-      molten(R, q, ph, 6 + 14 * hash(i + side * 5000 + 17));
+  // where the blade meets the armour now: its segment against the outline — molten spray leaves from each crossing
+  if (live) {
+    let bi = 0; while (bi < SEC.blade.length - 1 && SEC.blade[bi + 1].t <= t) bi++;
+    const bl = SEC.blade[bi], hits = [];
+    for (const [a, b] of SEC.segs) {
+      const r = [bl.b[0] - bl.a[0], bl.b[2] - bl.a[2]], sv = [b[0] - a[0], b[2] - a[2]], den = r[0] * sv[1] - r[1] * sv[0]; if (Math.abs(den) < 1e-9) continue;
+      const wx = a[0] - bl.a[0], wz = a[2] - bl.a[2], u = (wx * sv[1] - wz * sv[0]) / den, v = (wx * r[1] - wz * r[0]) / den;
+      if (u >= 0 && u <= 1 && v >= 0 && v <= 1) hits.push([a[0] + sv[0] * v, CUT_Y, a[2] + sv[1] * v]);
     }
+    hits.sort((x, y) => x[0] - y[0]);
+    const ends = hits.length > 2 ? [hits[0], hits[hits.length - 1]] : hits;   // (the outermost entry and exit)
+    ends.forEach((hp, side) => {
+      const pw = TW(hp), out = V.norm([0, 0, 0], V.sub([0, 0, 0], pw, TW([0, CUT_Y, 0.43])));
+      R.glow(pw, 0.4, [2.4, 1.2, 0.4], 0.2); R.light(pw, 14, [1, 0.5, 0.2], 1.2);
+      for (let i = 0; i < 450; i++) {                                               // molten metal thrown off in round gobbets, story-fast
+        const life = 0.012 + hash(i + side * 5000) * 0.035, ph = ((t / life) + hash(i + 3 + side * 5000)) % 1;
+        const sd = V.norm([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], randDir([0, 0, 0], i * 3.1 + side * 7 + Math.floor(t / life) * 0.37), out, 1.4), D_SWEEP(), 0.8));
+        const sp = life * (140 + 220 * hash(i + 9)), q = madd(pw, sd, ph * sp);
+        molten(R, q, ph, 6 + 14 * hash(i + side * 5000 + 17));
+      }
+    });
   }
 }
 let _dsw = null; const D_SWEEP = () => _dsw || (_dsw = (() => { const ev = DUEL_EVENTS.find((x) => x.slash); return ev ? ev.dir : [0, 0, 1]; })());
@@ -1471,11 +1509,9 @@ function drawUlt(R, t) {
       } else {
         const lt = t - FINALE_T;
         if (lt < 0.06) { const f = 1 - lt / 0.06; R.glow(bp, 6 + 22 * f, [6 * f, 4 * f, 5 * f], 0.4); R.light(bp, 200, [1, 0.5, 0.7], 30 * f); }   // the white flash
-        for (const [d0, sz] of [[0, 140], [0.08, 90], [0.2, 190]]) { const l2 = lt - d0; if (l2 > 0 && l2 < 0.15) R.ripple(bp, 10 + sz * easeOut(l2 / 0.15), [0.6, 0.45, 0.55], (1 - l2 / 0.15) * 1.4); }   // shock rings
-        if (lt < 0.15) {                                             // the halo: a ring of light bursting out round the machine
-          const rr = 5 + 70 * easeOut(Math.min(1, lt / 0.13)), k = Math.pow(1 - lt / 0.15, 1.5);
-          for (let j = 0; j < 72; j++) { const a = j / 72 * 2 * Math.PI, p = V.add([0, 0, 0], bp, V.add([0, 0, 0], V.scale([0, 0, 0], s1, Math.cos(a) * rr), V.scale([0, 0, 0], s2, Math.sin(a) * rr)));
-            R.glow(p, 1.2 + 1.5 * k, [3 * k, 0.9 * k, 1.8 * k], 0.3); }
+        // (2026-10-03: no halo ring of light points and no shock rings round it any more — they read as rounds bursting in
+        // a circle; the flash and the sparks carry the launch)
+        if (lt < 0.15) {
           sparkBurst(R, bp, back, lt, 811, 160, 1.6, 90, 1.2, [5, 2, 3.2]);
         }
       }

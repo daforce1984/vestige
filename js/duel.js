@@ -1043,7 +1043,12 @@ function catchDash(tw) {
   const u = sat((tw - CATCH_T) / CD_T), x = CD_D * (1 - Math.pow(1 - u, 3)) * smooth(0, 0.12, u) * (1 - smooth(CD_HOLD, CD_END, tw));
   return scl(_cdDir, x);
 }
-const heroRawPos = (tw) => add(add(tw > CIRCUS_C0 - 0.1 && tw < CUT_T ? add(add(heroPos0(tw), circusOffset(tw)), circusResidual(tw)) : heroPos0(tw), transLunge(tw)), catchDash(tw));   // (+ the Itano-circus run, and its momentum carried on into the dash)
+// THE SANDEVISTAN KICK (2026-10-03): over the dash (CIRCUS_C1 → 192.0) his path runs on a clock that starts 1.5× fast and
+// eases back to normal by the end — the burst off the mark is half as hard again; where he arrives (and when) is unchanged
+const SW0 = CIRCUS_C1, SW1 = 192.0;
+const sandeWarp = (tw) => { if (tw <= SW0 || tw >= SW1) return tw; const u = (tw - SW0) / (SW1 - SW0); return SW0 + (SW1 - SW0) * (u + 0.5 * u * (1 - u) * (1 - u)); };
+const heroRawPos = (tw) => heroRawPos_(sandeWarp(tw));
+const heroRawPos_ = (tw) => add(add(tw > CIRCUS_C0 - 0.1 && tw < CUT_T ? add(add(heroPos0(tw), circusOffset(tw)), circusResidual(tw)) : heroPos0(tw), transLunge(tw)), catchDash(tw));   // (+ the Itano-circus run, and its momentum carried on into the dash)
 function enemyRawPos(tw) {
   if (tw < SERAPH_HANDOFF) { const c = circ(tw); return add(add(add(e1Pos(tw), hover(tw, 7.1, 0)), [CIRC_AX[0] * 6 * c, -0.8 * c, CIRC_AX[2] * 6 * c]), add(transShove(tw), strafe(tw, -1))); }
   return add(add(e2Pos(tw), transShove(tw)), strafe(tw, -1));
@@ -1202,8 +1207,8 @@ function duelHero_(t) {
   }
   _pose[PIDX._body + 2] += heroRoll(tw);
   s.eye = 1 + 2.2 * Math.exp(-Math.abs(tw - HERO_FLARE - 0.03) * 40) * (tw > HERO_FLARE - 0.03 ? 1 : 0);   // the eye flares once he is on it
-  s.weapon = tw < HERO_GRAB ? 'back' : tw > THROW0 && tw < CATCH_T ? 'thrown' : tw < 191.22 || tw >= 200 ? 'rifle' : tw < 194.1 ? 'saber' : 'none';   // slung over the shoulder at 191.2
-  s.saber = Math.max(smooth(191.26, 191.36, tw) * (1 - smooth(193.85, 194.1, tw)), transSaber(tw));
+  s.weapon = tw < HERO_GRAB ? 'back' : tw > THROW0 && tw < CATCH_T ? 'thrown' : tw < 191.22 || tw >= 200 ? 'rifle' : 'saber';   // slung over the shoulder at 191.2   // (2026-10-03: after the cut the hilt stays in his hand, the blade dies down — it vanished, hilt and all, at 194.1)
+  s.saber = Math.max(smooth(191.26, 191.36, tw) * (1 - smooth(193.95, 194.5, tw)), transSaber(tw));   // (the blade shrinks back into the hilt over half a second)
   s.saberL = transSaber(tw) > 0;                                     // (the blade lit in his left hand)
   s.hiltL = hiltInHand(tw);                                          // the hilt in his left hand (else it hangs on his hip)
   s.saberPow = s.saberL ? 2 : 1;                                     // full output against the charged shot: twice as thick
