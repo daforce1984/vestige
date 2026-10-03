@@ -773,7 +773,9 @@ const heroPose = poseTrack([
 ]);
 const heroImp = impulses([
   // beam-rifle recoil: hand kicks up and back, torso rocks, a damped settle
-  ...HERO_SHOTS.map((t) => [t + 0.001, P({ arm_R_upper: [10, 0, 0], arm_R_lower: [-14, 0, 0], hand_R: [-16, 0, 0], torso: [-6, 5, 0], head: [-4, 0, 0], _body: [-4, 0, 0] }), 0.035, 0.5, 16]),
+  // (2026-10-03: the whole body takes it, a slight rock back — no separate arm kick and no springy overshoot: the arms
+  // stay on the rifle and on the target instead of flying open)
+  ...HERO_SHOTS.map((t) => [t + 0.001, P({ torso: [-3, 0, 0], head: [-2, 0, 0], _body: [-2.5, 0, 0] }), 0.03, 0.35]),
 ]);
 // the finale: the rifle charges (190.95 → the shot at 192.35) — its glow and the muzzle gather light, then all of it goes
 export const rifleCharge = () => 0;   // (the finish is the saber now)
@@ -800,7 +802,7 @@ const enemyPose = poseTrack([
   [CUT_T - 0.02, VG.ultDown], [CUT_T + 0.25, W(VG.hit, { torso: [-35, 10, 20] }), 'out'], [193.4, VG.limp, 'io'],
 ]);
 const enemyImp = impulses([
-  ...SERAPH_SHOTS.map((ts) => [ts + 0.001, P({ arm_R_upper: [-12, 0, 0], torso: [-6, 0, 0], _body: [-4, 0, 0] }), 0.03, 0.45, 14]),   // recoil
+  ...SERAPH_SHOTS.filter((ts) => ts !== TRANS_SHOT).map((ts) => [ts + 0.001, P({ torso: [-3, 0, 0], head: [-2, 0, 0], _body: [-2.5, 0, 0] }), 0.03, 0.35]),   // recoil: the body rocks back a little (no arm kick, no overshoot)
   [TRANS_SHOT + 0.002, P({ arm_R_upper: [-30, 0, 0], arm_L_upper: [-24, 0, 0], torso: [-26, 0, 0], head: [-16, 0, 0], _body: [-24, 0, 0] }), 0.05, 0.9, 6],   // the heavy shot throws it back hard             // the shield takes it
   [FINALE_T, P({ torso: [-12, 0, 0], head: [-10, 0, 0], _body: [-8, 0, 0] }), 0.05, 0.6],                               // the beams tear out of its back
 ]);
@@ -850,7 +852,7 @@ const enemyBoost = scalarTrack([[170, 1], [175.9, 1], [176.5, 0.6],
 // k = aim weight (pose → placed rifle), kL = the left hand's weight (off while the shield is up / after the cut)
 // recoil: the muzzle climbs with the body's kick (fraction of the range raised at the target), then settles
 const kickCurve = (x) => (x <= 0 || x > 0.9 ? 0 : (1 - Math.exp(-x * 45)) * Math.exp(-x * 5.5));
-const recoilKick = (tw) => { let k = 0.42 * kickCurve(tw - TRANS_SHOT); for (const ts of SERAPH_SHOTS) if (ts !== TRANS_SHOT) k = Math.max(k, 0.08 * kickCurve(tw - ts)); return k; };
+const recoilKick = (tw) => { let k = 0.42 * kickCurve(tw - TRANS_SHOT); for (const ts of SERAPH_SHOTS) if (ts !== TRANS_SHOT) k = Math.max(k, 0.035 * kickCurve(tw - ts)); return k; };
 // the shield arm while it still has the shield: carried out front-left (the shield guarding its flank), the forearm up —
 // unless it is blocking (VG.guard keys own it then)
 const SHIELD_CARRY = { arm_L_upper: [-35, 25, 40], arm_L_lower: [-65, 0, 0], hand_L: [0, 0, 0] };
@@ -1295,7 +1297,7 @@ function enemyState_(t) {
     aim2H(s, tg, ak, kL, lrp([-0.35, 3.9, 2.3], [-1.6, 1.2, 2.2], wHip));
     if (wSnap > 0) aimEnemy(s, tg, wSnap * ak);                          // the snap shot: its arm thrown out
     holdWrist(s, tw, [TRANS0], _wristT, (x) => enemyRaw_(x), TRANS_SHOT - TRANS0);   // the transformation: arm + rifle held as one
-    holdWrist(s, tw, [...SERAPH_SHOTS, ...ENEMY_BURST], _wristE, (x) => enemyRaw_(x));
+    holdWrist(s, tw, [...SERAPH_SHOTS, ...ENEMY_BURST], _wristE, (x) => enemyRaw_(x), 0.01, 0.05);   // (only through the shot itself: held longer, the gun arm turned with the body as it dodged — off the target, flung open)
     if (kick > 0) {                                                        // the recoil: the arm (wrist + rifle as one) thrown up
       kickArm(s, 'enemy_ms', Math.atan(kick) * ak);
       if (kL > 0) { const fk = duelFK(s, 'enemy_ms'), Rr = r3(fk.rifle), HwL = r3mul(Rr, E_SUP_R);
@@ -1513,8 +1515,8 @@ function heroAim2H(s, target, k) {
   heroArmPlace(s, fk, grip, r3mul(Rh, RQ3()));                      // (the wrist locked: arm + rifle as one — see heroArmPlace)
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
   const wSnap = styleW(tw, HERO_SHOTS, HERO_STYLE, 'snap'); if (wSnap > 0) aimRifle(s, target, wSnap * k);   // the snap shot: one arm thrown out
-  let hk = 0; for (const ts of [...HERO_SHOTS, ...HERO_BURST]) hk = Math.max(hk, 0.1 * kickCurve(tw - ts));
-  holdWrist(s, tw, [...HERO_SHOTS, ...HERO_BURST], _wristH, (x) => duelHero_(x), 0.1);
+  let hk = 0; for (const ts of [...HERO_SHOTS, ...HERO_BURST]) hk = Math.max(hk, 0.035 * kickCurve(tw - ts));   // (a slight climb: ~2°)
+  holdWrist(s, tw, [...HERO_SHOTS, ...HERO_BURST], _wristH, (x) => duelHero_(x), 0.01, 0.05);   // (likewise)
   kickArm(s, 'gundam', hk * k);                                        // his recoil: the arm, wrist and rifle kick up together
 }
 // THE DRAW + LOAD (170–173.1, on the move; after the Unicorn's Magnum handling — fast moves, dead holds): wind-up, he
@@ -1656,10 +1658,10 @@ const aimEnemy = (s, target, k) => layRifle(s, 'enemy_ms', target, k);
 // the wrist is held at its angle from just before the shot while the recoil plays out (forearm, wrist and rifle as one)
 const lastShot = (tw, list, win = 0.9) => { let b = null; for (const ts of list) if (tw > ts && tw - ts < win && (b === null || ts > b)) b = ts; return b; };
 const _wristE = new Map(), _wristH = new Map(), _wristT = new Map();
-function holdWrist(s, tw, list, cache, stateAt, hold = 0.2) {   // (the whole gun arm, relative to the torso: it rides the body's kick)
-  const ts = lastShot(tw, list, hold + 0.3); if (ts === null) return;
+function holdWrist(s, tw, list, cache, stateAt, hold = 0.2, back = 0.25) {   // (the whole gun arm, relative to the torso: it rides the body's kick)
+  const ts = lastShot(tw, list, hold + back + 0.05); if (ts === null) return;
   let ref = cache.get(ts); if (!ref) { const q = stateAt(ts - 0.004).pose; ref = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) ref[p] = (q[p] || [0, 0, 0]).slice(); cache.set(ts, ref); }
-  const w = 1 - smooth(ts + hold, ts + hold + 0.25, tw);               // held through the kick, then back onto the aim
+  const w = 1 - smooth(ts + hold, ts + hold + back, tw);               // held through the kick, then back onto the aim
   s.pose = { ...s.pose };
   for (const p in ref) { const c = s.pose[p] || [0, 0, 0]; s.pose[p] = [0, 1, 2].map((i) => lerp(c[i], ref[p][i], w)); }
 }
