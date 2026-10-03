@@ -1,6 +1,6 @@
 // Persistent world state as pure functions of film time t (seconds). Seek-safe.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
-import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, breakOff, chargeInflow, spark } from './fx.js';
+import { fxOpts, explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, breakOff, chargeInflow, spark } from './fx.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 export { explosion };
 
@@ -734,7 +734,7 @@ export function drawWorld(R, t, opts = {}) {
     }
     // the wound: the hangar bay behind the melted wall, molten drips, and the bay's contents sucked out into space
     engineGlows(R, 'mothership', me, [0.3, 1.1, 0.85], 0.6, t > 232 && t < 292 ? 1 : 0.7, 1.6);   // (after the jump code: it hides/reveals the hull)
-    if (t > LANCE_FIRE && (me._woundVis ?? 1) > 0.02) drawWound(R, t, me);
+    if (t > LANCE_FIRE && (me._woundVis ?? 1) > 0.02) { fxOpts.noRipple = true; drawWound(R, t, me); fxOpts.noRipple = false; }   // (2026-10-03: no space distortion round the torn flank)
     drawDock(R, t, me);                                          // bay doors + mouth frame always; the rig and fields inside
     // hull fires after lance
     if (t > LANCE_FIRE + 1 && (me._woundVis ?? 1) > 0.02) {

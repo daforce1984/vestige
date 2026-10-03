@@ -614,6 +614,7 @@ fn shadowAt(wp: vec3f, n: vec3f) -> f32 {
 
 // cut-away effects shared by the colour pass and the depth prepass: melt hole, fracture chunks, hyperspace reveal.
 // Discards the removed surface; returns (torn-edge heat, hyperspace glow).
+var<private> g_edge: f32 = 0.0;
 fn cutAway(i: VO, inst: Inst) -> vec2f {
   var hyper = 0.0;
   // fracture chunk: keep only this cell of the hull; jagged boundary, glowing torn edges
@@ -667,13 +668,22 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   if (abs(inst.clipMin.w) > 0.5 && inst.clipMin.w < 1.5) {
     let span = inst.clipMax.xyz - inst.clipMin.xyz;
     // clipMax.w < 0: a CLEAN cut (a beam blade through the hull): no jagged fracture edge, heat = |w|
-    let jag = select((vnoise(i.lp * (3.0 / max(max(span.x, span.y), span.z)) + inst.p1.w) - 0.5) * 0.35 * min(min(span.x, span.y), span.z), 0.0, inst.clipMax.w < 0.0);
+    // a torn fracture (2026-10-03): a fractal jagged boundary (three octaves) and each chunk's faces slanted its own way,
+    // so no two pieces are the same box; a beam cut (w < 0) stays clean
+    let fq = 3.0 / max(max(span.x, span.y), span.z);
+    let ms = min(min(span.x, span.y), span.z);
+    let sdd = inst.p1.w;
+    let jg = (vnoise(i.lp * fq + sdd) - 0.5) * 0.6 + (vnoise(i.lp * fq * 3.1 + sdd * 1.7 + 5.0) - 0.5) * 0.25 + (vnoise(i.lp * fq * 9.0 + sdd * 3.1 + 9.0) - 0.5) * 0.08;
+    let qm = i.lp - (inst.clipMin.xyz + inst.clipMax.xyz) * 0.5;
+    let sk = vec3f(dot(qm, hash33(vec3f(sdd, 1.0, 7.0)) - 0.5), dot(qm, hash33(vec3f(sdd, 2.0, 3.0)) - 0.5), dot(qm, hash33(vec3f(sdd, 5.0, 1.0)) - 0.5)) * 0.55;
+    let jag = select(vec3f(jg * ms) + sk, vec3f(0.0), inst.clipMax.w < 0.0);
     let dl = i.lp - inst.clipMin.xyz + jag;
     let dh = inst.clipMax.xyz - i.lp + jag;
     let inside = min(min(min(dl.x, dl.y), dl.z), min(min(dh.x, dh.y), dh.z));
     let sc = min(0.01 * min(min(span.x, span.y), span.z) + 0.12, 0.6);
     if (inst.clipMin.w > 0.5) {
       if (inside < 0.0) { discard; }
+      g_edge = select(exp(-inside / (sc * 3.0)), 0.0, inst.clipMax.w < 0.0);   // (how near the torn edge: soot, slag)
       tornEdge = select(abs(inst.clipMax.w) * exp(-inside / sc),
         abs(inst.clipMax.w) * (exp(-inside / 0.2) + 0.3 * exp(-inside / 0.55)), inst.clipMax.w < 0.0);   // a beam cut: a thick molten seam + a soft glow
     } else {
@@ -971,7 +981,17 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     col = mix(col, mix(vec3f(3.0, 0.55, 0.08), vec3f(4.2, 2.4, 0.8), clamp(tornEdge - 1.2, 0.0, 1.0)) * tornEdge, clamp(tornEdge, 0.0, 1.0)) * (0.85 + 0.15 * sin(F.camPos.w * 23.0 + i.lp.x * 3.0));
   } else if (inst.clipMin.w > 1.5 && inst.clipMin.w < 2.5) {       // melt hole: red → white-hot molten rim
     col += mix(vec3f(3.2, 0.8, 0.16), vec3f(4.5, 3.0, 1.5), clamp(tornEdge - 0.9, 0.0, 1.0)) * tornEdge * (0.7 + 0.3 * sin(F.camPos.w * 17.0 + i.lp.x));
-  } else {                                                           // broken-off chunk: only the torn edge smoulders dark cherry red
+  } else {                                                           // broken-off chunk: the torn edge, burnt and melted
+    // (2026-10-03) the armour round the break is scorched dark, and melted metal has run and set along it — dark, glossy
+    // slag in streaks and beads, a few still glowing cherry; the edge itself smoulders while it is hot
+    let ed = g_edge;
+    if (ed > 0.001) {
+      let fq2 = 1.6 / max(length(inst.clipMax.xyz - inst.clipMin.xyz), 0.5);
+      let slag = smoothstep(0.52, 0.72, vnoise(vec3f(i.lp.x * fq2 * 9.0, i.lp.y * fq2 * 3.0, i.lp.z * fq2 * 9.0) + inst.p1.w)) * ed;
+      col *= 1.0 - 0.6 * ed;                                         // scorched
+      col = mix(col, vec3f(0.035, 0.03, 0.028) + vec3f(0.25) * pow(max(dot(n, normalize(V + F.sunDir.xyz)), 0.0), 40.0), slag * 0.7);   // set slag: dark, glossy
+      col += vec3f(1.4, 0.3, 0.05) * slag * smoothstep(0.75, 0.95, vnoise(i.lp * fq2 * 20.0 + inst.p1.w * 2.0)) * (0.25 + tornEdge);   // beads still glowing
+    }
     col += vec3f(1.1, 0.12, 0.03) * tornEdge * tornEdge * (0.8 + 0.2 * sin(F.camPos.w * 11.0 + i.lp.x * 0.3));
   }
   col += vec3f(inst.p0.x);

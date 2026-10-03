@@ -25,6 +25,7 @@ const _cm = new Float32Array(16), _cq = [0, 0, 0, 1];
 /** a spark PARTICLE: a tight hot point with a little bloom (never a streak/line). size = sprite radius (the bright
  *  core is ~¼ of it) */
 export function spark(R, p, size, col) { R.glow(p, size * 0.45, col, 0.15); }   // fine points: small core, little halo
+export const fxOpts = { noRipple: false };   // (set round blasts that must not bend space: the flagship's torn flank)
 export function explosion(R, t, t0, pos, size, seed, kind = 'ship', lightR = 16) {   // lightR: light radius in sizes (keep small for blasts ON a hull)
   // homeland/fx.js explosion(): light first (white HDR core layers), a soft wash, three wavefronts,
   // three offset cauliflower fireballs, burning hull fragments. Almost no smoke (vacuum).
@@ -51,7 +52,7 @@ export function explosion(R, t, t0, pos, size, seed, kind = 'ship', lightR = 16)
   for (const [rr, life, del, c] of [[7.5, 0.34, 0.015, [1, 1, 1]], [12, 0.7, 0.06, warm], [17, 1.15, 0.16, [1, 0.54, 0.25]]]) {
     const a = (lt - del) / life;
     if (a < 0 || a > 1) continue;
-    R.ripple(pos, size * rr * 0.22 * (0.06 + 0.94 * easeOut(a)), [c[0] * 0.25, c[1] * 0.25, c[2] * 0.25], (1 - a) * 1.2);
+    if (!fxOpts.noRipple) R.ripple(pos, size * rr * 0.22 * (0.06 + 0.94 * easeOut(a)), [c[0] * 0.25, c[1] * 0.25, c[2] * 0.25], (1 - a) * 1.2);
   }
   // fireball clusters: a main ball + satellite balls + delayed secondary blasts (chain reaction)
   const nb = kind === 'huge' ? 16 : kind === 'small' ? 4 : 9;
@@ -390,7 +391,7 @@ export function shatter(R, name, base, t, t0, seed, grid = [2, 2, 3], speed = 1,
   for (let ix = 0; ix < gx; ix++) for (let iy = 0; iy < gy; iy++) for (let iz = 0; iz < gz; iz++, k++) {
     const s = seed * 7.31 + k * 3.17;
     // uneven cell boundaries so chunks aren't a regular grid
-    const cut = (i, n, a, c, o) => i <= 0 ? a - 1 : i >= n ? c + 1 : a + (c - a) * (i / n + (hash(s + o + i) - 0.5) * 0.18 / n);
+    const cut = (i, n, a, c, o) => i <= 0 ? a - 1 : i >= n ? c + 1 : a + (c - a) * (i / n + (hash(seed * 7.31 + o * 13 + i * 5.1) - 0.5) * 0.55 / n);   // (shared between neighbours, uneven: pieces of very different sizes)
     const lo = [cut(ix, gx, mn[0], mx[0], 1), cut(iy, gy, mn[1], mx[1], 2), cut(iz, gz, mn[2], mx[2], 3)];
     const hi = [cut(ix + 1, gx, mn[0], mx[0], 1), cut(iy + 1, gy, mn[1], mx[1], 2), cut(iz + 1, gz, mn[2], mx[2], 3)];
     const c = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
@@ -414,7 +415,7 @@ export function shatter(R, name, base, t, t0, seed, grid = [2, 2, 3], speed = 1,
     const e = R.add(name, _sm);
     if (!e) continue;
     e.clip = [lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]];
-    e.clipHeat = Math.max(0, 1 - lt / 9) * 1.2;
+    e.clipHeat = Math.max(0.12, 1 - lt / 9) * 1.2;   // (a faint warmth stays in the slag)
     e.damage = 0.1; e.seed = seed + k;                                   // light soot only: the torn edges carry the heat
     e.emissive = Math.max(0, 1 - lt * 1.5) * (hash(s + 6) > 0.5 ? 1 : 0.2);   // lights die, a few flicker
     if (opts.tint) e.tint = opts.tint;

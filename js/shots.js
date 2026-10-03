@@ -1,6 +1,6 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
-import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
+import { fxOpts, explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
 import { RIFLE_T, RIFLE_Q, ENEMY_HOLE, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX, energyShards, SHARD_LIFE } from './duel.js';
 import { storyT, filmT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
@@ -283,7 +283,7 @@ function recoveryPos(t) {
 let _diveStart = null;
 // (2026-10-03) his mark for the dive is already clear of the flagship — out wide and a little up — so the dive is ONE
 // straight line to the well (no swing round the hull); he takes it up off screen, already squared to the well
-function diveStart() { if (_diveStart) return _diveStart; const nOut = V.norm([0, 0, 0], [motherDir(240, [1, 0, 0])[0], 0, motherDir(240, [1, 0, 0])[2]]); return (_diveStart = addv(madd(divePass(240), nOut, 160), [0, 50, 0])); }
+function diveStart() { if (_diveStart) return _diveStart; const nOut = V.norm([0, 0, 0], [motherDir(240, [1, 0, 0])[0], 0, motherDir(240, [1, 0, 0])[2]]); return (_diveStart = addv(madd(divePass(240), nOut, 160), [-60, 310, 0])); }   // (high over the flank: his line to the well clears the drifting bay contents by ~175 m and the frigates by ~70 m)
 const diveDir = () => V.norm([0, 0, 0], V.sub([0, 0, 0], addv(WELL, [0, -10, DIVE_END_Z]), diveStart()));
 function divePass(t) {
   const W = motherPoint([0, 0, 0], t, LANCE_HIT), n = V.norm([0, 0, 0], motherDir(t, [1, 0, 0]));
@@ -3090,7 +3090,9 @@ function drawLanceAndCannon(R, t, c) {
   }
   // mothership hit explosions chain
   const chain = [[216.9, [64, 30, 70], 55], [218.2, [62, -15, 0], 38], [219.4, [60, 34, -10], 40], [221, [58, -20, 95], 36], [223, [62, 40, 60], 30]];   // secondary blasts along the scorched flank
+  fxOpts.noRipple = true;   // (no space distortion round the torn flank)
   for (const [t0, lp, sz] of chain) explosion(R, t, t0, motherPoint([0, 0, 0], t0, lp), sz, t0 * 3, 'ship', 3.5);   // light the flank locally, not the whole ship
+  fxOpts.noRipple = false;
   // main cannon
   if (t > MAIN_CHARGE && t < MAIN_FIRE + 5) {
     const mc = mainCannon(R, t);
