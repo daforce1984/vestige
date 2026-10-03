@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
-import { SHIELD_CLUNKS, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
+import { SHIELD_CLUNKS, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, inSkip, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -682,7 +682,8 @@ function duelCues() {
   out.push([TRANS_SHOT + 0.02, 'heavy_beam', { rate: 0.6, dur: FD2(TRANS_SHOT, TRANS_PASS), fadeOut: 0.15, gain: G * 1.0, prio: 9, norand: true }]);
   // he cuts it in half with his saber: ignite, the swing, the cut (a clash + sizzle), both halves whipping past, retract
   out.push([SD_GRAB, 'reload_grab', { at: 'hit', rate: 1.3, gain: G * 0.55, pan: -0.2, prio: 8, norand: true }]);   // his hand closes on the hilt
-  out.push([SD_OUT, '@beamSaberIgnite', { vel: 0.9 * G }]);                                                                  // ripped out: the blade lights
+  out.push([SD_OUT, '@beamSaberIgnite', { vel: 1.8 * G }]);                                                                  // ripped out: the blade lights
+  out.push([SD_OUT, 'saber_ignite', { gain: G * 2.4, prio: 10, norand: true }]);                                         // (2026-10-03: the energy blade's ignition, big)
   out.push([SD_HOLSTER, 'reload_slam', { at: 'hit', rate: 1.4, gain: G * 0.4, pan: -0.2, prio: 7, norand: true }]);        // back on the hip
   out.push([THROW0, 'whoosh:a', { at: 0.3, dur: 0.9, rate: 0.7, gain: G * 0.55, pan0: -0.1, pan1: -0.7, prio: 7, norand: true }]);   // the rifle tossed aside …
   out.push([CATCH_T, 'reload_grab', { at: 'hit', rate: 0.85, gain: G * 0.8, pan: -0.2, prio: 8, norand: true }]);                      // … and slapped back into his hand
@@ -692,6 +693,11 @@ function duelCues() {
   out.push([TRANS_PASS, 'magic_impact', { at: 'hit', rate: 0.75, gain: G * 1.2, prio: 9, norand: true }]);   // the ball smashed into scattering energy
   out.push([TRANS_PASS, '@shockwave', { vel: G * 0.7 }]);
   out.push([TRANS_PASS + 0.47, '@beamSaberRetract', { vel: 0.6 * G, dur: 0.4 }]);
+  // the smashed ball's pieces striking his armour one after another: a clank each (duel.js energyShards — the same hits the
+  // picture shows sparks for)
+  { let last = -1, i = 0; for (const tH of energyShards().filter((x) => isFinite(x.hitT)).map((x) => x.hitT).sort((a, b) => a - b)) {
+    if (tH - last < 0.003) continue; last = tH;
+    out.push([tH, i % 3 === 2 ? 'axe_metal1' : 'metal_knock', { at: 'hit', rate: 1.05 + 0.45 * ((i * 0.618) % 1), gain: G * (0.45 + 0.2 * ((i * 0.37) % 1)), pan: ((i * 0.53) % 1) - 0.5, prio: 7, norand: true }]); i++; } }
   for (const ts of SERAPH_SHOTS) {
     if (ts === TRANS_SHOT) continue;
     out.push([ts, 'energy_beam2', { at: 'hit', rate: R(0.92, 1.0), gain: G * 0.9, pan: 0.3, prio: 9, norand: true }]);   // its heavier blaster                          // its heavier rifle, pitched down

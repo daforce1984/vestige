@@ -1024,9 +1024,9 @@ function heroPos0(tw) {
 // momentum carries him on forward, easing off; the offset then merges back into his own path over a second
 let _lungeDir = null;
 function transLunge(tw) {
-  const a = 184.72, p = TRANS_PASS, b = 185.35, c = 186.4; if (tw <= a || tw >= c) return [0, 0, 0];
+  const a = 184.8, p = TRANS_PASS, b = 185.15, c = 186.6; if (tw <= a || tw >= c) return [0, 0, 0];   // (2026-10-03: a harder charge — from the start of scene 51, 26 m in, ~60 m on)
   if (!_lungeDir) _lungeDir = nrm(flat(sub(e2Pos(TRANS_SHOT), heroPos0(TRANS_PASS)), 0));
-  const D1 = 12, vp = 2 * D1 / (p - a), T = b - p;                   // accelerating in (D1 by the pass), then coasting to a stop
+  const D1 = 26, vp = 2 * D1 / (p - a), T = b - p;                   // accelerating in (D1 by the pass), then coasting to a stop
   let x;
   if (tw < p) { const u = (tw - a) / (p - a); x = D1 * u * u; }
   else if (tw < b) { const q = tw - p; x = D1 + vp * q * (1 - q / (2 * T)); }
@@ -1812,6 +1812,21 @@ function hiltFrame(fk, P, D, R) {   // hilt world position + hand rotation for a
   const upv = nrm(sub(u0, scl(d, V.dot(u0, d)))), xv = V.cross([0, 0, 0], upv, d);
   return { p, d, Hw: [...xv, ...upv, ...d] };
 }
+// THE HAND ON A HILT: the blade axis (Hw's Z) is as given, the roll about it is free — taken so the hand carries straight on
+// from the forearm (fingers along the forearm, a straight wrist). Re-derived over a few IK passes; the hilt point stays put.
+// (2026-10-03: the roll came from 'the torso's forward' — the wrists were bent back 110–160° through the draw and the cut)
+function hiltIK(s, side, hilt, Hw) {
+  let H = Hw;
+  for (let it = 0; it < 3; it++) {
+    armIK(s, duelFK(s, 'gundam'), 'gundam', side, sub(hilt, r3v(H, SABER_GRIP_T)), H);
+    if (it === 2) break;
+    const f2 = duelFK(s, 'gundam'), lo = f2['arm_' + side + '_lower'], hd = f2['hand_' + side];
+    const fa = nrm(sub([hd[12], hd[13], hd[14]], [lo[12], lo[13], lo[14]])), Z = H.slice(6, 9);
+    const y0 = sub(scl(fa, -1), scl(Z, -V.dot(fa, Z))); if (V.len(y0) < 0.25) break;   // (blade along the forearm: keep it)
+    const Y = nrm(y0), X = V.cross([0, 0, 0], Y, Z); H = [...X, ...Y, ...Z];
+  }
+  return H;
+}
 function saberDrawIK(s, tw) {   // the left hand: to the hip, rip it out, overhead (and later: back onto the hip)
   const wD = smooth(SD_REACH, SD_REACH + 0.05, tw) * (1 - smooth(SD_OUT + 0.045, SD_GUARD - 0.005, tw));
   const wH = smooth(SD_HOLSTER0 - 0.06, SD_HOLSTER0, tw) * (1 - smooth(SD_HOLSTER, SD_HOLSTER + 0.1, tw));
@@ -1820,7 +1835,7 @@ function saberDrawIK(s, tw) {   // the left hand: to the hip, rip it out, overhe
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const fk = duelFK(s, 'gundam'), F = hiltFrame(fk, kp.P, kp.D, kp.R);
-  armIK(s, fk, 'gundam', 'L', sub(F.p, r3v(F.Hw, [0, -1.2, 0.6])), F.Hw);
+  hiltIK(s, 'L', F.p, F.Hw);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
 function saberRightGrip(s, tw) {   // the right hand joins below the left once the rifle is gone: a two-handed grip for the cut
@@ -1830,12 +1845,13 @@ function saberRightGrip(s, tw) {   // the right hand joins below the left once t
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const fk = duelFK(s, 'gundam'), hm = fk.hand_L, d = nrm(M.transformDir([0, 0, 0], hm, [0, 0, 1])), Hw = r3(hm);
   const hiltL = M.transformPoint([0, 0, 0], hm, [0, -1.2, 0.6]), hiltR = sub(hiltL, scl(d, 1.7));
-  if (k >= 0.999) { armIK(s, fk, 'gundam', 'R', sub(hiltR, r3v(Hw, [0, -1.2, 0.6])), Hw); return; }
+  if (k >= 0.999) { hiltIK(s, 'R', hiltR, Hw); return; }
+  const sT = { ...s, pose: { ...s.pose } }, Hn = hiltIK(sT, 'R', hiltR, Hw);   // (the natural grip it is heading for)
   // on the way: the hand's own path from where it is to the grip (position lerped, rotation slerped) — lerping the joint
   // angles instead swung the wrist through 120° in a frame and twisted the shoulder open
   const P0 = M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]), R0 = nrmCols(r3(fk.hand_R)), ke = k * k * (3 - 2 * k);
-  const R = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(R0), qFromCols(nrmCols(Hw)), ke));
-  armIK(s, fk, 'gundam', 'R', lrp(P0, sub(hiltR, r3v(Hw, [0, -1.2, 0.6])), ke), R);
+  const R = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(R0), qFromCols(nrmCols(Hn)), ke));
+  armIK(s, fk, 'gundam', 'R', lrp(P0, sub(hiltR, r3v(Hn, [0, -1.2, 0.6])), ke), R);
 }
 const nrmCols = (m) => { const o = m.slice(); for (let c = 0; c < 3; c++) { const l = Math.hypot(o[3 * c], o[3 * c + 1], o[3 * c + 2]) || 1; for (let r = 0; r < 3; r++) o[3 * c + r] /= l; } return o; };
 function throwFling(s, tw) {   // the right arm: wound in across his chest, then flung out straight to his right, arm at full stretch — the rifle leaves at THROW0
@@ -1884,6 +1900,36 @@ function transCutRef() {   // the blade's line onto the ball at the pass (from w
   _tcut = { base, a, reach: V.dist(P, hilt) };
   return _tcut;
 }
+// THE BALL SMASHED INTO PIECES (2026-10-03): solid lumps of its energy, not a gas — they fly on with its momentum, split
+// either side of the blade, and every one that meets his body strikes it (a few sparks, a clank: audio.js); the rest
+// fly past. Positions in story time from TRANS_PASS; his body as spheres on the duel FK, swept along his own motion.
+export const SHARD_LIFE = 0.8;
+let _shards = null;
+export function energyShards() {
+  if (_shards) return _shards;
+  const TP = transPath(), P0 = transHead(TRANS_PASS), ax = transCutAxis(), dirIn = TP.dirIn, v0 = Math.min(TP.speed || 120, 160);
+  const rd = (n) => { const u = hsh(n) * 2 - 1, th = hsh(n + 0.5) * 6.2832, r = Math.sqrt(1 - u * u); return [r * Math.cos(th), u, r * Math.sin(th)]; };
+  const S = [];
+  for (let i = 0; i < 36; i++) {
+    const sg = i % 2 ? 1 : -1;
+    const v = add(add(scl(dirIn, v0 * (0.15 + 0.75 * hsh(i * 3.1 + 1))), scl(rd(i * 5.7 + 2), 25 + 25 * hsh(i + 7))), scl(ax, sg * (10 + 18 * hsh(i + 11))));
+    S.push({ p0: add(P0, scl(rd(i * 2.3 + 9), 1.5 + 7 * hsh(i + 3))),   // (scattered through the space he charges into: he meets them one after another)
+      v, r: 0.25 + 0.4 * hsh(i * 1.7 + 5), seed: i, hitT: Infinity, hitP: null, hitN: null });
+  }
+  const BODY = [['torso', [0, 1.5, 0.3], 3.0], ['head', [0, 1, 0], 1.6], ['pelvis', [0, 0, 0], 2.2], ['arm_L_upper', [0, -1.5, 0], 1.4], ['arm_R_upper', [0, -1.5, 0], 1.4],
+    ['arm_L_lower', [0, -1.5, 0], 1.3], ['arm_R_lower', [0, -1.5, 0], 1.3], ['hand_L', [0, -0.6, 0], 1.0], ['hand_R', [0, -0.6, 0], 1.0], ['leg_L_upper', [0, -2.5, 0], 1.7], ['leg_R_upper', [0, -2.5, 0], 1.7], ['leg_L_lower', [0, -2.5, 0], 1.5], ['leg_R_lower', [0, -2.5, 0], 1.5]];
+  for (let tau = 0; tau <= SHARD_LIFE; tau += 0.002) {
+    const h = duelHero_(TRANS_PASS + tau); if (!h) continue;
+    const fk = duelFK(h, 'gundam');
+    const sph = BODY.filter(([pn]) => fk[pn]).map(([pn, off, r]) => [M.transformPoint([0, 0, 0], fk[pn], off), r]);
+    for (const sh of S) {
+      if (sh.hitT < Infinity) continue;
+      const p = add(sh.p0, scl(sh.v, tau));
+      for (const [c, r] of sph) { const d = V.dist(p, c); if (d < r + sh.r) { const n = nrm(sub(p, c)); sh.hitT = TRANS_PASS + tau; sh.hitN = n; sh.hitP = add(c, scl(n, r)); break; } }
+    }
+  }
+  return (_shards = S);
+}
 export const transCutAxis = () => { const r = transCutRef(); return r && !r.pending ? r.a : [1, 0, 0]; };
 function transTwist(s, tw) {   // the body: wound round to his right for the draw-back, uncoiling hard through the cut
   const wind = smooth(SD_GUARD - 0.06, SD_SWEEP, tw), cut = smooth(TRANS_PASS - 0.008, TRANS_PASS + 0.016, tw), rel = smooth(TRANS_PASS + 0.2, TRANS_PASS + 0.5, tw);
@@ -1900,7 +1946,7 @@ function transCutIK(s, tw) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const fk = duelFK(s, 'gundam'), hilt = hiltAtTrans(fk, ang);
-  armIK(s, fk, 'gundam', 'L', sub(hilt, r3v(Hw, [0, -1.2, 0.6])), Hw);
+  hiltIK(s, 'L', hilt, Hw);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
 // the rifle tossed aside for the cut: it leaves his right hand as the saber lights, tumbles once end over end out to his

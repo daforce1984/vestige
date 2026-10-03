@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { RIFLE_T, RIFLE_Q, ENEMY_HOLE, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX } from './duel.js';
+import { RIFLE_T, RIFLE_Q, ENEMY_HOLE, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX, energyShards, SHARD_LIFE } from './duel.js';
 import { storyT, filmT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -1643,87 +1643,28 @@ function drawTransShot(R, t) {
     if (orb) { const o = transOrb(t); R.glow(o, 0.6 * g, [5, 3.5, 4.5], 0.2); R.glow(o, 1.2 * g, [2, 0.6, 1.3], 0.3); R.beam(h, o, 0.08, [1.6, 0.5, 1.0], 0.5, 6); }
   };
   if (t <= TRANS_PASS) ball(transHead(t), sat(lt / 0.06), TRANS_SHOT, transHead, true);
-  // CUT THROUGH (2026-10-03): the ball loses its coherence — it parts into two halves along the blade's plane, carried on
-  // by its own momentum and drifting apart; each half's energy unravels into curling filaments that stream off it, the
-  // light flickering out of phase and cooling white → magenta → violet until nothing is left (no sparks of metal: energy)
+  // CUT THROUGH: a flash where the blade met it, then the ball's energy in solid pieces (duel.js energyShards) — each a
+  // glowing lump flying on with its momentum; the ones that meet his body strike it with a few sparks and are gone
   const lc = t - TRANS_PASS;
-  if (lc >= 0 && lc < 0.75 && !inCatchCut(t)) {
-    const TP = transPath(), P0 = transHead(TRANS_PASS), ax = transCutAxis(), dirIn = TP.dirIn, v0 = Math.min(TP.speed || 120, 160);
-    const C = madd(P0, dirIn, v0 * 0.22 * (1 - Math.exp(-lc / 0.22)));            // its momentum carried on, bleeding off
-    const f = Math.exp(-lc * 9), life = sat(lc / 0.72), fade = Math.pow(1 - life, 1.4);
-    R.glow(P0, 1 + 3 * f, [3.5 * f, 2 * f, 3 * f], 0.3);                          // the instant of the cut
-    R.light(C, 70, [1, 0.45, 0.8], 5 * Math.exp(-lc * 3.5));
-    const cool = life < 0.35 ? lerpv([3.2, 2.6, 3.0], [3.0, 0.75, 1.5], life / 0.35) : lerpv([3.0, 0.75, 1.5], [1.1, 0.35, 1.9], (life - 0.35) / 0.65);
-    const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], ax, dirIn)), up2 = V.cross([0, 0, 0], dirIn, sd);
-    for (const sg of [1, -1]) {
-      const Hc = madd(madd(C, ax, sg * (4.5 * easeOut(sat(lc / 0.35)) + 4 * lc)), sd, sg * 1.2 * lc);
-      const flick = 0.72 + 0.28 * Math.sin(lc * 95 + sg * 2.1) * Math.sin(lc * 41 + 1.3 + sg);   // its phase breaking up
-      if (fade > 0.01) { R.orb(Hc, 1.5 * (1 - 0.7 * life), cool, 2.4 * fade * flick, 31 + sg * 7); R.glow(Hc, 3 + 12 * life, [cool[0] * 0.22 * fade, cool[1] * 0.22 * fade, cool[2] * 0.22 * fade], 0.7); }   // + the haze it is thinning into
-      for (let j = 0; j < 26; j++) {                                               // filaments unravelling off the half
-        const sj = 300 + j * 7.3 + (sg > 0 ? 0 : 91), born = 0.02 + 0.18 * hash(sj), age = lc - born;
-        if (age <= 0) continue;
-        const la = sat(age / (0.55 - 0.2 * hash(sj + 1))), b = Math.pow(1 - la, 1.6) * (0.6 + 0.4 * Math.sin(lc * 60 + j * 1.7)) * 1.3;
-        if (b < 0.01) continue;
-        const d = V.norm([0, 0, 0], madd(madd(V.scale([0, 0, 0], ax, sg * 0.6), randDir([0, 0, 0], sj), 1.1), dirIn, -0.45 * hash(sj + 4)));   // (streaming back off it as it slows)
-        const p1 = V.norm([0, 0, 0], V.cross([0, 0, 0], d, Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), p2 = V.cross([0, 0, 0], d, p1);
-        const base = madd(Hc, d, 0.8 + 6 * age), L = (1.5 + 8 * easeOut(sat(age * 2.5))) * (0.6 + 0.8 * hash(sj + 5)), ph = hash(sj + 2) * 6.28, cw = (1.2 + 4 * age) * (0.5 + hash(sj + 6)), fq = 2 + 3 * hash(sj + 7);
-        let prev = base;
-        for (let i = 1; i <= 7; i++) {
-          const q = i / 7, w = Math.sin(q * fq + ph + lc * 7) * cw * q, w2 = Math.cos(q * fq * 0.8 + ph * 1.3 - lc * 5) * cw * q;
-          const pt = madd(madd(madd(base, d, L * q), p1, w), p2, w2), k = b * (1 - 0.75 * q);
-          R.beam(prev, pt, 0.1 + 0.4 * (1 - la) * (1 - q * 0.5), [cool[0] * k * 0.8, cool[1] * k * 0.8, cool[2] * k * 0.8], 0.45, 1.6);   // soft, wide wisps
-          prev = pt;
-        }
+  if (lc >= 0 && lc < SHARD_LIFE + 0.2 && !inCatchCut(t)) {
+    const P0 = transHead(TRANS_PASS), f = Math.exp(-lc * 9);
+    R.glow(P0, 1 + 3 * f, [3.5 * f, 2 * f, 3 * f], 0.3); R.light(P0, 70, [1, 0.45, 0.8], 5 * Math.exp(-lc * 4));
+    for (const sh of energyShards()) {
+      if (t >= sh.hitT) {                                            // struck him: sparks off the armour where it hit
+        const a = t - sh.hitT; if (a > 0.25) continue;
+        const k = Math.exp(-a * 14);
+        R.glow(sh.hitP, 0.5 + 1.2 * k, [3 * k, 1.6 * k, 2.2 * k], 0.25);
+        if (a < 0.08) R.light(sh.hitP, 12, [1, 0.6, 0.5], 2 * k);
+        sparkBurst(R, sh.hitP, sh.hitN, a, 1300 + sh.seed * 17, 14, 0.9, 30, 0.22, [4, 2.4, 1.6]);
+        continue;
       }
-    }
-    drawCutWake(R, t, lc, C, cool, fade);
-  }
-}
-// HE GOES THROUGH IT (2026-10-03): the ball's energy spreads into a loose cloud that its momentum carries on into him;
-// he flies straight through it and his passage stirs it into a vortex — each mote, once he has gone by, is swung round
-// the line of his flight, flung outward and dragged a little after him, flaring as he tears through, in every direction
-const WAKE_N = 80;
-let _wake = null;
-function cutWake() {
-  if (_wake) return _wake;
-  const TP = transPath(), P0 = transHead(TRANS_PASS), dirIn = TP.dirIn, v0 = Math.min(TP.speed || 120, 160);
-  const Cof = (lc) => madd(P0, dirIn, v0 * 0.22 * (1 - Math.exp(-lc / 0.22)));
-  const spread = (lc) => 2 + 10 * (1 - Math.exp(-lc / 0.06));   // (a soft swell, not a starburst)
-  const motes = [];
-  for (let i = 0; i < WAKE_N; i++) motes.push({ o: V.scale([0, 0, 0], randDir([0, 0, 0], 700 + i * 3.7), Math.cbrt(0.15 + 0.85 * hash(800 + i))), dr: randDir([0, 0, 0], 900 + i * 2.3), seed: 1000 + i * 5.1 });
-  const base = (m, lc) => madd(madd(Cof(lc), m.o, spread(lc)), m.dr, 3 * lc);
-  // his torso along the pass (story seconds after the cut), for each mote its closest approach
-  const DT = 0.004, H = [];
-  for (let lc = 0; lc <= 0.4; lc += DT) { const h = duelHero(TRANS_PASS + lc); const fk = h && duelFK(h, 'gundam'); H.push(fk ? [fk.torso[12], fk.torso[13], fk.torso[14]] : null); }
-  for (const m of motes) {
-    let best = 1e9, bi = 0;
-    for (let k = 0; k < H.length; k++) { if (!H[k]) continue; const d = V.dist(base(m, k * DT), H[k]); if (d < best) { best = d; bi = k; } }
-    const k0 = Math.max(0, bi - 1), k1 = Math.min(H.length - 1, bi + 1);
-    const A = V.norm([0, 0, 0], V.sub([0, 0, 0], V.sub([0, 0, 0], H[k1], H[k0]), V.sub([0, 0, 0], base(m, k1 * DT), base(m, k0 * DT))));   // his motion through the cloud
-    const rel = V.sub([0, 0, 0], base(m, bi * DT), H[bi]), er0 = madd(rel, A, -V.dot(rel, A));
-    const r = V.len(er0), er = r > 1e-3 ? V.scale([0, 0, 0], er0, 1 / r) : randDir([0, 0, 0], m.seed);
-    Object.assign(m, { tp: bi * DT, r, A, er, et: V.cross([0, 0, 0], A, er), w: Math.exp(-Math.max(0, r - 4) / 7), spin: hash(m.seed + 1) < 0.5 ? 1 : -1 });
-  }
-  return (_wake = { motes, base });
-}
-function drawCutWake(R, t, lc, C, cool, fade) {
-  const W = cutWake(), pos = (m, l) => {
-    const p = W.base(m, l), a = l - m.tp; if (a <= 0 || m.w < 0.02) return p;
-    const th = m.spin * 2.6 * (1 - Math.exp(-a * 7)) * m.w / (0.4 + m.r / 6), push = 9 * (1 - Math.exp(-a * 9)) * m.w;
-    const ring = madd(V.scale([0, 0, 0], m.er, Math.cos(th) * (m.r + push)), m.et, Math.sin(th) * (m.r + push));
-    return madd(madd(madd(p, m.er, -m.r), ring, 1), m.A, 7 * (1 - Math.exp(-a * 6)) * m.w);   // swung round his line, flung out, dragged after him
-  };
-  for (const m of W.motes) {
-    const a = lc - m.tp, flare = a > 0 ? 1 + 2.2 * m.w * Math.exp(-a * 9) : 1;
-    const b = fade * flare * (0.55 + 0.45 * Math.sin(lc * 70 + m.seed)) * 0.75 * smooth(0, 0.025, lc); if (b < 0.02) continue;
-    let prev = pos(m, lc);
-    for (let k = 1; k <= 7; k++) {                                   // a soft curved wisp: where it has just been
-      const pt = pos(m, Math.max(0, lc - k * 0.007)), f = 1 - k / 8;
-      R.beam(madd(prev, V.sub([0, 0, 0], prev, pt), 0.35), pt, 0.12 + 0.24 * f, [cool[0] * b * f, cool[1] * b * f, cool[2] * b * f], 0.6, 4);   // (each piece overlapping the last: one continuous wisp, not beads)
-      prev = pt;
+      const life = sat(lc / SHARD_LIFE), fade = Math.pow(1 - life, 1.3); if (fade < 0.02) continue;
+      const p = madd(sh.p0, sh.v, lc), tail = madd(p, sh.v, -Math.min(lc, 0.006));
+      const col = lerpv([3.0, 1.0, 2.0], [1.8, 0.4, 1.7], life), fl = 0.8 + 0.2 * Math.sin(lc * 80 + sh.seed);   // (the ball's own magenta, cooling violet)
+      R.orb(p, sh.r * (1 - 0.4 * life), col, 1.6 * fade * fl, 400 + sh.seed);
+      R.beam(tail, p, sh.r * 0.55, [col[0] * fade * 0.6, col[1] * fade * 0.6, col[2] * fade * 0.6], 0.6, 3);   // its streak
     }
   }
-  const g = duelHero(t); if (g && lc < 0.3) R.light(madd(g.pos, [0, 1, 0], 6), 40, [cool[0] / 3, cool[1] / 3, cool[2] / 3], 4 * fade);   // its light on him as he goes through
 }
 function drawSeraphFire(R, t) {
   drawTransShot(R, t);
