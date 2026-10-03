@@ -1612,7 +1612,54 @@ function drawTransShot(R, t) {
         }
       }
     }
+    drawCutWake(R, t, lc, C, cool, fade);
   }
+}
+// HE GOES THROUGH IT (2026-10-03): the ball's energy spreads into a loose cloud that its momentum carries on into him;
+// he flies straight through it and his passage stirs it into a vortex — each mote, once he has gone by, is swung round
+// the line of his flight, flung outward and dragged a little after him, flaring as he tears through, in every direction
+const WAKE_N = 80;
+let _wake = null;
+function cutWake() {
+  if (_wake) return _wake;
+  const TP = transPath(), P0 = transHead(TRANS_PASS), dirIn = TP.dirIn, v0 = Math.min(TP.speed || 120, 160);
+  const Cof = (lc) => madd(P0, dirIn, v0 * 0.22 * (1 - Math.exp(-lc / 0.22)));
+  const spread = (lc) => 2 + 10 * (1 - Math.exp(-lc / 0.06));   // (a soft swell, not a starburst)
+  const motes = [];
+  for (let i = 0; i < WAKE_N; i++) motes.push({ o: V.scale([0, 0, 0], randDir([0, 0, 0], 700 + i * 3.7), Math.cbrt(0.15 + 0.85 * hash(800 + i))), dr: randDir([0, 0, 0], 900 + i * 2.3), seed: 1000 + i * 5.1 });
+  const base = (m, lc) => madd(madd(Cof(lc), m.o, spread(lc)), m.dr, 3 * lc);
+  // his torso along the pass (story seconds after the cut), for each mote its closest approach
+  const DT = 0.004, H = [];
+  for (let lc = 0; lc <= 0.4; lc += DT) { const h = duelHero(TRANS_PASS + lc); const fk = h && duelFK(h, 'gundam'); H.push(fk ? [fk.torso[12], fk.torso[13], fk.torso[14]] : null); }
+  for (const m of motes) {
+    let best = 1e9, bi = 0;
+    for (let k = 0; k < H.length; k++) { if (!H[k]) continue; const d = V.dist(base(m, k * DT), H[k]); if (d < best) { best = d; bi = k; } }
+    const k0 = Math.max(0, bi - 1), k1 = Math.min(H.length - 1, bi + 1);
+    const A = V.norm([0, 0, 0], V.sub([0, 0, 0], V.sub([0, 0, 0], H[k1], H[k0]), V.sub([0, 0, 0], base(m, k1 * DT), base(m, k0 * DT))));   // his motion through the cloud
+    const rel = V.sub([0, 0, 0], base(m, bi * DT), H[bi]), er0 = madd(rel, A, -V.dot(rel, A));
+    const r = V.len(er0), er = r > 1e-3 ? V.scale([0, 0, 0], er0, 1 / r) : randDir([0, 0, 0], m.seed);
+    Object.assign(m, { tp: bi * DT, r, A, er, et: V.cross([0, 0, 0], A, er), w: Math.exp(-Math.max(0, r - 4) / 7), spin: hash(m.seed + 1) < 0.5 ? 1 : -1 });
+  }
+  return (_wake = { motes, base });
+}
+function drawCutWake(R, t, lc, C, cool, fade) {
+  const W = cutWake(), pos = (m, l) => {
+    const p = W.base(m, l), a = l - m.tp; if (a <= 0 || m.w < 0.02) return p;
+    const th = m.spin * 2.6 * (1 - Math.exp(-a * 7)) * m.w / (0.4 + m.r / 6), push = 9 * (1 - Math.exp(-a * 9)) * m.w;
+    const ring = madd(V.scale([0, 0, 0], m.er, Math.cos(th) * (m.r + push)), m.et, Math.sin(th) * (m.r + push));
+    return madd(madd(madd(p, m.er, -m.r), ring, 1), m.A, 7 * (1 - Math.exp(-a * 6)) * m.w);   // swung round his line, flung out, dragged after him
+  };
+  for (const m of W.motes) {
+    const a = lc - m.tp, flare = a > 0 ? 1 + 2.2 * m.w * Math.exp(-a * 9) : 1;
+    const b = fade * flare * (0.55 + 0.45 * Math.sin(lc * 70 + m.seed)) * 0.75 * smooth(0, 0.025, lc); if (b < 0.02) continue;
+    let prev = pos(m, lc);
+    for (let k = 1; k <= 7; k++) {                                   // a soft curved wisp: where it has just been
+      const pt = pos(m, Math.max(0, lc - k * 0.007)), f = 1 - k / 8;
+      R.beam(madd(prev, V.sub([0, 0, 0], prev, pt), 0.35), pt, 0.12 + 0.24 * f, [cool[0] * b * f, cool[1] * b * f, cool[2] * b * f], 0.6, 4);   // (each piece overlapping the last: one continuous wisp, not beads)
+      prev = pt;
+    }
+  }
+  const g = duelHero(t); if (g && lc < 0.3) R.light(madd(g.pos, [0, 1, 0], 6), 40, [cool[0] / 3, cool[1] / 3, cool[2] / 3], 4 * fade);   // its light on him as he goes through
 }
 function drawSeraphFire(R, t) {
   drawTransShot(R, t);
