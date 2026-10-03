@@ -1579,12 +1579,39 @@ function drawTransShot(R, t) {
     if (orb) { const o = transOrb(t); R.glow(o, 0.6 * g, [5, 3.5, 4.5], 0.2); R.glow(o, 1.2 * g, [2, 0.6, 1.3], 0.3); R.beam(h, o, 0.08, [1.6, 0.5, 1.0], 0.5, 6); }
   };
   if (t <= TRANS_PASS) ball(transHead(t), sat(lt / 0.06), TRANS_SHOT, transHead, true);
-  const lc = t - TRANS_PASS;                                           // SMASHED: the ball comes apart into energy — a flash, a
-  if (lc >= 0 && lc < 1.4) {                                           // shock ring, its light scattering off the blade and dying out
-    const P = transHead(TRANS_PASS), ax = transCutAxis(), f = Math.exp(-lc * 9), dirIn = transPath().dirIn;
-    R.glow(P, 1 + 3 * f, [3.5 * f, 2 * f, 3 * f], 0.3); R.light(P, 70, [1, 0.5, 0.8], 5 * f);
-    const back = V.scale([0, 0, 0], dirIn, -1);   // (no halo ring and no round motes any more: a short flash and the spark streaks)
-    if (!inCatchCut(t)) sparkBurst(R, P, back, lc, 921, 250, 1.8, 60, 0.7, [3.5, 1.5, 2.4]);
+  // CUT THROUGH (2026-10-03): the ball loses its coherence — it parts into two halves along the blade's plane, carried on
+  // by its own momentum and drifting apart; each half's energy unravels into curling filaments that stream off it, the
+  // light flickering out of phase and cooling white → magenta → violet until nothing is left (no sparks of metal: energy)
+  const lc = t - TRANS_PASS;
+  if (lc >= 0 && lc < 0.75 && !inCatchCut(t)) {
+    const TP = transPath(), P0 = transHead(TRANS_PASS), ax = transCutAxis(), dirIn = TP.dirIn, v0 = Math.min(TP.speed || 120, 160);
+    const C = madd(P0, dirIn, v0 * 0.22 * (1 - Math.exp(-lc / 0.22)));            // its momentum carried on, bleeding off
+    const f = Math.exp(-lc * 9), life = sat(lc / 0.72), fade = Math.pow(1 - life, 1.4);
+    R.glow(P0, 1 + 3 * f, [3.5 * f, 2 * f, 3 * f], 0.3);                          // the instant of the cut
+    R.light(C, 70, [1, 0.45, 0.8], 5 * Math.exp(-lc * 3.5));
+    const cool = life < 0.35 ? lerpv([3.2, 2.6, 3.0], [3.0, 0.75, 1.5], life / 0.35) : lerpv([3.0, 0.75, 1.5], [1.1, 0.35, 1.9], (life - 0.35) / 0.65);
+    const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], ax, dirIn)), up2 = V.cross([0, 0, 0], dirIn, sd);
+    for (const sg of [1, -1]) {
+      const Hc = madd(madd(C, ax, sg * (4.5 * easeOut(sat(lc / 0.35)) + 4 * lc)), sd, sg * 1.2 * lc);
+      const flick = 0.72 + 0.28 * Math.sin(lc * 95 + sg * 2.1) * Math.sin(lc * 41 + 1.3 + sg);   // its phase breaking up
+      if (fade > 0.01) { R.orb(Hc, 1.5 * (1 - 0.7 * life), cool, 2.4 * fade * flick, 31 + sg * 7); R.glow(Hc, 3 + 12 * life, [cool[0] * 0.22 * fade, cool[1] * 0.22 * fade, cool[2] * 0.22 * fade], 0.7); }   // + the haze it is thinning into
+      for (let j = 0; j < 26; j++) {                                               // filaments unravelling off the half
+        const sj = 300 + j * 7.3 + (sg > 0 ? 0 : 91), born = 0.02 + 0.18 * hash(sj), age = lc - born;
+        if (age <= 0) continue;
+        const la = sat(age / (0.55 - 0.2 * hash(sj + 1))), b = Math.pow(1 - la, 1.6) * (0.6 + 0.4 * Math.sin(lc * 60 + j * 1.7)) * 1.3;
+        if (b < 0.01) continue;
+        const d = V.norm([0, 0, 0], madd(madd(V.scale([0, 0, 0], ax, sg * 0.6), randDir([0, 0, 0], sj), 1.1), dirIn, -0.45 * hash(sj + 4)));   // (streaming back off it as it slows)
+        const p1 = V.norm([0, 0, 0], V.cross([0, 0, 0], d, Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), p2 = V.cross([0, 0, 0], d, p1);
+        const base = madd(Hc, d, 0.8 + 6 * age), L = (1.5 + 8 * easeOut(sat(age * 2.5))) * (0.6 + 0.8 * hash(sj + 5)), ph = hash(sj + 2) * 6.28, cw = (1.2 + 4 * age) * (0.5 + hash(sj + 6)), fq = 2 + 3 * hash(sj + 7);
+        let prev = base;
+        for (let i = 1; i <= 7; i++) {
+          const q = i / 7, w = Math.sin(q * fq + ph + lc * 7) * cw * q, w2 = Math.cos(q * fq * 0.8 + ph * 1.3 - lc * 5) * cw * q;
+          const pt = madd(madd(madd(base, d, L * q), p1, w), p2, w2), k = b * (1 - 0.75 * q);
+          R.beam(prev, pt, 0.1 + 0.4 * (1 - la) * (1 - q * 0.5), [cool[0] * k * 0.8, cool[1] * k * 0.8, cool[2] * k * 0.8], 0.45, 1.6);   // soft, wide wisps
+          prev = pt;
+        }
+      }
+    }
   }
 }
 function drawSeraphFire(R, t) {
