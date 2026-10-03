@@ -1104,11 +1104,37 @@ export function duelHero(t) {
   if (r === undefined) { r = duelHero_(t); if (_c_duelHero.size > 64) _c_duelHero.clear(); _c_duelHero.set(t, r); }
   return r;
 }
+// THE CUT's blade height: the iai swing lifts his arm while he sinks past it, so the blade crossed its waist on a slant
+// (torso-local y 1.3 → 3.7 during contact) while the cut is the plane y = CUT_Y. Over the pass he is carried along its
+// torso's up axis so the blade runs through it exactly at CUT_Y (eased in over the dash, out once he is through).
+let _cutLift = null, _cutLiftWork = null, _noLift = false;
+const CL0 = 191.88, CL1 = 192.0, CL2 = 192.09, CL3 = 192.2, CL_DT = 0.002, CL_N = Math.ceil((CL3 - CL0) / CL_DT) + 1;
+function cutLift(t) {
+  if (t <= CL0 || t >= CL3 || _noLift) return null;
+  let tab = _cutLiftWork || _cutLift;
+  if (!tab) {   // built once: the IK reaches further once he is lifted, so the lift is refined over a few passes
+    slashRef();
+    _cutLiftWork = Array.from({ length: CL_N }, () => [0, 0, 0]);
+    for (let pass = 0; pass < 4; pass++) {
+      for (let i = 0; i < CL_N; i++) {
+        const tt = CL0 + i * CL_DT, h = duelHero_(tt), e = enemyRaw_(tt);
+        const H = duelFK({ ...h, saber: 1 }, 'gundam'), E = duelFK(e, 'enemy_ms');
+        const y = M.transformPoint([0, 0, 0], M.invert(M.new(), E.torso), H.saber[0])[1];
+        const w = smooth(CL0, CL1, tt) * (1 - smooth(CL2, CL3, tt));
+        _cutLiftWork[i] = add(_cutLiftWork[i], scl(M.transformDir([0, 0, 0], E.torso, [0, CUT_Y - y, 0]), w));   // (the table holds the applied offset; w eases it in / out)
+      }
+    }
+    _cutLift = _cutLiftWork; _cutLiftWork = null; tab = _cutLift;
+  }
+  const x = (t - CL0) / CL_DT, i = Math.min(CL_N - 2, Math.floor(x)), f = x - i;
+  return lrp(tab[i], tab[i + 1], f);
+}
 function duelHero_(t) {
   if (t < DUEL_T0 || t >= DUEL_T1) return null;
   const s = base(true);
   const tw = warp(t);
   s.pos = add(heroRawPos(tw), transDodge(tw));                      // (the charged shot: he slips it hard, afterimages behind)
+  { const cl = cutLift(t); if (cl) s.pos = add(s.pos, cl); }
   s.vel = velOf((x) => heroRawPos(warp(x)), t); s._pf = (x) => heroRawPos(warp(x)); s._t = t;
   springPose(heroPose, tw, _pose); heroImp(tw, _pose);
   // IDLE (170–175.8, scenes 32–36): the body is held still — no squash / weight-shift / jitter / inertia lean; only a
@@ -1630,11 +1656,11 @@ const SLASH_W = (tw) => smooth(CUT_T - 0.3, CUT_T - 0.14, tw) * (1 - smooth(CUT_
 let _slashRef = null;
 function slashRef() {   // the blade direction onto the waist at CUT_T, levelled in its torso's cut plane (computed once)
   if (_slashRef) return _slashRef;
-  _slashRef = { pending: true };
+  _slashRef = { pending: true }; _noLift = true;
   const h = duelHero_(CUT_T), fk = duelFK(h, 'gundam'), e = enemyRaw_(CUT_T), E = duelFK(e, 'enemy_ms');
   const waist = partPoint(E, 'torso', [0, CUT_Y, 0]), upE = nrm(M.transformDir([0, 0, 0], E.torso, [0, 1, 0]));
   const hilt = onPlane(hiltAt(fk), waist, upE);
-  _slashRef = { dir: nrm(sub(waist, hilt)), waist };
+  _slashRef = { dir: nrm(sub(waist, hilt)), waist }; _noLift = false;
   return _slashRef;
 }
 const onPlane = (p, o, n) => sub(p, scl(n, V.dot(sub(p, o), n)));                 // p moved along n onto the plane (o, n)
@@ -2093,7 +2119,7 @@ export const DUEL_CAMS = [
     return { pos: add(add(add(up(H0, 6), scl(P.dirIn, -44)), scl(sd, -16)), [0, -9, 0]), target: lrp(up(hp(t), 7), P.p3, 0.4), fov: 50, handheld: 0.03, baseShake: 0.04 }; } },   // high above and behind him looking down: the flat swing reads as one big arc across the frame, right to left
   { t0: 185.2, t1: CATCH_T - 0.2, roll: 0.2, name: 'D16 fly-by — he tears past the lens', fn: (t, u) => { const P = hp(185.85), o = nrm(flat(sub(P, MID), 0));
     return { pos: add(add(P, scl(o, 13)), [0, 4, 0]), target: up(hp(t), 2), fov: 50, handheld: 0.08 }; } },
-  { t0: CATCH_T - 0.2, t1: CATCH_T + 0.05, roll: 0.06, name: 'D16c on the rifle — it tumbles back in, he flies in and snatches it out of the air (bullet time)', slowmo: true, fn: (t, u) => {
+  { t0: CATCH_T - 0.2, t1: CATCH_T + 0.05, roll: 0.06, name: 'D16c on the rifle — it tumbles back in, he flies in and snatches it out of the air', fn: (t, u) => {
       const Rc = rifleCentre(t), v = nrm(sub(hp(CATCH_T + 0.05), hp(CATCH_T - 0.05))), T = r3(duelFK(duelHero(CATCH_T), 'gundam').torso);
       const rt0 = scl(nrm(r3v(T, [1, 0, 0])), -1), rt = nrm(sub(rt0, scl(v, V.dot(rt0, v)))), upv = V.cross([0, 0, 0], v, rt);
       return { pos: add(add(add(Rc, scl(v, 34)), scl(rt, 20)), scl(upv, -6)), target: add(Rc, scl(v, -4 * (1 - u))), fov: 40, handheld: 0.03 }; } },   // locked on the rifle, out ahead and to its outside: he comes in from behind it and takes it
