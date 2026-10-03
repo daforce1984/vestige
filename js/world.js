@@ -987,6 +987,7 @@ function drawWell(R, t, tmpM) {
   const up = smooth(70.0, 70.5, t), stut = t > 70 && t < 71.2 ? 0.55 + 0.45 * Math.sign(Math.sin(t * 57) + Math.sin(t * 23.3)) : 1;
   const lamp = (0.14 + 0.86 * up * stut) * dead, beacon = (0.2 + 0.8 * up) * (0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(t * 2.1), 3)) * dead;
   e.matOverride = { violet: { base: [0.05, 0.05, 0.06], metal: 0.8, rough: 0.4, emissive: [0.35 * on, 0.3 * on, 0.28 * on] },
+    core: { base: [0.012, 0.012, 0.014], metal: 0.95, rough: 0.3, emissive: [0, 0, 0] },   // (2026-10-03: a black mirror-metal sphere)
     gw_lamp: { base: [0.85, 0.82, 0.95], metal: 0, rough: 0.2, emissive: [2.4 * lamp / ek, 2.2 * lamp / ek, 2.8 * lamp / ek] },
     gw_beacon: { base: [0.7, 0.35, 0.95], metal: 0, rough: 0.2, emissive: [2.8 * beacon / ek, 1.1 * beacon / ek, 3.6 * beacon / ek] } };
   e.seed = 9;

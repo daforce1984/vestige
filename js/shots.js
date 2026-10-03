@@ -281,7 +281,10 @@ function recoveryPos(t) {
 // the fly-by point off the melted flank: 85 m out from the wound along the hull normal, a little above
 // the charge starts off the wound (flagship at t = 240, fixed point so the line to the well is one straight line)
 let _diveStart = null;
-function diveStart() { return _diveStart || (_diveStart = divePass(240)); }
+// (2026-10-03) his mark for the dive is already clear of the flagship — out wide and a little up — so the dive is ONE
+// straight line to the well (no swing round the hull); he takes it up off screen, already squared to the well
+function diveStart() { if (_diveStart) return _diveStart; const nOut = V.norm([0, 0, 0], [motherDir(240, [1, 0, 0])[0], 0, motherDir(240, [1, 0, 0])[2]]); return (_diveStart = addv(madd(divePass(240), nOut, 160), [0, 50, 0])); }
+const diveDir = () => V.norm([0, 0, 0], V.sub([0, 0, 0], addv(WELL, [0, -10, DIVE_END_Z]), diveStart()));
 function divePass(t) {
   const W = motherPoint([0, 0, 0], t, LANCE_HIT), n = V.norm([0, 0, 0], motherDir(t, [1, 0, 0]));
   return addv(madd(W, n, 122), [0, 30, 0]);                          // close past the camera (S16a sits at 150 m)
@@ -369,7 +372,7 @@ function gundamStateRaw(t, s) {
     // (off screen 226–240) he moves up beside the flagship's melted flank, where the charge will start
     s.pos = lerpv(addv(CP, [6, -4 + Math.sin(t * 0.7), -34]), diveStart(), easeInOut(sat((t - 226.5) / 11)));
     const u = easeInOut(sat((t - 229) / 6));
-    s.fwd = [Math.sin(u * Math.PI) * 1, 0, -Math.cos(u * Math.PI)];
+    s.fwd = V.norm([0, 0, 0], lerpv([Math.sin(u * Math.PI) * 1, 0, -Math.cos(u * Math.PI)], diveDir(), smooth(235.5, 239.5, t)));   // (squared to the well before the dive starts)
     blendPose('stand', 'flight', smooth(237.5, 240, t), s.pose);
     breathe(s.pose, t, 1 - u);
     s.thr = 0.3 + smooth(238, 239.5, t) * 0.7;
@@ -380,7 +383,9 @@ function gundamStateRaw(t, s) {
     const u = (t - 240) / 22;
     // coil for a breath, then an explosive burst to full speed (continuous: the old curve jumped back at 244.5); over its
     // last stretch it eases to CHARGE_V so the charge at the barrier carries straight on from it (no stop at 262)
-    const B = 0.06, K = 18, eRaw = (x) => { const v = Math.max(0, x - B) / (1 - B); return x < B ? 0.004 * (x / B) * (x / B) : 0.004 + 0.996 * (v - (1 - Math.exp(-K * v)) / K) / (1 - (1 - Math.exp(-K)) / K); };
+    // (2026-10-03) a held breath, then a sudden kick off the mark — and he keeps accelerating, half of it the kick's
+    // momentum, half a steady burn (the old curve reached its top speed at once and coasted: it read as a linear slide)
+    const B = 0.025, K = 60, eRaw = (x) => { if (x < B) return 0; const v = (x - B) / (1 - B), kick = (v - (1 - Math.exp(-K * v)) / K) / (1 - (1 - Math.exp(-K)) / K); return 0.5 * kick + 0.5 * v * v; };
     const U0 = 0.82, L = V.dist(start, end), s0 = (eRaw(U0 + 1e-4) - eRaw(U0 - 1e-4)) / 2e-4, s1 = CHARGE_V * 22 / L;
     let e = eRaw(u);
     if (u > U0) { const w = (u - U0) / (1 - U0), h = 1 - U0, e0 = eRaw(U0);
@@ -389,13 +394,13 @@ function gundamStateRaw(t, s) {
     // side — and a little up, then back onto his line once he's past it)
     const nOut = V.norm([0, 0, 0], [motherDir(240, [1, 0, 0])[0], 0, motherDir(240, [1, 0, 0])[2]]);
     const clr = (x) => smooth(0, 0.05, x) * (1 - smooth(0.3, 0.85, x));
-    const offAt = (x) => addv(V.scale([0, 0, 0], nOut, 160 * clr(x)), [0, 50 * clr(x), 0]);
+    const offAt = (x) => [0, 0, 0];   // (no swing any more: his mark is clear of the hull — diveStart)
     const ec = clamp(e, 0, 1);
     s.pos = addv(lerpv(start, end, ec), offAt(ec));
     { const e2 = Math.min(1, ec + 0.01), p2 = addv(lerpv(start, end, e2), offAt(e2)), d = V.sub([0, 0, 0], p2, s.pos);
       s.fwd = V.len(d) > 1e-4 ? d : V.sub([0, 0, 0], end, start); }
     blendPose('flight', 'flight', 0, s.pose);
-    s.pitch = 0.9 * smooth(240.9, 241.5, t) * (1 - smooth(258, 262, t)); s.thr = t < 241.3 ? 0.4 : 1; s.boostK = smooth(241.2, 241.45, t);
+    s.pitch = 0.9 * smooth(240.45, 240.9, t) * (1 - smooth(258, 262, t)); s.thr = t < 240.55 ? 0.4 : 1; s.boostK = smooth(240.5, 240.62, t);
     s.roll = Math.sin(t * 0.5) * 0.05;
     // he flings the rifle away before the well: the arm wound in across him, then thrown out wide to his right (it leaves
     // the hand at FLING_T) and brought back in
@@ -3001,6 +3006,12 @@ function drawShield(R, t, c) {
         R.beam(prev, q, 0.25 * k, [2 * k, 3.2 * k, 6 * k], 1, 12); prev = q;
       }
     }
+  }
+  if (t > THRUST_T - 0.03 && t < 268.6) {   // the barrier pierced: space itself buckles round the point (shape 16)
+    const lt = t - THRUST_T, P = addv(WELL, [g.pos[0] - WELL[0], g.pos[1] - WELL[1] + 4.2, -SHIELD_R]);
+    const k = smooth(-0.03, 0.08, lt) * (1 - smooth(0.9, 1.18, lt));
+    R.anomaly(P, 28 + 70 * easeOut(sat(lt / 0.9)), [0.6, 0.45, 1.2], 1.6 * k, 5);
+    R.anomaly(P, 14 + 20 * sat(lt / 0.5), [0.9, 0.6, 1.4], 2.2 * k, 9);   // (the tighter knot right at the tip)
   }
   if (collapse > 0 && collapse < 1.6) {
     // shock ring at the wound and glowing hex shards thrown off the dome surface

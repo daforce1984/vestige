@@ -1323,6 +1323,22 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     col = tint * e * s.d.a;
     alpha = 0.0;
     dist = vec2f(0.0);
+  } else if (shape == 16) {
+    // SPACE ANOMALY (2026-10-03) where the beam saber pierces the well's barrier: the space round the point twists — a
+    // swirling refraction (tangential pull, tighter near the centre), concentric shear waves running out, the image torn
+    // in thin flickering slices, faint violet/cyan fringes where it bends. b.x radius, b.z seed, d.a strength
+    let r = length(i.uv);
+    if (r > 1.0) { discard; }
+    let seed = s.b.z;
+    let fall = smoothstep(1.0, 0.25, r);
+    let tg = vec2f(-i.uv.y, i.uv.x) / max(r, 0.05);
+    let n = vnoise(vec3f(i.uv * 3.5, t * 5.0 + seed));
+    let wave = sin(r * 34.0 - t * 26.0 + n * 5.0);
+    let slice = step(0.9, hash31(vec3f(floor(i.uv.y * 26.0), floor(t * 24.0), seed))) * (hash31(vec3f(floor(i.uv.y * 26.0), floor(t * 24.0), seed + 3.0)) - 0.5);
+    dist = (tg * (1.0 - r) * 1.4 + normalize(i.uv + 1e-5) * wave * 0.35 + vec2f(slice * 2.2, 0.0)) * fall * 0.028 * s.d.a;
+    let rings = pow(abs(wave), 24.0) * fall;
+    col = (tint * rings * 0.35 + vec3f(0.35, 0.15, 0.9) * abs(slice) * fall * 0.8 + vec3f(0.1, 0.6, 1.0) * pow(abs(n - 0.5) * 2.0, 6.0) * fall * 0.3) * s.d.a;
+    alpha = 0.0;
   } else if (shape == 8) {
     // refractive ripple ring (camera-facing): hyperspace rifts and blast wavefronts
     let r = length(i.uv);

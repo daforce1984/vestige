@@ -19,6 +19,24 @@ const SAMPLES = 4;
 const HDR = 'rgba16float';
 
 // uniform load-time scale: vertices, part rest transforms, empties and bounds (everything derived stays consistent)
+// a part that is a sphere, rebuilt as a smooth high-resolution UV sphere (same centre, radius and material): the low-poly
+// mesh showed its facets up close (the gravity well's core — 2026-10-03)
+function resphere(g, partName, seg, rings) {
+  const part = g.parts.find((p) => p.name === partName); if (!part || !part.groups.length) return;
+  const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+  for (const gr of part.groups) for (let k = gr.first; k < gr.first + gr.count; k++) { const v = g.indices[k] * 8; for (let a = 0; a < 3; a++) { mn[a] = Math.min(mn[a], g.verts[v + a]); mx[a] = Math.max(mx[a], g.verts[v + a]); } }
+  const c = mn.map((v, a) => (v + mx[a]) / 2), r = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) / 2;
+  const nv = (seg + 1) * (rings + 1), V0 = g.verts.length / 8, verts = new Float32Array(g.verts.length + nv * 8);
+  verts.set(g.verts);
+  let o = g.verts.length;
+  for (let j = 0; j <= rings; j++) { const th = Math.PI * j / rings; for (let i = 0; i <= seg; i++) { const ph = 2 * Math.PI * i / seg, n = [Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)];
+    verts[o++] = c[0] + r * n[0]; verts[o++] = c[1] + r * n[1]; verts[o++] = c[2] + r * n[2]; verts[o++] = n[0]; verts[o++] = n[1]; verts[o++] = n[2]; verts[o++] = i / seg; verts[o++] = j / rings; } }
+  const tri = [];
+  for (let j = 0; j < rings; j++) for (let i = 0; i < seg; i++) { const a = V0 + j * (seg + 1) + i, b = a + seg + 1; tri.push(a, a + 1, b, a + 1, b + 1, b); }
+  const idx = new Uint32Array(g.indices.length + tri.length); idx.set(g.indices); idx.set(tri, g.indices.length);
+  const mat = part.groups[0].mat; part.groups = [{ first: g.indices.length, count: tri.length, mat }];
+  g.verts = verts; g.indices = idx;
+}
 function scaleGLB(g, k) {
   for (let i = 0; i < g.verts.length; i += 8) { g.verts[i] *= k; g.verts[i + 1] *= k; g.verts[i + 2] *= k; }
   for (const p of g.parts) { for (const m of [p.rest, p.worldRest]) { m[12] *= k; m[13] *= k; m[14] *= k; } }
@@ -349,6 +367,7 @@ export class Renderer {
         const g = parseGLB(await r.arrayBuffer(), new Set(s.keep || []));
         if (s.scale && s.scale !== 1) scaleGLB(g, s.scale);
         if (s.sortAxis) sortTriangles(g, s.sortAxis);
+        if (s.resphere) for (const pn of s.resphere) resphere(g, pn, 192, 96);
         return { s, g };
       } catch (e) { console.warn('model missing:', s.url, e.message); return null; }
     }))).filter(Boolean);
@@ -533,6 +552,7 @@ export class Renderer {
   flame(nozzle, axisLen, halfWidth, col, intensity, seed = 0, speed = 1) { this.sprite(7, nozzle, axisLen, [halfWidth, seed, speed, 0], col, intensity); }
   shield(p, radius, impactUV, flash, tear, hitAge, col, intensity, collapse = 0) { this.sprite(9, p, [radius, collapse, flash, 0], [impactUV[0], impactUV[1], tear, hitAge], col, intensity); }
   orb(p, radius, col, intensity = 1, seed = 0, irregular = 0) { this.sprite(15, p, [radius, 0, seed, irregular], Z4, col, intensity); }   // energy sphere (a charge inside a bore)
+  anomaly(p, radius, col, strength, seed = 0) { this.sprite(16, p, [radius, 0, seed, 0], Z4, col, strength); }   // space twisting round a point (refraction + shear waves + torn slices)
   ripple(p, radius, col, strength) { this.sprite(8, p, [radius, 0, 0, 0], Z4, col, strength); }
   haze(p, radius, strength, seed = 0) { this.sprite(6, p, [radius, seed, 0, seed], Z4, Z4, strength); }
   hyperWindow(center, axU, axV, col, intensity) { this.sprite(5, center, axU, axV, col, intensity); }
