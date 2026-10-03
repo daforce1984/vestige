@@ -624,7 +624,7 @@ export function missilePosC(m, c) {
 export const missilePos = (m, t) => missilePosC(m, circusClock(t));
 // Sigma's shots: 178.7 is taken on the shield; 183.25 tears the shield off; the charged 192.35 goes through its chest
 // how each shot is fired: 'hip' from the hip, 'aim' two-handed on the shoulder, 'snap' one arm thrown out, 'burst' three quick
-export const HERO_STYLE = ['hip', 'aim', 'aim', 'snap', 'burst', 'hip', 'aim', 'aim', 'aim', 'burst'];
+export const HERO_STYLE = ['hip', 'aim', 'shoulder', 'snap', 'burst', 'hip', 'aim', 'aim', 'aim', 'burst'];   // (178.7, the aimed shot the shield takes: shouldered — 2026-10-03)
 export const ENEMY_STYLE = { 176.75: 'aim', 177.5: 'hip', 178.35: 'aim', 179.95: 'snap', 181.4: 'burst', 182.1: 'hip', 182.8: 'aim', 184.45: 'aim', 185.35: 'snap', 186.4: 'burst', 187.45: 'hip' };
 export const HERO_SHOTS = [177.2, 177.85, 178.7, 180.55, 181.7, 182.4, 183.25, 185.9, 186.85, 187.9];
 // the bursts: two more quick shots after a 'burst' shot (both sides), laid on just past the target
@@ -1522,13 +1522,24 @@ function heroArmPlace(s, fk, gripDes, Rr) {
 let _rq = null; const RQ3 = () => _rq || (_rq = r3(M.fromTRS(M.new(), [0, 0, 0], RIFLE_Q, 1)));
 const styleW = (tw, list, styles, want) => { let w = 0; list.forEach((ts, i) => { const st = Array.isArray(styles) ? styles[i] : styles[ts]; if (st === want) w = Math.max(w, smooth(ts - 0.45, ts - 0.25, tw) * (1 - smooth(ts + 0.25, ts + 0.5, tw))); }); return w; };
 const HERO_GRIP_HIP = [-4.4, 0.6, 3.8];
+const HERO_POCKET = [-3.4, 3.6, 1.1], HERO_BUTT = [0, 0.7, -3.6];   // the right shoulder's pocket (torso frame, the joint is at −4.6, 3.8, 0) and the stock's butt (rifle frame)
 function heroAim2H(s, target, k) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const tw = warp(s._t), wHip = styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip');
   aimYaw(s, target, k);
-  const fk = duelFK(s, 'gundam'), grip = M.transformPoint([0, 0, 0], fk.torso, lrp(HERO_GRIP, HERO_GRIP_HIP, wHip));
-  const d = nrm(sub(target, grip)), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
+  const fk = duelFK(s, 'gundam'), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
+  let grip = M.transformPoint([0, 0, 0], fk.torso, lrp(HERO_GRIP, HERO_GRIP_HIP, wHip));
+  let d = nrm(sub(target, grip));
+  // SHOULDERED (the aimed shot): the stock's butt in the pocket of his right shoulder, the rifle laid from there along the
+  // line to the target at eye height — the grip falls where it falls on that line (left hand on the fore-end: heroLeft)
+  const wSh = styleW(tw, HERO_SHOTS, HERO_STYLE, 'shoulder');
+  if (wSh > 0) {
+    const P = M.transformPoint([0, 0, 0], fk.torso, HERO_POCKET), dS = nrm(sub(target, P));
+    const US = nrm(sub(up0, scl(dS, V.dot(up0, dS)))), XS = V.cross([0, 0, 0], US, dS);
+    const gS = sub(P, r3v([...XS, ...US, ...dS], HERO_BUTT));
+    grip = lrp(grip, gS, wSh); d = nrm(lrp(d, dS, wSh));
+  }
   const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
   const Rh = r3mul([...X, ...U, ...d], r3T(RQ3()));                       // hand rotation so the rifle frame lands on (X, U, d)
   heroArmPlace(s, fk, grip, r3mul(Rh, RQ3()));                      // (the wrist locked: arm + rifle as one — see heroArmPlace)
