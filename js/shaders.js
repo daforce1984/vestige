@@ -432,18 +432,18 @@ struct MC { g: vec3f, rim: f32, ray: f32, basin: f32 };
 // a natural crater's cross-section (d = distance / radius): a flat floor, a steep upper wall, a sharp raised rim and an
 // ejecta blanket that thins away outside; depth ≈ 1, rim ≈ +0.25 (2026-10-03)
 fn craterProf(d: f32) -> f32 {
-  let crest = 0.08 * exp(-pow((d - 1.0) / 0.06, 2.0));                          // (on both sides: continuous at the rim)
-  if (d < 1.0) { return -1.0 + 1.25 * pow(smoothstep(0.3, 1.0, d), 1.6) + crest; }
-  return 0.25 * exp(-(d - 1.0) / 0.32) + crest;
+  let crest = 0.2 * exp(-abs(d - 1.0) / 0.045);                                // a sharp cusp of a crest (continuous at the rim)
+  if (d < 1.0) { return -1.0 + 1.05 * pow(smoothstep(0.3, 1.0, d), 2.6) + crest; }   // (the wall steepest just under the rim)
+  return 0.05 + 0.2 * exp(-(d - 1.0) / 0.32) - 0.05 * smoothstep(1.0, 2.0, d) + crest;
 }
 fn basinH(d: f32) -> f32 {
   var h = 0.12 * exp(-max(d - 1.0, 0.0) / 0.45) * step(1.0, d);               // ejecta blanket
   if (d < 1.0) {
     let wall = smoothstep(0.55, 1.0, d);
-    h = mix(-0.75, 0.12, wall * wall)                                          // the bowl: a flat floor, a steep wall (meets the blanket at the rim: no step)
+    h = mix(-0.75, 0.12, pow(wall, 2.6))                                      // the bowl: a flat floor, the wall steepest under the rim (meets the blanket: no step)
       + 0.32 * exp(-pow(d / 0.11, 2.0));                                       // central peak
   }
-  return h + 0.45 * exp(-pow((d - 1.0) / 0.075, 2.0));                          // the raised rim
+  return h + 0.5 * exp(-abs(d - 1.0) / 0.035);                                // the raised rim: a sharp crest
 }
 // THE MOON'S RELIEF as real geometry (2026-10-03): height (fraction of its radius) of the giant basin and the two coarsest
 // crater octaves — the vertex shader displaces the mesh by it, the fragment takes its normal from it (the same cells and
@@ -461,7 +461,8 @@ fn moonHN(q: vec3f) -> f32 {
 }
 fn moonHeight(q: vec3f) -> f32 {
   let bd = basinD(q);
-  var h = basinH(bd) * 0.06 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
+  let jag = 0.6 + 0.8 * vnoise(q * 34.0);                                       // (the crest broken and jagged along its length)
+  var h = mix(basinH(bd), basinH(bd) - 0.5 * exp(-abs(bd - 1.0) / 0.035) * (1.0 - jag), 1.0) * 0.06 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
   var cover = smoothstep(1.3, 1.05, bd);
   var sc = 14.0;
   for (var oc = 0; oc < 2; oc++) {
@@ -476,7 +477,7 @@ fn moonHeight(q: vec3f) -> f32 {
       let rad = dmin / 1.3 * (0.4 + 0.6 * r3.y);
       let d = length(p - ctr) / rad * (1.0 + 0.2 * (vnoise(p * 2.7 + c * 1.3) - 0.5));   // (an irregular outline)
       if (d < 1.3) {
-        h += keep * craterProf(d) * rad / sc * 0.42;
+        h += keep * (craterProf(d) - 0.2 * exp(-abs(d - 1.0) / 0.045) * (0.6 - 0.8 * vnoise(p * 6.0 + c))) * rad / sc * 0.42;   // (a jagged crest)
         cov2 = max(cov2, keep * smoothstep(1.3, 1.05, d));
       }
     }
