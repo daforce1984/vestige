@@ -2100,9 +2100,15 @@ export const DUEL_CAMS = [
     return { pos: at(M, 0, 480, 60, T), target: M, fov: 24, handheld: 0.04, baseShake: 0.02 }; } },
   { t0: 177.05, t1: 177.8, snap: 1.7, roll: 0.12, name: 'D07 low angle on him', fn: (t, u) => { const T = 177.05, H = hp(T);
     return { pos: at(H, 30, -48, -26, T), target: pan(up(H, 4), up(hp(t), 4), 0.8), fov: 36, handheld: 0.1 }; } },
-  { t0: 177.8, t1: 178.55, snap: 2.2, roll: -0.06, name: 'D08 long lens on it', fn: (t, u) => { const T = 177.8, E = ep(T);
+  { t0: 177.8, t1: 178.2, snap: 2.2, roll: -0.06, name: 'D08 long lens on it', fn: (t, u) => { const T = 177.8, E = ep(T);
     return { pos: at(E, -150, -40, 6, T), target: pan(up(E, 2), up(ep(t), 2), 0.9), fov: 12, handheld: 0.06 }; } },
-  { t0: 178.55, t1: 179.25, snap: 1.8, name: 'D09 front on — the shield across its front takes his shot, the energy splashing off', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T), f = nrm(flat(sub(hp(T), E), 0)), sd = [f[2], 0, -f[0]];
+  // HE AIMS, THEN FIRES (2026-10-03): side-on to the line of fire, his rifle-arm side to the lens — he levels it, the
+  // muzzle steadies, a slow push in toward the barrel, and the shot (178.7) leaves it across the frame; cut on the flash
+  { t0: 178.2, t1: 178.722, roll: -0.04, name: 'D08b side-on — he lays the rifle on it and fires', fn: (t, u) => { const T = 178.2, H = hp(T), E = ep(T);
+      const f = nrm(flat(sub(E, H), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0])), m = duelMuzzle(t), M = m ? m.pos : add(up(hp(t), 6), scl(f, 8));
+      const k = easeInOut(u), C = lrp(up(hp(t), 5), M, 0.45);
+      return { pos: add(add(add(C, scl(sd, -lerp(46, 34, k))), scl(f, lerp(4, 9, k))), [0, -4, 0]), target: add(C, scl(f, 3)), fov: 30, handheld: 0.02, baseShake: 0 }; } },
+  { t0: 178.722, t1: 179.25, snap: 1.8, name: 'D09 front on — the shield across its front takes his shot, the energy splashing off', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T), f = nrm(flat(sub(hp(T), E), 0)), sd = [f[2], 0, -f[0]];
     return { pos: add(add(add(E, scl(f, 30)), scl(sd, 4)), [0, 8, 0]), target: pan(up(E, 8), up(ep(t), 8), 0.8), fov: 38, handheld: 0.03, baseShake: 0.02 }; } },
   { t0: 180.45, t1: 181.4, roll: -0.1, name: 'D11 profile — he rolls out and answers', fn: (t, u) => { const T = 180.45, H = hp(T);
     return { pos: add(at(H, 0, 38, 2, T), scl(sub(hp(t), H), 0.4)), target: up(hp(t), 3), fov: 38, handheld: 0.08 }; } },   // a slow dolly, half his speed
