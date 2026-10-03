@@ -1522,12 +1522,13 @@ function heroArmPlace(s, fk, gripDes, Rr) {
 let _rq = null; const RQ3 = () => _rq || (_rq = r3(M.fromTRS(M.new(), [0, 0, 0], RIFLE_Q, 1)));
 const styleW = (tw, list, styles, want) => { let w = 0; list.forEach((ts, i) => { const st = Array.isArray(styles) ? styles[i] : styles[ts]; if (st === want) w = Math.max(w, smooth(ts - 0.45, ts - 0.25, tw) * (1 - smooth(ts + 0.25, ts + 0.5, tw))); }); return w; };
 const HERO_GRIP_HIP = [-4.4, 0.6, 3.8];
-const HERO_POCKET = [-3.4, 3.6, 1.1], HERO_BUTT = [0, 0.7, -3.6];   // the right shoulder's pocket (torso frame, the joint is at −4.6, 3.8, 0) and the stock's butt (rifle frame)
+const HERO_GRIP_SH = [-4.3, 2.7, 4.3];
+const SH_YAW = -0.3;   // (the chest turned a little right of the line: the gun arm hangs along his side instead of folding across the chest)   // shouldered: the grip (torso frame) — the stock's butt then sits at the right shoulder (joint at −4.6, 3.8, 0)
 function heroAim2H(s, target, k) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const tw = warp(s._t), wHip = styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip');
-  aimYaw(s, target, k);
+  aimYaw(s, target, k, SH_YAW * styleW(tw, HERO_SHOTS, HERO_STYLE, 'shoulder'));   // (shouldered: the chest turned further onto the target, so the gun arm doesn't cross it)
   const fk = duelFK(s, 'gundam'), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
   let grip = M.transformPoint([0, 0, 0], fk.torso, lrp(HERO_GRIP, HERO_GRIP_HIP, wHip));
   let d = nrm(sub(target, grip));
@@ -1535,10 +1536,10 @@ function heroAim2H(s, target, k) {
   // line to the target at eye height — the grip falls where it falls on that line (left hand on the fore-end: heroLeft)
   const wSh = styleW(tw, HERO_SHOTS, HERO_STYLE, 'shoulder');
   if (wSh > 0) {
-    const P = M.transformPoint([0, 0, 0], fk.torso, HERO_POCKET), dS = nrm(sub(target, P));
-    const US = nrm(sub(up0, scl(dS, V.dot(up0, dS)))), XS = V.cross([0, 0, 0], US, dS);
-    const gS = sub(P, r3v([...XS, ...US, ...dS], HERO_BUTT));
-    grip = lrp(grip, gS, wSh); d = nrm(lrp(d, dS, wSh));
+    // (the grip raised and drawn back a little from the normal hold — that brings the butt into the shoulder; solving
+    // the butt onto the shoulder's pocket instead folded the upper arm 77° into the chest and the pauldron came away)
+    const gS = M.transformPoint([0, 0, 0], fk.torso, HERO_GRIP_SH);
+    grip = lrp(grip, gS, wSh); d = nrm(sub(target, grip));
   }
   const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
   const Rh = r3mul([...X, ...U, ...d], r3T(RQ3()));                       // hand rotation so the rifle frame lands on (X, U, d)
@@ -1580,10 +1581,10 @@ function drawKey(tw) {
 }
 // the body turns into the shot: the target brought round to just right of his chest line, so the rifle is out beside
 // him, never across his chest (ramped in through the draw, so it never pops when the aim takes over)
-function aimYaw(s, target, k) {
+function aimYaw(s, target, k, extra = 0) {
   if (k <= 0) return;
   const f0 = duelFK(s, 'gundam'), tl = r3v(r3T(r3(f0.torso)), sub(target, partPoint(f0, 'torso'))), az = Math.atan2(tl[0], tl[2]);
-  const t0 = s.pose.torso || [0, 0, 0]; s.pose = { ...s.pose }; s.pose.torso = [t0[0], t0[1] + clamp(az + 0.25, -1.5, 1.5) * k, t0[2]];
+  const t0 = s.pose.torso || [0, 0, 0]; s.pose = { ...s.pose }; s.pose.torso = [t0[0], t0[1] + clamp(az + 0.25 + extra, -1.5, 1.5) * k, t0[2]];
 }
 // THE DRAW as one continuous move (no dead stops): off the back mount, up past his right shoulder muzzle-high, swung down
 // and forward onto the target — a time-based Hermite curve through the keys (torso frame), easing only at its two ends
