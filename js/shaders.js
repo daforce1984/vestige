@@ -423,28 +423,73 @@ fn seg7w(p: vec2f, d: i32, w: f32) -> f32 {           // 7-segment digit, p in [
 // procedural crater field on a unit sphere (3D cell noise), 4 octaves (cells 1/14 … 1/260 of the radius), ~10× finer
 // than the moon mesh. ONE evaluation returns the analytic height gradient (for the bump), rim and ray brightness;
 // each octave only visits the 2×2×2 cells nearest the point (craters sit inside their cell).
-struct MC { g: vec3f, rim: f32, ray: f32 };
+struct MC { g: vec3f, rim: f32, ray: f32, basin: f32 };
+// ONE GIANT IMPACT BASIN (2026-10-03) on the face the camera sees (moon-local, angular radius 0.42 rad): a deep bowl with
+// a terraced inner wall, a central peak, a sharp raised rim and an ejecta blanket with long bright rays; its floor is dark
+// and smooth (filled with melt). The basin height profile, d = angle from its centre / its radius:
+fn basinH(d: f32) -> f32 {
+  var h = 0.12 * exp(-max(d - 1.0, 0.0) / 0.45) * step(1.0, d);               // ejecta blanket
+  if (d < 1.0) {
+    let wall = smoothstep(0.55, 1.0, d);
+    h = mix(-0.75, 0.05, wall * wall)                                          // the bowl: a flat floor, a steep wall
+      + 0.035 * sin(d * 46.0) * smoothstep(0.6, 0.75, d) * (1.0 - smoothstep(0.93, 1.0, d))   // terraces
+      + 0.32 * exp(-pow(d / 0.11, 2.0));                                       // central peak
+  }
+  return h + 0.45 * exp(-pow((d - 1.0) / 0.075, 2.0));                          // the raised rim
+}
+// craters on a unit sphere (3D cell noise), 4 octaves; each crater stays inside its own cell (no two of a size overlap)
+// and no smaller crater is made where a bigger one (or the basin) already is
 fn moonCraters(q: vec3f, seed: f32, pw: f32) -> MC {   // pw: the pixel's footprint on the unit sphere
-  var o: MC; o.g = vec3f(0.0); o.rim = 0.0; o.ray = 0.0;
+  var o: MC; o.g = vec3f(0.0); o.rim = 0.0; o.ray = 0.0; o.basin = 0.0;
+  let C0 = normalize(vec3f(0.35, 0.3, 0.89)); let R0 = 0.42;
+  let ca = clamp(dot(q, C0), -1.0, 1.0); let bd = acos(ca) / R0;
+  if (bd < 3.4) {
+    let rad = normalize(q - C0 * ca + vec3f(1e-6));
+    let dh = (basinH(bd + 0.003) - basinH(bd - 0.003)) / 0.006;
+    o.g += dh * rad / R0 * 0.06;
+    o.rim += 1.3 * exp(-pow((bd - 1.0) / 0.06, 2.0)) + 0.35 * smoothstep(0.6, 0.75, bd) * (1.0 - smoothstep(0.93, 1.0, bd)) * (0.5 + 0.5 * sin(bd * 46.0));
+    o.basin = smoothstep(0.62, 0.45, bd);
+    let e1 = normalize(cross(C0, vec3f(0.0, 1.0, 0.0))); let e2 = cross(C0, e1);
+    let az = atan2(dot(q, e2), dot(q, e1));
+    // rays: irregular — each angular sector its own width, brightness and reach, two scales, frayed along their length
+    var rays = 0.0;
+    for (var rs = 0; rs < 2; rs++) {
+      let nseg = select(17.0, 41.0, rs == 1);
+      let a = (az / 6.2832 + 0.5) * nseg + f32(rs) * 0.37;
+      let sct = floor(a); let fr = fract(a) - 0.5;
+      let hh = hash33(vec3f(sct, f32(rs) * 7.0, 3.0));
+      let wdt = 0.06 + 0.22 * hh.x;
+      let reach = 1.25 + 2.2 * hh.y;
+      let fray = 0.6 + 0.4 * vnoise(vec3f(bd * 9.0, sct, 1.0));
+      rays += step(0.35, hh.z) * smoothstep(wdt, 0.0, abs(fr + (hh.y - 0.5) * 0.3 * bd)) * (1.0 - smoothstep(reach * 0.6, reach, bd)) * fray * select(1.0, 0.55, rs == 1);
+    }
+    o.ray += 1.2 * rays * smoothstep(1.03, 1.25, bd);
+  }
+  var cover = smoothstep(1.3, 1.05, bd);                                        // (nothing smaller inside the basin)
   var sc = 14.0; var amp = 1.0;
   for (var oc = 0; oc < 4; oc++) {
     if (oc > 0 && sc * pw > 0.25) { break; }                          // (craters under ~1.5 px: they only shimmer — skip the octave)
     let p = q * sc; let fl = floor(p); let off = step(vec3f(0.5), p - fl) - 1.0;
+    var cov2 = 0.0;
+    let keep = 1.0 - clamp(cover, 0.0, 1.0);
     for (var k = 0; k < 8; k++) {
       let c = fl + off + vec3f(f32(k & 1), f32((k >> 1) & 1), f32((k >> 2) & 1));
       let r3 = hash33(c + seed + f32(oc) * 17.0);
       if (r3.z > 0.55) { continue; }
-      let ctr = c + 0.3 + r3 * 0.4;
-      let rad = 0.22 + 0.25 * r3.y;
+      let ctr = c + 0.25 + r3 * 0.5;
+      let dmin = min(min(min(ctr.x - c.x, c.x + 1.0 - ctr.x), min(ctr.y - c.y, c.y + 1.0 - ctr.y)), min(ctr.z - c.z, c.z + 1.0 - ctr.z));
+      let rad = dmin / 1.3 * (0.4 + 0.6 * r3.y);                      // (it and its rim fit inside its own cell)
       let dv = (p - ctr) / rad; let d = length(dv);
-      if (d < 1.5 && d > 1e-4) {
+      if (d < 1.3 && d > 1e-4) {
         // height h(d) = (d²−1)·0.6 inside + 0.25·exp(−((d−1)/0.18)²); dh/dd, chain to p (× sc/rad per unit q)
         var dh = select(0.0, 1.2 * d, d < 1.0) - 0.25 * 2.0 * (d - 1.0) / (0.18 * 0.18) * exp(-pow((d - 1.0) / 0.18, 2.0));
-        o.g += amp * dh * (dv / d) * (sc / rad) * 0.02;
-        o.rim += amp * exp(-pow((d - 1.0) / 0.12, 2.0));
-        if (oc == 0 && r3.x > 0.8) { o.ray += smoothstep(1.0, 1.4, d) * pow(abs(sin(atan2(dv.y, dv.x) * 9.0)), 6.0); }
+        o.g += keep * amp * dh * (dv / d) * (sc / rad) * 0.02;
+        o.rim += keep * amp * exp(-pow((d - 1.0) / 0.12, 2.0));
+        if (oc == 0 && r3.x > 0.8) { o.ray += keep * smoothstep(1.0, 1.25, d) * pow(abs(sin(atan2(dv.y, dv.x) * 9.0)), 6.0); }
+        cov2 = max(cov2, keep * smoothstep(1.3, 1.05, d));
       }
     }
+    cover = max(cover, cov2);
     sc *= 2.35; amp *= 0.55;
   }
   return o;
@@ -837,6 +882,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
       let mare = smoothstep(0.42, 0.62, fbm(qs * 1.6 + 11.0, 4));
       base *= mix(1.0, 0.55, mare);                                    // dark basaltic maria
       base *= 1.0 + 0.35 * clamp(c0.rim, 0.0, 1.5) + 0.6 * clamp(c0.ray, 0.0, 1.0);   // bright fresh rims and ray ejecta
+      base *= mix(1.0, 0.5, c0.basin);                                  // the giant basin's floor: dark, melt-filled
       base *= 0.92 + 0.16 * vnoise(qs * 900.0);                        // fine regolith grain
     }
   }
