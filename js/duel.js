@@ -1208,7 +1208,7 @@ function duelHero_(t) {
   _pose[PIDX._body + 2] += heroRoll(tw);
   s.eye = 1 + 2.2 * Math.exp(-Math.abs(tw - HERO_FLARE - 0.03) * 40) * (tw > HERO_FLARE - 0.03 ? 1 : 0);   // the eye flares once he is on it
   s.weapon = tw < HERO_GRAB ? 'back' : tw > THROW0 && tw < CATCH_T ? 'thrown' : tw < 191.22 || tw >= 200 ? 'rifle' : 'saber';   // slung over the shoulder at 191.2   // (2026-10-03: after the cut the hilt stays in his hand, the blade dies down — it vanished, hilt and all, at 194.1)
-  s.saber = Math.max(smooth(191.26, 191.36, tw) * (1 - smooth(193.95, 194.5, tw)), transSaber(tw));   // (the blade shrinks back into the hilt over half a second)
+  s.saber = Math.max(smooth(191.26, 191.36, tw) * (1 - smooth(194.62, 195.0, tw)), transSaber(tw));   // (lit right to the end of D24 — it goes out only after the cut, off screen)
   s.saberL = transSaber(tw) > 0;                                     // (the blade lit in his left hand)
   s.hiltL = hiltInHand(tw);                                          // the hilt in his left hand (else it hangs on his hip)
   s.saberPow = s.saberL ? 2 : 1;                                     // full output against the charged shot: twice as thick

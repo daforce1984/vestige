@@ -655,6 +655,14 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
       heat = heat * (1.0 - smoothstep(-0.05, 0.08, fr)) * (1.0 + 2.2 * exp(-abs(fr) / 0.5));
     }
     tornEdge = heat * (exp(-sd / 0.2) + 0.3 * exp(-sd / 0.55));
+    if (F.lights[31].w > 0.5) {
+      // where the blade IS (2026-10-03): any armour of a cut part it touches glows molten right there — by distance to the
+      // blade segment (world), not by any timing
+      let A = F.lights[30].xyz; let B = F.lights[31].xyz;
+      let ab = B - A; let h = clamp(dot(i.wp - A, ab) / max(dot(ab, ab), 1e-4), 0.0, 1.0);
+      let db = max(length(i.wp - (A + ab * h)) - F.lights[30].w, 0.0);
+      tornEdge = max(tornEdge, abs(inst.clipMax.w) * 2.6 * exp(-db / 0.45));
+    }
   }
   if (abs(inst.clipMin.w) > 0.5 && inst.clipMin.w < 1.5) {
     let span = inst.clipMax.xyz - inst.clipMin.xyz;
@@ -1199,10 +1207,15 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     // ENERGY ORB: the charge forming inside a gun bore — a plasma sphere with a defined edge: white-hot centre, the
     // gun's colour through the body with slow churning bands, a brighter limb. Depth per pixel on the sphere's front
     // surface, so the bore walls hide what is inside them. b.x = radius, b.z = seed, d.a = intensity
-    let r = length(i.uv);
+    let seed = s.b.z;
+    // b.w > 0: an IRREGULAR plasma lump — its outline torn by moving noise, always changing shape
+    let th = atan2(i.uv.y, i.uv.x);
+    let cdir = vec2f(cos(th), sin(th));
+    let wob = vnoise(vec3f(cdir * 1.8, t * 5.0 + seed)) * 0.6 + vnoise(vec3f(cdir * 4.5 + 3.0, t * 9.0 + seed * 1.7)) * 0.4;
+    let re = 1.0 - s.b.w * (0.15 + 0.55 * wob);
+    let r = length(i.uv) / max(re, 0.2);
     if (r > 1.0) { discard; }
     let zz = sqrt(1.0 - r * r);
-    let seed = s.b.z;
     let q3 = vec3f(i.uv, zz);
     let churn = vnoise(q3 * 3.2 + vec3f(t * 1.7, -t * 1.3, seed)) * 0.65 + vnoise(q3 * 7.5 + vec3f(-t * 2.6, t * 2.1, seed + 5.0)) * 0.35;
     let hot = pow(zz, 2.2);                                              // the centre (seen through the depth of the ball)

@@ -1058,19 +1058,19 @@ function cutPlanes(R) {
   return _cutPlanes;
 }
 // the blade's first touch: from here the two halves are drawn in place (lt = 0) so the melt band runs along the real armour
-const CUT_SEAM_T = CUT_T - 0.012;
-const CUT_LEAD = 1.0;   // m: the melt front runs this far ahead of the blade's centre line (its glowing width + the drawn hilt's offset)
+const CUT_SEAM_T = CUT_T - 0.03;   // (the halves are drawn from before the blade arrives: its front and its touch decide what glows)
+const CUT_LEAD = 0.3;   // m: the melt front runs this far ahead of the blade's centre line (its glowing width + the drawn hilt's offset)
 // the blade going through (until CUT_SPLIT): a point on it and the way it moves through VANGUARD (relative to its torso,
 // square to the blade) — the cut melts open only behind that front (shader: plane-cut front), not all at once
 let _bfT = null, _bf = null;
 function bladeFront(t) {
   if (t >= CUT_SPLIT) return null;
   if (_bfT === t) return _bf;
-  const at = (x) => { const h = duelHero(x), e = duelEnemy2(x); if (!h || !e) return null; const H = duelFK({ ...h, saber: 1 }, 'gundam'), E = duelFK(e, 'enemy_ms'); return { p: madd(H.saber[0], H.saber[2], 6.5), d: H.saber[2], o: [E.torso[12], E.torso[13], E.torso[14]] }; };
+  const at = (x) => { const h = duelHero(x), e = duelEnemy2(x); if (!h || !e) return null; const H = duelFK({ ...h, saber: 1 }, 'gundam'), E = duelFK(e, 'enemy_ms'); return { p: madd(H.saber[0], H.saber[2], 6.5), d: H.saber[2], h: H.saber[0], tip: madd(H.saber[0], H.saber[2], 13), o: [E.torso[12], E.torso[13], E.torso[14]] }; };
   const a = at(t), b = at(t + 0.002); _bfT = t;
   if (!a || !b) return (_bf = null);
   let v = V.sub([0, 0, 0], V.sub([0, 0, 0], b.p, a.p), V.sub([0, 0, 0], b.o, a.o)); v = madd(v, a.d, -V.dot(v, a.d));
-  return (_bf = V.len(v) > 1e-6 ? { p: a.p, v: V.norm([0, 0, 0], v) } : null);
+  return (_bf = V.len(v) > 1e-6 ? { p: a.p, v: V.norm([0, 0, 0], v), a: a.h, b: a.tip } : null);
 }
 function drawHalves(R, t, s) {
   const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, lt = s.cutK;
@@ -1096,6 +1096,7 @@ function drawHalves(R, t, s) {
     if (CP) {
       e.clipParts = {}; for (const k in CP) e.clipParts[k] = half > 0 ? CP[k] : flip(CP[k]);
       const BF = bladeFront(t);
+      if (BF && half > 0) ctx.env.blade = { a: BF.a, b: BF.b, r: 0.5 };   // (the shader: whatever it touches glows)
       if (BF) for (const k in e.clipParts) {                         // melted only behind the blade (each part in its own frame)
         const n = e.clipParts[k], W = R.partWorld('enemy_ms', e, k); if (!W) continue;
         const inv = M.invert(M.new(), W), pl = M.transformPoint([0, 0, 0], inv, BF.p);
@@ -1179,20 +1180,31 @@ function drawCutDetail(R, t) {
   const e = duelEnemy2(Math.min(t, CUT_SPLIT)); if (!e || !e.vis) return;
   const E = duelFK(e, 'enemy_ms'), TW = (p) => M.transformPoint([0, 0, 0], E.torso, p);
   const live = t < CUT_SPLIT;
-  // the melt line: every piece of the outline the blade has already been through, hot at the moment of cutting, cooling
-  if (live) for (const pc of SEC.pieces) {
-    if (pc.tp > t && pc.tq > t) continue;
+  // the melt line, from where the blade is NOW (no timing): every piece of the outline its line has already gone past is
+  // molten — white-hot right at the blade, cooling to orange-red the further behind it lies
+  let cur = null;
+  if (live) {
+    const at = (x) => { const h = duelHero(x), e2 = duelEnemy2(x); if (!h || !e2) return null; const H = duelFK({ ...h, saber: 1 }, 'gundam'), inv = M.invert(M.new(), duelFK(e2, 'enemy_ms').torso);
+      return { a: M.transformPoint([0, 0, 0], inv, H.saber[0]), b: M.transformPoint([0, 0, 0], inv, madd(H.saber[0], H.saber[2], 13)) }; };
+    const b0 = at(t), b1 = at(t + 0.002);
+    if (b0 && b1) {
+      const dx = b0.b[0] - b0.a[0], dz = b0.b[2] - b0.a[2], L = Math.hypot(dx, dz), nx = -dz / L, nz = dx / L;   // the blade line's normal in the plane
+      const mid1 = [(b1.a[0] + b1.b[0]) / 2, (b1.a[2] + b1.b[2]) / 2], sg = Math.sign(nx * (mid1[0] - b0.a[0]) + nz * (mid1[1] - b0.a[2])) || 1;
+      cur = { b0, sd: (q) => sg * (nx * (q[0] - b0.a[0]) + nz * (q[2] - b0.a[2])) };   // > 0: ahead of the blade (not reached)
+    }
+  }
+  if (cur) for (const pc of SEC.pieces) {
+    const dp = cur.sd(pc.p) - CUT_LEAD, dq = cur.sd(pc.q) - CUT_LEAD; if (dp > 0 && dq > 0) continue;
     let p = pc.p, q = pc.q;
-    if (pc.tp > t) p = lerpv(pc.q, pc.p, 0.5); else if (pc.tq > t) q = lerpv(pc.p, pc.q, 0.5);   // (half a piece at the cutting front)
-    const age = t - Math.min(pc.tp, pc.tq), k = Math.exp(-age * 25) * 0.85 + 0.25;   // white at the front, cooling to orange-red
+    if (dp > 0) p = lerpv(pc.q, pc.p, -dq / (dp - dq)); else if (dq > 0) q = lerpv(pc.p, pc.q, -dp / (dq - dp));   // (cut off exactly at the blade)
+    const k = Math.exp(-Math.max(0, -Math.max(dp, dq)) / 1.2) * 0.85 + 0.25;   // white at the blade, cooling behind it
     const pa = TW(p), pb = TW(q);
     R.beam(pa, pb, 0.22, [1.9 * k + 1.1, 0.75 * k * k + 0.22, 0.12 * k * k + 0.02], 1, 8);
     R.beam(pa, pb, 0.6, [0.5 * k + 0.3, 0.08 * k + 0.03, 0.01], 0.35, 2);
   }
   // where the blade meets the armour now: its segment against the outline — molten spray leaves from each crossing
   if (live) {
-    let bi = 0; while (bi < SEC.blade.length - 1 && SEC.blade[bi + 1].t <= t) bi++;
-    const bl = SEC.blade[bi], hits = [];
+    const bl = cur ? cur.b0 : null, hits = []; if (!bl) return;   // (the blade where it is now)
     for (const [a, b] of SEC.segs) {
       const r = [bl.b[0] - bl.a[0], bl.b[2] - bl.a[2]], sv = [b[0] - a[0], b[2] - a[2]], den = r[0] * sv[1] - r[1] * sv[0]; if (Math.abs(den) < 1e-9) continue;
       const wx = a[0] - bl.a[0], wz = a[2] - bl.a[2], u = (wx * sv[1] - wz * sv[0]) / den, v = (wx * r[1] - wz * r[0]) / den;
@@ -1661,8 +1673,13 @@ function drawTransShot(R, t) {
       const life = sat(lc / SHARD_LIFE), fade = Math.pow(1 - life, 1.3); if (fade < 0.02) continue;
       const p = madd(sh.p0, sh.v, lc), tail = madd(p, sh.v, -Math.min(lc, 0.006));
       const col = lerpv([3.0, 1.0, 2.0], [1.8, 0.4, 1.7], life), fl = 0.8 + 0.2 * Math.sin(lc * 80 + sh.seed);   // (the ball's own magenta, cooling violet)
-      R.orb(p, sh.r * (1 - 0.4 * life), col, 1.6 * fade * fl, 400 + sh.seed);
-      R.beam(tail, p, sh.r * 0.55, [col[0] * fade * 0.6, col[1] * fade * 0.6, col[2] * fade * 0.6], 0.6, 3);   // its streak
+      // an irregular plasma lump: a torn, writhing head and a few smaller ragged pieces strung out behind it
+      R.orb(p, sh.r * 1.3 * (1 - 0.4 * life), col, 1.6 * fade * fl, 400 + sh.seed, 0.9);
+      for (let k = 1; k <= 3; k++) {
+        const q = madd(madd(p, sh.v, -0.0035 * k), randDir([0, 0, 0], sh.seed * 13 + k), sh.r * 0.5);
+        R.orb(q, sh.r * (1.0 - 0.22 * k) * (1 - 0.4 * life), col, 1.2 * fade * fl * (1 - 0.2 * k), 430 + sh.seed * 3 + k, 1.0);
+      }
+      R.beam(tail, p, sh.r * 0.4, [col[0] * fade * 0.4, col[1] * fade * 0.4, col[2] * fade * 0.4], 0.5, 2);   // a faint streak
     }
   }
 }

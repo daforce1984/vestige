@@ -11,7 +11,7 @@ const NO_RIM = new Set(['gundam', 'enemy_ms', 'mace', 'mech_hand']);
 const MAX_INST = 16384;
 const INST_FLOATS = 60;
 const MAX_SPRITES = 40000;
-const MAX_LIGHTS = 16;
+const MAX_LIGHTS = 15;   // (the 16th slot carries the beam blade: env.blade, for the melt where it touches)
 const FRAME_BYTES = 512 + 512;  // 3 mat4 + 20 vec4 + 32 light vec4
 const POST_FLOATS = 92;
 const BLOOM_LEVELS = 6;
@@ -532,7 +532,7 @@ export class Renderer {
   plume(nozzle, axis, halfW, col, intensity) { this.sprite(10, nozzle, axis, halfW, col, intensity); }
   flame(nozzle, axisLen, halfWidth, col, intensity, seed = 0, speed = 1) { this.sprite(7, nozzle, axisLen, [halfWidth, seed, speed, 0], col, intensity); }
   shield(p, radius, impactUV, flash, tear, hitAge, col, intensity, collapse = 0) { this.sprite(9, p, [radius, collapse, flash, 0], [impactUV[0], impactUV[1], tear, hitAge], col, intensity); }
-  orb(p, radius, col, intensity = 1, seed = 0) { this.sprite(15, p, [radius, 0, seed, 0], Z4, col, intensity); }   // energy sphere (a charge inside a bore)
+  orb(p, radius, col, intensity = 1, seed = 0, irregular = 0) { this.sprite(15, p, [radius, 0, seed, irregular], Z4, col, intensity); }   // energy sphere (a charge inside a bore)
   ripple(p, radius, col, strength) { this.sprite(8, p, [radius, 0, 0, 0], Z4, col, strength); }
   haze(p, radius, strength, seed = 0) { this.sprite(6, p, [radius, seed, 0, seed], Z4, Z4, strength); }
   hyperWindow(center, axU, axV, col, intensity) { this.sprite(5, center, axU, axV, col, intensity); }
@@ -683,6 +683,8 @@ export class Renderer {
       nl = MAX_LIGHTS;
     } else for (let i = 0; i < nl; i++) this._copyLight(i, this.lights[i]);
     f[72] = nl; f[73] = env.sunDisc ?? 0; f[74] = near; f[75] = far;
+    const bl = env.blade;   // the beam blade (world): hilt a, tip b, radius — whatever cut part it touches glows molten there
+    if (bl) { f[248] = bl.a[0]; f[249] = bl.a[1]; f[250] = bl.a[2]; f[251] = bl.r; f[252] = bl.b[0]; f[253] = bl.b[1]; f[254] = bl.b[2]; f[255] = 1; } else f[255] = 0;
     f[76] = env.nebula ?? 1; f[77] = env.stars ?? 1; f[78] = cam.fov / H; f[79] = env.warp ?? 0;
     const pl = env.planet;
     if (pl) { f[80] = pl.dir[0]; f[81] = pl.dir[1]; f[82] = pl.dir[2]; f[83] = env.planetInSky ? pl.radius : 0; f[84] = pl.col[0]; f[85] = pl.col[1]; f[86] = pl.col[2]; f[87] = pl.earth ? 1 : 0; }
