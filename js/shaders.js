@@ -355,12 +355,14 @@ struct VO {
 
 @vertex fn vs(@location(0) p: vec3f, @location(1) n: vec3f, @location(2) uv: vec2f, @builtin(instance_index) ii: u32) -> VO {
   let m = I[ii].m;
-  let w = vec4f(crushW((m * vec4f(p, 1.0)).xyz, I[ii]), 1.0);
+  var pp = p;
+  if (i32(I[ii].extra.x) == -3) { pp = p + normalize(p) * moonHeight(normalize(p)) * length(p); }   // the moon: its relief displaced
+  let w = vec4f(crushW((m * vec4f(pp, 1.0)).xyz, I[ii]), 1.0);
   var o: VO;
   o.pos = F.viewProj * w;
   o.wp = w.xyz;
   o.n = normalize((m * vec4f(n, 0.0)).xyz);
-  o.lp = p; o.ln = n; o.ii = ii; o.uv = uv;
+  o.lp = pp; o.ln = n; o.ii = ii; o.uv = uv;
   return o;
 }
 
@@ -432,38 +434,48 @@ fn basinH(d: f32) -> f32 {
   if (d < 1.0) {
     let wall = smoothstep(0.55, 1.0, d);
     h = mix(-0.75, 0.05, wall * wall)                                          // the bowl: a flat floor, a steep wall
-      + 0.035 * sin(d * 46.0) * smoothstep(0.6, 0.75, d) * (1.0 - smoothstep(0.93, 1.0, d))   // terraces
       + 0.32 * exp(-pow(d / 0.11, 2.0));                                       // central peak
   }
   return h + 0.45 * exp(-pow((d - 1.0) / 0.075, 2.0));                          // the raised rim
 }
+// THE MOON'S RELIEF as real geometry (2026-10-03): height (fraction of its radius) of the giant basin and the two coarsest
+// crater octaves — the vertex shader displaces the mesh by it, the fragment takes its normal from it (the same cells and
+// seed as moonCraters, so they line up with the finer bumped craters)
+fn moonHeight(q: vec3f) -> f32 {
+  let C0 = normalize(vec3f(0.35, 0.3, 0.89));
+  let bd = acos(clamp(dot(q, C0), -1.0, 1.0)) / 0.42;
+  var h = basinH(bd) * 0.06;
+  var cover = smoothstep(1.3, 1.05, bd);
+  var sc = 14.0;
+  for (var oc = 0; oc < 2; oc++) {
+    let p = q * sc; let fl = floor(p); let off = step(vec3f(0.5), p - fl) - 1.0;
+    var cov2 = 0.0; let keep = 1.0 - clamp(cover, 0.0, 1.0);
+    for (var k = 0; k < 8; k++) {
+      let c = fl + off + vec3f(f32(k & 1), f32((k >> 1) & 1), f32((k >> 2) & 1));
+      let r3 = hash33(c + 5.0 + f32(oc) * 17.0);
+      if (r3.z > 0.55) { continue; }
+      let ctr = c + 0.25 + r3 * 0.5;
+      let dmin = min(min(min(ctr.x - c.x, c.x + 1.0 - ctr.x), min(ctr.y - c.y, c.y + 1.0 - ctr.y)), min(ctr.z - c.z, c.z + 1.0 - ctr.z));
+      let rad = dmin / 1.3 * (0.4 + 0.6 * r3.y);
+      let d = length(p - ctr) / rad;
+      if (d < 1.3) {
+        h += keep * (select(0.0, (d * d - 1.0) * 0.6, d < 1.0) + 0.25 * exp(-pow((d - 1.0) / 0.18, 2.0))) * rad / sc * 0.9;
+        cov2 = max(cov2, keep * smoothstep(1.3, 1.05, d));
+      }
+    }
+    cover = max(cover, cov2); sc *= 2.35;
+  }
+  return h;
+}
 // craters on a unit sphere (3D cell noise), 4 octaves; each crater stays inside its own cell (no two of a size overlap)
 // and no smaller crater is made where a bigger one (or the basin) already is
-fn moonCraters(q: vec3f, seed: f32, pw: f32) -> MC {   // pw: the pixel's footprint on the unit sphere
+fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixel's footprint on the unit sphere; oc0: the first octave that bumps (the coarser ones are real displacement)
   var o: MC; o.g = vec3f(0.0); o.rim = 0.0; o.ray = 0.0; o.basin = 0.0;
   let C0 = normalize(vec3f(0.35, 0.3, 0.89)); let R0 = 0.42;
   let ca = clamp(dot(q, C0), -1.0, 1.0); let bd = acos(ca) / R0;
   if (bd < 3.4) {
-    let rad = normalize(q - C0 * ca + vec3f(1e-6));
-    let dh = (basinH(bd + 0.003) - basinH(bd - 0.003)) / 0.006;
-    o.g += dh * rad / R0 * 0.06;
-    o.rim += 1.3 * exp(-pow((bd - 1.0) / 0.06, 2.0)) + 0.35 * smoothstep(0.6, 0.75, bd) * (1.0 - smoothstep(0.93, 1.0, bd)) * (0.5 + 0.5 * sin(bd * 46.0));
-    o.basin = smoothstep(0.62, 0.45, bd);
-    let e1 = normalize(cross(C0, vec3f(0.0, 1.0, 0.0))); let e2 = cross(C0, e1);
-    let az = atan2(dot(q, e2), dot(q, e1));
-    // rays: irregular — each angular sector its own width, brightness and reach, two scales, frayed along their length
-    var rays = 0.0;
-    for (var rs = 0; rs < 2; rs++) {
-      let nseg = select(17.0, 41.0, rs == 1);
-      let a = (az / 6.2832 + 0.5) * nseg + f32(rs) * 0.37;
-      let sct = floor(a); let fr = fract(a) - 0.5;
-      let hh = hash33(vec3f(sct, f32(rs) * 7.0, 3.0));
-      let wdt = 0.06 + 0.22 * hh.x;
-      let reach = 1.25 + 2.2 * hh.y;
-      let fray = 0.6 + 0.4 * vnoise(vec3f(bd * 9.0, sct, 1.0));
-      rays += step(0.35, hh.z) * smoothstep(wdt, 0.0, abs(fr + (hh.y - 0.5) * 0.3 * bd)) * (1.0 - smoothstep(reach * 0.6, reach, bd)) * fray * select(1.0, 0.55, rs == 1);
-    }
-    o.ray += 1.2 * rays * smoothstep(1.03, 1.25, bd);
+    o.basin = smoothstep(0.62, 0.45, bd);   // (its shape is displaced geometry now — moonHeight; no rim lines)
+
   }
   var cover = smoothstep(1.3, 1.05, bd);                                        // (nothing smaller inside the basin)
   var sc = 14.0; var amp = 1.0;
@@ -483,9 +495,8 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32) -> MC {   // pw: the pixel's footpr
       if (d < 1.3 && d > 1e-4) {
         // height h(d) = (d²−1)·0.6 inside + 0.25·exp(−((d−1)/0.18)²); dh/dd, chain to p (× sc/rad per unit q)
         var dh = select(0.0, 1.2 * d, d < 1.0) - 0.25 * 2.0 * (d - 1.0) / (0.18 * 0.18) * exp(-pow((d - 1.0) / 0.18, 2.0));
-        o.g += keep * amp * dh * (dv / d) * (sc / rad) * 0.02;
-        o.rim += keep * amp * exp(-pow((d - 1.0) / 0.12, 2.0));
-        if (oc == 0 && r3.x > 0.8) { o.ray += keep * smoothstep(1.0, 1.25, d) * pow(abs(sin(atan2(dv.y, dv.x) * 9.0)), 6.0); }
+        if (oc >= oc0) { o.g += keep * amp * dh * (dv / d) * (sc / rad) * 0.02; }
+        o.rim += keep * amp * 0.35 * exp(-pow((d - 1.0) / 0.25, 2.0));   // (a soft lighter apron, not a line)
         cov2 = max(cov2, keep * smoothstep(1.3, 1.05, d));
       }
     }
@@ -875,13 +886,19 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     if (moonK > 0.5) {
       // procedural crater field (4 octaves) — bump from its gradient, bright rims, a few ray systems, dark maria
       let qs = normalize(q);
-      let c0 = moonCraters(qs, 5.0, pwLP / max(length(q), 1e-3));
+      let c0 = moonCraters(qs, 5.0, pwLP / max(length(q), 1e-3), 2);
+      // the displaced relief's own normal (finite differences of moonHeight on the sphere), then the finer craters' bump
+      let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
+      let eh = 0.0012; let h0 = moonHeight(qs);
+      let hx = (moonHeight(normalize(qs + t1 * eh)) - h0) / eh; let hy = (moonHeight(normalize(qs + t2 * eh)) - h0) / eh;
+      let nl = normalize(qs - t1 * hx - t2 * hy);
+      n = normalize((inst.m * vec4f(nl, 0.0)).xyz);
       var cg = (inst.m * vec4f(c0.g, 0.0)).xyz / max(length(inst.m[0].xyz), 1e-3);
       cg = cg - n * dot(cg, n);
       n = normalize(n - cg * 0.18);
       let mare = smoothstep(0.42, 0.62, fbm(qs * 1.6 + 11.0, 4));
       base *= mix(1.0, 0.55, mare);                                    // dark basaltic maria
-      base *= 1.0 + 0.35 * clamp(c0.rim, 0.0, 1.5) + 0.6 * clamp(c0.ray, 0.0, 1.0);   // bright fresh rims and ray ejecta
+      base *= 1.0 + 0.3 * clamp(c0.rim, 0.0, 1.0);                     // a lighter apron of fresh ejecta round young craters (no lines, no rays)
       base *= mix(1.0, 0.5, c0.basin);                                  // the giant basin's floor: dark, melt-filled
       base *= 0.92 + 0.16 * vnoise(qs * 900.0);                        // fine regolith grain
     }
