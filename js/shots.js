@@ -1059,6 +1059,18 @@ function cutPlanes(R) {
 }
 // the blade's first touch: from here the two halves are drawn in place (lt = 0) so the melt band runs along the real armour
 const CUT_SEAM_T = CUT_T - 0.012;
+// the blade going through (until CUT_SPLIT): a point on it and the way it moves through VANGUARD (relative to its torso,
+// square to the blade) — the cut melts open only behind that front (shader: plane-cut front), not all at once
+let _bfT = null, _bf = null;
+function bladeFront(t) {
+  if (t >= CUT_SPLIT) return null;
+  if (_bfT === t) return _bf;
+  const at = (x) => { const h = duelHero(x), e = duelEnemy2(x); if (!h || !e) return null; const H = duelFK({ ...h, saber: 1 }, 'gundam'), E = duelFK(e, 'enemy_ms'); return { p: madd(H.saber[0], H.saber[2], 6.5), d: H.saber[2], o: [E.torso[12], E.torso[13], E.torso[14]] }; };
+  const a = at(t), b = at(t + 0.002); _bfT = t;
+  if (!a || !b) return (_bf = null);
+  let v = V.sub([0, 0, 0], V.sub([0, 0, 0], b.p, a.p), V.sub([0, 0, 0], b.o, a.o)); v = madd(v, a.d, -V.dot(v, a.d));
+  return (_bf = V.len(v) > 1e-6 ? { p: a.p, v: V.norm([0, 0, 0], v) } : null);
+}
 function drawHalves(R, t, s) {
   const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, lt = s.cutK;
   const up = R.models.enemy_ms.parts, hideUp = {}, hideLo = {};
@@ -1080,7 +1092,19 @@ function drawHalves(R, t, s) {
     e.hidden = CP ? (half > 0 ? { shield: 1, rifle: 1, pelvis: 1, leg_L_upper: 1, leg_L_lower: 1, foot_L: 1, leg_R_upper: 1, leg_R_lower: 1, foot_R: 1 } : { shield: 1, rifle: 1 }) : hide;   // every part drawn in both halves, each clipped to its side of the blade's plane (the hips and legs, wholly below it, only in the lower)
     if (half < 0 || !CP) meltHole(e, 'enemy', t, 'leg_R_upper');   // (the melt hole replaces that part's clip: the lower half only)
     e.clipInv = false; e.clipHeat = -(0.5 + 1.6 * Math.exp(-lt * 1.0)) * (0.35 + 0.65 * sat((t - CUT_SEAM_T) / (CUT_SPLIT - CUT_SEAM_T)));   // the molten rim of the cut: thick, white-hot, cooling to red (shader band; w < 0: a clean beam cut)
-    if (CP) { e.clipParts = {}; for (const k in CP) e.clipParts[k] = half > 0 ? CP[k] : flip(CP[k]); }
+    if (CP) {
+      e.clipParts = {}; for (const k in CP) e.clipParts[k] = half > 0 ? CP[k] : flip(CP[k]);
+      const BF = bladeFront(t);
+      if (BF) for (const k in e.clipParts) {                         // melted only behind the blade (each part in its own frame)
+        const n = e.clipParts[k], W = R.partWorld('enemy_ms', e, k); if (!W) continue;
+        const inv = M.invert(M.new(), W), pl = M.transformPoint([0, 0, 0], inv, BF.p);
+        let vl = M.transformDir([0, 0, 0], inv, BF.v); vl = madd(vl, n, -V.dot(vl, n));
+        if (V.len(vl) < 1e-6) continue; vl = V.norm([0, 0, 0], vl);
+        const b1 = V.norm([0, 0, 0], V.cross([0, 0, 0], n, Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), b2 = V.cross([0, 0, 0], n, b1);
+        const ang = Math.atan2(V.dot(vl, b2), V.dot(vl, b1)), f = madd(V.scale([0, 0, 0], b1, Math.cos(ang)), b2, Math.sin(ang));
+        e.clipParts[k] = [n[0], n[1], n[2], n[3], ang, V.dot(pl, f)];
+      }
+    }
     else { const CA = cutArms(), box = (y) => (half > 0 ? [-30, y, -30, 30, 40, 30] : [-30, -40, -30, 30, y, 30]); e.clipParts = { torso: box(CUT_Y), arm_L_upper: box(CA.arm_L_upper), arm_R_upper: box(CA.arm_R_upper) }; }
   }
   if (t < HALF_BLAST.upper) R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));   // the molten cut glows

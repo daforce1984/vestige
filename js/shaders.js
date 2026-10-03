@@ -643,7 +643,18 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   if (inst.clipMin.w > 2.5) {
     let sd = dot(i.lp, inst.clipMin.xyz) - inst.clipMax.x;
     if (sd < 0.0) { discard; }
-    tornEdge = abs(inst.clipMax.w) * (exp(-sd / 0.2) + 0.3 * exp(-sd / 0.55));
+    var heat = abs(inst.clipMax.w);
+    if (inst.clipMax.z < 1.0e4) {
+      // the blade still going through (2026-10-03): only where it has already passed is melted — its front is a line in
+      // the cut plane (direction clipMax.y as an angle in the plane, offset clipMax.z); ahead of it the armour is whole,
+      // right at it the metal is white-hot
+      let n = inst.clipMin.xyz;
+      let b1 = normalize(cross(n, select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), abs(n.y) < 0.9)));
+      let b2 = cross(n, b1);
+      let fr = dot(i.lp, cos(inst.clipMax.y) * b1 + sin(inst.clipMax.y) * b2) - inst.clipMax.z;   // > 0: not reached yet
+      heat = heat * (1.0 - smoothstep(-0.1, 0.15, fr)) * (1.0 + 2.2 * exp(-abs(fr) / 0.5));
+    }
+    tornEdge = heat * (exp(-sd / 0.2) + 0.3 * exp(-sd / 0.55));
   }
   if (abs(inst.clipMin.w) > 0.5 && inst.clipMin.w < 1.5) {
     let span = inst.clipMax.xyz - inst.clipMin.xyz;
