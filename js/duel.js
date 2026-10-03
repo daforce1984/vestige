@@ -911,14 +911,23 @@ const HERO_AIM = (tw) => { let k = (tw >= HERO_SNAP1 ? 1 : 0) * (1 - smooth(190.
   return Math.min(1, k); };
 const MISS = [[0, 6], [6, 1], null, [-6, 4], [2, -6], [6, 3], null, [-7, 0], [5, -5], [-5, 5]];   // [side, up] (m) across the line of fire
 const SHIELD_C = [1.351, -2.337, 0.17];   // the centre of the shield's outer face, in its part frame (assets/enemy_ms.glb)
-function heroAimPoint(tw) {
-  let bi = 0; for (let i = 0; i < HERO_SHOTS.length; i++) if (Math.abs(tw - HERO_SHOTS[i]) < Math.abs(tw - HERO_SHOTS[bi])) bi = i;
+function heroAimAt(bi) {   // where shot bi is laid
   const ts = HERO_SHOTS[bi], es = enemyRaw_(ts + 0.02), fk = es ? duelFK(es, 'enemy_ms') : null;
   if (!fk) return add(enemyRawPos(ts), [0, 10, 0]);
   if (ts === BLOCK_T || ts === SHIELD_HIT_T) return partPoint(fk, 'shield', SHIELD_C);
   if (ts === THIGH_T) return partPoint(fk, 'leg_R_upper', THIGH_P);
   const c = partPoint(fk, 'torso', [0, 2.5, 0]), d = nrm(sub(c, heroRawPos(ts))), sd = nrm([d[2], 0, -d[0]]), upv = nrm(V.cross([0, 0, 0], sd, d)), m = MISS[bi] || [0, 0];
   return add(c, add(scl(sd, m[0]), scl(upv, m[1])));
+}
+const _aimAt = [];
+function heroAimPoint(tw) {
+  // held on the last shot's point, then swung onto the next one just before it (was: whichever shot was nearest — the
+  // aim, and with it the torso and arms, snapped across at the midpoint between two shots: 184.575, a 35° jerk)
+  const N = HERO_SHOTS.length, at = (i) => _aimAt[i] || (_aimAt[i] = heroAimAt(i));
+  let nx = HERO_SHOTS.findIndex((x) => x > tw); if (nx < 0) return at(N - 1);
+  if (nx === 0) return at(0);
+  const a = HERO_SHOTS[nx - 1], b = HERO_SHOTS[nx], ramp = Math.min(0.35, (b - a) * 0.6);
+  return lrp(at(nx - 1), at(nx), smooth(b - ramp, b - 0.03, tw));
 }
 
 // ============================================================================ state assembly
@@ -1765,13 +1774,34 @@ const SD_KEYS = [[SD_GRAB, SABER_MOUNT_P, SABER_MOUNT_D],
 const SH_KEYS = [[SD_HOLSTER0, [1.4, 0.4, 2.8], nrm([0.2, -0.3, 1])], [SD_HOLSTER, SABER_MOUNT_P, SABER_MOUNT_D]];
 export const hiltInHand = (tw) => tw >= SD_GRAB && tw < SD_HOLSTER;
 const saberBusy = (tw) => smooth(SD_REACH - 0.02, SD_REACH + 0.02, tw) * (1 - smooth(SD_HOLSTER + 0.02, SD_HOLSTER + 0.12, tw));
+// rotations as quaternions (3×3 column bases [x | y | z])
+const qFromCols = (m) => {
+  const [m00, m10, m20, m01, m11, m21, m02, m12, m22] = m, tr = m00 + m11 + m22;
+  if (tr > 0) { const q = Math.sqrt(tr + 1) * 2; return [(m21 - m12) / q, (m02 - m20) / q, (m10 - m01) / q, 0.25 * q]; }
+  if (m00 > m11 && m00 > m22) { const q = Math.sqrt(1 + m00 - m11 - m22) * 2; return [0.25 * q, (m01 + m10) / q, (m02 + m20) / q, (m21 - m12) / q]; }
+  if (m11 > m22) { const q = Math.sqrt(1 + m11 - m00 - m22) * 2; return [(m01 + m10) / q, 0.25 * q, (m12 + m21) / q, (m02 - m20) / q]; }
+  const q = Math.sqrt(1 + m22 - m00 - m11) * 2; return [(m02 + m20) / q, (m12 + m21) / q, 0.25 * q, (m10 - m01) / q];
+};
+const colsFromQ = ([x, y, z, w]) => [1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w), 2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w), 2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)];
+const hiltLocal = (D) => { const d = nrm(D), upv = nrm(sub([0, 0, 1], scl(d, d[2]))), xv = V.cross([0, 0, 0], upv, d); return [...xv, ...upv, ...d]; };   // the hand's frame for a blade direction (torso-local)
+// a hilt track through its keys WITHOUT stopping at them (was: smoothstep per segment — the hand came to a dead stop at
+// every key, the move read as jerky): position on a Hermite spline (Catmull-Rom tangents, at rest only at the two ends),
+// the hand's rotation slerped between the keys' frames (re-deriving it from the blade direction flipped the wrist over
+// whenever the blade swung through 'straight ahead')
 function keyPose(K, tw) {
-  let i = 0; while (i < K.length - 2 && tw > K[i + 1][0]) i++;
-  const a = K[i], b = K[i + 1], u = sat((tw - a[0]) / (b[0] - a[0])), e = u * u * (3 - 2 * u);
-  return { P: lrp(a[1], b[1], e), D: nrm(lrp(a[2], b[2], e)) };
+  const n = K.length - 1; let i = 0; while (i < n - 1 && tw > K[i + 1][0]) i++;
+  const a = K[i], b = K[i + 1], u = sat((tw - a[0]) / (b[0] - a[0])), dt = b[0] - a[0];
+  const pm = K[Math.max(0, i - 1)], pp = K[Math.min(n, i + 2)];
+  const m1 = i === 0 ? [0, 0, 0] : scl(sub(b[1], pm[1]), dt / (b[0] - pm[0])), m2 = i + 1 === n ? [0, 0, 0] : scl(sub(pp[1], a[1]), dt / (pp[0] - a[0]));
+  const u2 = u * u, u3 = u2 * u, P = add(add(scl(a[1], 2 * u3 - 3 * u2 + 1), scl(m1, u3 - 2 * u2 + u)), add(scl(b[1], -2 * u3 + 3 * u2), scl(m2, u3 - u2)));
+  const e = n === 1 ? u * u * (3 - 2 * u) : i === 0 ? u * u : i === n - 1 ? 1 - (1 - u) * (1 - u) : u;
+  const R = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(hiltLocal(a[2])), qFromCols(hiltLocal(b[2])), e));
+  return { P, R, D: R.slice(6, 9) };
 }
-function hiltFrame(fk, P, D) {   // hilt world position + hand rotation for a torso-local hilt pose
-  const T = r3(fk.torso), p = M.transformPoint([0, 0, 0], fk.torso, P), d = nrm(r3v(T, D)), u0 = r3v(T, [0, 0, 1]);
+function hiltFrame(fk, P, D, R) {   // hilt world position + hand rotation for a torso-local hilt pose (R: its torso-local frame)
+  const T = r3(fk.torso), p = M.transformPoint([0, 0, 0], fk.torso, P);
+  if (R) { const xv = r3v(T, R.slice(0, 3)), upv = r3v(T, R.slice(3, 6)), d = r3v(T, R.slice(6, 9)); return { p, d, Hw: [...xv, ...upv, ...d] }; }
+  const d = nrm(r3v(T, D)), u0 = r3v(T, [0, 0, 1]);
   const upv = nrm(sub(u0, scl(d, V.dot(u0, d)))), xv = V.cross([0, 0, 0], upv, d);
   return { p, d, Hw: [...xv, ...upv, ...d] };
 }
@@ -1782,22 +1812,28 @@ function saberDrawIK(s, tw) {   // the left hand: to the hip, rip it out, overhe
   const kp = wD >= wH ? keyPose(SD_KEYS, Math.max(tw, SD_GRAB)) : keyPose(SH_KEYS, tw);
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
-  const fk = duelFK(s, 'gundam'), F = hiltFrame(fk, kp.P, kp.D);
+  const fk = duelFK(s, 'gundam'), F = hiltFrame(fk, kp.P, kp.D, kp.R);
   armIK(s, fk, 'gundam', 'L', sub(F.p, r3v(F.Hw, [0, -1.2, 0.6])), F.Hw);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
 function saberRightGrip(s, tw) {   // the right hand joins below the left once the rifle is gone: a two-handed grip for the cut
-  const k = smooth(SD_OUT + 0.02, SD_GUARD - 0.01, tw) * (1 - smooth(TRANS_PASS + 0.1, TRANS_PASS + 0.2, tw)); if (k <= 0) return;
+  const k = smooth(THROW0 + 0.07, SD_GUARD - 0.005, tw)   // (from the end of the throw's follow-through: the long way up to the hilt, not in a twentieth of a second)
+    * (1 - smooth(TRANS_PASS + 0.1, TRANS_PASS + 0.2, tw)); if (k <= 0) return;
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const fk = duelFK(s, 'gundam'), hm = fk.hand_L, d = nrm(M.transformDir([0, 0, 0], hm, [0, 0, 1])), Hw = r3(hm);
   const hiltL = M.transformPoint([0, 0, 0], hm, [0, -1.2, 0.6]), hiltR = sub(hiltL, scl(d, 1.7));
-  armIK(s, fk, 'gundam', 'R', sub(hiltR, r3v(Hw, [0, -1.2, 0.6])), Hw);
-  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+  if (k >= 0.999) { armIK(s, fk, 'gundam', 'R', sub(hiltR, r3v(Hw, [0, -1.2, 0.6])), Hw); return; }
+  // on the way: the hand's own path from where it is to the grip (position lerped, rotation slerped) — lerping the joint
+  // angles instead swung the wrist through 120° in a frame and twisted the shoulder open
+  const P0 = M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]), R0 = nrmCols(r3(fk.hand_R)), ke = k * k * (3 - 2 * k);
+  const R = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(R0), qFromCols(nrmCols(Hw)), ke));
+  armIK(s, fk, 'gundam', 'R', lrp(P0, sub(hiltR, r3v(Hw, [0, -1.2, 0.6])), ke), R);
 }
+const nrmCols = (m) => { const o = m.slice(); for (let c = 0; c < 3; c++) { const l = Math.hypot(o[3 * c], o[3 * c + 1], o[3 * c + 2]) || 1; for (let r = 0; r < 3; r++) o[3 * c + r] /= l; } return o; };
 function throwFling(s, tw) {   // the right arm: wound in across his chest, then flung out straight to his right, arm at full stretch — the rifle leaves at THROW0
   if (tw < THROW0 - 0.07 || tw > THROW0 + 0.17) return;
-  const wind = smooth(THROW0 - 0.07, THROW0 - 0.025, tw), out = smooth(THROW0 - 0.025, THROW0 + 0.004, tw), rel = smooth(THROW0 + 0.08, THROW0 + 0.17, tw), k = wind * (1 - rel);
+  const wind = smooth(THROW0 - 0.07, THROW0 - 0.035, tw), out = smooth(THROW0 - 0.035, THROW0 + 0.006, tw), rel = smooth(THROW0 + 0.08, THROW0 + 0.17, tw), k = wind * (1 - rel);
   if (k <= 0) return;
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
@@ -1806,7 +1842,8 @@ function throwFling(s, tw) {   // the right arm: wound in across his chest, then
   const S = M.transformPoint([0, 0, 0], fk.torso, sub(pv.arm_R_upper, pv.torso)), L = V.dist(pv.arm_R_lower, pv.arm_R_upper) + V.dist(pv.hand_R, pv.arm_R_lower);
   const W = add(S, scl(nrm(add(add(scl(rt, -0.2), scl(fw, 1.0)), scl(upv, -0.1))), 0.6 * L));   // wound in, in front of him (not across the chest: the rifle would go through it)
   const O = add(S, scl(nrm(add(add(rt, scl(fw, 0.2)), scl(upv, 0.12))), 1.1 * L));             // flung out: the arm dead straight, out to his right
-  const P = lrp(W, O, out), o = nrm(sub(P, S)), y = scl(o, -1), z = nrm(sub(fw, scl(o, V.dot(fw, o)))), x = V.cross([0, 0, 0], y, z);
+  const P = add(S, scl(nrm(lrp(nrm(sub(W, S)), nrm(sub(O, S)), out)), lerp(0.6, 1.1, out) * L)), o = nrm(sub(P, S)),   // (round an arc about the shoulder: straight across, the hand passed close by it and the elbow flipped)
+  y = scl(o, -1), zr = nrm(lrp(upv, fw, out)), z = nrm(sub(zr, scl(o, V.dot(zr, o)))), x = V.cross([0, 0, 0], y, z);   // (the hand's Z reference turns from up (wound in: the arm points forward, so 'forward' was degenerate and the hand flipped over) to forward (flung out))
   armIK(s, fk, 'gundam', 'R', P, [...x, ...y, ...z]);
   for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
 }
