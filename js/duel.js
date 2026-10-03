@@ -566,7 +566,7 @@ export function circusOffset(t) {
   // ONE WAY: he breaks off to his side and keeps running that way, accelerating (~520 m out by the end), a slow rise and
   // fall on it and small jinks; the one take ends on him out there and the cut (D22) hides his return to his mark
   const g = Math.pow(sat((c - 0.35) / (CIRCUS_END - 0.35)), 1.3), jk = smooth(0.35, 1.2, c);
-  const x = 1040 * g + 14 * Math.sin(2.6 * c) * jk, y = 160 * Math.sin(Math.PI * g) + 9 * Math.sin(3.3 * c + 1) * jk, z = 0;   // (twice the speed: ~1 km out by the end)
+  const x = 1900 * g + 22 * Math.sin(3.4 * c) * jk, y = 220 * Math.sin(Math.PI * g) + 14 * Math.sin(4.1 * c + 1) * jk, z = 0;   // (2026-10-03: faster again — ~1.9 km out by the end, sharper jinks)
   return add(add(scl(sd, x), [0, y, 0]), scl(f, z));
 }
 // after the run: no snap back to his mark — the run's offset and speed carry on through the cut (D21d → D22) and bleed
@@ -1022,7 +1022,17 @@ function transLunge(tw) {
   else x = (D1 + vp * T / 2) * (1 - smooth(b, c, tw));
   return scl(_lungeDir, x);
 }
-const heroRawPos = (tw) => add(tw > CIRCUS_C0 - 0.1 && tw < CUT_T ? add(add(heroPos0(tw), circusOffset(tw)), circusResidual(tw)) : heroPos0(tw), transLunge(tw));   // (+ the Itano-circus run, and its momentum carried on into the dash)
+// THE CATCH → BOOST DASH: the rifle back in his hand, he hits the boosters and bolts on along his run — a hard burst
+// (~90 m ahead of his mark in half a second), held through the fly-by, then let go so his own run catches up (he coasts)
+const CD_D = 90, CD_T = 0.5, CD_HOLD = 186.4, CD_END = 188.2;
+let _cdDir = null;
+function catchDash(tw) {
+  if (tw <= CATCH_T || tw >= CD_END) return [0, 0, 0];
+  if (!_cdDir) _cdDir = nrm(flat(sub(heroPos0(CATCH_T + 0.05), heroPos0(CATCH_T - 0.05)), 0));
+  const u = sat((tw - CATCH_T) / CD_T), x = CD_D * (1 - Math.pow(1 - u, 3)) * smooth(0, 0.12, u) * (1 - smooth(CD_HOLD, CD_END, tw));
+  return scl(_cdDir, x);
+}
+const heroRawPos = (tw) => add(add(tw > CIRCUS_C0 - 0.1 && tw < CUT_T ? add(add(heroPos0(tw), circusOffset(tw)), circusResidual(tw)) : heroPos0(tw), transLunge(tw)), catchDash(tw));   // (+ the Itano-circus run, and its momentum carried on into the dash)
 function enemyRawPos(tw) {
   if (tw < SERAPH_HANDOFF) { const c = circ(tw); return add(add(add(e1Pos(tw), hover(tw, 7.1, 0)), [CIRC_AX[0] * 6 * c, -0.8 * c, CIRC_AX[2] * 6 * c]), add(transShove(tw), strafe(tw, -1))); }
   return add(add(e2Pos(tw), transShove(tw)), strafe(tw, -1));
@@ -1188,8 +1198,9 @@ function duelHero_(t) {
   s.saberPow = s.saberL ? 2 : 1;                                     // full output against the charged shot: twice as thick
   s.sande = Math.max(sat((tw - SANDE0 + 0.05) / 0.1) * (1 - smooth(CUT_T - 0.05, CUT_T - 0.025, tw)), transGhost(tw));
   s.ghostFrom = tw < SANDE0 - 0.1 ? TRANS_PASS - 0.1 : SANDE0 - 0.02;   // afterimages (shots.js); gone for the close-up of the cut
-  s.boost = Math.max(heroBoost(tw), ck);
-  s.blurTrail = cc > 0 && cc < CIRCUS_END + 0.6 ? smooth(0.2, 0.8, cc) * (1 - smooth(CIRCUS_END, CIRCUS_END + 0.6, cc)) : 0;   // boosting through the circus: a short motion-blur smear behind him (shots.js)
+  s.boost = Math.max(heroBoost(tw), ck, 1.6 * smooth(CATCH_T, CATCH_T + 0.05, tw) * (1 - smooth(CATCH_T + 0.45, CD_HOLD, tw)));   // (the catch dash: boosters flat out)
+  s.blurTrail = cc > 0 && cc < CIRCUS_END + 0.6 ? smooth(0.2, 0.8, cc) * (1 - smooth(CIRCUS_END, CIRCUS_END + 0.6, cc)) : 0;
+  if (tw > CATCH_T && tw < CD_HOLD + 0.4) s.blurTrail = Math.max(s.blurTrail, smooth(CATCH_T + 0.03, CATCH_T + 0.12, tw) * (1 - smooth(CATCH_T + 0.5, CD_HOLD + 0.4, tw)));   // the dash after the catch: the same boost smear   // boosting through the circus: a short motion-blur smear behind him (shots.js)
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
   { if (tw >= HERO_GRAB - 0.3 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); catchReach(s, tw); heroLeft(s, tw); transTwist(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
@@ -2137,9 +2148,9 @@ export const DUEL_CAMS = [
   // then rides him the whole run (the operator a beat behind), the missiles bursting along the line he's just left
   { t0: 190.7, t1: circusStory(CIRCUS_B1), name: 'D21 the Itano circus, one take — long lens from far off, tracking him through the swarm', slowmo: true, fn: (t, u) => {
       const c = circusClock(t), H0 = hp(190.9), E0 = ep(190.9), f = nrm(flat(sub(E0, H0), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
-      const H = up(hp(t), 8), Hl = up(hp(circusStory(Math.max(0, c - 0.35))), 8);   // (the operator a good third of a second behind him)
-      const Hc = up(hp(circusStory(Math.max(0, c - 0.6))), 8), pos = add(add(H0, chaseAxes().camOff), scl(sub(Hc, H0), 0.55));   // the camera itself dragged along after him, well behind   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
-      const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(1.0, 2.2, c), tgt = lrp(up(E0, 6), lrp(Hl, H, 0.25), onHim);   // barely keeping up with him: he pulls toward the edge of frame   // (leading him: room ahead on the left)
+      const H = up(hp(t), 8), Hl = up(hp(circusStory(Math.max(0, c - 0.2))), 8);   // (the operator a good third of a second behind him)
+      const Hc = up(hp(circusStory(Math.max(0, c - 0.45))), 8), pos = add(add(H0, chaseAxes().camOff), scl(sub(Hc, H0), 0.7));   // (2026-10-03: he runs faster — the camera keeps closer behind so he stays in frame)   // the camera itself dragged along after him, well behind   // high up on its side of him, looking back down at him: it (and the stream of missiles leaving it) stays out of the long lens; only the ones closing on him come in
+      const vRun = nrm(add(sub(H, Hl), [1e-4, 0, 0])), onHim = smooth(1.0, 2.2, c), tgt = lrp(up(E0, 6), lrp(Hl, H, 0.55), onHim);   // barely keeping up with him: he pulls toward the edge of frame   // (leading him: room ahead on the left)
       const fov = lerp(38, 16, smooth(1.4, 2.6, c)) + 1.5 * Math.sin(c * 0.9) * smooth(2, 3, c);   // pulled well back
       return { pos, target: tgt, fov, handheld: 0.12, baseShake: 0.04 }; } },   // (a rougher hand: the operator straining after him)
   // … and the back half cut up: on his tail, then head-on as he comes at the lens with it all behind him, then wide
