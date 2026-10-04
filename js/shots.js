@@ -798,8 +798,8 @@ export function drawGundam(R, t, s, opts = {}) {
     const cp = M.transformPoint([0, 0, 0], R.partWorld('gundam', e, 'torso'), [0.03, 3.14, 2.7]);
     R.glow(cp, 1.9, [cc[0] * 0.35, cc[1] * 0.35, cc[2] * 0.35], 0.45);
   }
-  // exhaust history never reaches back across a scene cut where his path jumps (340: the drift → the bay approach)
-  const pastHero = opts.pastState || ((tau) => { const q = gundamState(t >= 340 && t - tau < 340 ? 340 : t - tau); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
+  // exhaust history never reaches back across a scene cut where his path jumps (340: the drift → the bay approach; 163: scene 30's run turned onto VANGUARD)
+  const pastHero = opts.pastState || ((tau) => { const cutAt = t >= 340 ? 340 : t >= 163 && t < 170 ? 163 : -1e9, q = gundamState(Math.max(t - tau, cutAt)); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
   const bk = s.boostK ?? (inDuel ? sat((s.boost - 0.62) / 0.38) : 0);   // duel quick-boosts: the nozzles flare
   if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.9, 1.2, 2.6], (inDuel ? 1.3 : 0.9) * (1 + 0.9 * bk), s.thr, (inDuel ? 2.4 : 1.2) + 2.2 * bk, s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
