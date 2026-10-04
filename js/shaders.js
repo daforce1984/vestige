@@ -303,14 +303,14 @@ struct MC { g: vec3f, rim: f32, ray: f32, basin: f32, pit: f32 };
 // ejecta blanket that thins away outside; depth ≈ 1, rim ≈ +0.25 (2026-10-03)
 fn craterProf(d: f32) -> f32 {
   let crest = 0.06 * exp(-abs(d - 1.0) / 0.045);                               // a sharp but LOW crest (craters are holes, not raised rings)
-  if (d < 1.0) { return -1.0 + 1.06 * pow(smoothstep(0.3, 1.0, d), 2.6) + crest; }   // (the wall steepest just under the rim)
+  if (d < 1.0) { return -1.0 + 1.06 * pow(smoothstep(0.6, 1.0, d), 1.6) + crest; }   // (a broad flat floor and a steep wall)
   return 0.06 * exp(-(d - 1.0) / 0.3) + crest;
 }
 fn basinH(d: f32) -> f32 {
   var h = 0.03 * exp(-max(d - 1.0, 0.0) / 0.45) * step(1.0, d);               // ejecta blanket (low)
   if (d < 1.0) {
-    let wall = smoothstep(0.55, 1.0, d);
-    h = mix(-0.75, 0.03, pow(wall, 2.6))                                      // the bowl: a flat floor, the wall steepest under the rim (meets the blanket: no step)
+    let wall = smoothstep(0.78, 1.0, d);
+    h = mix(-0.75, 0.03, pow(wall, 1.5))                                      // the bowl: a flat floor, the wall steepest under the rim (meets the blanket: no step)
       + 0.32 * exp(-pow(d / 0.11, 2.0));                                       // central peak
   }
   return h + 0.12 * exp(-abs(d - 1.0) / 0.035);                               // the rim: a sharp, low crest
@@ -327,7 +327,7 @@ fn basinD(q: vec3f) -> f32 {   // the basin's distance measure, its outline torn
 fn moonHN(q: vec3f) -> f32 {
   let bd = basinD(q);
   let rubble = exp(-pow((bd - 1.0) / 0.35, 2.0));
-  return moonHeight(q) + 0.0016 * (fbm(q * 70.0, 3) - 0.5) + 0.0009 * (1.0 + 2.0 * rubble) * (vnoise(q * 260.0) - 0.5);
+  return moonHeight(q) + 0.0007 * (fbm(q * 40.0, 3) - 0.5) + 0.00035 * (1.0 + 3.0 * rubble) * (vnoise(q * 180.0) - 0.5);   // (gentle: the pores read as bread)
 }
 fn moonHeight(q: vec3f) -> f32 {
   let bd = basinD(q);
@@ -341,7 +341,7 @@ fn moonHeight(q: vec3f) -> f32 {
     for (var k = 0; k < 8; k++) {
       let c = fl + off + vec3f(f32(k & 1), f32((k >> 1) & 1), f32((k >> 2) & 1));
       let r3 = hash33(c + 5.0 + f32(oc) * 17.0);
-      if (r3.z > 0.55) { continue; }
+      if (r3.z > 0.75) { continue; }   // (three cells in four hold a crater: a densely cratered surface, still none overlapping)
       let ctr = c + 0.25 + r3 * 0.5;
       let dmin = min(min(min(ctr.x - c.x, c.x + 1.0 - ctr.x), min(ctr.y - c.y, c.y + 1.0 - ctr.y)), min(ctr.z - c.z, c.z + 1.0 - ctr.z));
       let rad = dmin / 1.3 * (0.4 + 0.6 * r3.y);
@@ -374,7 +374,7 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixe
     for (var k = 0; k < 8; k++) {
       let c = fl + off + vec3f(f32(k & 1), f32((k >> 1) & 1), f32((k >> 2) & 1));
       let r3 = hash33(c + seed + f32(oc) * 17.0);
-      if (r3.z > 0.55) { continue; }
+      if (r3.z > 0.75) { continue; }   // (three cells in four hold a crater: a densely cratered surface, still none overlapping)
       let ctr = c + 0.25 + r3 * 0.5;
       let dmin = min(min(min(ctr.x - c.x, c.x + 1.0 - ctr.x), min(ctr.y - c.y, c.y + 1.0 - ctr.y)), min(ctr.z - c.z, c.z + 1.0 - ctr.z));
       let rad = dmin / 1.3 * (0.4 + 0.6 * r3.y);                      // (it and its rim fit inside its own cell)
@@ -418,7 +418,7 @@ struct BU { a: vec4f };   // x: the moon's radius (model units), y: its seed, z:
   base += vec3f(0.025) * smoothstep(0.85, 0.92, vnoise(q * 70.0 + seed));
   base = base * 2.3 + vec3f(0.02);
   let c0 = moonCraters(qs, 5.0, U.a.z, 2);
-  base *= mix(1.0, 0.55, smoothstep(0.42, 0.62, fbm(qs * 1.6 + 11.0, 4)));
+  base *= mix(1.15, 0.42, smoothstep(0.45, 0.58, fbm(qs * 1.6 + 11.0, 4)));   // bright highlands, dark maria with crisp shores
   base *= 1.0 + 0.3 * clamp(c0.rim, 0.0, 1.0);
   base *= mix(1.0, 0.5, c0.basin);
   base *= 1.0 - 0.42 * c0.pit;                                                // crater bowls hold shadow (they read as holes whatever the light)
@@ -926,9 +926,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let mu = vec2f(atan2(qs.z, qs.x) / 6.2831853 + 0.5, acos(clamp(qs.y, -1.0, 1.0)) / 3.14159265);
     let mt = textureSampleLevel(texMoon, texSmp, mu, 0.0);
     let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
-    let gn = vnoise(qs * 2600.0) - 0.5;                                // (a live micro bump: grit under the baked detail)
-    n = normalize((inst.m * vec4f(normalize(qs + t1 * (mt.r + gn * 0.05) + t2 * (mt.g - gn * 0.04)), 0.0)).xyz);
-    base = mt.b * vec3f(1.06, 1.0, 0.93) * (0.92 + 0.16 * vnoise(qs * 900.0));
+    n = normalize((inst.m * vec4f(normalize(qs + t1 * mt.r + t2 * mt.g), 0.0)).xyz);
+    base = mt.b * vec3f(1.06, 1.0, 0.93) * (0.97 + 0.06 * vnoise(qs * 900.0));
     rough = 0.93; metal = 0.0; texAO = 1.0;
   } else if (texSet == -1) {
     let moonK = 0.0;
@@ -1067,8 +1066,12 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   let G = (ndl / (ndl * (1.0 - kq) + kq)) * (ndv / (ndv * (1.0 - kq) + kq));
   let Fh = F0 + (1.0 - F0) * pow(1.0 - max(dot(H, V), 0.0), 5.0);
   let specG = D * G * Fh / max(4.0 * ndl * ndv, 1e-3);
-  var col = F.sunCol.rgb * sh * ndl * (diffC / 3.14159 * 2.6 + min(specG, vec3f(40.0)));
-  let amb = mix(F.ambDown.rgb, F.ambUp.rgb, n.y * 0.5 + 0.5) * F.sunCol.w;
+  // THE MOON's photometry (2026-10-04): Lommel–Seeliger — flat to the limb, no soft roll-off — and almost no fill: shadows
+  // fall black as they do in space (the generic diffuse + strong sky fill made it look soft and doughy)
+  let lunar = texSet == -3;
+  let lsd = select(ndl, 2.0 * ndl / max(ndl + ndv, 1e-3), lunar);
+  var col = F.sunCol.rgb * sh * lsd * (diffC / 3.14159 * 2.6 + min(specG, vec3f(40.0)) * select(1.0, 0.0, lunar));
+  let amb = mix(F.ambDown.rgb, F.ambUp.rgb, n.y * 0.5 + 0.5) * F.sunCol.w * select(1.0, 0.3, lunar);
   col += (diffC + F0 * 0.3) * amb * ao * texAO;
   // environment reflection with a brushed-metal streak (anisotropic look along the hull's long axis)
   let Rv = reflect(-V, n);
@@ -1089,7 +1092,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let G2 = (ndl2 / (ndl2 * (1.0 - kq) + kq)) * (ndv / (ndv * (1.0 - kq) + kq));
     let Fh2 = F0 + (1.0 - F0) * pow(1.0 - max(dot(H2, V), 0.0), 5.0);
     let spec2 = D2 * G2 * Fh2 / max(4.0 * ndl2 * ndv, 1e-3);
-    col += F.fill.rgb * ndl2 * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0))) * mix(0.6, 1.0, ao * texAO);
+    col += F.fill.rgb * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
   }
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;
