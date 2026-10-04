@@ -3,7 +3,7 @@ Each is re-posed into its hand's rifle frame (origin at the pistol grip, scaled 
 material, and its textures packed into one atlas pair:
   assets/tex/<name>_albedo.png  RGB albedo, A = emissive mask (glows in the shader)
   assets/tex/<name>_orm.png     R = AO, G = roughness, B = metal (glTF metallic-roughness channels)
-usage: uv run --with pygltflib --with numpy --with pillow tools/build_rifles.py
+usage: uv run --with pygltflib --with numpy --with pillow tools/build_rifles.py [name ...]
 The user-supplied source models live in assets/src/ (not in the repository: their licences don't allow redistributing
 them as they are — see assets/THIRD_PARTY_MODELS.md)."""
 import os, sys, numpy as np
@@ -14,7 +14,9 @@ from glbload import load, image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 A = lambda p: os.path.join(ROOT, 'assets', p)
 
+ONLY = sys.argv[1:]   # (names given: build only those)
 def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, skip=(), empties=None, tex=True):
+    if ONLY and name not in ONLY: return
     prims, g, blob = load(A(src))
     prims = [p for p in prims if g.materials[p['mat']].name not in skip]
     texOf = lambda m: g.materials[m].pbrMetallicRoughness.baseColorTexture.index
@@ -98,3 +100,11 @@ build('src/aquamarine_dec.glb', 'dreadnought_game', np.array([0, 18.6, 17.6]), n
 build('src/light_fighter_lod.glb', 'light_fighter_game_lod', np.array([0, 1.4, 0]), np.eye(3), 0.75, 1024, emis_tex, engines=[(-0.58, 1.8, -5.58, 0.12), (0.58, 1.8, -5.58, 0.12)], tex=False)
 build('src/aquamarine_lod.glb', 'dreadnought_game_lod', np.array([0, 18.6, 17.6]), np.eye(3), 2.53, 768, emis_tex,
       engines=[(x, y, z, r) for (x, y, z, r) in _N], wrap=True, skip=('lambert1',), empties={'lance_emitter': (0, 11.25, 103.6)}, tex=False)
+# the enemy frigates (every enemy_frigate): assets/src/cargo_spaceship.glb (user-supplied; blaice, CC BY 4.0), bow −z → turned
+# to +z, centred, ×0.0035 to the old frigate's length (57.7 m); its three texture sets in one 3×1 atlas, engine discs in its
+# two big rear nacelles. Decimated (blender/decimate_glb.py) 184k → 37.6k (near) / 10.3k (_lod, past 3× its length) /
+# 6.6k triangles (_far, past 12×), all on the one atlas
+_CG, _CR, _CE = np.array([24, -1218, 6248]), np.diag([-1., 1., -1.]), [(x, -2200, 14400, 850) for x in (3500, -3500)]
+build('src/cargo_dec.glb', 'cargo_game', _CG, _CR, 0.0035, 1024, emis_tex, engines=_CE)
+build('src/cargo_lod.glb', 'cargo_game_lod', _CG, _CR, 0.0035, 1024, emis_tex, engines=_CE, tex=False)
+build('src/cargo_far.glb', 'cargo_game_far', _CG, _CR, 0.0035, 1024, emis_tex, engines=_CE, tex=False)

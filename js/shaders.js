@@ -482,6 +482,8 @@ fn crushW(w: vec3f, inst: Inst) -> vec3f {
 @group(0) @binding(16) var texM6: texture_2d<f32>;
 @group(0) @binding(17) var texA7: texture_2d<f32>;   // the enemy dreadnought (a 3×3 atlas of tiling cells: cell index in uv.y / 10)
 @group(0) @binding(18) var texM7: texture_2d<f32>;
+@group(0) @binding(20) var texA8: texture_2d<f32>;   // the enemy frigates (cargo_game)
+@group(0) @binding(21) var texM8: texture_2d<f32>;
 @group(0) @binding(19) var texMoon: texture_2d<f32>;   // the moon, baked once (equirect: normal slopes rg, albedo b, height a) — MOONBAKE
 
 struct VO {
@@ -829,6 +831,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   let tA4 = textureSample(texA4, texSmp, i.uv); let tM4 = textureSample(texM4, texSmp, i.uv);
   let tA5 = textureSample(texA5, texSmp, i.uv); let tM5 = textureSample(texM5, texSmp, i.uv);
   let tA6 = textureSample(texA6, texSmp, i.uv); let tM6 = textureSample(texM6, texSmp, i.uv);
+  let tA8 = textureSample(texA8, texSmp, i.uv); let tM8 = textureSample(texM8, texSmp, i.uv);
   let cell7 = floor(i.uv.y / 10.0); let uv7 = (vec2f(cell7 % 3.0, floor(cell7 / 3.0)) + 0.004 + 0.992 * fract(vec2f(i.uv.x, i.uv.y - cell7 * 10.0))) / 3.0;   // (wrapped inside its cell)
   let tA7 = textureSampleGrad(texA7, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0); let tM7 = textureSampleGrad(texM7, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0);
   let faceN = normalize(cross(dpdx(i.wp), dpdy(i.wp)));           // facet normal for crumpled metal
@@ -853,9 +856,9 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   var texGlow = vec3f(0.0);
   if (texSet > 0 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01) {
     var ta = select(tA2, tA1, texSet == 1); var tm = select(tM2, tM1, texSet == 1);
-    if (texSet == 3) { ta = tA3; tm = tM3; } else if (texSet == 4) { ta = tA4; tm = tM4; } else if (texSet == 5) { ta = tA5; tm = tM5; } else if (texSet == 6) { ta = tA6; tm = tM6; } else if (texSet == 7) { ta = tA7; tm = tM7; }
+    if (texSet == 3) { ta = tA3; tm = tM3; } else if (texSet == 4) { ta = tA4; tm = tM4; } else if (texSet == 5) { ta = tA5; tm = tM5; } else if (texSet == 6) { ta = tA6; tm = tM6; } else if (texSet == 7) { ta = tA7; tm = tM7; } else if (texSet == 8) { ta = tA8; tm = tM8; }
     base = pow(ta.rgb, vec3f(2.2)); texAO = tm.r; rough = tm.g; metal = tm.b;
-    if (texSet >= 3) { texGlow = pow(ta.rgb, vec3f(2.2)) * ta.a * select(14.0, 3.0, texSet == 7) * inst.p1.z; }   // the emissive inlays, bright (the dreadnought's toned down; all follow the entry's emissive, 0 once it is wrecked)
+    if (texSet >= 3) { texGlow = pow(ta.rgb, vec3f(2.2)) * ta.a * select(select(14.0, 3.0, texSet == 7), 6.0, texSet == 8) * inst.p1.z; }   // the emissive inlays, bright (the dreadnought's toned down; all follow the entry's emissive, 0 once it is wrecked)
     if (texSet == 7) {   // the dreadnought in ONE colour: steel grey, only the texture's light/dark left in it (the panel detail stays)
       let lum = dot(pow(ta.rgb, vec3f(2.2)), vec3f(0.2126, 0.7152, 0.0722));
       base = vec3f(0.16, 0.165, 0.175) * (0.45 + 1.4 * sqrt(lum));

@@ -92,7 +92,7 @@ export class Renderer {
     if (!adapter) throw new Error('no GPU adapter');
     const prof = new URLSearchParams(location.search).has('prof') && adapter.features.has('timestamp-query');   // ?prof: GPU time per pass
     this.device = await adapter.requestDevice({
-      requiredLimits: { maxStorageBufferBindingSize: Math.min(adapter.limits.maxStorageBufferBindingSize, 256 << 20) },
+      requiredLimits: { maxStorageBufferBindingSize: Math.min(adapter.limits.maxStorageBufferBindingSize, 256 << 20), maxSampledTexturesPerShaderStage: Math.min(adapter.limits.maxSampledTexturesPerShaderStage, 24) },   // (the mesh pass samples 18 textures)
       requiredFeatures: prof ? ['timestamp-query'] : [],
     });
     const dev = this.device;
@@ -148,6 +148,7 @@ export class Renderer {
         { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         ...[9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((b) => ({ binding: b, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } })),   // the rifles (texSet 3 / 4)
+        ...[20, 21].map((b) => ({ binding: b, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } })),   // the enemy frigates (texSet 8)
         { binding: 19, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },   // the moon's bake (MOONBAKE; its height displaces the mesh)
       ],
     });
@@ -244,7 +245,7 @@ export class Renderer {
 
     // model textures: [hero albedo, hero orm, enemy albedo, enemy orm, hero rifle albedo(+emissive in A), orm, enemy rifle albedo, orm]; 1x1 placeholders until loaded
     this.texSmp = dev.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 });
-    this.modelTex = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map(() => dev.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT }));
+    this.modelTex = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(() => dev.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT }));
     this.moonTex = dev.createTexture({ size: [1, 1], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT });   // (placeholder until the moon is baked)
     this._makeMeshBG();
     this.shadowBG = dev.createBindGroup({
@@ -306,7 +307,7 @@ export class Renderer {
       layout: this.meshBGL,
       entries: [{ binding: 0, resource: { buffer: this.frameUBO } }, { binding: 1, resource: { buffer: this.instBuf } },
         { binding: 2, resource: this.shadowView }, { binding: 3, resource: this.cmpSmp }, { binding: 4, resource: this.texSmp },
-        ...this.modelTex.map((tx, k) => ({ binding: 5 + k, resource: tx.createView() })), { binding: 19, resource: this.moonTex.createView() }],
+        ...this.modelTex.map((tx, k) => ({ binding: k < 14 ? 5 + k : 6 + k, resource: tx.createView() }))   /* (slots 14/15 → bindings 20/21: 19 is the moon) */, { binding: 19, resource: this.moonTex.createView() }],
     });
   }
   /** load model textures (slot 0/1 hero albedo/orm, 2/3 enemy albedo/orm). Missing files keep the placeholder. */

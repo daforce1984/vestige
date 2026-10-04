@@ -73,6 +73,7 @@ python3 tools/serve.py 8791
 | 3D 모델 | Blender 5.2 (Python 스크립트로 절차 생성) |
 | 메카 원본 | ATLAS/09(시그마), RONIN/04(적 메카), Ramon Linares, **CC0** |
 | 적 모함 | "Space Battleship Aquamarine", Kai Xiang, **CC BY 4.0** (수정: 폴리곤 감소, 단색화 등) |
+| 적 중형함 | "Cargo Spaceship", blaice, **CC BY 4.0** (수정: 폴리곤 감소 + 거리별 LOD, 방향·크기 조정, 텍스처 아틀라스, 엔진 발광점 추가) |
 | 시그마 소총 | "Futuristic Sci-Fi Rifle", Janis Zeps, **CC BY 4.0** (수정) |
 | 적 메카 소총 | "NANITE SYSTEMS Assault Rifle", Frostoise, **CC BY-NC-SA 4.0** (수정본도 CC BY-NC-SA 4.0) |
 | 적 전투기 | "Spaceship", Jefferson Frenay, **CC BY-NC-ND 4.0** (형식 변환만, 변경 없음) |
