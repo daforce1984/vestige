@@ -680,7 +680,7 @@ export class Renderer {
           const mt = (e.matOverride && e.matOverride[d.matName]) || d.mat;
           I[o + 16] = mt.base[0]; I[o + 17] = mt.base[1]; I[o + 18] = mt.base[2]; I[o + 19] = mt.metal;
           I[o + 20] = mt.emissive[0]; I[o + 21] = mt.emissive[1]; I[o + 22] = mt.emissive[2]; I[o + 23] = mt.rough;
-          I[o + 24] = e.flash; I[o + 25] = e.damage; I[o + 26] = e.ghost > 0 ? -Math.min(1, e.ghost) : model.detail; I[o + 27] = e.revealZ;   // ghost: afterimage (shader)
+          I[o + 24] = e.flash; I[o + 25] = e.damage; I[o + 26] = e.ghost > 0 ? -Math.min(1, e.ghost) : d.matName === 'inner' ? 0.25 : model.detail; I[o + 27] = e.revealZ;   // ghost: afterimage (shader)
           I[o + 28] = e.revealDir; I[o + 29] = e.revealWidth; I[o + 30] = e.emissive; I[o + 31] = e.seed;
           I[o + 32] = e.tint[0]; I[o + 33] = e.tint[1]; I[o + 34] = e.tint[2]; I[o + 35] = e.wear || 0;
           if (e.dmgPart && model.parts[d.part].name !== e.dmgPart) { I[o + 36] = 1e5; I[o + 37] = 1e5; I[o + 38] = 1e5; I[o + 39] = 1; }   // dmgPart: the scorch on that part only
@@ -691,7 +691,7 @@ export class Renderer {
           else if (cl && (cl.length === 4 || cl.length === 6)) { I[o + 40] = cl[0]; I[o + 41] = cl[1]; I[o + 42] = cl[2]; I[o + 43] = 3; I[o + 44] = cl[3]; I[o + 45] = cl.length === 6 ? cl[4] : 0; I[o + 46] = cl.length === 6 ? cl[5] : 1e5; I[o + 47] = e.clipHeat ?? 1; }   // [nx, ny, nz, d (, front angle, front offset)]: a plane cut (part-local); the front: only behind the blade is melted
           else if (cl) { I[o + 40] = cl[0]; I[o + 41] = cl[1]; I[o + 42] = cl[2]; I[o + 43] = e.clipInv ? -1 : 1; I[o + 44] = cl[3]; I[o + 45] = cl[4]; I[o + 46] = cl[5]; I[o + 47] = e.clipHeat ?? 1; }
           else { I[o + 43] = 0; }
-          I[o + 48] = e.texSet || 0;
+          I[o + 48] = d.matName === 'inner' ? 0 : e.texSet || 0;   // (a mech's inner body: plain dark metal, untextured — tools/fill_mech_interior.py)
           const cr = e.crush;          // world-space crumple: [x, y, z, radius, amount, dirX, dirY, dirZ]
           if (cr) { I[o + 49] = cr[4]; I[o + 50] = cr[5]; I[o + 51] = cr[6]; I[o + 52] = cr[0]; I[o + 53] = cr[1]; I[o + 54] = cr[2]; I[o + 55] = cr[3]; }
           else { I[o + 49] = 0; }
