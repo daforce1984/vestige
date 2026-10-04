@@ -917,7 +917,8 @@ const SHIELD_C = [1.351, -2.337, 0.17];   // the centre of the shield's outer fa
 function heroAimAt(bi) {   // where shot bi is laid
   const ts = HERO_SHOTS[bi], es = enemyRaw_(ts + 0.02), fk = es ? duelFK(es, 'enemy_ms') : null;
   if (!fk) return add(enemyRawPos(ts), [0, 10, 0]);
-  if (ts === BLOCK_T || ts === SHIELD_HIT_T) return partPoint(fk, 'shield', SHIELD_C);
+  if (ts === BLOCK_T) { const { sy, sz } = bigShieldScale(BLOCK_T); return partPoint(fk, 'shield', [SHIELD_C[0], SHIELD_C[1] + sy * 2.3, SHIELD_C[2] - sz * 0.95]); }   // (laid on where the burn starts: the plate's upper edge — it then drags down)
+  if (ts === SHIELD_HIT_T) return partPoint(fk, 'shield', SHIELD_C);
   if (ts === THIGH_T) return partPoint(fk, 'leg_R_upper', THIGH_P);
   const c = partPoint(fk, 'torso', [0, 2.5, 0]), d = nrm(sub(c, heroRawPos(ts))), sd = nrm([d[2], 0, -d[0]]), upv = nrm(V.cross([0, 0, 0], sd, d)), m = MISS[bi] || [0, 0];
   return add(c, add(scl(sd, m[0]), scl(upv, m[1])));
@@ -930,7 +931,11 @@ function heroAimPoint(tw) {
   let nx = HERO_SHOTS.findIndex((x) => x > tw); if (nx < 0) return at(N - 1);
   if (nx === 0) return at(0);
   const a = HERO_SHOTS[nx - 1], b = HERO_SHOTS[nx], ramp = Math.min(0.35, (b - a) * 0.6);
-  return lrp(at(nx - 1), at(nx), smooth(b - ramp, b - 0.03, tw));
+  const p = lrp(at(nx - 1), at(nx), smooth(b - ramp, b - 0.03, tw));
+  // the shield shot's burn (scene 41): the muzzle follows the beam's point as it drags down across the plate
+  const wb = smooth(BLOCK_T, BLOCK_T + 0.03, tw) * (1 - smooth(BLOCK_T + 0.26, BLOCK_T + 0.4, tw));
+  if (wb > 0) { const es = enemyRaw_(Math.min(tw, BLOCK_T + 0.26)), fk = es && duelFK(es, 'enemy_ms'); if (fk) return lrp(p, M.transformPoint([0, 0, 0], fk.shield, blockLocalAt(Math.min(tw, BLOCK_T + 0.26))), wb); }
+  return p;
 }
 
 // ============================================================================ state assembly
@@ -2267,13 +2272,13 @@ export const DUEL_CAMS = [
     return { pos: at(H, 30, -48, -26, T), target: pan(up(H, 4), up(hp(t), 4), 0.8), fov: 36, handheld: 0.1 }; } },
   { t0: 177.8, t1: 178.2, snap: 2.2, roll: -0.06, name: 'D08 long lens on it', fn: (t, u) => { const T = 177.8, E = ep(T);
     return { pos: at(E, -150, -40, 6, T), target: pan(up(E, 2), up(ep(t), 2), 0.9), fov: 12, handheld: 0.06 }; } },
-  // HE AIMS, THEN FIRES (2026-10-03): side-on to the line of fire, his rifle-arm side to the lens — he levels it, the
+  // HE AIMS, THEN FIRES (2026-10-03; 2026-10-04: and holds it — a 1.5 s burn dragged down across the shield, in bullet time): side-on to the line of fire, his rifle-arm side to the lens — he levels it, the
   // muzzle steadies, a slow push in toward the barrel, and the shot (178.7) leaves it across the frame; cut on the flash
-  { t0: 178.2, t1: 178.722, roll: -0.04, name: 'D08b side-on — he lays the rifle on it and fires', fn: (t, u) => { const T = 178.2, H = hp(T), E = ep(T);
+  { t0: 178.2, t1: 178.895, roll: -0.04, name: 'D08b side-on — he lays the rifle on it and fires', fn: (t, u) => { const T = 178.2, H = hp(T), E = ep(T);
       const f = nrm(flat(sub(E, H), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0])), m = duelMuzzle(t), M = m ? m.pos : add(up(hp(t), 6), scl(f, 8));
       const k = easeInOut(u), C = lrp(up(hp(t), 5), M, 0.45);
       return { pos: add(add(add(C, scl(sd, -lerp(46, 34, k))), scl(f, lerp(4, 9, k))), [0, -4, 0]), target: add(C, scl(f, 3)), fov: 30, handheld: 0.02, baseShake: 0 }; } },
-  { t0: 178.722, t1: 179.25, snap: 1.8, name: 'D09 front on — the shield across its front takes his shot, the energy splashing off', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T), f = nrm(flat(sub(hp(T), E), 0)), sd = [f[2], 0, -f[0]];
+  { t0: 178.895, t1: 179.25, snap: 1.8, name: 'D09 front on — the shield across its front takes his shot, the energy splashing off', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T), f = nrm(flat(sub(hp(T), E), 0)), sd = [f[2], 0, -f[0]];
     return { pos: add(add(add(E, scl(f, 30)), scl(sd, 4)), [0, 8, 0]), target: pan(up(E, 8), up(ep(t), 8), 0.8), fov: 38, handheld: 0.03, baseShake: 0.02 }; } },
   { t0: 180.45, t1: 181.4, roll: -0.1, name: 'D11 profile — he rolls out and answers', fn: (t, u) => { const T = 180.45, H = hp(T);
     return { pos: add(at(H, 0, 38, 2, T), scl(sub(hp(t), H), 0.4)), target: up(hp(t), 3), fov: 38, handheld: 0.08 }; } },   // a slow dolly, half his speed

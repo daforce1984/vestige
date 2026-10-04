@@ -529,6 +529,7 @@ export const INSERT_CUES = insertCues();
 //   per-mech state (duelHero/duelEnemy1/duelEnemy2 sampled every 20 ms) → saber ignite/extinguish edges, saber hum
 //   modulated by swing speed, thruster boosts (boost rising edges), servo/hydraulic moves (joint angular-speed peaks).
 function duelCues() {
+  const FD = (a, b) => filmT(b) - filmT(a);                          // cue lengths in film seconds (the bullet time stretches them)
   const out = [], r = rng(8080), R = (a, b) => a + r() * (b - a), G = DUEL_GAIN;
   // choreographed events + contacts found by the hitbox sweep (duel.js AUTO_FX): every real touch gets its sound
   const EV = [...DUEL_EVENTS, ...AUTO_FX.map((e) => ({ ...e, strength: e.strength * 0.8 }))].filter((e) => e.t >= 150 && e.t <= 200).sort((a, b) => a.t - b.t);
@@ -574,7 +575,7 @@ function duelCues() {
   out.push([BLOCK_T, 'sfx16_beam', { at: 'hit', gain: G * 1.8, pan: -0.1, prio: 10, norand: true }]);
   out.push([BLOCK_T, 'energy_beam2', { at: 'hit', rate: 0.8, gain: G * 1.5, pan: -0.1, prio: 10, norand: true }]);
   DUEL_RIFLE.forEach((t) => {   // his HEAVY beam: the heavy_beam attack, cut short and pitched down a little, + low weight
-    out.push([t, 'heavy_beam', { rate: R(0.86, 0.92), gain: G * 1.05, dur: 1.1, fadeOut: 0.55, pan: -0.15, prio: t === BLOCK_T ? 10 : 9, norand: true }]);
+    out.push([t, 'heavy_beam', { rate: R(0.86, 0.92), gain: G * 1.05, dur: t === BLOCK_T ? FD(BLOCK_T, BLOCK_T + 0.27) : 1.1, fadeOut: 0.55, pan: -0.15, prio: t === BLOCK_T ? 10 : 9, norand: true }]);   // (the shield shot: held for its 1.5 s burn)
     out.push([t, '@boom', { bus: 'sfx', f: 50, vel: G * 0.35, dur: 0.8, verb: 0.25 }]);
   });
   // the shots that land: struck plate, ring, and the armour burning through
@@ -599,7 +600,6 @@ function duelCues() {
   out.push([ENEMY_EYE + 0.02, '@beep', { f: 2600, dur: 0.05, vel: 0.35, pan: 0.2 }]);
   // THE FINISH: the rifle slung (a servo clunk), the saber lit, the SANDEVISTAN (time folds: a deep inhaling whoomp,
   // the world's sound smeared low by the master slow-mo), the pass-cut (buzz + sizzle + armour parting), retract
-  const FD = (a, b) => filmT(b) - filmT(a);                          // cue lengths in film seconds (the bullet time stretches them)
   out.push([191.18, 'metal_knock', { at: 'hit', rate: 1.1, gain: G * 0.35, pan: -0.2, prio: 7, norand: true }]);   // the rifle locks on his back
   out.push([SANDE0 - 0.04, '@beamSaberIgnite', { vel: 0.9 * G }]);
   out.push([SANDE0 - 0.02, 'power_down', { rate: 0.45, gain: G * 0.9, prio: 9, duck: 1.5, norand: true }]);   // time folding in

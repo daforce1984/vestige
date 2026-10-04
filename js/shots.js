@@ -1341,26 +1341,29 @@ function flungRifle(t) {
   const out = M.mul(new Float32Array(16), m, spin); out[12] = p[0]; out[13] = p[1]; out[14] = p[2];
   return out;
 }
-function rifleShot(R, t, t0, from, to, hit = false, mz = null, pw = 1) {   // pw: output (the aimed shot: 2.2 — a thicker beam and an energy backblast)
-  const lt = t - t0;
-  if (lt < 0 || lt > 0.7) return;
+function rifleShot(R, t, t0, from, to, hit = false, mz = null, pw = 1, hold = 0) {   // pw: output (the aimed shot: 2.2 — a thicker beam and an energy backblast); hold: a sustained burn — the line stays joined to the muzzle at full strength that long (story s) before its tail leaves
+  const lt0 = t - t0;
+  if (lt0 < 0 || lt0 > 0.7 + hold) return;
+  const lt = lt0 < 0.05 ? lt0 : Math.max(0.05, lt0 - hold);   // (the line's fade / tail clock waits out the burn)
   if (mz) from = mz;                                                 // the line leaves from where the muzzle IS now (it moves while the beam burns), still ending on its target
   const L = V.dist(from, to);
   // a beam-rifle LINE (the Unicorn look): the head races out at 5 km/s, the tail leaves the muzzle 0.12 s later — at
   // 60–90 m a bolt would cross in under a frame; a line reads for several frames and thins as it goes
   const speed = 5000;
-  const head = Math.min(1, (lt * speed) / L), tail = Math.min(1, Math.max(0, ((lt - 0.12) * speed) / L));
+  const head = Math.min(1, (lt0 * speed) / L), tail = Math.min(1, Math.max(0, ((lt - 0.12) * speed) / L));
   const a = lerpv(from, to, tail), b = lerpv(from, to, head), kk = 1 - 0.6 * sat((lt - 0.05) / 0.25);
   if (head > tail) { R.beam(a, b, (1.5 * kk + 0.4) * pw, [0.9 * kk, 2.0 * kk, 2.9 * kk], 1, 20, 0.6, 0.8); R.beam(a, b, 4.4 * pw, [0.5 * kk, 1.1 * kk, 1.6 * kk], 0.04, 3, 2, 0.6); }   // a HEAVY beam, twice the old bolt's thickness; cyan like his core (white core kept low)
-  if (lt < 0.16) { R.glow(from, 7 * (1 - lt / 0.16), [0.9, 2.0, 2.9], 0.5); R.light(from, 60, [0.4, 0.8, 1], 4); }
-  if (pw > 1 && lt < 0.6) {   // THE BACKBLAST: the shot's energy bursts out of the muzzle in a shock ring and vents back out of the breech
-    const dir = V.norm([0, 0, 0], V.sub([0, 0, 0], to, from)), k = 1 - lt / 0.6, e = easeOut(sat(lt / 0.35));
-    R.glow(from, 6.5 * pw * Math.exp(-lt * 10), [1.4, 2.6, 3.6], 0.45);
-    if (lt < 0.35) R.ripple(madd(from, dir, 8), 5 + 26 * pw * e, [0.3, 0.6, 0.9], (1 - lt / 0.35) * 0.7);   // (out ahead of the muzzle, gentle: it warped him)
+  if (lt0 < 0.16) { R.glow(from, 7 * (1 - lt0 / 0.16), [0.9, 2.0, 2.9], 0.5); R.light(from, 60, [0.4, 0.8, 1], 4); }
+  if (hold > 0 && lt0 < hold + 0.05) { const fl = 0.85 + 0.15 * Math.sin(t * 310) * Math.sin(t * 173); R.glow(from, 2.2 * pw * fl, [0.5, 1.1, 1.6], 0.5); R.light(from, 70, [0.4, 0.8, 1], 5 * fl); }   // the burn: the muzzle stays lit
+  const lb = hold > 0 ? lt0 * 3.5 : lt0;   // (the backblast keeps its own quick clock through the burn's bullet time)
+  if (pw > 1 && lb < 0.6) {   // THE BACKBLAST: the shot's energy bursts out of the muzzle in a shock ring and vents back out of the breech
+    const dir = V.norm([0, 0, 0], V.sub([0, 0, 0], to, from)), k = 1 - lb / 0.6, e = easeOut(sat(lb / 0.35));
+    R.glow(from, 6.5 * pw * Math.exp(-lb * 10), [1.4, 2.6, 3.6], 0.45);
+    if (lb < 0.35) R.ripple(madd(from, dir, 8), 5 + 26 * pw * e, [0.3, 0.6, 0.9], (1 - lb / 0.35) * 0.7);   // (out ahead of the muzzle, gentle: it warped him)
     const br = madd(from, dir, -16);                                      // the breech, behind the grip
-    if (lt < 0.45) { const kb = 1 - lt / 0.45; R.beam(br, madd(br, dir, -(5 + 28 * e)), (2.2 + 3 * e) * kb, [0.7 * kb, 1.6 * kb, 2.4 * kb], 0.55, 3, 1.5, 1.2); R.glow(br, 5 * kb, [0.8 * kb, 1.8 * kb, 2.6 * kb], 0.5); }
-    sparkBurst(R, br, V.scale([0, 0, 0], dir, -1), lt, 1777, 40, 0.75, 55, 0.45, [1.2, 2.6, 3.4]);
-    sparkBurst(R, from, dir, lt, 1781, 30, 1.3, 45, 0.35, [1.6, 2.8, 3.6]);
+    if (lb < 0.45) { const kb = 1 - lb / 0.45; R.beam(br, madd(br, dir, -(5 + 28 * e)), (2.2 + 3 * e) * kb, [0.7 * kb, 1.6 * kb, 2.4 * kb], 0.55, 3, 1.5, 1.2); R.glow(br, 5 * kb, [0.8 * kb, 1.8 * kb, 2.6 * kb], 0.5); }
+    sparkBurst(R, br, V.scale([0, 0, 0], dir, -1), lb, 1777, 40, 0.75, 55, 0.45, [1.2, 2.6, 3.4]);
+    sparkBurst(R, from, dir, lb, 1781, 30, 1.3, 45, 0.35, [1.6, 2.8, 3.6]);
     R.light(from, 90, [0.4, 0.8, 1], 9 * k);
   }
   if (hit && head >= 1) hitFlash(R, t, t0 + L / speed, to, 6, [1, 0.6, 0.8]);
@@ -1728,14 +1731,16 @@ function drawSeraphFire(R, t) {
 // ---- Sigma's beam rifle: fast cyan bolts; the reversal shot takes SERAPH's left wing; the charged shot is a magnum —
 // a thick beam that goes straight through its chest and on out into space
 const HERO_COL = [0.9, 2.3, 3.4];
+const BLOCK_BURN = 0.25;   // the aimed shot on the shield (scene 41, 2026-10-04): a 1.5 s burn on screen (timemap SLOW_RANGES 178.7–178.96), dragged down across the plate
 function drawHeroFire(R, t) {
   for (const sh of DUEL_SHOTS) {
-    if (t < sh.t - 0.01 || t > sh.t + 0.9) continue;
+    if (t < sh.t - 0.01 || t > sh.t + 0.9 + (sh.block ? BLOCK_BURN : 0)) continue;
     const lt = t - sh.t;
     if (!sh.kill) {
       if (sh.block) {                                                  // the block: a live ray from his muzzle, cut off where it meets the plate
-        const bh = blockHitAt(t), from = bh ? bh.from : sh.from, to = bh && bh.inside ? bh.p : bh ? V.add([0, 0, 0], bh.from, V.scale([0, 0, 0], bh.dir, 1500)) : sh.to;
-        rifleShot(R, t, sh.t, from, to, false, null, 2.2); continue;   // (the aimed, shouldered shot the shield takes: full output)
+        const bh = blockHitAt(t), bc = t > sh.t + 0.1 ? blockHitAt(Math.min(t, sh.t + 0.26)) : null;   // (after the drag it stays on the plate's last point: no line on through it)
+        const from = bh ? bh.from : sh.from, to = bh && bh.inside ? bh.p : bc ? bc.p : bh ? V.add([0, 0, 0], bh.from, V.scale([0, 0, 0], bh.dir, 1500)) : sh.to;
+        rifleShot(R, t, sh.t, from, to, false, null, 2.2, BLOCK_BURN); continue;   // (the aimed, shouldered shot the shield takes: full output, held on the plate as it drags down across it)
       }
       const mz = duelMuzzle(t);
       rifleShot(R, t, sh.t, sh.from, sh.to, false, mz && lt < 0.7 ? mz.pos : null);   // (no flash ball on the wing hit: the sparks + light carry it)
