@@ -2038,12 +2038,22 @@ export function heroRifleThrow(t) {
   const cr = (a, b, c, d, x) => 0.5 * (2 * b + (-a + c) * x + (2 * a - 5 * b + 4 * c - d) * x * x + (-a + 3 * b - 3 * c + d) * x * x * x);
   const rel = [0, 1, 2].map((i) => cr(P0[i], P1[i], P2[i], P3[i], seg === 0 ? 1 - (1 - lu) * (1 - lu) : lu));
   const p = add(add(heroRawPos(warp(t)), transDodge(warp(t))), rel);
-  const e = u * u * (3 - 2 * u), q = Q.slerp([0, 0, 0, 1], _thr.q0, _thr.q1, e);
-  const m = M.fromTRS(new Float32Array(16), p, q, 1);
-  const sp = 4 * Math.PI * (1 - Math.pow(1 - u, 1.7)), c = Math.cos(sp), sn = Math.sin(sp);   // two turns end over end, slowing as it comes in (back the right way up)
-  const rx = new Float32Array([1, 0, 0, 0, 0, c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1]);
-  return M.mul(new Float32Array(16), m, rx);
+  // an irregular tumble about its middle, still spinning hard when he snatches it: three axes at their own rates, a
+  // wobble on each, every angle counted back from the catch (0 there → exactly the rifle in his hand); the spin picks up
+  // over the first ~0.15 s off his hand, and the turn it has made by then is taken out of the base orientation so it
+  // leaves his hand exactly as he held it. (was: two turns end over end, slowing to a stop the right way up)
+  const tq = thrTumble(dF, DF), t0q = thrTumble(0, DF), q0b = Q.mul([0, 0, 0, 1], _thr.q0, [-t0q[0], -t0q[1], -t0q[2], t0q[3]]);
+  const e = u * u * (3 - 2 * u), q = Q.slerp([0, 0, 0, 1], q0b, _thr.q1, e), qf = Q.mul([0, 0, 0, 1], q, tq);
+  // turned about its middle: the grip moves by q·(C − tq·C); the offset that gives at the release is faded out
+  const off = (qq, tt) => { const R = r3(M.fromTRS(new Float32Array(16), [0, 0, 0], qq, 1)), Tq = r3(M.fromTRS(new Float32Array(16), [0, 0, 0], tt, 1)); return r3v(R, sub(THR_C, r3v(Tq, THR_C))); };
+  const pf = sub(add(p, off(q, tq)), scl(off(q0b, t0q), 1 - smooth(0, 0.15, u)));
+  return M.fromTRS(new Float32Array(16), pf, qf, 1);
 }
+function thrTumble(dF, DF) {
+  const E = (x) => x - 0.15 * (1 - Math.exp(-x / 0.15)), tau = E(dF) - E(DF), wt = dF - DF;   // spin-up eased in; tau = 0 at the catch
+  return Q.fromEuler([0, 0, 0, 1], -10.5 * tau + 0.7 * Math.sin(6.1 * wt), 3.4 * tau + 0.8 * Math.sin(3.3 * wt), -2.2 * tau + 0.5 * Math.sin(4.7 * wt));
+}
+const THR_C = [0, 1.5, 4.5];   // the rifle's middle (rifle frame): it turns about its balance point
 /** the middle of his rifle at t: tumbling through the air (the throw) or in his hand */
 function rifleCentre(t) {
   const m = heroRifleThrow(t) || duelFK(duelHero(t), 'gundam').rifle;
