@@ -1020,6 +1020,10 @@ const strafe = (tw, sgn) => { const k = smooth(176.4, 177.2, tw) * (1 - smooth(1
 // turned (about where it ends, at 170, so the duel picks up unchanged) to lie along the line to VANGUARD; he faces that way
 // throughout (no turn onto it), leant forward over his thrusters
 let _s30 = null;
+// while one frame's velocity / acceleration is sampled (AMBAC: ±0.22 s), the path stays on that frame's side of the cut
+// at 163 — sampled across it, the jump to the turned run read as a huge acceleration and flung his arm and legs about for
+// the last 0.2 s of scene 29 and the first 0.2 s of scene 30
+let _s30side = null;
 function scene30Pos(tw) {
   const at = (x) => add(gundamLaunchPath(x), dodgeOffset(x));
   if (!_s30) {
@@ -1030,7 +1034,7 @@ function scene30Pos(tw) {
   return add(P1, [d[0] * c + d[2] * sn, d[1], -d[0] * sn + d[2] * c]);
 }
 function heroPos0(tw) {
-  if (tw < 170) return tw >= 163 ? scene30Pos(tw) : add(gundamLaunchPath(tw), dodgeOffset(tw));   // (the launch run: he jinks out of the ion bolt)
+  if (tw < 170) return (_s30side ?? tw >= 163) ? scene30Pos(tw) : add(gundamLaunchPath(tw), dodgeOffset(tw));   // (the launch run: he jinks out of the ion bolt)
   const c = circ(tw);
   return add(add(add(springPos(heroPos, tw), scl(hover(tw, 1.3, 0.35), 0)), [CIRC_AX[0] * -6 * c, 1.2 * c, CIRC_AX[2] * -6 * c]), strafe(tw, 1));
 }
@@ -1175,6 +1179,7 @@ function duelHero_(t) {
   const tw = warp(t);
   s.pos = add(heroRawPos(tw), transDodge(tw));                      // (the charged shot: he slips it hard, afterimages behind)
   { const cl = cutLift(t); if (cl) s.pos = add(s.pos, cl); }
+  _s30side = tw < 170.5 ? tw >= 163 : null;
   s.vel = velOf((x) => heroRawPos(warp(x)), t); s._pf = (x) => heroRawPos(warp(x)); s._t = t;
   springPose(heroPose, tw, _pose); heroImp(tw, _pose);
   // IDLE (170–175.8, scenes 32–36): the body is held still — no squash / weight-shift / jitter / inertia lean; only a
@@ -1234,6 +1239,7 @@ function duelHero_(t) {
   if (tw > CATCH_T && tw < CD_HOLD + 0.4) s.blurTrail = Math.max(s.blurTrail, smooth(CATCH_T + 0.03, CATCH_T + 0.12, tw) * (1 - smooth(CATCH_T + 0.5, CD_HOLD + 0.4, tw)));   // the dash after the catch: the same boost smear   // boosting through the circus: a short motion-blur smear behind him (shots.js)
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
+  _s30side = null;
   { if (tw >= HERO_GRAB - 0.45 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); catchReach(s, tw); heroLeft(s, tw); transTwist(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
   slashIK(s, tw);                                                   // the pass-cut: the blade swept exactly through its waist
   hitReact('hero', tw, s, 'gundam');
