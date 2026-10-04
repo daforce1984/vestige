@@ -295,6 +295,7 @@ fn skyColor(d0: vec3f) -> vec3f {
 // ---------------------------------------------------------------- meshes
 // the moon's relief and craters: shared by the mesh shader (displacement) and the one-time bake (MOONBAKE)
 export const MOONFN = /* wgsl */ `
+const MOON_LOW: f32 = 0.82;   // how far the moon's light is lowered toward its basin's horizon (0 = the scene's own sun)
 struct MC { g: vec3f, rim: f32, ray: f32, basin: f32, pit: f32 };
 // ONE GIANT IMPACT BASIN (2026-10-03) on the face the camera sees (moon-local, angular radius 0.42 rad): a deep bowl with
 // a terraced inner wall, a central peak, a sharp raised rim and an ejecta blanket with long bright rays; its floor is dark
@@ -853,6 +854,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   var metal = inst.base.w;
   let texSet = i32(inst.extra.x);
   var texAO = 1.0;
+  var moonSh = 1.0;   // the moon's own relief shadowing its light (texSet -3)
+  var moonL = vec3f(0.0);   // the moon's light direction (world; lowered over its basin)
   var texGlow = vec3f(0.0);
   if (texSet > 0 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01) {
     var ta = select(tA2, tA1, texSet == 1); var tm = select(tM2, tM1, texSet == 1);
@@ -931,6 +934,25 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     n = normalize((inst.m * vec4f(normalize(qs + t1 * mt.r + t2 * mt.g), 0.0)).xyz);
     base = mt.b * vec3f(1.06, 1.0, 0.93) * (0.97 + 0.06 * vnoise(qs * 900.0));
     rough = 0.93; metal = 0.0; texAO = 1.0;
+    // CAST SHADOWS IN ITS RELIEF (2026-10-04): march the baked height toward the light along the surface — the basin's rim
+    // and the crater walls throw real shadows across their floors (N·L alone left the bowls lit, reading flat)
+    let Lw = select(F.sunDir.xyz, F.rimCol.xyz, F.rimCol.w > 0.5);
+    let Ll0 = normalize(transpose(mat3x3f(inst.m[0].xyz, inst.m[1].xyz, inst.m[2].xyz)) * Lw);
+    let C0 = normalize(vec3f(0.765, 0.069, 0.640));
+    let Ll = normalize(Ll0 - C0 * dot(Ll0, C0) * MOON_LOW * mix(0.35, 1.0, smoothstep(2.2, 1.1, acos(clamp(dot(qs, C0), -1.0, 1.0)) / 0.42)));   // (its light lowered over the basin — a low sun throws long shadows into it — and less so away from it)
+    moonL = normalize((inst.m * vec4f(Ll, 0.0)).xyz);
+    let lt = Ll - qs * dot(Ll, qs); let ltl = length(lt);
+    if (ltl > 1e-4) {
+      let dir = lt / ltl; let tanE = dot(Ll, qs) / ltl;
+      var occ = 0.0; var dist = 0.002;
+      for (var k = 0; k < 12; k++) {
+        let q2 = normalize(qs + dir * dist);
+        let hk = textureSampleLevel(texMoon, texSmp, vec2f(atan2(q2.z, q2.x) / 6.2831853 + 0.5, acos(clamp(q2.y, -1.0, 1.0)) / 3.14159265), 0.0).a;
+        occ = max(occ, (hk - (mt.a + tanE * dist - 0.5 * dist * dist)) / (dist * 0.04));   // (the sphere curving away below the ray; a soft penumbra)
+        dist *= 1.5;
+      }
+      moonSh = 1.0 - clamp(occ, 0.0, 1.0);
+    }
   } else if (texSet == -1) {
     let moonK = 0.0;
     let q = i.lp;
@@ -1049,7 +1071,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let flick = 0.7 + 0.3 * sin(F.camPos.w * 13.0 + nz * 30.0);
     emis += vec3f(3.0, 0.8, 0.15) * crack * 0.6 * flick * smoothstep(0.5, 0.9, nz);
   }
-  let sh = shadowAt(i.wp, n);
+  let sh = shadowAt(i.wp, n) * moonSh;
   let L = F.sunDir.xyz;
   let H = normalize(L + V);
   let ndl = max(dot(n, L), 0.0);
@@ -1072,7 +1094,10 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // fall black as they do in space (the generic diffuse + strong sky fill made it look soft and doughy)
   let lunar = texSet == -3;
   let lsd = select(ndl, 2.0 * ndl / max(ndl + ndv, 1e-3), lunar);
-  var col = F.sunCol.rgb * sh * lsd * (diffC / 3.14159 * 2.6 + min(specG, vec3f(40.0)) * select(1.0, 0.0, lunar));
+  // the moon takes ONE sun — the second (the one on the face the film sees) — when there is one: lit from both sides its
+  // craters' shadows were filled in and the big basin read flat (2026-10-04)
+  let sunK = select(1.0, 0.0, lunar && F.rimCol.w > 0.5);
+  var col = F.sunCol.rgb * sh * lsd * sunK * (diffC / 3.14159 * 2.6 + min(specG, vec3f(40.0)) * select(1.0, 0.0, lunar));
   let amb = mix(F.ambDown.rgb, F.ambUp.rgb, n.y * 0.5 + 0.5) * F.sunCol.w * select(1.0, 0.3, lunar);
   col += (diffC + F0 * 0.3) * amb * ao * texAO;
   // environment reflection with a brushed-metal streak (anisotropic look along the hull's long axis)
@@ -1085,7 +1110,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   col += envC * reflK * ao * mix(0.35, 1.0, sh);
   // the SECOND SUN (a real star in the sky, no rim / fill tricks any more): same GGX light, no shadow map of its own
   if (F.rimCol.w > 0.5) {
-    let L2 = F.rimCol.xyz;
+    let L2 = select(F.rimCol.xyz, moonL, lunar);
     let H2 = normalize(L2 + V);
     let ndl2 = max(dot(n, L2), 0.0);
     let nh2 = max(dot(n, H2), 0.0);
@@ -1094,7 +1119,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let G2 = (ndl2 / (ndl2 * (1.0 - kq) + kq)) * (ndv / (ndv * (1.0 - kq) + kq));
     let Fh2 = F0 + (1.0 - F0) * pow(1.0 - max(dot(H2, V), 0.0), 5.0);
     let spec2 = D2 * G2 * Fh2 / max(4.0 * ndl2 * ndv, 1e-3);
-    col += F.fill.rgb * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
+    col += F.fill.rgb * moonSh * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
   }
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;
