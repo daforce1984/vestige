@@ -860,10 +860,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
       let lum = dot(pow(ta.rgb, vec3f(2.2)), vec3f(0.2126, 0.7152, 0.0722));
       base = vec3f(0.16, 0.165, 0.175) * (0.45 + 1.4 * sqrt(lum));
     }
-    if (texSet == 1) {                                   // Sigma: matte paint, and the chipped bare metal is scuffed, not a mirror
-      rough = max(rough, mix(0.72, 0.5, metal));
-      metal = metal * 0.75;
-    }
+    if (texSet == 1) { metal = 0.6; rough = 0.4; }      // Sigma: one material all over, metalness 60 %, roughness 40 % (the texture's colour and AO kept)
   }
   // cinematic hull detail (flagship: shade.z = material class 1 hull, 2 plate, 3 hull2, 4 greeble, 5 trim)
   let hullFlag = inst.shade.z > 0.5 && inst.shade.z < 9.5 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01;   // flagship armour (any distance)
