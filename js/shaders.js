@@ -332,7 +332,7 @@ fn moonHN(q: vec3f) -> f32 {
 fn moonHeight(q: vec3f) -> f32 {
   let bd = basinD(q);
   let jag = 0.6 + 0.8 * vnoise(q * 34.0);                                       // (the crest broken and jagged along its length)
-  var h = mix(basinH(bd), basinH(bd) - 0.12 * exp(-abs(bd - 1.0) / 0.035) * (1.0 - jag), 1.0) * 0.06 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
+  var h = mix(basinH(bd), basinH(bd) - 0.12 * exp(-abs(bd - 1.0) / 0.035) * (1.0 - jag), 1.0) * 0.12 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
   var cover = smoothstep(1.3, 1.05, bd);
   var sc = 14.0;
   for (var oc = 0; oc < 2; oc++) {
@@ -347,7 +347,7 @@ fn moonHeight(q: vec3f) -> f32 {
       let rad = dmin / 1.3 * (0.4 + 0.6 * r3.y);
       let d = length(p - ctr) / rad * (1.0 + 0.2 * (vnoise(p * 2.7 + c * 1.3) - 0.5));   // (an irregular outline)
       if (d < 1.3) {
-        h += keep * (craterProf(d) - 0.06 * exp(-abs(d - 1.0) / 0.045) * (0.6 - 0.8 * vnoise(p * 6.0 + c))) * rad / sc * 0.42;   // (a jagged crest)
+        h += keep * (craterProf(d) - 0.06 * exp(-abs(d - 1.0) / 0.045) * (0.6 - 0.8 * vnoise(p * 6.0 + c))) * rad / sc * 0.84;   // (a jagged crest)   (depths doubled 2026-10-04)
         cov2 = max(cov2, keep * smoothstep(1.3, 1.05, d));
       }
     }
@@ -381,7 +381,7 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixe
       let dv = (p - ctr) / rad; let d = length(dv) * (1.0 + 0.2 * (vnoise(p * 2.7 + c * 1.3) - 0.5));
       if (d < 1.3 && d > 1e-4) {
         let dh = (craterProf(d + 0.01) - craterProf(d - 0.01)) / 0.02;   // the natural profile's slope; chain to p (× sc/rad per unit q)
-        if (oc >= oc0) { o.g += keep * amp * dh * normalize(dv) * (sc / rad) * 0.016; }
+        if (oc >= oc0) { o.g += keep * amp * dh * normalize(dv) * (sc / rad) * 0.032; }
         o.rim += keep * amp * 0.35 * step(1.0, d) * exp(-(d - 1.0) / 0.25);   // (a soft lighter apron OUTSIDE the rim)
         o.pit = max(o.pit, keep * (1.0 - smoothstep(0.35, 1.0, d)));            // (the bowl: shadowed, reads as a hole)
         cov2 = max(cov2, keep * smoothstep(1.3, 1.05, d));
