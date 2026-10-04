@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 A = lambda p: os.path.join(ROOT, 'assets', p)
 
 ONLY = sys.argv[1:]   # (names given: build only those)
-def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, skip=(), empties=None, tex=True):
+def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, skip=(), empties=None, tex=True, post=None):
     if ONLY and name not in ONLY: return
     prims, g, blob = load(A(src))
     prims = [p for p in prims if g.materials[p['mat']].name not in skip]
@@ -35,6 +35,7 @@ def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, sk
         if pr.metallicRoughnessTexture is not None:
             orm.paste(image(g, blob, g.textures[pr.metallicRoughnessTexture.index].source).convert('RGB').resize((cell, cell), Image.LANCZOS), (c * cell, r * cell))
     os.makedirs(A('tex'), exist_ok=True)
+    if post: alb = post(alb, cell)
     if tex: alb.save(A(f'tex/{name}_albedo.png')); orm.save(A(f'tex/{name}_orm.png'))   # (an LOD shares its full model's atlas)
     P, N, U, I = [], [], [], []; base = 0
     for p in prims:
@@ -69,6 +70,17 @@ def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, sk
     out.set_binary_blob(data); out.save_binary(A(f'{name}.glb'))
     print(name, 'verts', len(P), 'tris', len(I) // 3, 'bounds', P.min(0).round(2), P.max(0).round(2), 'atlas', alb.size)
 
+def flatten_detail(alb, cell, rad=40):   # one even tone all over: per atlas cell, the light/dark is divided by its own blur (wrapped,
+    # the UVs tile), so the big blotches and the cells' different brightness go and only the small panel detail is left (grey)
+    from PIL import ImageFilter
+    a = np.asarray(alb, np.float32); out = a.copy(); H, W = a.shape[0] // cell, a.shape[1] // cell
+    for r in range(H):
+        for c in range(W):
+            L = a[r * cell:(r + 1) * cell, c * cell:(c + 1) * cell, :3] @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+            T = np.tile(L, (3, 3)); B = np.asarray(Image.fromarray(np.clip(T, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(rad)), np.float32)[cell:2 * cell, cell:2 * cell]
+            d = np.clip(L / np.maximum(B, 4.0), 0.55, 1.45); g = np.clip(150.0 * d, 0, 255)
+            out[r * cell:(r + 1) * cell, c * cell:(c + 1) * cell, :3] = g[..., None]
+    return Image.fromarray(out.astype(np.uint8), 'RGBA')
 def emis_tex(g, blob, mt, alb):   # rifle1: the material's own emissive map (luminance)
     if mt.emissiveTexture is None: return Image.new('L', alb.size, 0)
     e = np.asarray(image(g, blob, g.textures[mt.emissiveTexture.index].source).convert('RGB'), np.float32).max(2)
@@ -94,7 +106,7 @@ build('src/light_fighter_dec.glb', 'light_fighter_game', np.array([0, 1.4, 0]), 
 _N = [(x, 16.9, -56.75, r) for (x, r) in [(10.6, 2.9), (16.0, 2.4), (20.1, 1.8), (23.6, 1.4)] for x in (x, -x)]
 # (source: blender/decimate_glb.py on assets/src/space_battleship_aquamarine.glb at 0.45 → assets/src/aquamarine_dec.glb, 113k → 51k triangles)
 build('src/aquamarine_dec.glb', 'dreadnought_game', np.array([0, 18.6, 17.6]), np.eye(3), 2.53, 768, emis_tex,
-      engines=[(x, y, z, r) for (x, y, z, r) in _N], wrap=True, skip=('lambert1',), empties={'lance_emitter': (0, 11.25, 103.6)})
+      engines=[(x, y, z, r) for (x, y, z, r) in _N], wrap=True, skip=('lambert1',), empties={'lance_emitter': (0, 11.25, 103.6)}, post=flatten_detail)
 # LODs (2026-10-01, speed): decimated sources (blender/decimate_glb.py) built onto the SAME atlas as their full models
 # light fighter: 72.7k → 7.3k triangles for the near model (above), 1.8k for the far one; dreadnought far / wreck chunks: 5.7k
 build('src/light_fighter_lod.glb', 'light_fighter_game_lod', np.array([0, 1.4, 0]), np.eye(3), 0.75, 1024, emis_tex, engines=[(-0.58, 1.8, -5.58, 0.12), (0.58, 1.8, -5.58, 0.12)], tex=False)

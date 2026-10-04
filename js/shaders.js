@@ -862,6 +862,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     if (texSet == 7) {   // the dreadnought in ONE colour: steel grey, only the texture's light/dark left in it (the panel detail stays)
       let lum = dot(pow(ta.rgb, vec3f(2.2)), vec3f(0.2126, 0.7152, 0.0722));
       base = vec3f(0.16, 0.165, 0.175) * (0.45 + 1.4 * sqrt(lum));
+      rough = 0.46; metal = 0.75; texAO = mix(1.0, texAO, 0.4);   // one material all over (its texture's roughness / metal / AO were a patchwork from part to part; the albedo is flattened to its small detail: tools/build_rifles.py flatten_detail)
     }
     if (texSet == 1) { metal = 0.3; rough = 0.4; }      // Sigma: one material all over, metalness 30 %, roughness 40 % (the texture's colour and AO kept)
     if (texSet == 2) { metal = mix(metal, 1.0, 0.3); }   // VANGUARD: a little more metal (median 0.35 → 0.54, the texture's variation kept)
@@ -1029,7 +1030,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     if (!hullFlag) { base *= (1.0 + pnl.y * 0.8) * (1.0 - pnl.x * 0.14); }   // (the flagship has its own plating)
     let grime = fbm(i.lp / (det * 7.0) + inst.p1.w, select(4, 2, hullOn));
     let streaks = vnoise(vec3f(i.lp.x / (det * 1.5), i.lp.y / (det * 12.0), i.lp.z / (det * 1.5)));
-    if (!hullFlag) { base *= mix(0.55, 1.08, smoothstep(0.25, 0.75, grime)) * mix(0.85, 1.0, streaks); }   // flagship: one tone per plate
+    if (!hullFlag && texSet != 7) { base *= mix(0.55, 1.08, smoothstep(0.25, 0.75, grime)) * mix(0.85, 1.0, streaks); }   // flagship: one tone per plate   // (the dreadnought: none — its big cloudy blotches made the hull a patchwork)
     if (!hullFlag) { rough = clamp(rough + pnl.y * 0.8, 0.15, 1.0); ao = 1.0 - pnl.x * 0.12; }
   }
   // damage: scorch + glowing cracks
