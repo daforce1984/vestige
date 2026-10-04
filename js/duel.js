@@ -1233,7 +1233,7 @@ function duelHero_(t) {
   if (tw > CATCH_T && tw < CD_HOLD + 0.4) s.blurTrail = Math.max(s.blurTrail, smooth(CATCH_T + 0.03, CATCH_T + 0.12, tw) * (1 - smooth(CATCH_T + 0.5, CD_HOLD + 0.4, tw)));   // the dash after the catch: the same boost smear   // boosting through the circus: a short motion-blur smear behind him (shots.js)
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);
-  { if (tw >= HERO_GRAB - 0.3 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); catchReach(s, tw); heroLeft(s, tw); transTwist(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
+  { if (tw >= HERO_GRAB - 0.45 && tw < HERO_SNAP1) heroDraw(s, tw); else { const ak = HERO_AIM(tw); if (ak > 0) heroAim2H(s, heroAimPoint(tw), ak); } throwFling(s, tw); catchReach(s, tw); heroLeft(s, tw); transTwist(s, tw); saberDrawIK(s, tw); transCutIK(s, tw); saberRightGrip(s, tw); }   // the rifle laid on its target, held upright
   slashIK(s, tw);                                                   // the pass-cut: the blade swept exactly through its waist
   hitReact('hero', tw, s, 'gundam');
   // hand-over to the old aftermath formula (identical at t = 200)
@@ -1508,12 +1508,20 @@ const HERO_GRIP = [-4.3, 2.3, 4.6];                     // torso frame
 // close as the arm allows to where it is wanted
 const HERO_WRIST = [0, 0, 0];   // (straight: the rifle's angle is in its grip, RIFLE_Q, not in a bent wrist)
 let _rh0 = null; const RH0 = () => _rh0 || (_rh0 = r3(M.fromTRS(M.new(), [0, 0, 0], Q.fromEuler([0, 0, 0, 1], ...HERO_WRIST.map((v) => v * DEG)), 1)));
-function heroArmPlace(s, fk, gripDes, Rr) {
+function heroArmPlace(s, fk, gripDes, Rr, hinge = 0) {
   const T = r3(fk.torso), piv = PIV.gundam, vU = sub(piv.arm_R_lower, piv.arm_R_upper), vF = sub(piv.hand_R, piv.arm_R_lower);
   const Rf = r3mul(Rr, r3T(r3mul(RH0(), RQ3()))), Rh = r3mul(Rf, RH0());
   const S = partPoint(fk, 'arm_R_upper'), Ed = sub(sub(gripDes, r3v(Rf, vF)), r3v(Rh, RIFLE_T));
-  const E = add(S, scl(nrm(sub(Ed, S)), Math.hypot(...vU)));
-  const Ru = r3mul(r3between(nrm(r3v(T, vU)), nrm(sub(E, S))), T);
+  const E = add(S, scl(nrm(sub(Ed, S)), Math.hypot(...vU))), a = nrm(sub(E, S));
+  let Ru = r3mul(r3between(nrm(r3v(T, vU)), a), T);
+  // `hinge`: the upper arm's twist taken from the forearm instead (its elbow axis = the forearm's X) — the minimal swing
+  // from the torso flips the arm over when it is raised past the shoulder (the draw over his head: 129° in one frame)
+  if (hinge > 0) {
+    const fx = Rf.slice(0, 3), h = nrm(sub(fx, scl(a, V.dot(fx, a)))), u = nrm(vU), ex = nrm(sub([1, 0, 0], scl(u, u[0])));
+    const F0 = [...ex, ...u, ...V.cross([0, 0, 0], ex, u)], F1 = [...h, ...a, ...V.cross([0, 0, 0], h, a)];
+    const Rh2 = r3mul(F1, r3T(F0));
+    Ru = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(Ru), qFromCols(Rh2), hinge));
+  }
   s.pose = { ...s.pose };
   s.pose.arm_R_upper = euler3(r3mul(r3T(T), Ru));
   s.pose.arm_R_lower = euler3(r3mul(r3T(Ru), Rf));
@@ -1605,12 +1613,36 @@ function heroDraw(s, tw) {
     const h00 = 2 * u * u * u - 3 * u * u + 1, h10 = u * u * u - 2 * u * u + u, h01 = -2 * u * u * u + 3 * u * u, h11 = u * u * u - u * u;
     return h00 * K[i][c][q] + h10 * h * m(i) + h01 * K[i + 1][c][q] + h11 * h * m(i + 1);
   });
-  const grip = M.transformPoint([0, 0, 0], fk.torso, herm(1)), d = nrm(r3v(T, nrm(herm(2))));
-  const up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0])), U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
-  const Rh = r3mul([...X, ...U, ...d], r3T(RQ3()));
-  heroArmPlace(s, fk, grip, r3mul(Rh, RQ3()));
-  const k = smooth(HERO_GRAB - 0.3, HERO_GRAB - 0.04, tw);            // the hand goes back for the grip
-  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+  const grip = M.transformPoint([0, 0, 0], fk.torso, herm(1));
+  // the rifle's rotation: each key's frame carried from the one before by the minimal swing (its top re-derived from
+  // "up" spun it over when the muzzle passed straight up, ~100° in a frame), the roll left over at the aim spread
+  // evenly along the draw; slerped key to key
+  const F = [heroBackMount()].map((m) => [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]]);
+  for (let j = 1; j < K.length; j++) F.push(r3mul(r3between(F[j - 1].slice(6), nrm(K[j][2])), F[j - 1]));
+  const dN = nrm(d1), uN = nrm(sub([0, 1, 0], scl(dN, dN[1]))), xN = V.cross([0, 0, 0], uN, dN), Fl = F[F.length - 1];
+  let roll = Math.atan2(V.dot(V.cross([0, 0, 0], Fl.slice(0, 3), xN), dN), V.dot(Fl.slice(0, 3), xN));
+  if (roll < -Math.PI / 2) roll += 2 * Math.PI;   // (it comes off the back upside down: a half turn, always the same way round — at ±180° it flipped sides)
+  for (let j = 1; j < K.length; j++) F[j] = r3mul(r3axis(nrm(K[j][2]), roll * (K[j][0] - K[0][0]) / (K[K.length - 1][0] - K[0][0])), F[j]);
+  // turned at an even pace across the keys: the angle turned so far on a Hermite curve through the keys' cumulative
+  // angles (Catmull-Rom rates, at rest at both ends) — slerping each segment at its own rate jerked the speed at every key
+  const qs = F.map(qFromCols), A = [0];
+  for (let j = 1; j < qs.length; j++) A.push(A[j - 1] + 2 * Math.acos(Math.min(1, Math.abs(qs[j - 1][0] * qs[j][0] + qs[j - 1][1] * qs[j][1] + qs[j - 1][2] * qs[j][2] + qs[j - 1][3] * qs[j][3]))));
+  const mA = (j) => (j <= 0 || j >= K.length - 1 ? 0 : (A[j + 1] - A[j - 1]) / (K[j + 1][0] - K[j - 1][0]));
+  const a = clamp((2 * u * u * u - 3 * u * u + 1) * A[i] + (u * u * u - 2 * u * u + u) * h * mA(i) + (-2 * u * u * u + 3 * u * u) * A[i + 1] + (u * u * u - u * u) * h * mA(i + 1), 0, A[A.length - 1]);
+  let ia = 0; while (ia < A.length - 2 && a > A[ia + 1]) ia++;
+  const Rl = colsFromQ(Q.slerp([0, 0, 0, 1], qs[ia], qs[ia + 1], (a - A[ia]) / Math.max(1e-6, A[ia + 1] - A[ia])));
+  heroArmPlace(s, fk, grip, r3mul(T, Rl), 1 - smooth(170.55, HERO_SNAP1, tw));
+  const k = smooth(HERO_GRAB - 0.45, HERO_GRAB - 0.04, tw);            // the hand goes back for the grip
+  poseSlerp(s, keep, k);
+}
+// blend joints from `keep` to the current pose as rotations (slerp) — lerping the euler angles swung the arm the long
+// way round through a wrap, one frame turning it 100°+
+function poseSlerp(s, keep, k) {
+  if (k >= 1) return;
+  for (const p in keep) {
+    const a = Q.fromEuler([0, 0, 0, 1], ...keep[p]), b = Q.fromEuler([0, 0, 0, 1], ...s.pose[p]);
+    s.pose[p] = euler3(colsFromQ(Q.slerp([0, 0, 0, 1], a, b, k)));
+  }
 }
 const heroLeftW = (tw) => smooth(HERO_SNAP0, HERO_SNAP0 + 0.2, tw) * (1 - smooth(190.85, 191.05, tw)) * (1 - saberBusy(tw)) * (1 - Math.max(styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip'), styleW(tw, HERO_SHOTS, HERO_STYLE, 'snap')));   // on from the pac grab through the whole gunfight
 const HERO_CAP_L = [0.1, -1.0, 0.6];   // the E-pac in his left hand (hand frame)
@@ -1624,7 +1656,7 @@ function heroLeft(s, tw) {   // the left hand onto the fore-end (GRIPS support g
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   armIK(s, fk, 'gundam', 'L', tg.P, tg.Hw);
-  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+  poseSlerp(s, keep, k);
 }
 // ---------------------------------------------------------------- WEAPON GRIPS
 // Where each hand takes hold of each weapon, as the HAND's frame inside the weapon's own frame ({side, p, R}: hand pivot
