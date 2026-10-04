@@ -295,7 +295,9 @@ fn skyColor(d0: vec3f) -> vec3f {
 // ---------------------------------------------------------------- meshes
 // the moon's relief and craters: shared by the mesh shader (displacement) and the one-time bake (MOONBAKE)
 export const MOONFN = /* wgsl */ `
-const MOON_LOW: f32 = 0.82;   // how far the moon's light is lowered toward its basin's horizon (0 = the scene's own sun)
+const MOON_LOW: f32 = 0.82;     // how far the moon's light is lowered toward its basin's horizon (0 = the scene's own sun)
+const MOON_HAZE: f32 = 0.35;    // how much of the space haze lies over the moon (more toward its limb)
+const MOON_HAZE_L: f32 = 0.14;  // the haze's brightness (× the sky light)
 struct MC { g: vec3f, rim: f32, ray: f32, basin: f32, pit: f32 };
 // ONE GIANT IMPACT BASIN (2026-10-03) on the face the camera sees (moon-local, angular radius 0.42 rad): a deep bowl with
 // a terraced inner wall, a central peak, a sharp raised rim and an ejecta blanket with long bright rays; its floor is dark
@@ -365,7 +367,7 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixe
   }
   var cover = 1.0 - smoothstep(0.12, 0.3, abs(bd - 1.05));   // (none on the basin's rim — later impacts pit its floor and walls, 2026-10-04)
   var sc = 14.0; var amp = 1.0;
-  for (var oc = 0; oc < 4; oc++) {
+  for (var oc = 0; oc < 3; oc++) {   // (3 octaves: the finest pits made it read as a small rock — 2026-10-05)
     if (oc > 0 && sc * pw > 0.25) { break; }                          // (craters under ~1.5 px: they only shimmer — skip the octave)
     let p = q * sc; let fl = floor(p); let off = step(vec3f(0.5), p - fl) - 1.0;
     var cov2 = 0.0;
@@ -420,7 +422,7 @@ struct BU { a: vec4f };   // x: the moon's radius (model units), y: its seed, z:
   base *= mix(1.15, 0.42, smoothstep(0.45, 0.58, fbm(qs * 1.6 + 11.0, 4)));   // bright highlands, dark maria with crisp shores
   base *= 1.0 + 0.3 * clamp(c0.rim, 0.0, 1.0);
   base *= mix(1.0, 0.5, c0.basin);
-  base *= 1.0 - 0.42 * c0.pit;                                                // crater bowls hold shadow (they read as holes whatever the light)
+  base *= 1.0 - 0.2 * c0.pit;                                                // crater bowls hold shadow (they read as holes whatever the light)
   // the normal: the relief (finite differences of moonHN) and the finer craters' bump
   let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
   let eh = 0.0012; let h0 = moonHN(qs);
@@ -930,7 +932,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let mt = textureSampleLevel(texMoon, texSmp, mu, 0.0);
     let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
     n = normalize((inst.m * vec4f(normalize(qs + t1 * mt.r + t2 * mt.g), 0.0)).xyz);
-    base = vec3f(mt.b) * (0.97 + 0.06 * vnoise(qs * 900.0));   // (grey — 2026-10-04)
+    base = vec3f(mt.b);   // (grey — 2026-10-04; no fine grain: at 110 km it read as a rock's surface)
     rough = 0.93; metal = 0.0; texAO = 1.0;
     // CAST SHADOWS IN ITS RELIEF (2026-10-04): march the baked height toward the light along the surface — the basin's rim
     // and the crater walls throw real shadows across their floors (N·L alone left the bowls lit, reading flat)
@@ -1140,6 +1142,12 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     col += lc.rgb * att * (diffC * max(dot(n, ld), 0.0) * 1.0 + fres * pow(max(dot(n, lh), 0.0), spec_pow) * 0.5);
   }
   col += emis;
+  // AERIAL PERSPECTIVE on the moon (2026-10-05): 110 km off it sat as crisp and contrasty as the ships beside it and read
+  // close; the space haze of the backdrop (its sky light's colour) lifts its blacks and softens it, more toward the limb
+  if (lunar) {
+    let hz = MOON_HAZE * (0.75 + 0.5 * pow(1.0 - ndv, 2.0));
+    col = mix(col, F.ambUp.rgb * F.sunCol.w * MOON_HAZE_L, clamp(hz, 0.0, 0.9));
+  }
   col += inst.tint.rgb * hyper * 6.0;
   if (((inst.clipMin.w > 0.5 && inst.clipMin.w < 1.5) || inst.clipMin.w > 2.5) && inst.clipMax.w < 0.0) {   // beam-cut seam: deep molten orange, yellow-hot in the core
     col = mix(col, mix(vec3f(3.0, 0.55, 0.08), vec3f(4.2, 2.4, 0.8), clamp(tornEdge - 1.2, 0.0, 1.0)) * tornEdge, clamp(tornEdge, 0.0, 1.0)) * (0.85 + 0.15 * sin(F.camPos.w * 23.0 + i.lp.x * 3.0));
