@@ -146,6 +146,7 @@ L.iaiEnd = P({
 // the rifle put away over the shoulder (onto the pack) before the saber is drawn
 // ---- the gunfight (beam rifle in the right hand; the exact aim is laid per frame — aimRifle)
 L.flyAim = W(L.aimRifle, { leg_L_upper: [-20, 0, 10], leg_L_lower: [50, 0, 0], leg_R_upper: [15, 0, -8], leg_R_lower: [60, 0, 0], _body: [18, 0, 0] });
+L.drawAim = W(L.aimRifle, { leg_L_upper: [-14, 0, 7], leg_L_lower: [24, 0, 0], foot_L: [14, 0, 0], leg_R_upper: [6, 0, -6], leg_R_lower: [32, 0, 0], foot_R: [18, 0, 0], _body: [3, 0, 0] });   // the draw (scene 33): upright, legs hanging down under him, knees just soft
 L.dodgeAimL = W(L.flyAim, { torso: [5, 20, -15], head: [0, -15, 8], _body: [0, 15, 22] });
 L.dodgeAimR = W(L.flyAim, { torso: [5, -20, 15], head: [0, 15, -8], _body: [0, -15, -22] });
 L.dodgeUpAim = W(L.flyAim, { leg_L_upper: [-80, 0, 10], leg_L_lower: [110, 0, 0], leg_R_upper: [-70, 0, -10], leg_R_lower: [120, 0, 0], _body: [-20, 0, 0] });
@@ -758,7 +759,7 @@ const heroPos = posTrack([
   [193.8, DP(36, -12, 3), 'io'], [194.6, DP(44, -14, 3), 'io'],   // on away from it (the reactor goes behind him)
 ]);
 const heroPose = poseTrack([
-  [169.3, L.flight], [170.0, L.flight], [170.2, L.windup, 'out'], [170.5, L.flyAim, 'out'],   // winds up, rips the rifle off his back (the arms are IK'd: heroDraw)
+  [169.3, L.flight], [170.0, L.flight], [170.2, L.windup, 'out'], [170.6, L.drawAim, 'out'], [172.4, L.drawAim], [173.0, L.flyAim, 'io'],   // winds up, rips the rifle off his back (the arms are IK'd: heroDraw)
   [176.55, L.flyAim, 'io'], [176.95, L.dodgeAimL, 'out'], [177.3, L.flyAim, 'io'],
   [177.65, L.dodgeAimR, 'out'], [177.95, L.flyAim, 'io'], [178.25, L.flyAim, 'io'],
   [178.55, L.dodgeUpAim, 'out'], [178.9, L.aimRifle, 'io'], [179.4, L.flyAim, 'io'],
