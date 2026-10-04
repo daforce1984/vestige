@@ -304,15 +304,13 @@ struct MC { g: vec3f, rim: f32, ray: f32, basin: f32, pit: f32 };
 // ejecta blanket that thins away outside; depth ≈ 1, rim ≈ +0.25 (2026-10-03)
 fn craterProf(d: f32) -> f32 {
   let crest = 0.025 * exp(-abs(d - 1.0) / 0.045);                              // a sharp but LOW crest (craters are holes, not raised rings; lowered again 2026-10-04)
-  if (d < 1.0) { return -1.0 + 1.025 * pow(smoothstep(0.6, 1.0, d), 1.6) + crest; }   // (a broad flat floor and a steep wall)
+  if (d < 1.0) { return -1.0 + 1.025 * d * d + crest; }   // (a ROUND bowl — was a flat floor and a steep wall; 2026-10-04)
   return 0.025 * exp(-(d - 1.0) / 0.3) + crest;
 }
 fn basinH(d: f32) -> f32 {
   var h = 0.01 * exp(-max(d - 1.0, 0.0) / 0.45) * step(1.0, d);               // ejecta blanket (low)
   if (d < 1.0) {
-    let wall = smoothstep(0.78, 1.0, d);
-    h = mix(-0.9, 0.01, pow(wall, 1.5))                                      // the bowl: a flat floor, the wall steepest under the rim (meets the blanket: no step)
-      + 0.32 * exp(-pow(d / 0.11, 2.0));                                       // central peak
+    h = 0.01 - 0.91 * pow(max(1.0 - d * d, 0.0), 0.6);                        // the bowl: ROUND, deepest in the middle, its sides steepening toward the rim (2026-10-04: was a flat floor, a steep wall and a central peak)
   }
   return h + 0.04 * exp(-abs(d - 1.0) / 0.035);                               // the rim: a sharp, low crest (a third of what it was: it stood up like a wall — 2026-10-04)
 }
@@ -334,7 +332,7 @@ fn moonHeight(q: vec3f) -> f32 {
   let bd = basinD(q);
   let jag = 0.6 + 0.8 * vnoise(q * 34.0);                                       // (the crest broken and jagged along its length)
   var h = mix(basinH(bd), basinH(bd) - 0.04 * exp(-abs(bd - 1.0) / 0.035) * (1.0 - jag), 1.0) * 0.12 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
-  var cover = smoothstep(1.3, 1.05, bd);
+  var cover = 1.0 - smoothstep(0.12, 0.3, abs(bd - 1.05));   // (none on the basin's rim; inside it and outside, the small ones pit it — 2026-10-04)
   var sc = 14.0;
   for (var oc = 0; oc < 2; oc++) {
     let p = q * sc; let fl = floor(p); let off = step(vec3f(0.5), p - fl) - 1.0;
@@ -365,7 +363,7 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixe
     o.basin = smoothstep(0.62, 0.45, bd);   // (its shape is displaced geometry now — moonHeight; no rim lines)
 
   }
-  var cover = smoothstep(1.3, 1.05, bd);                                        // (nothing smaller inside the basin)
+  var cover = 1.0 - smoothstep(0.12, 0.3, abs(bd - 1.05));   // (none on the basin's rim — later impacts pit its floor and walls, 2026-10-04)
   var sc = 14.0; var amp = 1.0;
   for (var oc = 0; oc < 4; oc++) {
     if (oc > 0 && sc * pw > 0.25) { break; }                          // (craters under ~1.5 px: they only shimmer — skip the octave)
@@ -932,7 +930,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let mt = textureSampleLevel(texMoon, texSmp, mu, 0.0);
     let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
     n = normalize((inst.m * vec4f(normalize(qs + t1 * mt.r + t2 * mt.g), 0.0)).xyz);
-    base = mt.b * vec3f(1.06, 1.0, 0.93) * (0.97 + 0.06 * vnoise(qs * 900.0));
+    base = vec3f(mt.b) * (0.97 + 0.06 * vnoise(qs * 900.0));   // (grey — 2026-10-04)
     rough = 0.93; metal = 0.0; texAO = 1.0;
     // CAST SHADOWS IN ITS RELIEF (2026-10-04): march the baked height toward the light along the surface — the basin's rim
     // and the crater walls throw real shadows across their floors (N·L alone left the bowls lit, reading flat)
@@ -1098,7 +1096,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // craters' shadows were filled in and the big basin read flat (2026-10-04)
   let sunK = select(1.0, 0.0, lunar && F.rimCol.w > 0.5);
   var col = F.sunCol.rgb * sh * lsd * sunK * (diffC / 3.14159 * 2.6 + min(specG, vec3f(40.0)) * select(1.0, 0.0, lunar));
-  let amb = mix(F.ambDown.rgb, F.ambUp.rgb, n.y * 0.5 + 0.5) * F.sunCol.w * select(1.0, 0.3, lunar);
+  var amb = mix(F.ambDown.rgb, F.ambUp.rgb, n.y * 0.5 + 0.5) * F.sunCol.w * select(1.0, 0.3, lunar);
+  if (lunar) { amb = vec3f(dot(amb, vec3f(0.2126, 0.7152, 0.0722))); }   // (the moon grey: no blue cast from the sky)
   col += (diffC + F0 * 0.3) * amb * ao * texAO;
   // environment reflection with a brushed-metal streak (anisotropic look along the hull's long axis)
   let Rv = reflect(-V, n);
@@ -1119,7 +1118,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let G2 = (ndl2 / (ndl2 * (1.0 - kq) + kq)) * (ndv / (ndv * (1.0 - kq) + kq));
     let Fh2 = F0 + (1.0 - F0) * pow(1.0 - max(dot(H2, V), 0.0), 5.0);
     let spec2 = D2 * G2 * Fh2 / max(4.0 * ndl2 * ndv, 1e-3);
-    col += F.fill.rgb * moonSh * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
+    col += select(F.fill.rgb, vec3f(dot(F.fill.rgb, vec3f(0.2126, 0.7152, 0.0722))), lunar) * moonSh * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
   }
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;
