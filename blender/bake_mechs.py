@@ -28,7 +28,22 @@ MODEL_OPTS = {'enemy_ms': dict(wear=0.6, bare=(0.52, 0.52, 0.54), paint_rough=0.
                                           'tryout_red': ('white', 4.5, (0.78, 0.055, 0.06)),
                                           'tryout_frame': ('frame', 3.0, (1.0, 1.0, 1.0)),
                                           'tryout_grey': ('metal', 2.5, (0.55, 0.55, 0.57))},
-                               tex_height_mats={'tryout_frame', 'tryout_grey'})}
+                               tex_height_mats={'tryout_frame', 'tryout_grey'},
+                               # PER PIECE (2026-10-05): every separate piece (connected mesh island) gets its own colour /
+                               # finish from its material's palette, and the panel textures are projected along the
+                               # piece's own axes (PCA) instead of the model's — so they run with the part, not across it.
+                               # palette: material -> [(weight, linear tint, roughness, metalness, source texture)]
+                               per_piece=True,
+                               palette={'tryout_white': [(40, (0.8, 0.8, 0.8), 0.4, 0.08, 'white'),           # satin white
+                                                         (22, (0.5, 0.52, 0.56), 0.46, 0.18, 'white'),         # cool grey
+                                                         (14, (0.76, 0.72, 0.62), 0.52, 0.06, 'white'),        # warm off-white, matte
+                                                         (14, (0.78, 0.055, 0.06), 0.34, 0.1, 'white'),        # red accent
+                                                         (10, (0.5, 0.5, 0.53), 0.32, 0.75, 'metal')],         # bare gunmetal
+                                        'tryout_frame': [(50, (1.0, 1.0, 1.0), 0.42, 0.6, 'frame'),             # dark frame
+                                                         (30, (0.42, 0.42, 0.45), 0.34, 0.8, 'metal'),          # machined steel
+                                                         (20, (0.55, 0.55, 0.6), 0.55, 0.45, 'frame')],         # anodised grey
+                                        'tryout_red': [(1, (0.78, 0.055, 0.06), 0.34, 0.1, 'white')],
+                                        'tryout_grey': [(1, (0.55, 0.55, 0.57), 0.38, 0.55, 'metal')]})}
 TEX_SRC = {'white': 'vestige_mech_white_armor_albedo_v1.png', 'frame': 'vestige_mech_dark_frame_albedo_v1.png',
            'metal': 'vestige_mech_metal_detail_albedo_v1.png', 'height': 'vestige_mech_panel_height_v1.png',
            'mask': 'vestige_mech_wear_grime_mask_v1.png'}
@@ -177,6 +192,14 @@ def build_bake_graph(m, scorches, seed):
     sv = g.vmath('MULTIPLY', posn, (9.0, 9.0, 0.45))
     streak = g.math('MULTIPLY', g.mr(g.noise(sv, 1.0, 3.0, 0.5), 0.52, 0.72), 0.45)
     tcls = OPT.get('tex_class', {}).get(m.name)
+    pp = None
+    if OPT.get('per_piece') and m.name in OPT.get('palette', {}):
+        pp = g.node('ShaderNodeAttribute', attribute_name='pp').outputs['Vector']   # the piece's own frame (assign_pieces)
+        ptint = g.node('ShaderNodeAttribute', attribute_name='pt').outputs['Color']
+        pmat = g.node('ShaderNodeSeparateColor')
+        g.link(g.node('ShaderNodeAttribute', attribute_name='pm').outputs['Color'], pmat.inputs[0])
+        paint_rough, paint_metal = pmat.outputs[0], pmat.outputs[1]
+    tpos = pp if pp is not None else posn
     cav = None
     if tcls:
         # the AI wear / grime mask: its bright flecks chip the paint to bare metal, its dim smears are grime
@@ -185,7 +208,7 @@ def build_bake_graph(m, scorches, seed):
         grime = g.math('MAXIMUM', grime, g.mr(wm, 0.06, 0.28, 0.0, 0.55))
         streak = g.math('MULTIPLY', streak, 0.5)                 # the sources carry their own streaking
         if m.name in OPT.get('tex_height_mats', ()):
-            h = box_tex(g, 'height', posn, tcls[1], color=False)
+            h = box_tex(g, 'height', tpos, tcls[1], color=False)
             cav = g.mr(h, 0.47, 0.3)                              # panel grooves / vents / bolt rims (height < plateau)
     # --- scratches (thin stretched noise iso-lines, masked)
     sc = g.vmath('MULTIPLY', posn, (30.0, 30.0, 2.5))
@@ -207,8 +230,13 @@ def build_bake_graph(m, scorches, seed):
         mt = g.node('ShaderNodeMix', data_type='RGBA', blend_type='MULTIPLY', clamp_factor=True)
         mt.inputs['Factor'].default_value = 1.0
         ins_t = [x for x in mt.inputs if x.type == 'RGBA']
-        g.link(box_tex(g, tcls[0], posn, tcls[1]), ins_t[0])
-        g.val(tuple(tcls[2]), ins_t[1])
+        if pp is not None:   # the piece's source texture (pm.b: 0 its material's own, 1 the metal detail) × its tint
+            alt = 'metal' if tcls[0] != 'metal' else 'white'
+            g.link(g.mix(pmat.outputs[2], box_tex(g, tcls[0], tpos, tcls[1]), box_tex(g, alt, tpos, 2.5)), ins_t[0])
+            g.link(ptint, ins_t[1])
+        else:
+            g.link(box_tex(g, tcls[0], posn, tcls[1]), ins_t[0])
+            g.val(tuple(tcls[2]), ins_t[1])
         base = [x for x in mt.outputs if x.type == 'RGBA'][0]
         col = base
         dark_paint = (0.02, 0.02, 0.022)
@@ -252,6 +280,72 @@ def build_bake_graph(m, scorches, seed):
     g.link(rough, orm.inputs[1])
     g.link(metal, orm.inputs[2])
     return g, col, orm.outputs[0]
+
+
+def assign_pieces(meshes):
+    """per connected piece: 'pp' (its corners in the piece's own PCA frame, offset per piece), 'pt' (palette tint),
+    'pm' (roughness, metalness, 1 = the metal-detail source texture) — mirror twins get the same pick"""
+    import bmesh, zlib
+    import numpy as np
+    pal = OPT['palette']
+    for o in meshes:
+        me = o.data
+        bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+        seen, comps = set(), []
+        for f in bm.faces:
+            if f.index in seen:
+                continue
+            stack, comp = [f], []
+            seen.add(f.index)
+            while stack:
+                x = stack.pop(); comp.append(x.index)
+                for v in x.verts:
+                    for nf in v.link_faces:
+                        if nf.index not in seen:
+                            seen.add(nf.index); stack.append(nf)
+            comps.append(comp)
+        bm.free()
+        for nm in ('pp', 'pt', 'pm'):
+            if nm in me.attributes:
+                me.attributes.remove(me.attributes[nm])
+        app = me.attributes.new('pp', 'FLOAT_VECTOR', 'CORNER')
+        apt = me.attributes.new('pt', 'FLOAT_COLOR', 'CORNER')
+        apm = me.attributes.new('pm', 'FLOAT_COLOR', 'CORNER')
+        W = o.matrix_world
+        for comp in comps:
+            vids = sorted({vi for fi in comp for vi in me.polygons[fi].vertices})
+            P = np.array([tuple(W @ me.vertices[vi].co) for vi in vids])
+            c = P.mean(0)
+            ev, vec = np.linalg.eigh(np.cov((P - c).T) + np.eye(3) * 1e-9)
+            A = vec[:, ::-1]
+            if np.linalg.det(A) < 0:
+                A[:, 2] *= -1
+            mats = [me.materials[me.polygons[fi].material_index].name if me.materials[me.polygons[fi].material_index] else '' for fi in comp]
+            mname = max(set(mats), key=mats.count)
+            key = '%.1f,%.1f,%.1f,%d' % (abs(c[0]), c[1], c[2], len(comp))
+            rnd = random.Random(zlib.crc32(key.encode()))
+            off = np.array([rnd.uniform(0, 50), rnd.uniform(0, 50), rnd.uniform(0, 50)])
+            opts = pal.get(mname)
+            if opts is None:
+                pick = (1, (1.0, 1.0, 1.0), 0.5, 0.2, 'white')
+            elif len(comp) < 40:
+                pick = opts[0]                                    # (bolts and slivers: the material's base finish)
+            else:
+                tot = sum(w for w, *_ in opts); x = rnd.uniform(0, tot)
+                for pick in opts:
+                    x -= pick[0]
+                    if x <= 0:
+                        break
+            _, tint, rough, metal, src = pick
+            alt = 1.0 if (src == 'metal') != (mname == 'tryout_grey') else 0.0
+            for fi in comp:
+                poly = me.polygons[fi]
+                for li, vi in zip(poly.loop_indices, poly.vertices):
+                    q = (np.array(tuple(W @ me.vertices[vi].co)) - c) @ A + off
+                    app.data[li].vector = tuple(q)
+                    apt.data[li].color = (*tint, 1.0)
+                    apm.data[li].color = (rough, metal, alt, 1.0)
+        print('PIECES', o.name, len(comps), flush=True)
 
 
 def run(name):
@@ -301,6 +395,8 @@ def run(name):
     for o in R.sample(cand, min(4, len(cand))):
         v = o.data.vertices[R.randrange(len(o.data.vertices))]
         scorches.append((tuple(o.matrix_world @ v.co), R.uniform(0.7, 1.3)))
+    if OPT.get('per_piece'):
+        assign_pieces(meshes)
     # ---- per-material bake graphs
     mats = {m for o in meshes for m in o.data.materials if m}
     graphs = {}
@@ -340,6 +436,10 @@ def run(name):
             m.node_tree.nodes.remove(n)
         if orig:
             m.node_tree.links.new(orig[0], out.inputs['Surface'])
+    for o in meshes:   # (the per-piece bake attributes are not part of the model)
+        for nm in ('pp', 'pt', 'pm'):
+            if nm in o.data.attributes:
+                o.data.attributes.remove(o.data.attributes[nm])
     sc.render.engine = 'BLENDER_EEVEE'
     bpy.ops.export_scene.gltf(filepath=os.path.join(ASSETS, name + '.glb'), export_format='GLB', export_yup=True,
                               export_apply=False, export_materials='EXPORT', export_texcoords=True,
