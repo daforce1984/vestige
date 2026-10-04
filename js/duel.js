@@ -510,7 +510,7 @@ const ringE = (phi, r, h) => ringH(phi + Math.PI, r, h);
 // advance, round the circling run. Its full-power shot: FINALE_T (he slips it).
 export const SERAPH_SHOTS = [176.75, 177.5, 178.35, 181.4, 182.1, 182.8, 184.45, 185.35, 186.4, 187.45];
 export const FINALE_T = 190.85, FINALE_END = 191.35;
-export const ENEMY_GRAB = 173.45, ENEMY_EYE = 173.95, ENEMY_CHARGE0 = 174.1, ENEMY_CHARGE1 = 175.15;   // it rips its rifle off its hip, levels it, its eye glints, it charges (3 steps)
+export const ENEMY_GRAB = 174.0, ENEMY_EYE = 173.95, ENEMY_CHARGE0 = 174.1, ENEMY_CHARGE1 = 175.15;   // its eye glints, it rips its rifle out of the holster on its right thigh (scene 36) and levels it, it charges (3 steps)
 // the transforming shot (see transPath): the rifle opens out TRANS0 →, fires at TRANS_SHOT, the energy body bursts at TRANS_HIT
 export const TRANS0 = 183.95, TRANS_SHOT = 184.45, TRANS_PASS = 184.95, TRANS_HIT = 185.13;   // fires → a hair past his head → bursts behind him
 export const transK = (t) => smooth(TRANS0, TRANS0 + 0.35, t) * (1 - smooth(184.95, 185.35, t));
@@ -886,7 +886,7 @@ const TWO_HAND = (tw) => (1 - smooth(178.4, 178.55, tw) * (1 - smooth(179.05, 17
 const HAND_TO_RIFLE = () => ENEMY_HOLE;
 // VANGUARD's fist: the centre of its hole (hand-local, measured from the mesh — the fingers curl round hand Z) = where its
 // rifle's grip sits; its left fist (mirrored) takes the handguard from below, palm up, knuckle line along the barrel
-export const ENEMY_HOLE = [0.82, -0.29, -0.36];
+export const ENEMY_HOLE = [0.82, -2.1, -0.36];
 const ENEMY_HOLE_L = [-0.82, -0.29, -0.36], E_SUP_R = [0, 0, -1, 1, 0, 0, 0, -1, 0], E_FORE = [0, -1.75, 0.35];   // (hand X = rifle −Z, hand Y = rifle X, hand Z = the barrel −Y)
 const E_POCKET = [-2.7, 4.7, 1.0], E_STOCK = 4.4;   // the right shoulder's pocket (torso frame) and how far ahead of it the grip sits along the line of fire
 function aim2H(s, target, k, kL, gripL = [-0.35, 3.9, 2.3]) {
@@ -1337,11 +1337,27 @@ function enemyState_(t) {
         for (const p in o) s.pose[p] = [0, 1, 2].map((c) => lerp(o[p][c], s.pose[p][c], kL)); }
     }
   }
+  if (tw < ENEMY_GRAB + 0.4) holsterDraw(s, tw);
   if (tw > CUT_T) {   // cut: the machine keeps the pose it was cut in (both halves), sagging only slowly toward limp — the aim
     const P0 = cutPose(), k = 0.6 * smooth(0, 2.2, tw - CUT_T);                    // IK switching off made the arms jump
     for (const p in P0) { const a = P0[p], b = s.pose[p] || a; s.pose[p] = [lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)]; }
   }
   return hitReact(tw < SERAPH_HANDOFF ? 'e1' : 'e2', tw, s, 'enemy_ms');
+}
+// ITS RIFLE ON ITS RIGHT THIGH (2026-10-05): holstered along the outside of the thigh, the grip just under the hip (as
+// high as the hanging hand reaches), the barrel down toward the knee, the long stock raked back; the hand goes down
+// for it, rips it out at ENEMY_GRAB and swings it up into the aim (the joints slerped from the holster grip to the aim)
+export const ENEMY_HOLSTER_T = [-1.32, -1.1, -0.3];   // leg_R_upper frame: outside the thigh (its outer face at x −0.87)
+let _hol = null;
+export const enemyHolsterLocal = () => _hol || (_hol = M.fromTRS(new Float32Array(16), ENEMY_HOLSTER_T, Q.fromEuler([0, 0, 0, 1], -0.4, 0, -0.12), 1));
+const holsterW = (tw) => smooth(ENEMY_GRAB - 0.3, ENEMY_GRAB - 0.03, tw) * (1 - smooth(ENEMY_GRAB + 0.03, ENEMY_GRAB + 0.34, tw));
+function holsterDraw(s, tw) {
+  const w = holsterW(tw); if (w <= 0) return;
+  const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
+  s.pose = { ...s.pose }; s.pose.rifle = [0, 0, 0];
+  const fk = duelFK(s, 'enemy_ms'), H = M.mul(M.new(), fk.leg_R_upper, enemyHolsterLocal()), Rh = r3(H);
+  armIK(s, fk, 'enemy_ms', 'R', sub(M.transformPoint([0, 0, 0], H, [0, 0, 0]), r3v(Rh, ENEMY_HOLE)), Rh);
+  poseSlerp(s, keep, w);
 }
 // ============================================================================ forward kinematics (same math as renderer + msMatrix)
 // pivots in model space (glTF, +Z forward, +X = model's left) from assets/*.glb
