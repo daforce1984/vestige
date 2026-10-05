@@ -146,7 +146,7 @@ L.iaiEnd = P({
 // the rifle put away over the shoulder (onto the pack) before the saber is drawn
 // ---- the gunfight (beam rifle in the right hand; the exact aim is laid per frame — aimRifle)
 L.flyAim = W(L.aimRifle, { leg_L_upper: [-20, 0, 10], leg_L_lower: [50, 0, 0], leg_R_upper: [15, 0, -8], leg_R_lower: [60, 0, 0], _body: [18, 0, 0] });
-L.drawAim = W(L.aimRifle, { leg_L_upper: [-14, 0, 7], leg_L_lower: [24, 0, 0], foot_L: [14, 0, 0], leg_R_upper: [6, 0, -6], leg_R_lower: [32, 0, 0], foot_R: [18, 0, 0], _body: [3, 0, 0] });   // the draw (scene 33): upright, legs hanging down under him, knees just soft
+L.drawAim = W(L.aimRifle, { head: [12, 18, 0], leg_L_upper: [-42, 0, 8], leg_L_lower: [68, 0, 0], foot_L: [18, 0, 0], leg_R_upper: [20, 0, -6], leg_R_lower: [34, 0, 0], foot_R: [24, 0, 0], _body: [7, 0, 0] });   // (braced as on the Codex stance sheet sigma-rifle-stance-v1: left leg forward and bent, right leg back, a slight lean in, head down behind the sights)   // the draw (scene 33): upright, legs hanging down under him, knees just soft
 L.dodgeAimL = W(L.flyAim, { torso: [5, 20, -15], head: [0, -15, 8], _body: [0, 15, 22] });
 L.dodgeAimR = W(L.flyAim, { torso: [5, -20, 15], head: [0, 15, -8], _body: [0, -15, -22] });
 L.dodgeUpAim = W(L.flyAim, { leg_L_upper: [-80, 0, 10], leg_L_lower: [110, 0, 0], leg_R_upper: [-70, 0, -10], leg_R_lower: [120, 0, 0], _body: [-20, 0, 0] });
@@ -1563,9 +1563,9 @@ const HERO_GRIP_SH = [-4.3, 2.7, 4.3];
 // under the rifle, palm up, cradling it (not the fist round the fore-end — it never reached: the fore-end was 11.6 from
 // his left shoulder, his arm 6.1). The grip drawn in to the middle of his chest so both hands reach (HERO_GRIP_BLADE)
 const bladeW = (tw) => smooth(170.55, 170.95, tw) * (1 - smooth(173.2, 173.9, tw));   // (held through scene 34, his face dead still; eased out in 35, which is on VANGUARD)
-const BLADE_YAW = -0.92;
-const HERO_CRADLE = [0, -1.55, 4.7];   // rifle frame: under its middle (its belly is at y ≈ −1.0; it spans z −3.7 … 13.2)
-const HERO_GRIP_BLADE = [-0.5, 3.8, 3.0];   // torso frame: the grip drawn in toward the chest's middle (from −4.3, 2.3, 4.6), so the left hand reaches under the rifle (it couldn't: 11.6 from the left shoulder, the arm 6.1)
+const BLADE_YAW = -0.8;
+const HERO_CRADLE = [0, -1.55, 3.0];   // rifle frame: under its middle (its belly is at y ≈ −1.0; it spans z −3.7 … 13.2)
+const HERO_GRIP_BLADE = [-1.5, 3.6, 2.6];   // torso frame: the grip high on the right of his chest so the stock butts into his right shoulder (stock sigma-rifle-stance-v1); the left hand just ahead of it underneath — his short arms reach that
 const SH_YAW = -0.3;   // (the chest turned a little right of the line: the gun arm hangs along his side instead of folding across the chest)   // shouldered: the grip (torso frame) — the stock's butt then sits at the right shoulder (joint at −4.6, 3.8, 0)
 function heroAim2H(s, target, k) {
   s.pose = { ...s.pose };
