@@ -990,6 +990,7 @@ function ambac(s, arr, fwdBase) {
   for (const [o, w] of [[-0.08, 1], [0, 2], [0.08, 1]]) a = add(a, scl(sub(vel(t + o + 0.08), vel(t + o - 0.08)), w / 0.16 / 4));
   const f = nrm([fwdBase[0], 0, fwdBase[2]]), l = [f[2], 0, -f[0]];               // forward, own left (horizontal)
   const vf = V.dot(v, f), vl = V.dot(v, l), af = V.dot(a, f), al = V.dot(a, l), au = a[1];
+  s.accel = Math.hypot(a[0], a[1], a[2]);                                        // (shots.js: the thrusters fire only on a hard push)
   const k = 1 - (s._idle || 0);
   if (k <= 0) return [0, 0];
   const sf = sat1(vf, 45), sl = sat1(vl, 45), sa = sat1(af, 160), sal = sat1(al, 160), sau = sat1(au, 160), spd = sat1(Math.hypot(vf, vl, v[1]), 60);

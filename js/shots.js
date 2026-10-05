@@ -802,7 +802,7 @@ export function drawGundam(R, t, s, opts = {}) {
   const pastHero = opts.pastState || ((tau) => { const cutAt = t >= 340 ? 340 : t >= 163 && t < 170 ? 163 : -1e9, q = gundamState(Math.max(t - tau, cutAt)); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
   const bk = s.boostK ?? (inDuel ? sat((s.boost - 0.62) / 0.38) : 0);   // duel quick-boosts: the nozzles flare
-  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.9, 1.2, 2.6], (inDuel ? 1.3 : 0.9) * (1 + 0.9 * bk), s.thr, (inDuel ? 2.4 : 1.2) + 2.2 * bk, s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
+  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.9, 1.2, 2.6], (inDuel ? 1.3 : 0.9) * (1 + 0.9 * bk), s.thr * (inDuel ? driveK(s) : 1), (inDuel ? 2.4 : 1.2) + 2.2 * bk, s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
   const eye = emitWorld(R, 'gundam', e, 'eye');
   if (!s.fpv && eye && eyeK > 0.05) R.glow(eye, (s.visorFlare !== undefined ? 0.4 : 0.55 + bz * 2.4) * Math.min(eyeK, 1.2), [lerp(0.5, 5, bz) * eyeK, lerp(1.6, 0.3, bz) * eyeK, lerp(1.0, 0.2, bz) * eyeK], 0.35);   // visor: a small glint (a big ball read as a stray light next to him)
   if (!s.fpv && eyeK > 0.05 && (s.visorFlare !== undefined)) {        // visor band glow: every emitter point + a light spill
@@ -903,6 +903,9 @@ function shieldScorch(e, t) {
 }
 // …and the shot's energy spreads out over its face from the hit in every direction and dies away: a ragged ring
 // racing out across the plate, radial pixel streaks skating flat along it, motes shed from the front fading behind
+// a mech's thrusters fire only when it is really pushing (2026-10-06): a hard acceleration — a dash, a jink, a brake —
+// or a flat-out run; drifting or hovering, the nozzles are dark (s.accel from duel.js ambac, m/s²)
+const driveK = (s) => (s.accel === undefined ? 1 : Math.max(smooth(45, 130, s.accel), smooth(130, 240, s.speed || 0)));
 const _sparkPts = new Map();   // the contact point at each spark burst's birth (block shot)
 function drawBlockSplash(R, t) {
   const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0 || lt > 1.8) return;
@@ -1296,7 +1299,7 @@ function drawEnemyMS(R, t, s, idx) {
   e.hidden = { ...(e.hidden || {}), rifle: 1 };
   const fn = idx === 1 ? enemyMS1 : enemyMS2;
   const ebk = sat(((s.boost ?? 0.5) - 0.6) / 0.4);   // quick-boosts: the nozzles flare
-  engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE.map((c) => c * 1.3), 1.3 * (1 + 0.9 * ebk), s.thr ?? 0.8, 2.4 + 2.2 * ebk, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
+  engineGlows(R, 'enemy_ms', e, ENEMY_ENGINE.map((c) => c * 1.3), 1.3 * (1 + 0.9 * ebk), (s.thr ?? 0.8) * (t > 169.5 && t < 200 ? driveK(s) : 1), 2.4 + 2.2 * ebk, t > 169.5 && t < 200 ? null : { past: (tau) => { const q = fn(t - tau); return { m: msMatrix(new Float32Array(16), q), pose: q.pose }; }, particles: true });
   const BL = BLOWS[idx];
   if (BL && t > BL.ev.t) {
     const tm = R.partWorld('enemy_ms', e, 'torso');

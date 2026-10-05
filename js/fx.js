@@ -187,6 +187,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     }
   }
   if (isShip && entry.forceThrottle && entry.throttleK !== undefined) throttle *= entry.throttleK;   // (a forced drive winding down: the plume fades, the nozzle hearts stay)
+  if (!isShip && throttle < 0.04) return;   // (mechs: the caller scales throttle by how hard they are pushing — shots.js driveK)
   const time = R._time || 0;
   for (let i = 0; i < pts.length; i++) {
     const ep = pts[i];
@@ -196,10 +197,15 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     const r = Math.max(ep.r, 0.3) * scale;
     const flick = 0.92 + Math.sin(time * 27 + i * 1.7) * 0.08;
     const pod = name === 'enemy_ms' && ep.pos[1] < -2;                          // its booster pods' nozzles (their lower ends)
-    M.transformDir(tmp2, pm, name === 'gundam' ? GUNDAM_NOZZLE : pod ? [ENEMY_POD[0] * Math.sign(ep.pos[0] || 1), ENEMY_POD[1], ENEMY_POD[2]] : [0, 0, -1]);   // (Sigma's backpack nozzles point DOWN, a little back; its pods fire down their own axis)
+    M.transformDir(tmp2, pm, ep.dir || (name === 'gundam' ? GUNDAM_NOZZLE : pod ? [ENEMY_POD[0] * Math.sign(ep.pos[0] || 1), ENEMY_POD[1], ENEMY_POD[2]] : [0, 0, -1]));   // (each nozzle's own axis, measured from its mesh)   // (Sigma's backpack nozzles point DOWN, a little back; its pods fire down their own axis)
     V.norm(tmp2, tmp2);
     const vent = name === 'enemy_ms' && !pod ? 0.45 : 1;                         // the pods' upper ends: small vents
-    const len = r * vent * (1.7 + throttle * 5.0) * Math.max(0.5, trail * 0.6);
+    let len = r * vent * (1.7 + throttle * 5.0) * Math.max(0.5, trail * 0.6);
+    if (!isShip) {   // a crackling flame, not a rigid cone: its length and aim jitter frame to frame
+      const fr = Math.floor((R._time || 0) * 30), h1 = hash(fr * 1.7 + i * 9.1), h2 = hash(fr * 2.3 + i * 4.7 + 11);
+      len *= 0.78 + 0.44 * h1;
+      V.madd(tmp2, tmp2, randDir(tmp3, fr * 0.37 + i * 5.3), 0.07 * h2); V.norm(tmp2, tmp2);
+    }
     // seen straight down the exhaust axis the plume planes collapse into a flat glowing disc: fade it end-on
     let endOn = 1;
     if (R.camPos) { const vx = R.camPos[0] - tmp[0], vy = R.camPos[1] - tmp[1], vz = R.camPos[2] - tmp[2], vl = Math.hypot(vx, vy, vz) || 1;
@@ -218,7 +224,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
         _pe.m.set(st.m); _pe.pose = st.pose || null;
         const pmp = R.partWorld(name, _pe, pname);
         M.transformPoint(_pn, pmp, ep.pos);
-        M.transformDir(_pa, pmp, [0, 0, -1]); V.norm(_pa, _pa);
+        M.transformDir(_pa, pmp, ep.dir || [0, 0, -1]); V.norm(_pa, _pa);
         V.madd(_pn, _pn, _pa, v * tau);
         const f = 1 - s2 / (N + 1);
         const kb = f * f * 0.5 + (s2 <= 2 ? 0.35 * f : 0);           // cone: thick + bright near the nozzle, thin + faint at the end
@@ -238,7 +244,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
           _pe.m.set(st.m); _pe.pose = st.pose || null;
           const pmp = R.partWorld(name, _pe, pname);
           M.transformPoint(_pn, pmp, ep.pos);
-          M.transformDir(_pa, pmp, [0, 0, -1]); V.norm(_pa, _pa);
+          M.transformDir(_pa, pmp, ep.dir || [0, 0, -1]); V.norm(_pa, _pa);
           const seed = p * 13.7 + i + Math.floor(time / life + hash(p * 7.3 + i)) * 3.3;
           const spread = randDir(tmp3, seed);
           const sp = v * (0.6 + hash(seed) * 0.6);
@@ -256,6 +262,20 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     R.flame(tmp, tmp3, rw, c, 1.4, i * 3.1, 1);
     crossPlume(R, tmp, tmp2, rw * 0.5, len * 1.1, c);                 // the same cone plume as the ships (hot, additive base)
     R.glow(tmp, rw * 0.9, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5], 0.15);   // tight nozzle glow
+    { const fr = Math.floor(time * 30);   // ragged: hot puffs breaking off along the jet, a few sparks spat out of it
+      for (let q = 0; q < 3; q++) {
+        const hq = hash(fr * 3.1 + i * 7 + q * 13), a = (0.35 + 0.55 * (q + hq) / 3) * len;
+        V.madd(_pn, tmp, tmp2, a); V.madd(_pn, _pn, randDir(tmp3, fr + q * 17 + i), rw * 0.5 * hq);
+        const kq = (1 - a / (len * 1.05)) * (0.5 + 0.5 * hq);
+        R.glow(_pn, rw * (0.7 + 0.8 * hq), [c[0] * 0.55 * kq, c[1] * 0.55 * kq, c[2] * 0.55 * kq], 0.12);
+      }
+      for (let q = 0; q < 6; q++) {
+        const life = 0.12 + 0.1 * hash(q + i * 3), ph = ((time / life) + hash(q * 5.1 + i)) % 1, sd = q * 7.7 + i * 3 + Math.floor(time / life + hash(q * 5.1 + i)) * 2.9;
+        V.madd(_pn, tmp, tmp2, len * (0.2 + 1.3 * ph)); V.madd(_pn, _pn, randDir(tmp3, sd), rw * 2.2 * ph);
+        const b = (1 - ph) * (1 - ph) * throttle * 1.6;
+        R.glow(_pn, rw * 0.22, [col[0] * b + 0.5 * b, col[1] * b + 0.35 * b, col[2] * b], 0.08);
+      }
+    }
   }
 }
 // two plume planes crossed along the thrust axis (reads as a volume from any angle), sized from the nozzle radius

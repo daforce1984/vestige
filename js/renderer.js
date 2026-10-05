@@ -915,6 +915,27 @@ function newEntry() {
 }
 
 // Cluster vertices of an emissive material into a few glow points (per part), in part space.
+function clusterAxis(pts, c, away) {
+  if (pts.length < 4) return null;
+  const C = [0, 0, 0, 0, 0, 0];   // xx yy zz xy xz yz
+  for (const p of pts) { const x = p[0] - c[0], y = p[1] - c[1], z = p[2] - c[2]; C[0] += x * x; C[1] += y * y; C[2] += z * z; C[3] += x * y; C[4] += x * z; C[5] += y * z; }
+  const A = [[C[0], C[3], C[4]], [C[3], C[1], C[5]], [C[4], C[5], C[2]]], V = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  for (let it = 0; it < 24; it++) {   // Jacobi sweeps
+    for (const [p, q] of [[0, 1], [0, 2], [1, 2]]) {
+      if (Math.abs(A[p][q]) < 1e-12) continue;
+      const th = 0.5 * Math.atan2(2 * A[p][q], A[q][q] - A[p][p]), cs = Math.cos(th), sn = Math.sin(th);
+      for (let k = 0; k < 3; k++) { const a = A[k][p], b = A[k][q]; A[k][p] = cs * a - sn * b; A[k][q] = sn * a + cs * b; }
+      for (let k = 0; k < 3; k++) { const a = A[p][k], b = A[q][k]; A[p][k] = cs * a - sn * b; A[q][k] = sn * a + cs * b; }
+      for (let k = 0; k < 3; k++) { const a = V[k][p], b = V[k][q]; V[k][p] = cs * a - sn * b; V[k][q] = sn * a + cs * b; }
+    }
+  }
+  const ev = [0, 1, 2].map((i) => ({ l: A[i][i], v: [V[0][i], V[1][i], V[2][i]] })).sort((a, b) => b.l - a.l);
+  let ax = ev[0].l > 2.5 * ev[1].l ? ev[0].v : ev[2].v;
+  const d = (c[0] - away[0]) * ax[0] + (c[1] - away[1]) * ax[1] + (c[2] - away[2]) * ax[2];
+  if (d < 0) ax = ax.map((x) => -x);
+  const l = Math.hypot(...ax) || 1;
+  return ax.map((x) => x / l);
+}
 function emissiveClusters(g, matName) {
   const mi = g.materials.findIndex((m) => m.name.toLowerCase().startsWith(matName));
   if (mi < 0) return [];
@@ -941,23 +962,28 @@ function emissiveClusters(g, matName) {
       for (const p of pts) {
         const key = Math.floor(p[0] / cell) + ',' + Math.floor(p[1] / cell) + ',' + Math.floor(p[2] / cell);
         let c = cells.get(key);
-        if (!c) cells.set(key, (c = { s: [0, 0, 0], n: 0, mn: [1e9, 1e9, 1e9], mx: [-1e9, -1e9, -1e9] }));
-        c.s[0] += p[0]; c.s[1] += p[1]; c.s[2] += p[2]; c.n++;
+        if (!c) cells.set(key, (c = { s: [0, 0, 0], n: 0, mn: [1e9, 1e9, 1e9], mx: [-1e9, -1e9, -1e9], pts: [] }));
+        c.s[0] += p[0]; c.s[1] += p[1]; c.s[2] += p[2]; c.n++; c.pts.push(p);
         for (let a = 0; a < 3; a++) { c.mn[a] = Math.min(c.mn[a], p[a]); c.mx[a] = Math.max(c.mx[a], p[a]); }
       }
       // merge neighbouring cells greedily
-      const list = [...cells.values()].map((c) => ({ p: [c.s[0] / c.n, c.s[1] / c.n, c.s[2] / c.n], n: c.n, r: Math.max(c.mx[0] - c.mn[0], c.mx[1] - c.mn[1], c.mx[2] - c.mn[2]) * 0.5 }));
+      const list = [...cells.values()].map((c) => ({ p: [c.s[0] / c.n, c.s[1] / c.n, c.s[2] / c.n], n: c.n, r: Math.max(c.mx[0] - c.mn[0], c.mx[1] - c.mn[1], c.mx[2] - c.mn[2]) * 0.5, pts: c.pts }));
       const merged = [];
       for (const c of list) {
         const m = merged.find((q) => Math.hypot(q.p[0] - c.p[0], q.p[1] - c.p[1], q.p[2] - c.p[2]) < cell * 1.6);
         if (m) {
           const t = m.n + c.n;
           for (let a = 0; a < 3; a++) m.p[a] = (m.p[a] * m.n + c.p[a] * c.n) / t;
-          m.n = t; m.r = Math.max(m.r, c.r, cell * 0.5);
+          m.n = t; m.r = Math.max(m.r, c.r, cell * 0.5); m.pts = m.pts.concat(c.pts);
         } else merged.push({ ...c, r: Math.max(c.r, cell * 0.3) });
       }
       merged.sort((a, b) => b.n - a.n);
-      for (const m of merged.slice(0, 24)) out.push({ part: pi, pos: m.p, r: m.r });
+      // each nozzle's own axis (2026-10-06): the principal axis of its glowing faces — a flat ring's thinnest axis, a long
+      // tube's longest — turned to point away from the part's middle (the plumes were laid along one guessed direction)
+      const pc = [0, 0, 0]; let pn = 0;
+      for (const g2 of part.groups) for (let k = g2.first; k < g2.first + g2.count; k += 3) { const v = g.indices[k]; pc[0] += g.verts[v * 8]; pc[1] += g.verts[v * 8 + 1]; pc[2] += g.verts[v * 8 + 2]; pn++; }
+      if (pn) { pc[0] /= pn; pc[1] /= pn; pc[2] /= pn; }
+      for (const m of merged.slice(0, 24)) out.push({ part: pi, pos: m.p, r: m.r, dir: clusterAxis(m.pts, m.p, pc) });
     }
   });
   return out;
