@@ -295,8 +295,10 @@ fn skyColor(d0: vec3f) -> vec3f {
 // ---------------------------------------------------------------- meshes
 // the moon's relief and craters: shared by the mesh shader (displacement) and the one-time bake (MOONBAKE)
 export const MOONFN = /* wgsl */ `
-const MOON_LOW: f32 = 0.82;     // how far the moon's light is lowered toward its basin's horizon (0 = the scene's own sun)
-const MOON_HAZE: f32 = 0.35;    // how much of the space haze lies over the moon (more toward its limb)
+const MOON_LOW: f32 = 0.72;     // how far the moon's light is lowered toward its basin's horizon (0 = the scene's own sun)
+const MOON_HAZE: f32 = 0.14;    // how much of the space haze lies over the moon (more toward its limb) — light: the shadows stay near black (2026-10-06, after an Apollo far-side photo)
+const MOON_SUN_K: f32 = 1.9;    // its sunlight boosted: the lit slopes and rims bright against the black shadows
+const MOON_AMB: f32 = 0.06;     // its ambient (was 0.3): no sky to fill the shadows
 const MOON_HAZE_L: f32 = 0.14;  // the haze's brightness (× the sky light)
 struct MC { g: vec3f, rim: f32, ray: f32, basin: f32, pit: f32 };
 // ONE GIANT IMPACT BASIN (2026-10-03) on the face the camera sees (moon-local, angular radius 0.42 rad): a deep bowl with
@@ -939,17 +941,17 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let Lw = select(F.sunDir.xyz, F.rimCol.xyz, F.rimCol.w > 0.5);
     let Ll0 = normalize(transpose(mat3x3f(inst.m[0].xyz, inst.m[1].xyz, inst.m[2].xyz)) * Lw);
     let C0 = normalize(vec3f(0.765, 0.069, 0.640));
-    let Ll = normalize(Ll0 - C0 * dot(Ll0, C0) * MOON_LOW * mix(0.35, 1.0, smoothstep(2.2, 1.1, acos(clamp(dot(qs, C0), -1.0, 1.0)) / 0.42)));   // (its light lowered over the basin — a low sun throws long shadows into it — and less so away from it)
+    let Ll = normalize(Ll0 - C0 * dot(Ll0, C0) * MOON_LOW * mix(0.75, 1.0, smoothstep(2.2, 1.1, acos(clamp(dot(qs, C0), -1.0, 1.0)) / 0.42)));   // (its light lowered over the basin — a low sun throws long shadows into it — and less so away from it)
     moonL = normalize((inst.m * vec4f(Ll, 0.0)).xyz);
     let lt = Ll - qs * dot(Ll, qs); let ltl = length(lt);
     if (ltl > 1e-4) {
       let dir = lt / ltl; let tanE = dot(Ll, qs) / ltl;
-      var occ = 0.0; var dist = 0.002;
-      for (var k = 0; k < 12; k++) {
+      var occ = 0.0; var dist = 0.0015;
+      for (var k = 0; k < 16; k++) {   // (out to ~0.4 rad: the low sun's shadows are long)
         let q2 = normalize(qs + dir * dist);
         let hk = textureSampleLevel(texMoon, texSmp, vec2f(atan2(q2.z, q2.x) / 6.2831853 + 0.5, acos(clamp(q2.y, -1.0, 1.0)) / 3.14159265), 0.0).a;
-        occ = max(occ, (hk - (mt.a + tanE * dist - 0.5 * dist * dist)) / (dist * 0.04));   // (the sphere curving away below the ray; a soft penumbra)
-        dist *= 1.5;
+        occ = max(occ, (hk - (mt.a + tanE * dist - 0.5 * dist * dist)) / (dist * 0.012));   // (the sphere curving away below the ray; a hard-edged shadow)
+        dist *= 1.45;
       }
       moonSh = 1.0 - clamp(occ, 0.0, 1.0);
     }
@@ -1098,7 +1100,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // craters' shadows were filled in and the big basin read flat (2026-10-04)
   let sunK = select(1.0, 0.0, lunar && F.rimCol.w > 0.5);
   var col = F.sunCol.rgb * sh * lsd * sunK * (diffC / 3.14159 * 2.6 + min(specG, vec3f(40.0)) * select(1.0, 0.0, lunar));
-  var amb = mix(F.ambDown.rgb, F.ambUp.rgb, n.y * 0.5 + 0.5) * F.sunCol.w * select(1.0, 0.3, lunar);
+  var amb = mix(F.ambDown.rgb, F.ambUp.rgb, n.y * 0.5 + 0.5) * F.sunCol.w * select(1.0, MOON_AMB, lunar);
   if (lunar) { amb = vec3f(dot(amb, vec3f(0.2126, 0.7152, 0.0722))); }   // (the moon grey: no blue cast from the sky)
   col += (diffC + F0 * 0.3) * amb * ao * texAO;
   // environment reflection with a brushed-metal streak (anisotropic look along the hull's long axis)
@@ -1120,7 +1122,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let G2 = (ndl2 / (ndl2 * (1.0 - kq) + kq)) * (ndv / (ndv * (1.0 - kq) + kq));
     let Fh2 = F0 + (1.0 - F0) * pow(1.0 - max(dot(H2, V), 0.0), 5.0);
     let spec2 = D2 * G2 * Fh2 / max(4.0 * ndl2 * ndv, 1e-3);
-    col += select(F.fill.rgb, vec3f(dot(F.fill.rgb, vec3f(0.2126, 0.7152, 0.0722))), lunar) * moonSh * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
+    col += select(F.fill.rgb, vec3f(dot(F.fill.rgb, vec3f(0.2126, 0.7152, 0.0722))) * MOON_SUN_K, lunar) * moonSh * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
   }
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;
