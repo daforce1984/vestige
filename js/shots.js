@@ -1590,7 +1590,7 @@ function drawUlt(R, t) {
       if (c - m.lc < 0.12) { const f = 1 - (c - m.lc) / 0.12; R.glow(m.p0, 1.2 + 1.5 * f, [3 * f, 1 * f, 2.4 * f], 0.35); }   // the pop out of the port
       if (i % 5 === 0 && c - m.lc < 1.0) { const a = (c - m.lc) / 1.0; R.glow(m.p0, 2 + 7 * easeOut(a), [0.22 * (1 - a), 0.2 * (1 - a), 0.26 * (1 - a)], 0.9); }   // the launch smoke puffing off the ports
     } else if (m.hit && c - m.sc < 0.8) {                                        // THE STRIKE: one after another, each a fireball on his heels
-      missileBurst(R, c - m.sc, m.p3, (9 + 6.75 * hash(i + 3)) * (m.sc >= CIRCUS_B3 ? 2 : 1), 610 + i, i % 6 === 0);   // (x1.5 the blast; x2 more in the last cut: the big one he slips)   // (big: the lens is right on them)
+      missileBurst(R, c - m.sc, m.p3, (13.5 + 10.1 * hash(i + 3)) * (m.sc >= CIRCUS_B3 ? 2 : 1), 610 + i, i % 6 === 0);   // (×1.5 again 2026-10-06)   // (x1.5 the blast; x2 more in the last cut: the big one he slips)   // (big: the lens is right on them)
     }
   }
 

@@ -729,7 +729,11 @@ function duelCues() {
   for (let k = 0; k < 8; k++) out.push([FINALE_T + 0.01 + 0.035 * k, 'missile', { rate: R(0.85, 1.25), gain: G * 0.55, pan: R(-0.8, 0.8), prio: 8, norand: true }]);   // the Itano circus: a swarm of motors screaming off
   out.push([FINALE_T + 0.02, 'hl_beam', { loop: true, rate: 1.4, dur: FD(FINALE_T, 191.12), fadeIn: 0.2, fadeOut: 0.4, gain: G * 0.45, prio: 7 }]);   // the swarm's roar under the whole circus
   ultSwarm().forEach((m, k) => {                                     // the circus: each wave screaming off, the strikes one after another
-    if (m.hit && k % 8 === 0) out.push([m.ta, k % 16 ? 'expl_metal' : 'hl_explosion', { rate: R(0.85, 1.2), gain: G * 0.5, pan: R(-0.7, 0.7), prio: 8, norand: true }]);
+    if (m.hit && k % 3 === 0) {                                      // (2026-10-06: a heavy blast for every third strike, louder — the bursts are 1.5× bigger)
+      const smp = ['hl_big_explosion', 'expl_epic', 'expl_debris'][(k / 3) % 3];
+      out.push([m.ta, smp, { rate: R(0.95, 1.2), gain: G * 0.95, pan: R(-0.75, 0.75), prio: 8, norand: true }]);
+      out.push([m.ta, '@boom', { bus: 'sfx', f: R(34, 46), vel: G * 0.45, dur: 1.0, verb: 0.3 }]);
+    }
     if (m.lc < 1.6 ? k % 6 === 0 : k % 40 === 0) out.push([m.ti, 'missile', { rate: R(0.85, 1.25), gain: G * 0.45, pan: R(-0.8, 0.8), prio: 7, norand: true }]);
   });
   return out;
