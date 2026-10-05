@@ -1562,7 +1562,8 @@ const HERO_GRIP_SH = [-4.3, 2.7, 4.3];
 // SCENE 33 (2026-10-05): bladed to the target — the chest turned right so his left shoulder leads — and the left hand
 // under the rifle, palm up, cradling it (not the fist round the fore-end — it never reached: the fore-end was 11.6 from
 // his left shoulder, his arm 6.1). The grip drawn in to the middle of his chest so both hands reach (HERO_GRIP_BLADE)
-const bladeW = (tw) => smooth(170.55, 170.95, tw) * (1 - smooth(173.2, 173.9, tw));   // (held through scene 34, his face dead still; eased out in 35, which is on VANGUARD)
+const bladeW = (tw) => Math.max(smooth(170.55, 170.95, tw) * (1 - smooth(173.2, 173.9, tw)),   // (scenes 33–34; held through 34, his face dead still; eased out in 35, which is on VANGUARD)
+  smooth(177.85, 178.2, tw) * (1 - smooth(178.95, 179.3, tw)));   // (scene 41: the aimed shot on the shield and its burn — eased in over the cut before it, out over D09)
 const BLADE_YAW = -0.55;   // the base blade (~30° with the aim's own turn, as on the stance sheet); bladeReach adds what the left hand needs
 const HERO_CRADLE = [0.1633, -0.0992, 5.4924];   // rifle frame (the fist hole's centre): solved against the meshes so the fist's PALM side
 // meets the rifle's underside exactly — its first contact (hand-local −1.192, −1.029, 1.338, on the palm side) touches it
@@ -1584,8 +1585,9 @@ function bladeReach(s, tw, target, k) {
     const t0 = s.pose.torso; s.pose.torso = [t0[0] + lean(e), t0[1], t0[2]];
     const fk = duelFK(s, 'gundam'), G = M.transformPoint([0, 0, 0], fk.torso, lrp(HERO_GRIP, HERO_GRIP_BLADE, w)), d = nrm(sub(target, G));
     const up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0])), U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
-    const P = add(add(add(G, scl(X, c[0])), scl(U, c[1])), scl(d, c[2]));
-    return V.dist(P, partPoint(fk, 'arm_L_upper'));
+    heroArmPlace(s, fk, G, [...X, ...U, ...d]);                     // the gun arm really placed — it can fall short of G, and
+    const fk2 = duelFK(s, 'gundam');                                  // the rifle with it (the support point is measured on it)
+    return V.dist(M.transformPoint([0, 0, 0], fk2.rifle, c), partPoint(fk2, 'arm_L_upper'));
   };
   let e = 0;
   if (dist(0) > ARM_REACH_L) {
@@ -1601,14 +1603,14 @@ function heroAim2H(s, target, k) {
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const tw = warp(s._t), wHip = styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip');
   const [bYaw, bLean] = bladeReach(s, tw, target, k);
-  aimYaw(s, target, k, SH_YAW * styleW(tw, HERO_SHOTS, HERO_STYLE, 'shoulder') + bYaw);
+  aimYaw(s, target, k, SH_YAW * styleW(tw, HERO_SHOTS, HERO_STYLE, 'shoulder') * (1 - bladeW(tw)) + bYaw);
   if (bLean) { s.pose = { ...s.pose }; const t0 = s.pose.torso; s.pose.torso = [t0[0] + bLean, t0[1], t0[2]]; }   // (shouldered: the chest turned further onto the target, so the gun arm doesn't cross it)
   const fk = duelFK(s, 'gundam'), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
   let grip = M.transformPoint([0, 0, 0], fk.torso, lrp(lrp(HERO_GRIP, HERO_GRIP_BLADE, bladeW(tw)), HERO_GRIP_HIP, wHip));
   let d = nrm(sub(target, grip));
   // SHOULDERED (the aimed shot): the stock's butt in the pocket of his right shoulder, the rifle laid from there along the
   // line to the target at eye height — the grip falls where it falls on that line (left hand on the fore-end: heroLeft)
-  const wSh = styleW(tw, HERO_SHOTS, HERO_STYLE, 'shoulder');
+  const wSh = styleW(tw, HERO_SHOTS, HERO_STYLE, 'shoulder') * (1 - bladeW(tw));   // (the braced hold — stock in the shoulder too — takes over where it is on)
   if (wSh > 0) {
     // (the grip raised and drawn back a little from the normal hold — that brings the butt into the shoulder; solving
     // the butt onto the shoulder's pocket instead folded the upper arm 77° into the chest and the pauldron came away)
