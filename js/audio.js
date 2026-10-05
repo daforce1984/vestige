@@ -611,15 +611,16 @@ function duelCues() {
   // the blade melting through (film seconds: the extreme bullet time stretches the pass to ~2 s): a hum-and-grind
   // buzz held across the pass (Freesound CC0 'bzzzzzzzzzzpht', FartMuffin) + hot metal searing under it (CC0
   // 'ShovelSizzle8_mod', rabban625), its tail ringing on as the halves part
-  out.push([CUT_T - 0.012, 'saber_cut', { at: 'hit', gain: G * 1.1, pan: 0.15, prio: 9, norand: true }]);
+  const CUT_CONTACT = CUT_T - 0.0295;   // the blade's first touch on its armour (measured on the frames: film 180.62 — the bullet time here makes 0.01 of story ≈ 0.4 s on screen; the cut sounds sat at CUT_T−0.012, ~0.6 s late)
+  out.push([CUT_CONTACT, 'saber_cut', { at: 'hit', gain: G * 1.1, pan: 0.15, prio: 9, norand: true }]);
   // the blade dragging through: Pixabay 'Squeak Metal PS-019' (AudioPapkin) reshaped — pitched down into a groaning
   // shriek (rate 0.55) with a slower, deeper copy under it (0.38) and a faster one on top (0.8) for the tearing edge
-  { const d = FD(CUT_T - 0.01, CUT_SPLIT + 0.01) + 0.6;
-    out.push([CUT_T - 0.01, 'scrape_squeak', { rate: 0.55, gain: G * 1.3, dur: d, fadeOut: 0.5, pan: 0.15, prio: 9, norand: true }]);
-    out.push([CUT_T - 0.008, 'scrape_squeak', { rate: 0.38, gain: G * 1.0, dur: d, fadeOut: 0.6, pan: 0.05, prio: 8, norand: true }]);
-    out.push([CUT_T - 0.005, 'scrape_squeak', { at: 0.6, rate: 0.8, gain: G * 0.45, dur: d * 0.7, fadeOut: 0.4, pan: 0.25, prio: 7, norand: true }]); }
-  out.push([CUT_T + 0.004, 'cut_sizzle', { at: 'hit', gain: G * 0.55, pan: 0.2, prio: 8, norand: true }]);
-  out.push([CUT_T, '@boom', { bus: 'sfx', f: 32, vel: G, dur: 2.0, verb: 0.4 }]);
+  { const d = FD(CUT_CONTACT, CUT_SPLIT + 0.01) + 0.6;
+    out.push([CUT_CONTACT + 0.002, 'scrape_squeak', { rate: 0.55, gain: G * 1.3, dur: d, fadeOut: 0.5, pan: 0.15, prio: 9, norand: true }]);
+    out.push([CUT_CONTACT + 0.004, 'scrape_squeak', { rate: 0.38, gain: G * 1.0, dur: d, fadeOut: 0.6, pan: 0.05, prio: 8, norand: true }]);
+    out.push([CUT_CONTACT + 0.007, 'scrape_squeak', { at: 0.6, rate: 0.8, gain: G * 0.45, dur: d * 0.7, fadeOut: 0.4, pan: 0.25, prio: 7, norand: true }]); }
+  out.push([CUT_CONTACT + 0.003, 'cut_sizzle', { at: 'hit', gain: G * 0.55, pan: 0.2, prio: 8, norand: true }]);
+  out.push([CUT_CONTACT, '@boom', { bus: 'sfx', f: 32, vel: G, dur: 2.0, verb: 0.4 }]);
   out.push([193.95, '@beamSaberRetract', { vel: 0.7 * G, dur: 0.5 }]);
   // ---- per-mech states
   const DT = 0.02, T0 = 150, T1 = 200;
