@@ -2348,7 +2348,7 @@ shot(170, 194.6, 'S12 DUEL', (c) => {
   // DEPTH OF FIELD through the duel (2026-10-06): focused on what each camera looks at, the field shallower and the blur
   // stronger the longer the lens — the long-lens cuts throw the background (and anything close to the lens) well out
   { const fd = V.dist(k.pos, k.focus), tele = 1 - smooth(14, 50, k.fov);
-    c.post.dof = { focus: fd, range: Math.max(5, fd * (0.38 - 0.22 * tele)), blur: 0.005 + 0.008 * tele }; }
+    if (!k.name.startsWith('D21')) c.post.dof = { focus: fd, range: Math.max(5, fd * (0.38 - 0.22 * tele)), blur: 0.005 + 0.008 * tele }; }   // (none through the Itano circus, D21–D21d: the swarm and its trails stay crisp)
   c.post.shakeBlur = k.blur;                                   // (no whole-screen flash on duel contacts: it read as flicker)
   if (c.t >= 170 && c.t < 176.4) { c.post.motionBlur = 0; c.post.shakeBlur = 0; }   // the draw + load: crisp, no motion blur
   if (k.name.startsWith('D21') || k.name.startsWith('D16c')) { c.post.motionBlur = 0; c.post.shakeBlur = 0; }   // the Itano-circus one take and the rifle catch: crisp, no motion blur   // the Itano-circus one take: crisp, no motion blur
