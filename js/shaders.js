@@ -442,7 +442,7 @@ struct BU { a: vec4f };   // x: the moon's radius (model units), y: its seed, z:
   let c0 = moonCraters(qs, 5.0, U.a.z, 2);
   base *= mix(1.15, 0.42, smoothstep(0.45, 0.58, fbm(qs * 1.6 + 11.0, 4)));   // bright highlands, dark maria with crisp shores
   base *= 1.0 + 0.3 * clamp(c0.rim, 0.0, 1.0);
-  base *= mix(1.0, 0.94, c0.basin);
+  // (no darkening of the basin floor at all — 2026-10-06)
   { let bdq = basinD(qs); base *= 1.0 + 0.35 * basinScour(qs, bdq) - 0.5 * max(-basinWear(qs, bdq), 0.0); }   // (the scour's fresh, lighter rock; the worn slumps a little darker)   // (the basin floor only a shade darker: the round dark disc painted there read as a round shadow in the middle of the bowl — 2026-10-06)
   base *= 1.0 - 0.05 * c0.pit;   // (barely: the light's own half-shadow in each bowl shows the hole now — a dark pit painted in made every crater a black dot)                                                // crater bowls hold shadow (they read as holes whatever the light)
   // the normal: the relief (finite differences of moonHN) and the finer craters' bump
