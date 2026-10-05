@@ -1564,8 +1564,12 @@ const HERO_GRIP_SH = [-4.3, 2.7, 4.3];
 // his left shoulder, his arm 6.1). The grip drawn in to the middle of his chest so both hands reach (HERO_GRIP_BLADE)
 const bladeW = (tw) => smooth(170.55, 170.95, tw) * (1 - smooth(173.2, 173.9, tw));   // (held through scene 34, his face dead still; eased out in 35, which is on VANGUARD)
 const BLADE_YAW = -0.55;   // the base blade (~30° with the aim's own turn, as on the stance sheet); bladeReach adds what the left hand needs
-const HERO_CRADLE = [0, -0.14, 6.0];   // rifle frame: the fist well forward under the barrel; a ray up from its top (0.607 above this point) meets the rifle's underside (y 0.47 at z 4.5 … 8) at once — touching, not holding up air
-const BLADE_LEAN = 0.12, BLADE_YAW_E = -1.0, BLADE_LEAN_E = 0.3, ARM_REACH_L = 5.9;   // base lean; how far the reach solve (bladeReach) may turn / pitch the chest further; the left arm's reach (shoulder → wrist pivot)
+const HERO_CRADLE = [0.1633, -0.0992, 5.4924];   // rifle frame (the fist hole's centre): solved against the meshes so the fist's PALM side
+// meets the rifle's underside exactly — its first contact (hand-local −1.192, −1.029, 1.338, on the palm side) touches it
+// at (0.034, 0.473, 6.02), a ray from there up along the palm's normal hits the rifle at distance 0, and no other vertex of
+// the hand pokes into it (ray-cast against assets/rifle2_game.glb and the gundam hand_L mesh, 2026-10-05)
+export const HERO_PALM_CONTACT = [-1.192, -1.029, 1.338];
+const BLADE_LEAN = 0.12, BLADE_YAW_E = -1.0, BLADE_LEAN_E = 0.3, ARM_REACH_L = 5.85;   // base lean; how far the reach solve (bladeReach) may turn / pitch the chest further; the left arm's reach (shoulder → wrist pivot)
 const HERO_GRIP_BLADE = [-1.5, 3.6, 2.6];   // torso frame: the grip high on the right of his chest so the stock butts into his right shoulder (stock sigma-rifle-stance-v1); the left hand just ahead of it underneath — his short arms reach that
 // THE BODY PULLED IN BY IK (2026-10-05): the chest turned / pitched just as far as the left hand needs to reach its support
 // point under the barrel — the smallest e in 0…1 (bisection) for which the support point lies within the left arm's reach,
