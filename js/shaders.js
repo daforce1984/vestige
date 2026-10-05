@@ -295,7 +295,7 @@ fn skyColor(d0: vec3f) -> vec3f {
 // ---------------------------------------------------------------- meshes
 // the moon's relief and craters: shared by the mesh shader (displacement) and the one-time bake (MOONBAKE)
 export const MOONFN = /* wgsl */ `
-const MOON_LOW: f32 = 0.72;     // how far the moon's light is lowered toward its basin's horizon (0 = the scene's own sun)
+const MOON_SUN_EL: f32 = 0.52;  // the moon's sun: its elevation (rad, ~30°) over the middle of the face we see — each crater half in shadow
 const MOON_HAZE: f32 = 0.14;    // how much of the space haze lies over the moon (more toward its limb) — light: the shadows stay near black (2026-10-06, after an Apollo far-side photo)
 const MOON_SUN_K: f32 = 1.9;    // its sunlight boosted: the lit slopes and rims bright against the black shadows
 const MOON_AMB: f32 = 0.06;     // its ambient (was 0.3): no sky to fill the shadows
@@ -424,7 +424,7 @@ struct BU { a: vec4f };   // x: the moon's radius (model units), y: its seed, z:
   base *= mix(1.15, 0.42, smoothstep(0.45, 0.58, fbm(qs * 1.6 + 11.0, 4)));   // bright highlands, dark maria with crisp shores
   base *= 1.0 + 0.3 * clamp(c0.rim, 0.0, 1.0);
   base *= mix(1.0, 0.5, c0.basin);
-  base *= 1.0 - 0.2 * c0.pit;                                                // crater bowls hold shadow (they read as holes whatever the light)
+  base *= 1.0 - 0.05 * c0.pit;   // (barely: the light's own half-shadow in each bowl shows the hole now — a dark pit painted in made every crater a black dot)                                                // crater bowls hold shadow (they read as holes whatever the light)
   // the normal: the relief (finite differences of moonHN) and the finer craters' bump
   let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
   let eh = 0.0012; let h0 = moonHN(qs);
@@ -941,7 +941,12 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let Lw = select(F.sunDir.xyz, F.rimCol.xyz, F.rimCol.w > 0.5);
     let Ll0 = normalize(transpose(mat3x3f(inst.m[0].xyz, inst.m[1].xyz, inst.m[2].xyz)) * Lw);
     let C0 = normalize(vec3f(0.765, 0.069, 0.640));
-    let Ll = normalize(Ll0 - C0 * dot(Ll0, C0) * MOON_LOW * mix(0.75, 1.0, smoothstep(2.2, 1.1, acos(clamp(dot(qs, C0), -1.0, 1.0)) / 0.42)));   // (its light lowered over the basin — a low sun throws long shadows into it — and less so away from it)
+    // ONE sun for the whole moon (2026-10-06: the per-point lowered light gave it several suns — a lit 'plateau' round the
+    // basin and a broken terminator): the scene's sun turned about its own azimuth to stand MOON_SUN_EL above the horizon
+    // at the basin, so every crater's far half lies in shadow
+    let V0 = normalize(transpose(mat3x3f(inst.m[0].xyz, inst.m[1].xyz, inst.m[2].xyz)) * (F.camPos.xyz - inst.m[3].xyz));   // the face the camera sees (moon-local)
+    let Th = Ll0 - V0 * dot(Ll0, V0); let Tl = length(Th);
+    let Ll = normalize(V0 * sin(MOON_SUN_EL) + select(normalize(cross(V0, vec3f(0.0, 1.0, 0.0))), Th / max(Tl, 1e-5), Tl > 1e-4) * cos(MOON_SUN_EL));   // (MOON_SUN_EL above the horizon in the middle of that face: the whole face lit slantwise, its terminator ~60° off)
     moonL = normalize((inst.m * vec4f(Ll, 0.0)).xyz);
     let lt = Ll - qs * dot(Ll, qs); let ltl = length(lt);
     if (ltl > 1e-4) {
