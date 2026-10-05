@@ -1563,17 +1563,42 @@ const HERO_GRIP_SH = [-4.3, 2.7, 4.3];
 // under the rifle, palm up, cradling it (not the fist round the fore-end — it never reached: the fore-end was 11.6 from
 // his left shoulder, his arm 6.1). The grip drawn in to the middle of his chest so both hands reach (HERO_GRIP_BLADE)
 const bladeW = (tw) => smooth(170.55, 170.95, tw) * (1 - smooth(173.2, 173.9, tw));   // (held through scene 34, his face dead still; eased out in 35, which is on VANGUARD)
-const BLADE_YAW = -0.86;
-const HERO_CRADLE = [0, -0.05, 4.5];   // rifle frame: the fist under it well ahead of the grip, its top against the rifle's underside (y 0.47 at z 4.5 — it was 2 below, holding up thin air)
-const BLADE_LEAN = 0.22;   // the chest pitched forward into the hold, the left side leaning in over the support hand
+const BLADE_YAW = -0.55;   // the base blade (~30° with the aim's own turn, as on the stance sheet); bladeReach adds what the left hand needs
+const HERO_CRADLE = [0, -0.14, 6.0];   // rifle frame: the fist well forward under the barrel; a ray up from its top (0.607 above this point) meets the rifle's underside (y 0.47 at z 4.5 … 8) at once — touching, not holding up air
+const BLADE_LEAN = 0.12, BLADE_YAW_E = -1.0, BLADE_LEAN_E = 0.3, ARM_REACH_L = 5.9;   // base lean; how far the reach solve (bladeReach) may turn / pitch the chest further; the left arm's reach (shoulder → wrist pivot)
 const HERO_GRIP_BLADE = [-1.5, 3.6, 2.6];   // torso frame: the grip high on the right of his chest so the stock butts into his right shoulder (stock sigma-rifle-stance-v1); the left hand just ahead of it underneath — his short arms reach that
+// THE BODY PULLED IN BY IK (2026-10-05): the chest turned / pitched just as far as the left hand needs to reach its support
+// point under the barrel — the smallest e in 0…1 (bisection) for which the support point lies within the left arm's reach,
+// with the rifle laid exactly as heroAim2H lays it (grip in the torso frame, barrel on the target). Returns the extra
+// yaw and pitch to apply (× bladeW), so the draw and the aim pull the body the same way (no jump where they hand over)
+function bladeReach(s, tw, target, k) {
+  const w = bladeW(tw); if (w <= 0) return [0, 0];
+  const pose0 = s.pose, c = sub(HERO_CRADLE, r3v(SUP_R, HOLE_L));
+  const lean = (e) => (BLADE_LEAN + BLADE_LEAN_E * e) * w, yaw = (e) => (BLADE_YAW + BLADE_YAW_E * e) * w;
+  const dist = (e) => {
+    s.pose = { ...pose0 }; aimYaw(s, target, k, yaw(e));
+    const t0 = s.pose.torso; s.pose.torso = [t0[0] + lean(e), t0[1], t0[2]];
+    const fk = duelFK(s, 'gundam'), G = M.transformPoint([0, 0, 0], fk.torso, lrp(HERO_GRIP, HERO_GRIP_BLADE, w)), d = nrm(sub(target, G));
+    const up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0])), U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
+    const P = add(add(add(G, scl(X, c[0])), scl(U, c[1])), scl(d, c[2]));
+    return V.dist(P, partPoint(fk, 'arm_L_upper'));
+  };
+  let e = 0;
+  if (dist(0) > ARM_REACH_L) {
+    if (dist(1) > ARM_REACH_L) e = 1;
+    else { let lo = 0, hi = 1; for (let i = 0; i < 9; i++) { const m = (lo + hi) / 2; if (dist(m) > ARM_REACH_L) lo = m; else hi = m; } e = hi; }
+  }
+  s.pose = pose0;
+  return [yaw(e), lean(e)];
+}
 const SH_YAW = -0.3;   // (the chest turned a little right of the line: the gun arm hangs along his side instead of folding across the chest)   // shouldered: the grip (torso frame) — the stock's butt then sits at the right shoulder (joint at −4.6, 3.8, 0)
 function heroAim2H(s, target, k) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const tw = warp(s._t), wHip = styleW(tw, HERO_SHOTS, HERO_STYLE, 'hip');
-  aimYaw(s, target, k, SH_YAW * styleW(tw, HERO_SHOTS, HERO_STYLE, 'shoulder') + BLADE_YAW * bladeW(tw));
-  if (bladeW(tw) > 0) { s.pose = { ...s.pose }; const t0 = s.pose.torso; s.pose.torso = [t0[0] + BLADE_LEAN * bladeW(tw), t0[1], t0[2]]; }   // (shouldered: the chest turned further onto the target, so the gun arm doesn't cross it)
+  const [bYaw, bLean] = bladeReach(s, tw, target, k);
+  aimYaw(s, target, k, SH_YAW * styleW(tw, HERO_SHOTS, HERO_STYLE, 'shoulder') + bYaw);
+  if (bLean) { s.pose = { ...s.pose }; const t0 = s.pose.torso; s.pose.torso = [t0[0] + bLean, t0[1], t0[2]]; }   // (shouldered: the chest turned further onto the target, so the gun arm doesn't cross it)
   const fk = duelFK(s, 'gundam'), up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
   let grip = M.transformPoint([0, 0, 0], fk.torso, lrp(lrp(HERO_GRIP, HERO_GRIP_BLADE, bladeW(tw)), HERO_GRIP_HIP, wHip));
   let d = nrm(sub(target, grip));
@@ -1638,8 +1663,9 @@ function heroDraw(s, tw) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const tgt = heroAimPoint(tw);
-  aimYaw(s, tgt, smooth(170.45, HERO_SNAP1, tw), BLADE_YAW * bladeW(tw));
-  if (bladeW(tw) > 0) { const t0 = s.pose.torso; s.pose.torso = [t0[0] + BLADE_LEAN * bladeW(tw), t0[1], t0[2]]; }
+  const kd = smooth(170.45, HERO_SNAP1, tw), [bYaw, bLean] = bladeReach(s, tw, tgt, kd);
+  aimYaw(s, tgt, kd, bYaw);
+  if (bLean) { const t0 = s.pose.torso; s.pose.torso = [t0[0] + bLean, t0[1], t0[2]]; }
   const fk = duelFK(s, 'gundam'), T = r3(fk.torso), Ti = r3T(T);
   const GE = lrp(HERO_GRIP, HERO_GRIP_BLADE, bladeW(HERO_SNAP1));   // (where heroAim2H takes it over)
   const G1w = M.transformPoint([0, 0, 0], fk.torso, GE), d1 = r3v(Ti, nrm(sub(tgt, G1w)));
