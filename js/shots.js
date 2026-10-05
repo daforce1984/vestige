@@ -903,6 +903,7 @@ function shieldScorch(e, t) {
 }
 // …and the shot's energy spreads out over its face from the hit in every direction and dies away: a ragged ring
 // racing out across the plate, radial pixel streaks skating flat along it, motes shed from the front fading behind
+const _sparkPts = new Map();   // the contact point at each spark burst's birth (block shot)
 function drawBlockSplash(R, t) {
   const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0 || lt > 1.8) return;
   const F = blockFrame(t); if (!F) return;
@@ -943,6 +944,20 @@ function drawBlockSplash(R, t) {
     for (let i = 0; i < 5; i++) {                                   // spokes from the spot out to the ring
       const a = spin * 0.6 + i * 1.2566 + 0.3 * hash(i + 870);
       R.arc(onFace(a, 0.3), onFace(a, rr * 0.95), 0.28, [0.8, 1.8, 3.2], 0.7 * rk, 880 + i, 20);
+    }
+  }
+  // 7. SPARKS (2026-10-05): all the while the beam drags across the plate, showers of sparks spray off the contact point —
+  //    a fresh burst every 6 ms of story (the burn plays in deep bullet time: ~1 per film frame), thrown off the face and
+  //    back along the drag, white-hot cooling to orange; each burst stays where it was born (they trail the moving point)
+  { const c0 = B.t + 0.012, c1 = B.t + 0.26, dt = 0.006, life = 0.11;
+    for (let te = c0; te <= Math.min(t, c1); te += dt) {
+      const ls = t - te; if (ls > life) continue;
+      const k = Math.round((te - c0) / dt); let hp = _sparkPts.get(k);
+      if (!hp) { const h = blockHitAt(te); hp = h ? h.p : F.p; _sparkPts.set(k, hp); }
+      const dir = V.norm([0, 0, 0], V.add([0, 0, 0], V.scale([0, 0, 0], nF, 0.85), V.scale([0, 0, 0], sk, -0.55)));
+      sparkBurst(R, madd(hp, nF, 0.6), dir, ls, 3100 + k * 7, 70, 0.95, 95, life, [6, 3.6, 1.3]);            // the hot core of the spray
+      sparkBurst(R, madd(hp, nF, 0.6), nF, ls, 5100 + k * 11, 45, 1.6, 55, life * 1.4, [4.5, 1.7, 0.35]);    // a wide fan of slower orange ones
+      if (ls < 0.025) R.glow(madd(hp, nF, 0.6), 3.2, [5, 3.2, 1.4], 0.3);   // the flash where each burst leaves
     }
   }
   // 6. the gouge the beam dragged across the plate: the track (kept in the shield's frame, so it rides with it) glowing
