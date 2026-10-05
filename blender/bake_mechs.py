@@ -44,6 +44,8 @@ MODEL_OPTS = {'enemy_ms': dict(wear=0.6, bare=(0.52, 0.52, 0.54), paint_rough=0.
                                                          (40, (0.16, 0.18, 0.21), 0.32, 0.8, 'metal')],         # gunmetal #454B52, machined
                                         'tryout_red': [(1, (0.035, 0.037, 0.045), 0.45, 0.15, 'white')],      # (the old red accents: charcoal)
                                         'tryout_grey': [(1, (0.16, 0.18, 0.21), 0.32, 0.8, 'metal')]},
+                               wear_obj={'shield': 0.15},   # per object: its wear / chips / scratches (the shield, drawn enlarged, read speckled and broken)
+                               accent_obj={'shield': 'tryout_red'},   # that object's pieces of that material in the accent colour (its stripe: yellow, as on the sheet)
                                accent=(0.14, (1.0, 0.55, 0.03), 0.55, 0.05, 'white'),   # hazard yellow #F3B928: that share of the SMALL armour pieces (< 0.9 m², sparingly — the sheet uses it on edges and vents)
                                # decal: (atlas id, object, world direction it faces, u axis, centre as bbox fractions (x, y, z), size m)
                                # (Blender axes: forward −Y, up +Z, the model's left +X)
@@ -208,8 +210,10 @@ def build_bake_graph(m, scorches, seed):
         pp = g.node('ShaderNodeAttribute', attribute_name='pp').outputs['Vector']   # the piece's own frame (assign_pieces)
         ptint = g.node('ShaderNodeAttribute', attribute_name='pt').outputs['Color']
         pmat = g.node('ShaderNodeSeparateColor')
-        g.link(g.node('ShaderNodeAttribute', attribute_name='pm').outputs['Color'], pmat.inputs[0])
+        pm_attr = g.node('ShaderNodeAttribute', attribute_name='pm')
+        g.link(pm_attr.outputs['Color'], pmat.inputs[0])
         paint_rough, paint_metal = pmat.outputs[0], pmat.outputs[1]
+        wear_k = pm_attr.outputs['Alpha']                                  # per-object wear multiplier
     tpos = pp if pp is not None else posn
     cav = None
     if tcls:
@@ -283,6 +287,8 @@ def build_bake_graph(m, scorches, seed):
         inside = g.math('MULTIPLY', g.math('MULTIPLY', g.math('GREATER_THAN', u_, 0.0), g.math('LESS_THAN', u_, 1.0)),
                         g.math('MULTIPLY', g.math('MULTIPLY', g.math('GREATER_THAN', v_, 0.0), g.math('LESS_THAN', v_, 1.0)), g.math('GREATER_THAN', i_, 0.5)))
         col = g.mix(g.math('MULTIPLY', dt.outputs['Alpha'], inside), col, dt.outputs['Color'])
+    if pp is not None:
+        worn = g.math('MULTIPLY', worn, wear_k); chip = g.math('MULTIPLY', chip, wear_k); scratch = g.math('MULTIPLY', scratch, wear_k)
     col = g.mix(chip, col, dark_paint)
     if cav is not None:                                           # height map baked as cavity shading (no normal slot)
         col = g.mix(g.math('MULTIPLY', cav, 0.55), col, (0.008, 0.008, 0.009))
@@ -364,7 +370,10 @@ def assign_pieces(meshes):
                     x -= pick[0]
                     if x <= 0:
                         break
+            if OPT.get('accent_obj', {}).get(o.name) == mname:
+                pick = (1, *OPT['accent'][1:])
             _, tint, rough, metal, src = pick
+            wk = OPT.get('wear_obj', {}).get(o.name, 1.0)
             alt = 1.0 if (src == 'metal') != (mname == 'tryout_grey') else 0.0
             for fi in comp:
                 poly = me.polygons[fi]
@@ -372,7 +381,7 @@ def assign_pieces(meshes):
                     q = (np.array(tuple(W @ me.vertices[vi].co)) - c) @ A + off
                     app.data[li].vector = tuple(q)
                     apt.data[li].color = (*tint, 1.0)
-                    apm.data[li].color = (rough, metal, alt, 1.0)
+                    apm.data[li].color = (rough, metal, alt, wk)   # (a: the wear multiplier)
         print('PIECES', o.name, len(comps), flush=True)
     place_decals(meshes)
 
