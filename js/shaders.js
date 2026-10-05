@@ -295,6 +295,7 @@ fn skyColor(d0: vec3f) -> vec3f {
 // ---------------------------------------------------------------- meshes
 // the moon's relief and craters: shared by the mesh shader (displacement) and the one-time bake (MOONBAKE)
 export const MOONFN = /* wgsl */ `
+const MOON_SUN_AZ: f32 = 1.2;   // the moon's sun turned this far (rad) about the face's centre from the scene sun's azimuth
 const MOON_SUN_EL: f32 = 0.52;  // the moon's sun: its elevation (rad, ~30°) over the middle of the face we see — each crater half in shadow
 const MOON_HAZE: f32 = 0.14;    // how much of the space haze lies over the moon (more toward its limb) — light: the shadows stay near black (2026-10-06, after an Apollo far-side photo)
 const MOON_SUN_K: f32 = 1.9;    // its sunlight boosted: the lit slopes and rims bright against the black shadows
@@ -314,7 +315,8 @@ fn craterProf(d: f32) -> f32 {
 fn basinH(d: f32) -> f32 {
   var h = 0.01 * exp(-max(d - 1.0, 0.0) / 0.45) * step(1.0, d);               // ejecta blanket (low)
   if (d < 1.0) {
-    h = 0.01 - 0.91 * pow(max(1.0 - d * d, 0.0), 0.6);                        // the bowl: ROUND, deepest in the middle, its sides steepening toward the rim (2026-10-04: was a flat floor, a steep wall and a central peak)
+    h = 0.01 - 1.4 * pow(max(1.0 - d * d, 0.0), 0.6);   // (deeper again 2026-10-06: −0.91 → −1.4)
+                                     // the bowl: ROUND, deepest in the middle, its sides steepening toward the rim (2026-10-04: was a flat floor, a steep wall and a central peak)
   }
   return h + 0.04 * exp(-abs(d - 1.0) / 0.035);                               // the rim: a sharp, low crest (a third of what it was: it stood up like a wall — 2026-10-04)
 }
@@ -332,10 +334,27 @@ fn moonHN(q: vec3f) -> f32 {
   let rubble = exp(-pow((bd - 1.0) / 0.35, 2.0));
   return moonHeight(q) + 0.0007 * (fbm(q * 40.0, 3) - 0.5) + 0.00035 * (1.0 + 3.0 * rubble) * (vnoise(q * 180.0) - 0.5);   // (gentle: the pores read as bread)
 }
+// THE IMPACT'S SCOUR (2026-10-06): radial grooves gouged outward by the impact's blast — from the inner wall up over the
+// rim and fading out across the ejecta, broken and wobbling, two widths — and the walls worn: slumped, uneven terraces
+fn basinScour(q: vec3f, bd: f32) -> f32 {
+  let C0 = normalize(vec3f(0.765, 0.069, 0.640));
+  let e1 = normalize(cross(C0, vec3f(0.0, 1.0, 0.0))); let e2 = cross(C0, e1);
+  let a = atan2(dot(q, e2), dot(q, e1));
+  let w = vnoise(vec3f(a * 6.0, bd * 3.0, 1.7));
+  let g1 = pow(1.0 - abs(2.0 * fract(a * 9.55 + 0.7 * w + 0.12 * bd) - 1.0), 8.0);
+  let g2 = pow(1.0 - abs(2.0 * fract(a * 23.9 + 1.4 * w - 0.2 * bd) - 1.0), 14.0) * 0.6;
+  let along = smoothstep(0.2, 0.62, bd) * (1.0 - smoothstep(1.05, 1.7, bd));
+  let brk = smoothstep(0.3, 0.62, vnoise(vec3f(a * 14.0, bd * 7.0, 3.1)));
+  return (g1 + g2) * along * brk;
+}
+fn basinWear(q: vec3f, bd: f32) -> f32 {   // slumps on the walls (signed, fraction of the radius before ×0.12)
+  return (fbm(q * 9.0 + 4.2, 3) - 0.5) * smoothstep(0.25, 0.85, bd) * (1.0 - smoothstep(0.95, 1.08, bd));
+}
 fn moonHeight(q: vec3f) -> f32 {
   let bd = basinD(q);
   let jag = 0.6 + 0.8 * vnoise(q * 34.0);                                       // (the crest broken and jagged along its length)
   var h = mix(basinH(bd), basinH(bd) - 0.04 * exp(-abs(bd - 1.0) / 0.035) * (1.0 - jag), 1.0) * 0.12 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
+  h += 0.12 * (0.06 * basinWear(q, bd) - 0.035 * basinScour(q, bd));   // (worn walls, scoured grooves)
   var cover = 1.0 - smoothstep(0.12, 0.3, abs(bd - 1.05));   // (none on the basin's rim; inside it and outside, the small ones pit it — 2026-10-04)
   var sc = 14.0;
   for (var oc = 0; oc < 2; oc++) {
@@ -423,7 +442,8 @@ struct BU { a: vec4f };   // x: the moon's radius (model units), y: its seed, z:
   let c0 = moonCraters(qs, 5.0, U.a.z, 2);
   base *= mix(1.15, 0.42, smoothstep(0.45, 0.58, fbm(qs * 1.6 + 11.0, 4)));   // bright highlands, dark maria with crisp shores
   base *= 1.0 + 0.3 * clamp(c0.rim, 0.0, 1.0);
-  base *= mix(1.0, 0.5, c0.basin);
+  base *= mix(1.0, 0.94, c0.basin);
+  { let bdq = basinD(qs); base *= 1.0 + 0.35 * basinScour(qs, bdq) - 0.5 * max(-basinWear(qs, bdq), 0.0); }   // (the scour's fresh, lighter rock; the worn slumps a little darker)   // (the basin floor only a shade darker: the round dark disc painted there read as a round shadow in the middle of the bowl — 2026-10-06)
   base *= 1.0 - 0.05 * c0.pit;   // (barely: the light's own half-shadow in each bowl shows the hole now — a dark pit painted in made every crater a black dot)                                                // crater bowls hold shadow (they read as holes whatever the light)
   // the normal: the relief (finite differences of moonHN) and the finer craters' bump
   let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
@@ -945,7 +965,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     // basin and a broken terminator): the scene's sun turned about its own azimuth to stand MOON_SUN_EL above the horizon
     // at the basin, so every crater's far half lies in shadow
     let V0 = normalize(transpose(mat3x3f(inst.m[0].xyz, inst.m[1].xyz, inst.m[2].xyz)) * (F.camPos.xyz - inst.m[3].xyz));   // the face the camera sees (moon-local)
-    let Th = Ll0 - V0 * dot(Ll0, V0); let Tl = length(Th);
+    let Th0 = Ll0 - V0 * dot(Ll0, V0); let Th = Th0 * cos(MOON_SUN_AZ) + cross(V0, Th0) * sin(MOON_SUN_AZ); let Tl = length(Th);   // (turned MOON_SUN_AZ about the view axis)
     let Ll = normalize(V0 * sin(MOON_SUN_EL) + select(normalize(cross(V0, vec3f(0.0, 1.0, 0.0))), Th / max(Tl, 1e-5), Tl > 1e-4) * cos(MOON_SUN_EL));   // (MOON_SUN_EL above the horizon in the middle of that face: the whole face lit slantwise, its terminator ~60° off)
     moonL = normalize((inst.m * vec4f(Ll, 0.0)).xyz);
     let lt = Ll - qs * dot(Ll, qs); let ltl = length(lt);
@@ -955,7 +975,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
       for (var k = 0; k < 16; k++) {   // (out to ~0.4 rad: the low sun's shadows are long)
         let q2 = normalize(qs + dir * dist);
         let hk = textureSampleLevel(texMoon, texSmp, vec2f(atan2(q2.z, q2.x) / 6.2831853 + 0.5, acos(clamp(q2.y, -1.0, 1.0)) / 3.14159265), 0.0).a;
-        occ = max(occ, (hk - (mt.a + tanE * dist - 0.5 * dist * dist)) / (dist * 0.012));   // (the sphere curving away below the ray; a hard-edged shadow)
+        occ = max(occ, (hk - (mt.a + tanE * dist + 0.5 * dist * dist)) / (dist * 0.012));   // (+: the sphere curves away BELOW the ray, so the ray stands higher over the ground the further it goes — the sign was wrong, the ray sank into the moon and threw huge false shadows; a hard edge)
         dist *= 1.45;
       }
       moonSh = 1.0 - clamp(occ, 0.0, 1.0);
