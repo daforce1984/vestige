@@ -1563,9 +1563,9 @@ const HERO_GRIP_SH = [-4.3, 2.7, 4.3];
 // under the rifle, palm up, cradling it (not the fist round the fore-end — it never reached: the fore-end was 11.6 from
 // his left shoulder, his arm 6.1). The grip drawn in to the middle of his chest so both hands reach (HERO_GRIP_BLADE)
 const bladeW = (tw) => smooth(170.55, 170.95, tw) * (1 - smooth(173.2, 173.9, tw));   // (held through scene 34, his face dead still; eased out in 35, which is on VANGUARD)
-const BLADE_YAW = -0.72;
-const HERO_CRADLE = [0, -1.55, 2.6];   // rifle frame: under its middle (its belly is at y ≈ −1.0)
-const HERO_GRIP_BLADE = [-0.5, 3.2, 2.5];   // torso frame: the grip drawn in toward the chest's middle (from −4.3, 2.3, 4.6), so the left hand reaches under the rifle (it couldn't: 11.6 from the left shoulder, the arm 6.1)
+const BLADE_YAW = -0.92;
+const HERO_CRADLE = [0, -1.55, 4.7];   // rifle frame: under its middle (its belly is at y ≈ −1.0; it spans z −3.7 … 13.2)
+const HERO_GRIP_BLADE = [-0.5, 3.8, 3.0];   // torso frame: the grip drawn in toward the chest's middle (from −4.3, 2.3, 4.6), so the left hand reaches under the rifle (it couldn't: 11.6 from the left shoulder, the arm 6.1)
 const SH_YAW = -0.3;   // (the chest turned a little right of the line: the gun arm hangs along his side instead of folding across the chest)   // shouldered: the grip (torso frame) — the stock's butt then sits at the right shoulder (joint at −4.6, 3.8, 0)
 function heroAim2H(s, target, k) {
   s.pose = { ...s.pose };
