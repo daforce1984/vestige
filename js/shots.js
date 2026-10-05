@@ -964,14 +964,14 @@ function drawBlockSplash(R, t) {
     }
   }
   // 6. the gouge the beam dragged across the plate: the track (kept in the shield's frame, so it rides with it) glowing
-  //    white-hot where it's fresh, cooling to red behind
+  //    white-hot where it's fresh, then quickly fading and thinning away bit by bit behind the beam
   { const P = blockPath();
     let pa = null, ta = 0;
     for (const x of P) {
       if (x.t > t) break;
       const q = madd(M.transformPoint([0, 0, 0], F.S, x.local), nF, 0.6);
-      if (pa) { const age = t - x.t, hh = Math.exp(-age * 2.5) * (1 - smooth(0.12, 0.4, age)), w2 = sat(hh * 1.6);   // each bit cools from when it was hit: the first-struck end goes out first
-        if (hh > 0.02) R.beam(pa, q, 0.35 + 0.25 * hh, [4 * hh, (0.6 + 2.2 * w2) * hh, (0.1 + 1.2 * w2 * w2) * hh], 0.35, 5, 0, 0.3); }
+      if (pa) { const age = t - x.t, hh = Math.exp(-age / 0.03) * (1 - smooth(0.05, 0.1, age)), w2 = sat(hh * 1.6);   // each bit cools from when it was hit, FAST (2026-10-06: ~0.2 s on screen in the bullet time, was ~3 s): the glow sweeps along behind the beam, the first-struck end out first
+        if (hh > 0.02) R.beam(pa, q, (0.08 + 0.55 * hh) * (0.6 + 0.4 * w2), [4 * hh, (0.6 + 2.2 * w2) * hh, (0.1 + 1.2 * w2 * w2) * hh], 0.35, 5, 0, 0.3); }   // (and thins as it fades)
       pa = q; ta = x.t;
     } }
   // 5. sparks spitting off the struck spot while it's hot — laid out in the plate's own frame, so they ride with the shield

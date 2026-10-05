@@ -709,7 +709,14 @@ function duelCues() {
   }
   out.push([179.3, '@msBoost', { vel: G * 0.75, dur: 1.0, pan: 0.35 }]);                     // the boost-jump
   // his 178.7 splashes off its shield: the plate rings, the face burns (the hole stays)
-  out.push([BLOCK_T + 0.03, 'magic_impact', { at: 'hit', gain: G * 1.1, pan: 0.3, prio: 9, norand: true }]);   // the splash on the shield: Pixabay 'Elemental Magic Spell Impact Outgoing' (front 1.1 s)
+  out.push([BLOCK_T + 0.03, 'magic_impact', { at: 'hit', gain: G * 1.1, pan: 0.3, prio: 10, norand: true }]);
+  // THE SHIELD TAKES IT (2026-10-06 — the block had no sound you could hear: its cues were prio 9 under the prio-10 beam):
+  // a heavy metal impact as the beam lands, a grinding sizzle all through the drag, a shock as it lets go
+  out.push([BLOCK_T + 0.012, 'hit_heavy', { at: 'hit', rate: 0.8, gain: G * 1.6, pan: 0.3, prio: 10, duck: 0.8, norand: true }]);
+  out.push([BLOCK_T + 0.012, 'expl_metal', { at: 'hit', rate: 0.9, gain: G * 1.2, pan: 0.3, prio: 10, norand: true }]);
+  out.push([BLOCK_T + 0.012, '@boom', { bus: 'sfx', f: 44, vel: G * 0.55, dur: 1.2, verb: 0.3 }]);
+  out.push([BLOCK_T + 0.02, 'cut_sizzle', { at: 0, dur: FD(BLOCK_T + 0.02, BLOCK_T + 0.27), fadeIn: 0.05, fadeOut: 0.3, rate: 0.85, gain: G * 1.3, pan: 0.3, prio: 10, norand: true }]);
+  out.push([BLOCK_T + 0.26, 'shockwave', { rate: 1.2, gain: G * 0.9, pan: 0.3, prio: 10, norand: true }]);   // the splash on the shield: Pixabay 'Elemental Magic Spell Impact Outgoing' (front 1.1 s)
   out.push([BLOCK_T + 0.03, '@sparkBurst', { vel: G * 0.6, pan: 0.3 }]);
   // the beam dragged across the plate: a hot electric SIZZLE for as long as it burns on the shield, fading as the face cools
   out.push([BLOCK_T + 0.015, 'cut_sizzle', { at: 0, dur: FD(BLOCK_T + 0.015, BLOCK_T + 0.42), fadeIn: 0.03, fadeOut: 0.5, rate: 1.15, gain: G * 1.1, pan: 0.3, prio: 9, norand: true }]);
