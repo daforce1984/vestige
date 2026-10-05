@@ -1299,7 +1299,7 @@ function drawEnemyMS(R, t, s, idx) {
   if (eye) {   // VANGUARD's eyes: a small glint on each (no big round glow), flaring in the standoff
     const pts = R.models.enemy_ms.emitPoints.eye || [];
     for (let i = 0; i < pts.length; i++) { const p = emitWorld(R, 'enemy_ms', e, 'eye', i); if (p) R.glow(p, 0.3 * (0.8 + 0.2 * eyeFl), [2.6 * eyeFl, 0.5 * eyeFl, 0.7 * eyeFl], 0.2); }
-    e.matOverride = { ...(e.matOverride || {}), eye: { base: [0.3, 0.08, 0.1], metal: 0, rough: 0.3, emissive: [5 * eyeFl, 1.0 * eyeFl, 1.4 * eyeFl] } };
+    e.matOverride = { ...(e.matOverride || {}), eye: { base: [0.35, 0.06, 0.18], metal: 0, rough: 0.3, emissive: [5 * eyeFl, 0.8 * eyeFl, 2.6 * eyeFl] }   /* magenta visor (scheme A) */ };
   }
   return e;
 }

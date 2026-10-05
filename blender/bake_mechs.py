@@ -34,17 +34,28 @@ MODEL_OPTS = {'enemy_ms': dict(wear=0.6, bare=(0.52, 0.52, 0.54), paint_rough=0.
                                # piece's own axes (PCA) instead of the model's — so they run with the part, not across it.
                                # palette: material -> [(weight, linear tint, roughness, metalness, source texture)]
                                per_piece=True,
-                               palette={'tryout_white': [(40, (0.8, 0.8, 0.8), 0.4, 0.08, 'white'),           # satin white
-                                                         (22, (0.5, 0.52, 0.56), 0.46, 0.18, 'white'),         # cool grey
-                                                         (14, (0.76, 0.72, 0.62), 0.52, 0.06, 'white'),        # warm off-white, matte
-                                                         (14, (0.78, 0.055, 0.06), 0.34, 0.1, 'white'),        # red accent
-                                                         (10, (0.5, 0.5, 0.53), 0.32, 0.75, 'metal')],         # bare gunmetal
-                                        'tryout_frame': [(50, (1.0, 1.0, 1.0), 0.42, 0.6, 'frame'),             # dark frame
-                                                         (30, (0.42, 0.42, 0.45), 0.34, 0.8, 'metal'),          # machined steel
-                                                         (20, (0.55, 0.55, 0.6), 0.55, 0.45, 'frame')],         # anodised grey
-                                        'tryout_red': [(1, (0.78, 0.055, 0.06), 0.34, 0.1, 'white')],
-                                        'tryout_grey': [(1, (0.55, 0.55, 0.57), 0.38, 0.55, 'metal')]})}
-TEX_SRC = {'white': 'vestige_mech_white_armor_albedo_v1.png', 'frame': 'vestige_mech_dark_frame_albedo_v1.png',
+                               # SCHEME A 'ace custom' (2026-10-05, after the Codex character sheet vanguard-scheme-a-v1):
+                               # oxblood glossy enamel + charcoal satin ceramic armour, machined gunmetal frame, hazard
+                               # yellow only on a few small pieces, magenta visor (shots.js); decals from
+                               # tools/make_vanguard_decals.py placed by 'decals' below
+                               palette={'tryout_white': [(68, (0.17, 0.015, 0.03), 0.3, 0.1, 'white'),           # oxblood #651C2B, glossy enamel
+                                                         (32, (0.035, 0.037, 0.045), 0.45, 0.15, 'white')],     # charcoal #24262B, satin ceramic
+                                        'tryout_frame': [(60, (1.0, 1.0, 1.0), 0.42, 0.6, 'frame'),             # dark frame
+                                                         (40, (0.16, 0.18, 0.21), 0.32, 0.8, 'metal')],         # gunmetal #454B52, machined
+                                        'tryout_red': [(1, (0.035, 0.037, 0.045), 0.45, 0.15, 'white')],      # (the old red accents: charcoal)
+                                        'tryout_grey': [(1, (0.16, 0.18, 0.21), 0.32, 0.8, 'metal')]},
+                               accent=(0.14, (1.0, 0.55, 0.03), 0.55, 0.05, 'white'),   # hazard yellow #F3B928: that share of the SMALL armour pieces (< 0.9 m², sparingly — the sheet uses it on edges and vents)
+                               # decal: (atlas id, object, world direction it faces, u axis, centre as bbox fractions (x, y, z), size m)
+                               # (Blender axes: forward −Y, up +Z, the model's left +X)
+                               decals=[(1, 'arm_R_upper', (-1, 0, 0), (0, -1, 0), (0.5, 0.5, 0.74), 1.7),   # '07' both shoulders
+                                       (1, 'arm_L_upper', (1, 0, 0), (0, 1, 0), (0.5, 0.5, 0.74), 1.7),
+                                       (2, 'torso', (0, -1, 0), (1, 0, 0), (0.7, 0.5, 0.62), 1.4),           # emblem: chest, its left
+                                       (3, 'leg_L_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.78), 1.3),    # warning stripes on the knees
+                                       (3, 'leg_R_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.78), 1.3),
+                                       (4, 'leg_R_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.45), 1.4),    # CAUTION on the right shin
+                                       (5, 'backpack', (0, 1, 0), (-1, 0, 0), (0.5, 0.5, 0.55), 1.7),       # SERVICE on the pack
+                                       (6, 'pelvis', (0, 1, 0), (-1, 0, 0), (0.28, 0.5, 0.35), 1.1)])}      # kill tally: rear skirt, right
+TEX_SRC = {'decals': 'vanguard_decals.png', 'white': 'vestige_mech_white_armor_albedo_v1.png', 'frame': 'vestige_mech_dark_frame_albedo_v1.png',
            'metal': 'vestige_mech_metal_detail_albedo_v1.png', 'height': 'vestige_mech_panel_height_v1.png',
            'mask': 'vestige_mech_wear_grime_mask_v1.png'}
 OPT = {}
@@ -257,6 +268,21 @@ def build_bake_graph(m, scorches, seed):
         g.val(base, ins[0])
         g.link(grey.outputs[0], ins[1])
         col = [x for x in mul.outputs if x.type == 'RGBA'][0]
+    if pp is not None and OPT.get('decals'):   # the decals (place_decals): atlas cell = id − 1, 4 × 2
+        sep = g.node('ShaderNodeSeparateXYZ')
+        g.link(g.node('ShaderNodeAttribute', attribute_name='dl').outputs['Vector'], sep.inputs[0])
+        u_, v_, i_ = sep.outputs[0], sep.outputs[1], sep.outputs[2]
+        k_ = g.math('SUBTRACT', i_, 1.0)
+        cx = g.math('MODULO', k_, 4.0); row = g.math('FLOOR', g.math('DIVIDE', k_, 4.0))
+        uv = g.node('ShaderNodeCombineXYZ')
+        g.link(g.math('DIVIDE', g.math('ADD', cx, g.math('MINIMUM', g.math('MAXIMUM', u_, 0.0), 1.0)), 4.0), uv.inputs[0])
+        g.link(g.math('DIVIDE', g.math('ADD', g.math('SUBTRACT', 1.0, row), g.math('MINIMUM', g.math('MAXIMUM', v_, 0.0), 1.0)), 2.0), uv.inputs[1])
+        img = bpy.data.images.load(os.path.join(TEX, 'src', TEX_SRC['decals']), check_existing=True)
+        dt = g.node('ShaderNodeTexImage', interpolation='Linear', extension='CLIP'); dt.image = img
+        g.link(uv.outputs[0], dt.inputs['Vector'])
+        inside = g.math('MULTIPLY', g.math('MULTIPLY', g.math('GREATER_THAN', u_, 0.0), g.math('LESS_THAN', u_, 1.0)),
+                        g.math('MULTIPLY', g.math('MULTIPLY', g.math('GREATER_THAN', v_, 0.0), g.math('LESS_THAN', v_, 1.0)), g.math('GREATER_THAN', i_, 0.5)))
+        col = g.mix(g.math('MULTIPLY', dt.outputs['Alpha'], inside), col, dt.outputs['Color'])
     col = g.mix(chip, col, dark_paint)
     if cav is not None:                                           # height map baked as cavity shading (no normal slot)
         col = g.mix(g.math('MULTIPLY', cav, 0.55), col, (0.008, 0.008, 0.009))
@@ -330,6 +356,8 @@ def assign_pieces(meshes):
                 pick = (1, (1.0, 1.0, 1.0), 0.5, 0.2, 'white')
             elif len(comp) < 40:
                 pick = opts[0]                                    # (bolts and slivers: the material's base finish)
+            elif OPT.get('accent') and mname == 'tryout_white' and len(comp) < 100 and sum(me.polygons[fi].area for fi in comp) * W.median_scale ** 2 < 0.9 and rnd.random() < OPT['accent'][0]:
+                pick = (1, *OPT['accent'][1:])                    # (a few small armour pieces in the accent colour)
             else:
                 tot = sum(w for w, *_ in opts); x = rnd.uniform(0, tot)
                 for pick in opts:
@@ -346,6 +374,49 @@ def assign_pieces(meshes):
                     apt.data[li].color = (*tint, 1.0)
                     apm.data[li].color = (rough, metal, alt, 1.0)
         print('PIECES', o.name, len(comps), flush=True)
+    place_decals(meshes)
+
+
+def place_decals(meshes):
+    """'dl' (corner): (u, v, atlas id) of the decal over that corner — each decal projected flat along its direction onto
+    the outermost faces turned that way, inside its square"""
+    from mathutils import Vector
+    by = {o.name: o for o in meshes}
+    for o in meshes:
+        if 'dl' in o.data.attributes:
+            o.data.attributes.remove(o.data.attributes['dl'])
+        o.data.attributes.new('dl', 'FLOAT_VECTOR', 'CORNER')
+    for did, name, d, ua, frac, size in OPT.get('decals', []):
+        o = by.get(name)
+        if o is None:
+            continue
+        me, W = o.data, o.matrix_world
+        d, ua = Vector(d).normalized(), Vector(ua).normalized(); va = d.cross(ua)   # (u right, v up, as seen looking at it along −d)
+        P = [W @ v.co for v in me.vertices]
+        lo = Vector([min(p[i] for p in P) for i in range(3)]); hi = Vector([max(p[i] for p in P) for i in range(3)])
+        c = Vector([lo[i] + (hi[i] - lo[i]) * frac[i] for i in range(3)])
+        N3 = W.to_3x3()
+        cand = []
+        for poly in me.polygons:
+            n = (N3 @ poly.normal).normalized()
+            if n.dot(d) < 0.55:
+                continue
+            q = W @ poly.center - c
+            if abs(q.dot(ua)) < size * 0.6 and abs(q.dot(va)) < size * 0.6:
+                cand.append((q.dot(d), poly))
+        if not cand:
+            print('DECAL none', did, name, flush=True); continue
+        top = max(h for h, _ in cand)
+        al = me.attributes['dl']
+        k = 0
+        for h, poly in cand:
+            if h < top - 0.45:                                   # (only the outermost skin facing that way)
+                continue
+            for li, vi in zip(poly.loop_indices, poly.vertices):
+                q = W @ me.vertices[vi].co - c
+                al.data[li].vector = (q.dot(ua) / size + 0.5, q.dot(va) / size + 0.5, float(did))
+            k += 1
+        print('DECAL', did, name, k, 'faces', flush=True)
 
 
 def run(name):
@@ -437,7 +508,7 @@ def run(name):
         if orig:
             m.node_tree.links.new(orig[0], out.inputs['Surface'])
     for o in meshes:   # (the per-piece bake attributes are not part of the model)
-        for nm in ('pp', 'pt', 'pm'):
+        for nm in ('pp', 'pt', 'pm', 'dl'):
             if nm in o.data.attributes:
                 o.data.attributes.remove(o.data.attributes[nm])
     sc.render.engine = 'BLENDER_EEVEE'
