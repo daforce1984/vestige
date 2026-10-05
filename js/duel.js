@@ -1565,10 +1565,11 @@ const HERO_GRIP_SH = [-4.3, 2.7, 4.3];
 const bladeW = (tw) => Math.max(smooth(170.55, 170.95, tw) * (1 - smooth(173.2, 173.9, tw)),   // (scenes 33–34; held through 34, his face dead still; eased out in 35, which is on VANGUARD)
   smooth(177.85, 178.2, tw) * (1 - smooth(178.95, 179.3, tw)));   // (scene 41: the aimed shot on the shield and its burn — eased in over the cut before it, out over D09)
 const BLADE_YAW = -0.55;   // the base blade (~30° with the aim's own turn, as on the stance sheet); bladeReach adds what the left hand needs
-const HERO_CRADLE = [0.1633, -0.0992, 5.4924];   // rifle frame (the fist hole's centre): solved against the meshes so the fist's PALM side
-// meets the rifle's underside exactly — its first contact (hand-local −1.192, −1.029, 1.338, on the palm side) touches it
-// at (0.034, 0.473, 6.02), a ray from there up along the palm's normal hits the rifle at distance 0, and no other vertex of
-// the hand pokes into it (ray-cast against assets/rifle2_game.glb and the gundam hand_L mesh, 2026-10-05)
+const HERO_CRADLE = [0.1633, 1.05, 5.4924];   // rifle frame (the fist hole's centre): the PALM's broad face against the rifle's
+// underside. Measured on the render's own matrices and meshes (ray-cast up from every hand vertex under the rifle): the
+// palm side is uneven — one ridge (the thumb) stands 1.0 – 1.2 m above the rest, and with only it touching the hand read as
+// floating under the gun; raised 1.0 so the broad face meets the underside, that ridge sinks into the rifle's body (2.1 m
+// tall there: hidden inside it); +0.15 more so the broad face sits 0 – 0.2 from the underside across the rifle's width
 export const HERO_PALM_CONTACT = [-1.192, -1.029, 1.338];
 const BLADE_LEAN = 0.12, BLADE_YAW_E = -1.0, BLADE_LEAN_E = 0.3, ARM_REACH_L = 5.85;   // base lean; how far the reach solve (bladeReach) may turn / pitch the chest further; the left arm's reach (shoulder → wrist pivot)
 const HERO_GRIP_BLADE = [-1.5, 3.6, 2.6];   // torso frame: the grip high on the right of his chest so the stock butts into his right shoulder (stock sigma-rifle-stance-v1); the left hand just ahead of it underneath — his short arms reach that
