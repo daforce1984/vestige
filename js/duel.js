@@ -1969,7 +1969,7 @@ function saberDrawIK(s, tw) {   // the left hand: to the hip, rip it out, overhe
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const fk = duelFK(s, 'gundam'), F = hiltFrame(fk, kp.P, kp.D, kp.R);
   hiltIK(s, 'L', F.p, F.Hw);
-  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+  poseSlerp(s, keep, k);   // (in rotation space: lerping the Euler angles wrapped, the wrist turned 50° in a frame)
 }
 function saberRightGrip(s, tw) {   // the right hand joins below the left once the rifle is gone: a two-handed grip for the cut
   const k = smooth(THROW0 + 0.07, SD_GUARD - 0.005, tw)   // (from the end of the throw's follow-through: the long way up to the hilt, not in a twentieth of a second)
@@ -1984,7 +1984,13 @@ function saberRightGrip(s, tw) {   // the right hand joins below the left once t
   // angles instead swung the wrist through 120° in a frame and twisted the shoulder open
   const P0 = M.transformPoint([0, 0, 0], fk.hand_R, [0, 0, 0]), R0 = nrmCols(r3(fk.hand_R)), ke = k * k * (3 - 2 * k);
   const R = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(R0), qFromCols(nrmCols(Hn)), ke));
-  armIK(s, fk, 'gundam', 'R', lrp(P0, sub(hiltR, r3v(Hn, [0, -1.2, 0.6])), ke), R);
+  // (2026-10-06) round an ARC about the shoulder, not a straight line: from the throw's arm flung out to his right, the
+  // line ran right past the shoulder — the elbow folded shut (−122°) and opened again and the wrist spun ~25° a frame
+  const pv = PIV.gundam, Sh = M.transformPoint([0, 0, 0], fk.torso, sub(pv.arm_R_upper, pv.torso)), P1 = sub(hiltR, r3v(Hn, [0, -1.2, 0.6]));
+  const v0 = sub(P0, Sh), v1 = sub(P1, Sh), l0 = V.len(v0), l1 = V.len(v1), u0 = scl(v0, 1 / l0), u1 = scl(v1, 1 / l1);
+  const om = Math.acos(clamp(V.dot(u0, u1), -1, 1)), so = Math.sin(om);
+  const u = so < 1e-4 ? u1 : add(scl(u0, Math.sin((1 - ke) * om) / so), scl(u1, Math.sin(ke * om) / so));
+  armIK(s, fk, 'gundam', 'R', add(Sh, scl(u, lerp(l0, l1, ke))), R);
 }
 const nrmCols = (m) => { const o = m.slice(); for (let c = 0; c < 3; c++) { const l = Math.hypot(o[3 * c], o[3 * c + 1], o[3 * c + 2]) || 1; for (let r = 0; r < 3; r++) o[3 * c + r] /= l; } return o; };
 function throwFling(s, tw) {   // the right arm: wound in across his chest, then flung out straight to his right, arm at full stretch — the rifle leaves at THROW0
@@ -2001,7 +2007,7 @@ function throwFling(s, tw) {   // the right arm: wound in across his chest, then
   const P = add(S, scl(nrm(lrp(nrm(sub(W, S)), nrm(sub(O, S)), out)), lerp(0.6, 1.1, out) * L)), o = nrm(sub(P, S)),   // (round an arc about the shoulder: straight across, the hand passed close by it and the elbow flipped)
   y = scl(o, -1), zr = nrm(lrp(upv, fw, out)), z = nrm(sub(zr, scl(o, V.dot(zr, o)))), x = V.cross([0, 0, 0], y, z);   // (the hand's Z reference turns from up (wound in: the arm points forward, so 'forward' was degenerate and the hand flipped over) to forward (flung out))
   armIK(s, fk, 'gundam', 'R', P, [...x, ...y, ...z]);
-  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+  poseSlerp(s, keep, k);   // (in rotation space: lerping the Euler angles wrapped, the wrist turned 50° in a frame)
 }
 // THE CATCH: one arm thrown up, open, toward the rifle coming in from ahead and above as he flies at it; he snatches it
 // out of the air (the grip lands in the hand the right way round — GRIPS) and yanks it down and back into his aim
@@ -2075,12 +2081,17 @@ function transCutIK(s, tw) {
   const ref = transCutRef(); if (!ref || ref.pending) return;
   const u = tw - TRANS_PASS, x = u < 0 ? clamp(-u / SWING_PRE, 0, 1) : clamp(u / SWING_POST, 0, 1);
   const ang = Math.sign(u) * (1 - (1 - x) * (1 - x)) * 110 * DEG;   // held out far right, whipped across (fastest through the ball) to far left
-  const dir = rotAxis(ref.base, ref.a, ang), upv = nrm(V.cross([0, 0, 0], dir, ref.a)), xv = V.cross([0, 0, 0], upv, dir), Hw = [...xv, ...upv, ...dir];
+  let dir = rotAxis(ref.base, ref.a, ang);
+  // (2026-10-06) the wind-up held RAISED — the blade up beside his right shoulder, a high two-handed guard — and whipped down
+  // into the stroke's plane as it goes (gone by the ball): held flat out to his right it ran back along his forearms and
+  // both wrists were cocked 70–80° (searched: left wrist ~1°, right ~31°)
+  if (u < 0) { const T = r3(duelFK(s, 'gundam').torso); dir = nrm(add(dir, scl(add(scl(nrm(r3v(T, [0, 1, 0])), 5), scl(nrm(r3v(T, [0, 0, 1])), -0.5)), x))); }
+  const upv = nrm(V.cross([0, 0, 0], dir, ref.a)), xv = V.cross([0, 0, 0], upv, dir), Hw = [...xv, ...upv, ...dir];
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   const fk = duelFK(s, 'gundam'), hilt = hiltAtTrans(fk, ang);
   hiltIK(s, 'L', hilt, Hw);
-  for (const p in keep) s.pose[p] = [0, 1, 2].map((c) => lerp(keep[p][c], s.pose[p][c], k));
+  poseSlerp(s, keep, k);
 }
 // the rifle tossed aside for the cut: it leaves his right hand as the saber lights, tumbles once end over end out to his
 // right and drops back into the same hand after the blade is through (the path is anchored to his grip at both ends)
