@@ -218,11 +218,11 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       const jl = len * (1.0 + 0.45 * hash(Math.floor(time * 30) * 1.3 + i)) * bk2, ck2 = k * bk2;   // (its length flickers frame to frame)
       // a flame, not a beam: three overlapping segments, each thinner and fainter toward the tail, the white core short
       V.madd(tmp3, tmp, tmp2, jl * 0.45);
-      R.beam(tmp, tmp3, r * 0.5, [2.0 * ck2, 2.1 * ck2, 2.6 * ck2], 1.0, 8, 1.5, 1.6);
+      R.beam(tmp, tmp3, r * 0.5, [2.0 * ck2, 2.1 * ck2, 2.6 * ck2], 1.0, 8, 0.2, 1.6);
       for (let q = 0; q < 3; q++) {
         V.madd(_pn, tmp, tmp2, jl * q / 3); V.madd(_pa, tmp, tmp2, jl * (q + 1.3) / 3);
         const f = 1 - q / 3.2;
-        R.beam(_pn, _pa, r * (1.6 - 0.35 * q), [c[0] * 1.5 * f * bk2, c[1] * 1.5 * f * bk2, c[2] * 1.5 * f * bk2], 0.7 * f, 4, 2.5, 1.4);
+        R.beam(_pn, _pa, r * (1.6 - 0.35 * q), [c[0] * 1.5 * f * bk2, c[1] * 1.5 * f * bk2, c[2] * 1.5 * f * bk2], 0.7 * f, 4, 0.3, 1.4);   // (a low shimmer: a strong one on a jet this long tore lines into it)
       }
       R.flame(tmp, V.scale(_pa, tmp2, jl * 0.6), r * 2.4, [c[0] * 1.3 * bk2, c[1] * 1.3 * bk2, c[2] * 1.3 * bk2], 1.6, i * 3.1 + 7, 1);
       R.glow(tmp, r * (2.2 + 1.0 * flick), [c[0] * 0.8 * bk2 + 0.35 * ck2, c[1] * 0.8 * bk2 + 0.35 * ck2, c[2] * 0.8 * bk2 + 0.35 * ck2], 0.3);

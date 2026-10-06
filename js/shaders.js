@@ -1363,6 +1363,10 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
   let tint = s.d.rgb;
   let t = F.camPos.w;
   let pxR = 1.414 / max(length(fwidth(i.uv)), 1e-6);                  // the sprite's radius on screen in pixels (uniform flow)
+  let gax = vec2f(dpdx(i.uv.x), dpdy(i.uv.x)); let gaxL = length(gax);   // (a beam's screen direction, for its shimmer — taken here, in uniform flow)
+  let tanS = select(vec2f(0.0), gax / max(gaxL, 1e-6), gaxL > 1e-6);
+  let gay = vec2f(dpdx(i.uv.y), dpdy(i.uv.y)); let gayL = length(gay);
+  let tanY = select(vec2f(0.0), gay / max(gayL, 1e-6), gayL > 1e-6);   // (a plume plane's: its uv.y runs nozzle → tip)
   if (shape == 0) {
     // glow: core + halo
     let r = length(i.uv);
@@ -1539,7 +1543,7 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     let core = exp(-pow(x / 0.22, 2.0)) * pow(1.0 - tt, 3.0);
     col = (tint * across * along * (1.0 + 1.6 * hot) + tint * exp(-pow(x / 0.9, 2.0)) * hot * 0.8 + vec3f(1.0, 0.95, 0.9) * core * 0.7 * length(tint)) * s.d.a;
     alpha = 0.0;
-    dist = vec2f(x, 0.0) * 0.004 * along * s.d.a;
+    dist = tanY * abs(x) * 0.004 * along * s.d.a;   // (2026-10-06: along the plume — ± across folded the image over its axis: a dark seam)
   } else if (shape == 9) {
     // energy barrier: ONLY a regular blue hex grid, invisible at rest, lit where it is hit and fading as the
     // pulse spreads. c.xy = impact (disc uv), c.z = tear 0..1 (opening), c.w = seconds since hit, b.z = global flash
@@ -1668,7 +1672,7 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     let win = (1.0 - smoothstep(0.6, 0.95, abs(v))) * smoothstep(0.0, 0.02, u) * smoothstep(1.0, 0.98, u) * step(0.0, i.uv.x) * step(i.uv.x, L);
     col = (vec3f(1.0, 0.97, 1.0) * clamp(lum - 0.9, 0.0, 3.0) * 0.8 + tint * (lum + glow) + tint * endK * 0.6) * s.d.a * win;
     alpha = 0.0;
-    dist = vec2f(0.0, v) * glow * 0.01 * s.d.a * win;
+    dist = tanS * (vnoise(vec3f(u * 9.0, t * 6.0, 3.0)) - 0.5) * glow * 0.02 * s.d.a * win;   // (along the arc: see shape 3)
   } else if (shape == 3) {
     // beam capsule: uv.x along (world units), uv.y across (-1..1)
     let L = i.ext.x; let r = i.ext.y;
@@ -1683,7 +1687,10 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     let flow = 0.85 + 0.15 * sin(ax * 0.15 - t * 60.0 * s.c.w);
     col = (vec3f(1.0) * core * core * 0.9 + tint * (core + glow * 0.8)) * s.d.a * flow;
     let nz = vnoise(vec3f(ax * 0.05, dd * 3.0, t * 8.0)) - 0.5;
-    dist = vec2f(nz, i.uv.y) * glow * s.c.z * 0.02;
+    // heat shimmer ALONG the beam only (2026-10-06): the across part (± the sprite's own v, used as a screen offset) pushed the
+    // two sides of a big beam in opposite screen directions and, at some angles, folded the image over its axis — a dark seam
+    // down the middle of the flames and the overdriven saber
+    dist = tanS * nz * glow * s.c.z * 0.02;
   } else if (shape == 17) {
     // ENERGY RUNAWAY on an overdriven blade (2026-10-06): the power it can't hold — irregular surges race up it (hilt →
     // tip), each one swelling the blade's envelope into ragged tongues of plasma that lick off its sides and stream
@@ -1712,7 +1719,7 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     col = (tint * heat + vec3f(1.0, 0.8, 0.7) * pow(clamp(body * pk * 0.5, 0.0, 1.2), 2.0) * 0.4) * s.d.a * flick
       * smoothstep(1.0, 0.8, abs(v));
     let nz = vnoise(vec3f(x * 0.4 - t * 10.0, v * 2.0, t * 4.0)) - 0.5;
-    dist = vec2f(nz, v) * body * pk * 0.01 * s.d.a;
+    dist = tanS * nz * body * pk * 0.01 * s.d.a;   // (along the blade only: see shape 3)
   } else if (shape == 4) {
     // shock ring (oriented quad), b/c = axes, d.a = ring position 0..1
     let r = length(i.uv);
