@@ -1280,7 +1280,7 @@ function drawSlash(R, c, t) {
     R.glow(P, 1 + 2 * k, [2.2 * k, 1.4 * k, 0.6 * k], 0.3);
     R.light(P, 40, [1, 0.6, 0.3], 4 * k);
     moltenBurst(R, P, d, lt, 77, 600, 1.0, 34, 1.1);
-    if (lt < 0.3) R.ripple(P, 6 + 40 * easeOut(lt / 0.3), [0.4, 0.4, 0.4], (1 - lt / 0.3) * 1.2);
+    // (2026-10-06: no shockwave ripple after the cut)
   }
 }
 // THRUSTER TRAILS (the Unicorn look): while a machine is boosting, a thin glowing line traces the path its backpack took
@@ -1486,7 +1486,7 @@ function drawMSBattle(R, t) {
       const d = V.norm([0, 0, 0], V.sub([0, 0, 0], ev.cut[1], ev.cut[0]));
       const kc = Math.exp(-ls * 4);
       R.light(ev.pos, 60, [1, 0.6, 0.35], 10 * kc);
-      if (ls < 0.5) {
+      if (ls < 0.5 && ev.t < 190) {   // (2026-10-06: no shockwave after the finishing cut — the blade passes clean through)
         R.ripple(ev.pos, 8 + 90 * easeOut(ls / 0.5), [0.5, 0.5, 0.5], (1 - ls / 0.5) * 1.0);
         R.ripple(ev.pos, 4 + 40 * easeOut(ls / 0.35), [0.5, 0.5, 0.5], sat(1 - ls / 0.35) * 1.6);
       }
