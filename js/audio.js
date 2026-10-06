@@ -685,7 +685,12 @@ function duelCues() {
   // ---- the transforming shot: the rifle opens out (heavy locking clacks), charges, fires a heavy homing shot whose
   //      energy body roars round after him and bursts behind him
   const FD2 = (a, b) => filmT(b) - filmT(a);
-  [0, 0.12, 0.26].forEach((d, i) => out.push([TRANS0 + d, 'metal_knock', { at: 'hit', rate: 0.62 + 0.08 * i, gain: G * 0.6, pan: 0.25, prio: 8, norand: true }]));
+  // (2026-10-06: the knocks replaced) a heavy mechanism: the casing unlocks with a big clunk and a hiss, a servo whine
+  // rising as it unfolds, two locking slams as the barrel extends and seats
+  out.push([TRANS0, 'metal_door', { at: 'hit', rate: 0.8, dur: 1.3, fadeOut: 0.4, gain: G * 0.9, pan: 0.25, prio: 8, norand: true }]);
+  out.push([TRANS0 + 0.02, 'reload_hiss', { rate: 0.85, gain: G * 0.5, pan: 0.25, prio: 7, norand: true }]);
+  out.push([TRANS0 + 0.04, 'reload_whine', { rate: 0.75, gain: G * 0.7, pan: 0.25, prio: 8, norand: true }]);
+  [0.14, 0.26].forEach((d, i) => out.push([TRANS0 + d, 'reload_slam', { at: 'hit', rate: 0.7 + 0.1 * i, gain: G * 0.85, pan: 0.25, prio: 8, norand: true }]));
   out.push([TRANS0 + 0.05, '@boom', { bus: 'sfx', f: 44, vel: G * 0.35, dur: 0.8, verb: 0.3 }]);
   out.push([TRANS0 + 0.2, 'charge_up', { at: 0, dur: FD2(TRANS0 + 0.2, TRANS_SHOT), fadeOut: 0.03, rate: 1.1, gain: G * 0.8, pan: 0.25, prio: 8, norand: true }]);
   out.push([TRANS_SHOT, 'sfx16_beam', { at: 'hit', gain: G * 2.0, pan: 0.2, prio: 9, norand: true }]);   // Pixabay 'Sfx16 - Beam' (Yarzur_ofc), louder
