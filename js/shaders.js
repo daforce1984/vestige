@@ -321,8 +321,8 @@ fn basinH(d: f32) -> f32 {
   }
   return h + 0.04 * rimFlat(d);   // (2026-10-06: a narrow FLAT band along the rim's top — was a sharp crest)
 }
-fn rimFlat(d: f32) -> f32 {   // the rim's top: up the inner wall's last lip, flat across 1.0 … 1.07, down onto the ejecta
-  return smoothstep(0.965, 1.0, d) * (1.0 - smoothstep(1.07, 1.13, d));
+fn rimFlat(d: f32) -> f32 {   // the rim's top: up the inner wall's last lip, flat across 1.0 … 1.16 (widened), down onto the ejecta
+  return smoothstep(0.965, 1.0, d) * (1.0 - smoothstep(1.16, 1.24, d));
 }
 // THE MOON'S RELIEF as real geometry (2026-10-03): height (fraction of its radius) of the giant basin and the two coarsest
 // crater octaves — the vertex shader displaces the mesh by it, the fragment takes its normal from it (the same cells and
@@ -358,7 +358,7 @@ fn moonHeight(q: vec3f) -> f32 {
   let bd = basinD(q);
   let jag = 0.6 + 0.8 * vnoise(q * 34.0);                                       // (the crest broken and jagged along its length)
   var h = mix(basinH(bd), basinH(bd) - 0.012 * rimFlat(bd) * (1.0 - jag), 1.0) * 0.12 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
-  h += 0.12 * (0.06 * basinWear(q, bd) - 0.035 * basinScour(q, bd));   // (worn walls, scoured grooves)
+  h += 0.12 * (0.06 * basinWear(q, bd) - 0.035 * basinScour(q, bd)) * (1.0 - 0.85 * rimFlat(bd));   // (worn walls, scoured grooves — mostly kept off the rim's flat top)
   h += 0.12 * 0.32 * exp(-pow(bd / 0.1, 2.0)) * (0.45 + 0.9 * vnoise(q * 70.0 + 5.0));   // a central peak cluster, rough
   h += 0.12 * 0.035 * sin(bd * 38.0 + 4.0 * vnoise(q * 18.0)) * smoothstep(0.62, 0.9, bd) * (1.0 - smoothstep(0.96, 1.0, bd));   // slumped terraces down the inner wall
   var cover = 1.0 - smoothstep(0.12, 0.3, abs(bd - 1.05));   // (none on the basin's rim; inside it and outside, the small ones pit it — 2026-10-04)
@@ -470,7 +470,7 @@ fn moonReal(q: vec3f) -> vec2f {   // (relief as a fraction of the radius, sRGB 
   let rl0 = moonReal(qs);
   base = mix(mix(base, vec3f(pow(rl0.y, 2.2) * 0.62), 0.6), vec3f(pow(rl0.y, 2.2) * 0.62), rwq);   // the real albedo (LROC): all of it outside the basin (its maria, rays, highlands), 60 % on the basin's floor so it has the same grain
   // (no darkening of the basin floor at all — 2026-10-06)
-  { let bdq = basinD(qs); base *= 1.0 + 0.35 * basinScour(qs, bdq) - 0.5 * max(-basinWear(qs, bdq), 0.0); }   // (the scour's fresh, lighter rock; the worn slumps a little darker)   // (the basin floor only a shade darker: the round dark disc painted there read as a round shadow in the middle of the bowl — 2026-10-06)
+  { let bdq = basinD(qs); base *= 1.0 + (0.35 * basinScour(qs, bdq) - 0.5 * max(-basinWear(qs, bdq), 0.0)) * (1.0 - 0.85 * rimFlat(bdq)); }   // (the scour's fresh, lighter rock; the worn slumps a little darker)   // (the basin floor only a shade darker: the round dark disc painted there read as a round shadow in the middle of the bowl — 2026-10-06)
   base *= 1.0 - 0.05 * c0.pit;   // (barely: the light's own half-shadow in each bowl shows the hole now — a dark pit painted in made every crater a black dot)                                                // crater bowls hold shadow (they read as holes whatever the light)
   // the normal: the relief (finite differences of moonHN) and the finer craters' bump
   let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
