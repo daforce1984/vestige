@@ -1241,7 +1241,9 @@ function duelHero_(t) {
   s.sande = Math.max(sat((tw - SANDE0 + 0.05) / 0.1) * (1 - smooth(CUT_T - 0.05, CUT_T - 0.025, tw)), transGhost(tw));
   s.ghostFrom = tw < SANDE0 - 0.1 ? TRANS_PASS - 0.1 : SANDE0 - 0.02;   // afterimages (shots.js); gone for the close-up of the cut
   s.boost = Math.max(heroBoost(tw) * (tw < 170.25 ? lerp(0.35, 1, smooth(169.7, 170.25, tw)) : 1), ck, 1.6 * smooth(CATCH_T, CATCH_T + 0.05, tw) * (1 - smooth(CATCH_T + 0.45, CD_HOLD, tw)));   // (the catch dash: boosters flat out)
-  s.blurTrail = cc > 0 && cc < CIRCUS_END + 0.6 ? smooth(0.2, 0.8, cc) * (1 - smooth(CIRCUS_END, CIRCUS_END + 0.6, cc)) : 0;
+  // the run through the circus (2026-10-06): no afterimage smear — his boosters burn flat out instead (shots.js: huge plumes)
+  s.blurTrail = 0;
+  s.circusBurn = cc > 0 && cc < CIRCUS_END + 0.6 ? smooth(0.05, 0.35, cc) * (1 - smooth(CIRCUS_END, CIRCUS_END + 0.6, cc)) : 0;
   if (tw > CATCH_T && tw < CD_HOLD + 0.4) s.blurTrail = Math.max(s.blurTrail, smooth(CATCH_T + 0.03, CATCH_T + 0.12, tw) * (1 - smooth(CATCH_T + 0.5, CD_HOLD + 0.4, tw)));   // the dash after the catch: the same boost smear   // boosting through the circus: a short motion-blur smear behind him (shots.js)
   s.thr = clamp(0.3 + s.boost * 0.7, 0, 1);
   finish(s, _pose, f);

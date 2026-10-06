@@ -817,7 +817,9 @@ export function drawGundam(R, t, s, opts = {}) {
   const pastHero = opts.pastState || ((tau) => { const cutAt = t >= 340 ? 340 : t >= 163 && t < 170 ? 163 : -1e9, q = gundamState(Math.max(t - tau, cutAt)); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
   const bk = s.boostK ?? (inDuel ? sat((s.boost - 0.62) / 0.38) : 0);   // duel quick-boosts: the nozzles flare
-  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.9, 1.2, 2.6], (inDuel ? 1.3 : 0.9) * (1 + 0.9 * bk), s.thr * (inDuel ? driveK(s) : 1), (inDuel ? 2.4 : 1.2) + 2.2 * bk, s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
+  const cb = s.circusBurn || 0;   // (2026-10-06) fleeing through the Itano circus: the boosters flat out — plumes ×1.9 the size, + afterburner jets (fx.js burnK)
+  e.burnK = cb;
+  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.9 + 0.6 * cb, 1.2 + 0.4 * cb, 2.6], (inDuel ? 1.3 : 0.9) * (1 + 0.9 * bk) * (1 + 0.9 * cb), Math.max(s.thr * (inDuel ? driveK(s) : 1), cb), ((inDuel ? 2.4 : 1.2) + 2.2 * bk) * (1 + 0.8 * cb), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
   const eye = emitWorld(R, 'gundam', e, 'eye');
   if (!s.fpv && eye && eyeK > 0.05) R.glow(eye, (s.visorFlare !== undefined ? 0.4 : 0.55 + bz * 2.4) * Math.min(eyeK, 1.2), [lerp(0.5, 5, bz) * eyeK, lerp(1.6, 0.3, bz) * eyeK, lerp(1.0, 0.2, bz) * eyeK], 0.35);   // visor: a small glint (a big ball read as a stray light next to him)
   if (!s.fpv && eyeK > 0.05 && (s.visorFlare !== undefined)) {        // visor band glow: every emitter point + a light spill

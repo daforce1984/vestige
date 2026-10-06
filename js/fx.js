@@ -213,6 +213,21 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     const k = throttle * flick * endOn;
     const c = [col[0] * k, col[1] * k, col[2] * k];
     if (isShip) nozzleHeart(R, tmp, r, col, Math.max(0.7, throttle) * flick, tmp2);   // every ship nozzle: white-hot heart + bloom (not faded end-on)
+    const bk2 = entry.burnK || 0;
+    if (bk2 > 0.01) {   // (2026-10-06) AFTERBURNER (Sigma fleeing through the Itano circus): a long white-hot core jet, a wide outer jet, a hard bloom at the nozzle and its light
+      const jl = len * (1.0 + 0.45 * hash(Math.floor(time * 30) * 1.3 + i)) * bk2, ck2 = k * bk2;   // (its length flickers frame to frame)
+      // a flame, not a beam: three overlapping segments, each thinner and fainter toward the tail, the white core short
+      V.madd(tmp3, tmp, tmp2, jl * 0.45);
+      R.beam(tmp, tmp3, r * 0.5, [2.0 * ck2, 2.1 * ck2, 2.6 * ck2], 1.0, 8, 1.5, 1.6);
+      for (let q = 0; q < 3; q++) {
+        V.madd(_pn, tmp, tmp2, jl * q / 3); V.madd(_pa, tmp, tmp2, jl * (q + 1.3) / 3);
+        const f = 1 - q / 3.2;
+        R.beam(_pn, _pa, r * (1.6 - 0.35 * q), [c[0] * 1.5 * f * bk2, c[1] * 1.5 * f * bk2, c[2] * 1.5 * f * bk2], 0.7 * f, 4, 2.5, 1.4);
+      }
+      R.flame(tmp, V.scale(_pa, tmp2, jl * 0.6), r * 2.4, [c[0] * 1.3 * bk2, c[1] * 1.3 * bk2, c[2] * 1.3 * bk2], 1.6, i * 3.1 + 7, 1);
+      R.glow(tmp, r * (2.2 + 1.0 * flick), [c[0] * 0.8 * bk2 + 0.35 * ck2, c[1] * 0.8 * bk2 + 0.35 * ck2, c[2] * 0.8 * bk2 + 0.35 * ck2], 0.3);
+      if (i === 0) R.light(tmp, 80, [0.5, 0.7, 1], 8 * bk2);
+    }
     if (opts && opts.past) {
       // curved plume: 8 samples of gas emitted over the last `span` seconds
       const N = isShip ? 0 : 8, span = opts.span ?? 0.12;       // ships: a single smooth cone (segments showed beads)

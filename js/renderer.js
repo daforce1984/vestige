@@ -528,7 +528,7 @@ export class Renderer {
     e.m.set(matrix);
     e.flash = 0; e.damage = 0; e.revealDir = 0; e.revealZ = 0; e.revealWidth = 1; e.emissive = 1; e.seed = model.entries.length * 7.13;
     e.tint[0] = 0.4; e.tint[1] = 0.7; e.tint[2] = 1.0;
-    e.pose = null; e.partXf = null; e.hidden = null; e.matOverride = null;
+    e.pose = null; e.partXf = null; e.hidden = null; e.matOverride = null; e.burnK = 0;
     e.dmgR = 0; e.ghost = 0; e.clip = null; e.clipHeat = 1; e.clipInv = false; e.stretch = 0; e.stretchOut = false; e.stretchAnchor = undefined; e.wear = 0; e.texSet = model.texSet && (this.texLoaded & model.texBit) ? model.texSet : 0; e.crush = null; e.melt = null; e.shadeK = 1; e.soot = 0; e.hideMats = null; e.rimK = 1; e.clipPart = null; e.meltPart = null; e.dmgPart = null; e.clipParts = null;
     model.entries.push(e);
     return e;
