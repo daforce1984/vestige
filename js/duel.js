@@ -2041,19 +2041,19 @@ function transCutRef() {   // the blade's line onto the ball at the pass (from w
 }
 // THE BALL SMASHED INTO PIECES (2026-10-03): solid lumps of its energy, not a gas — they fly on with its momentum, split
 // either side of the blade, and every one that meets his body strikes it (a few sparks, a clank: audio.js); the rest
-// fly past. Positions in story time from TRANS_PASS; his body as spheres on the duel FK, swept along his own motion.
-export const SHARD_LIFE = 0.8;
+// fly past (2026-10-06: each that strikes him goes off in a small burst and is gone). Positions in story time from TRANS_PASS; his body as spheres on the duel FK, swept along his own motion.
+export const SHARD_LIFE = 0.8, SHARD_N = 720, SHARD_BIG = 36;
 let _shards = null;
 export function energyShards() {
   if (_shards) return _shards;
   const TP = transPath(), P0 = transHead(TRANS_PASS), ax = transCutAxis(), dirIn = TP.dirIn, v0 = Math.min(TP.speed || 120, 160);
   const rd = (n) => { const u = hsh(n) * 2 - 1, th = hsh(n + 0.5) * 6.2832, r = Math.sqrt(1 - u * u); return [r * Math.cos(th), u, r * Math.sin(th)]; };
   const S = [];
-  for (let i = 0; i < 36; i++) {
-    const sg = i % 2 ? 1 : -1;
-    const v = add(add(scl(dirIn, v0 * (0.15 + 0.75 * hsh(i * 3.1 + 1))), scl(rd(i * 5.7 + 2), 25 + 25 * hsh(i + 7))), scl(ax, sg * (10 + 18 * hsh(i + 11))));
-    S.push({ p0: add(P0, scl(rd(i * 2.3 + 9), 1.5 + 7 * hsh(i + 3))),   // (scattered through the space he charges into: he meets them one after another)
-      v, r: 0.25 + 0.4 * hsh(i * 1.7 + 5), seed: i, hitT: Infinity, hitP: null, hitN: null });
+  for (let i = 0; i < SHARD_N; i++) {   // (2026-10-06: ×20 — the first 36 the big lumps as before, the rest a spray of smaller ones)
+    const sg = i % 2 ? 1 : -1, big = i < SHARD_BIG, sp = big ? 1 : 1.35;
+    const v = add(add(scl(dirIn, v0 * (0.15 + 0.75 * hsh(i * 3.1 + 1))), scl(rd(i * 5.7 + 2), (25 + 25 * hsh(i + 7)) * sp)), scl(ax, sg * (10 + 18 * hsh(i + 11)) * sp));
+    S.push({ p0: add(P0, scl(rd(i * 2.3 + 9), (1.5 + 7 * hsh(i + 3)) * sp)),   // (scattered through the space he charges into: he meets them one after another)
+      v, r: big ? 0.25 + 0.4 * hsh(i * 1.7 + 5) : 0.1 + 0.18 * hsh(i * 1.7 + 5), big, seed: i, hitT: Infinity, hitP: null, hitN: null });
   }
   const BODY = [['torso', [0, 1.5, 0.3], 3.0], ['head', [0, 1, 0], 1.6], ['pelvis', [0, 0, 0], 2.2], ['arm_L_upper', [0, -1.5, 0], 1.4], ['arm_R_upper', [0, -1.5, 0], 1.4],
     ['arm_L_lower', [0, -1.5, 0], 1.3], ['arm_R_lower', [0, -1.5, 0], 1.3], ['hand_L', [0, -0.6, 0], 1.0], ['hand_R', [0, -0.6, 0], 1.0], ['leg_L_upper', [0, -2.5, 0], 1.7], ['leg_R_upper', [0, -2.5, 0], 1.7], ['leg_L_lower', [0, -2.5, 0], 1.5], ['leg_R_lower', [0, -2.5, 0], 1.5]];

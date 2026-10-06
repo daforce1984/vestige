@@ -1701,12 +1701,14 @@ function drawTransShot(R, t) {
     const P0 = transHead(TRANS_PASS), f = Math.exp(-lc * 9);
     R.glow(P0, 1 + 3 * f, [3.5 * f, 2 * f, 3 * f], 0.3); R.light(P0, 70, [1, 0.45, 0.8], 5 * Math.exp(-lc * 4));
     for (const sh of energyShards()) {
-      if (t >= sh.hitT) {                                            // struck him: sparks off the armour where it hit
+      if (t >= sh.hitT) {                                            // struck him: it goes off — a small burst on the armour, and it is gone
         const a = t - sh.hitT; if (a > 0.25) continue;
-        const k = Math.exp(-a * 14);
-        R.glow(sh.hitP, 0.5 + 1.2 * k, [3 * k, 1.6 * k, 2.2 * k], 0.25);
-        if (a < 0.08) R.light(sh.hitP, 12, [1, 0.6, 0.5], 2 * k);
-        sparkBurst(R, sh.hitP, sh.hitN, a, 1300 + sh.seed * 17, 14, 0.9, 30, 0.22, [4, 2.4, 1.6]);
+        const k = Math.exp(-a * 14), e = easeOut(sat(a / 0.05)), rr = sh.r * (sh.big ? 1 : 1.6);
+        R.glow(sh.hitP, rr * (2 + 6 * e), [3.5 * k, 1.5 * k, 2.6 * k], 0.25);            // the flash, swelling as it fades
+        if (a < 0.06) R.orb(sh.hitP, rr * (1.2 + 3.5 * e), [3.2, 1.2, 2.4], 1.4 * (1 - a / 0.06), 900 + sh.seed, 0.9);   // its energy torn open
+        if (a < 0.03) R.ripple(sh.hitP, rr * (3 + 14 * a / 0.03), [0.4, 0.4, 0.4], (1 - a / 0.03) * 0.8);
+        if (sh.big && a < 0.08) R.light(sh.hitP, 12, [1, 0.6, 0.5], 2 * k);
+        sparkBurst(R, sh.hitP, sh.hitN, a, 1300 + sh.seed * 17, sh.big ? 14 : 5, 0.9, sh.big ? 30 : 22, 0.22, [4, 2.4, 1.6]);
         continue;
       }
       const life = sat(lc / SHARD_LIFE), fade = Math.pow(1 - life, 1.3); if (fade < 0.02) continue;
@@ -1714,6 +1716,7 @@ function drawTransShot(R, t) {
       const col = lerpv([3.0, 1.0, 2.0], [1.8, 0.4, 1.7], life), fl = 0.8 + 0.2 * Math.sin(lc * 80 + sh.seed);   // (the ball's own magenta, cooling violet)
       // an irregular plasma lump: a torn, writhing head and a few smaller ragged pieces strung out behind it
       R.orb(p, sh.r * 1.3 * (1 - 0.4 * life), col, 1.6 * fade * fl, 400 + sh.seed, 0.9);
+      if (!sh.big) { R.beam(tail, p, sh.r * 0.5, [col[0] * fade * 0.5, col[1] * fade * 0.5, col[2] * fade * 0.5], 0.5, 2); continue; }   // (the spray: one lump and its streak)
       for (let k = 1; k <= 3; k++) {
         const q = madd(madd(p, sh.v, -0.0035 * k), randDir([0, 0, 0], sh.seed * 13 + k), sh.r * 0.5);
         R.orb(q, sh.r * (1.0 - 0.22 * k) * (1 - 0.4 * life), col, 1.2 * fade * fl * (1 - 0.2 * k), 430 + sh.seed * 3 + k, 1.0);

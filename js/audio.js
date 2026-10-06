@@ -697,12 +697,18 @@ function duelCues() {
   out.push([TRANS_PASS, '@boom', { bus: 'sfx', f: 34, vel: G * 0.8, dur: 1.6, verb: 0.4 }]);
   out.push([TRANS_PASS, 'magic_impact', { at: 'hit', rate: 0.75, gain: G * 1.2, prio: 9, norand: true }]);   // the ball smashed into scattering energy
   out.push([TRANS_PASS, '@shockwave', { vel: G * 0.7 }]);
+  out.push([TRANS_PASS, 'beam_blast4', { at: 'hit', rate: 0.7, gain: G * 1.3, prio: 10, norand: true }]);        // (2026-10-06) the ball BLOWS: an energy explosion …
+  out.push([TRANS_PASS + 0.004, 'hl_big_explosion', { at: 'hit', rate: 1.15, gain: G * 0.9, prio: 10, norand: true }]);   // … and its blast rolling on
   out.push([TRANS_PASS + 0.47, '@beamSaberRetract', { vel: 0.6 * G, dur: 0.4 }]);
-  // the smashed ball's pieces striking his armour one after another: a clank each (duel.js energyShards — the same hits the
-  // picture shows sparks for)
-  { let last = -1, i = 0; for (const tH of energyShards().filter((x) => isFinite(x.hitT)).map((x) => x.hitT).sort((a, b) => a - b)) {
-    if (tH - last < 0.003) continue; last = tH;
-    out.push([tH, i % 3 === 2 ? 'axe_metal1' : 'metal_knock', { at: 'hit', rate: 1.05 + 0.45 * ((i * 0.618) % 1), gain: G * (0.45 + 0.2 * ((i * 0.37) % 1)), pan: ((i * 0.53) % 1) - 0.5, prio: 7, norand: true }]); i++; } }
+  // the smashed ball's pieces striking his armour one after another — each goes off in a small burst: an energy pop, every
+  // few a clank of the armour under it (duel.js energyShards — the same hits the picture shows; hundreds since 2026-10-06,
+  // so thinned to one every 0.006 s of story — ~0.06 s on screen in the slow motion there)
+  { let last = -1, i = 0; for (const sh of energyShards().filter((x) => isFinite(x.hitT)).sort((a, b) => a.hitT - b.hitT)) {
+    const tH = sh.hitT; if (tH - last < (sh.big ? 0.003 : 0.006)) continue; last = tH;
+    const pan = ((i * 0.53) % 1) - 0.5, g = sh.big ? 1 : 0.6;
+    out.push([tH, 'laser_shot2', { at: 'hit', rate: 1.5 + 0.6 * ((i * 0.618) % 1), gain: G * 0.5 * g, pan, prio: 7, norand: true }]);
+    if (sh.big || i % 4 === 0) out.push([tH, i % 3 === 2 ? 'axe_metal1' : 'metal_knock', { at: 'hit', rate: 1.05 + 0.45 * ((i * 0.618) % 1), gain: G * (0.45 + 0.2 * ((i * 0.37) % 1)) * g, pan, prio: 7, norand: true }]);
+    i++; } }
   for (const ts of SERAPH_SHOTS) {
     if (ts === TRANS_SHOT) continue;
     out.push([ts, 'energy_beam2', { at: 'hit', rate: R(0.92, 1.0), gain: G * 0.9, pan: 0.3, prio: 9, norand: true }]);   // its heavier blaster                          // its heavier rifle, pitched down
