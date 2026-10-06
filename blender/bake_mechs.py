@@ -57,10 +57,31 @@ MODEL_OPTS = {'enemy_ms': dict(wear=0.6, bare=(0.52, 0.52, 0.54), paint_rough=0.
                                        (4, 'leg_R_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.45), 1.4),    # CAUTION on the right shin
                                        (5, 'backpack', (0, 1, 0), (-1, 0, 0), (0.5, 0.5, 0.55), 1.7),       # SERVICE on the pack
                                        (6, 'pelvis', (0, 1, 0), (-1, 0, 0), (0.28, 0.5, 0.35), 1.1)])}      # kill tally: rear skirt, right
+# Sigma (2026-10-06): WHITE AND BLACK, MATTE METAL — the original's lighter paint tiers white, its darker tier black, the
+# frame a dark gunmetal, every one a matte metal (metal ~0.55, rough ~0.6);
+# the edge wear only on real convex edges (a tighter bevel test, held off the creases by AO) and far less of it, worn to a
+# dark steel; no speckle chips; small holes filled; the islands unwrapped with wider margins (the bake's bleed reached
+# the neighbouring islands: broken-looking seams); decals from tools/make_sigma_decals.py ('praise the sun')
+MODEL_OPTS['gundam'] = dict(paint_override=(0.021, 0.021, 0.023), paint_rough=0.65, paint_metal=0.55, paint_floor=0.0,
+                            # by PART, not by the original paint tiers (those are scattered in small patches over every part: a
+                            # white / black camouflage): each part's paint all white or all black, the frame dark gunmetal
+                            obj_paint={**{k: (0.6, 0.6, 0.58) for k in ('head', 'torso', 'arm_L_upper', 'arm_R_upper', 'leg_L_lower', 'leg_R_lower')},
+                                       **{k: (0.022, 0.022, 0.024) for k in ('pelvis', 'backpack', 'arm_L_lower', 'arm_R_lower', 'hand_L', 'hand_R',
+                                                                              'leg_L_upper', 'leg_R_upper', 'foot_L', 'foot_R', 'rifle', 'saber_hilt')}},
+                            panel_var=0.04, wear=0.3, bare=(0.4, 0.4, 0.42), edge=(0.035, 0.975, 0.88), edge_ao=True,
+                            small_chips=False, scratch_k=0.25, fill_holes=12, uv_angle=50, uv_margin=0.004,
+                            decal_src='sigma_decals.png', mech_dark=(0.04, 0.58, 0.6),   # (the unpainted frame: dark gunmetal, matte)
+                            decals=[(1, 'torso', (0, -1, 0), (1, 0, 0), (0.72, 0.5, 0.66), 1.5),           # the emblem: chest, his left
+                                    (2, 'arm_L_upper', (1, 0, 0), (0, 1, 0), (0.5, 0.5, 0.74), 1.4),       # the sun on both shoulders
+                                    (2, 'arm_R_upper', (-1, 0, 0), (0, -1, 0), (0.5, 0.5, 0.74), 1.4),
+                                    (1, 'backpack', (0, 1, 0), (-1, 0, 0), (0.5, 0.5, 0.55), 1.9),         # the emblem large on the pack
+                                    (3, 'leg_L_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.62), 1.0),      # Σ on the shins
+                                    (3, 'leg_R_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.62), 1.0)])
 TEX_SRC = {'decals': 'vanguard_decals.png', 'white': 'vestige_mech_white_armor_albedo_v1.png', 'frame': 'vestige_mech_dark_frame_albedo_v1.png',
            'metal': 'vestige_mech_metal_detail_albedo_v1.png', 'height': 'vestige_mech_panel_height_v1.png',
            'mask': 'vestige_mech_wear_grime_mask_v1.png'}
 OPT = {}
+OUT = {'tex': None, 'glb': None}   # (--out DIR: write the textures and the GLB there instead of over the live assets — swapped in together afterwards)
 
 
 class G:
@@ -164,10 +185,15 @@ def build_bake_graph(m, scorches, seed):
         orm = g.node('ShaderNodeCombineColor')
         orm.inputs[0].default_value, orm.inputs[1].default_value, orm.inputs[2].default_value = 1.0, rough0, metal0
         return g, alb, orm.outputs[0]
-    painted = lum > 0.02
+    painted = lum > 0.02 or (bool(OPT.get('obj_paint')) and m.name != 'inner')   # (by part: the original's dark 'frame' tiers are scattered patches too — they take the part's colour)
     # engine-friendly values: painted albedo mid-range (lum >= ~0.12 linear ~ sRGB 0.38), low metalness;
     # dark mechanics lifted to a satin dark grey. Only worn edges become bare metal (metal 1).
-    if painted:
+    if painted and OPT.get('paint_override'):
+        base = tuple(OPT['paint_override'])
+        paint_metal, paint_rough = OPT['paint_metal'], OPT['paint_rough']
+        if OPT.get('obj_paint'):   # (assign_obj_paint: the part's colour on its corners)
+            base = g.node('ShaderNodeAttribute', attribute_name='op').outputs['Color']
+    elif painted:
         k = min(max(OPT.get('paint_floor', 0.12) / max(lum, 1e-4), 1.0), 4.5)
         base = tuple(min(0.75, c * k) for c in base)
         paint_metal, paint_rough = OPT.get('paint_metal', 0.12), OPT.get('paint_rough', max(rough0, 0.55))
@@ -176,19 +202,23 @@ def build_bake_graph(m, scorches, seed):
         grey = max(lum, 1e-4)
         base = tuple(0.05 * (0.6 + 0.4 * c / grey) for c in base)   # ~0.05 linear, slight original tint
         paint_metal, paint_rough = 0.35, 0.55
+        if OPT.get('mech_dark'):
+            md = OPT['mech_dark']; base = (md[0], md[0], md[0] * 1.08); paint_rough, paint_metal = md[1], md[2]
     # --- edge mask from bevel normal vs true normal, broken up with noise
+    er, e0, e1 = OPT.get('edge', (0.07, 0.998, 0.93))
     bev = g.node('ShaderNodeBevel', samples=8)
-    bev.inputs['Radius'].default_value = 0.07
+    bev.inputs['Radius'].default_value = er
     dotn = g.vmath('DOT_PRODUCT', bev.outputs['Normal'], geo.outputs['True Normal'])
-    edge = g.mr(dotn, 0.998, 0.93)                       # 0 flat -> 1 sharp edge
+    edge = g.mr(dotn, e0, e1)                            # 0 flat -> 1 sharp edge
     posn = g.vmath('ADD', pos, (seed * 13.1, seed * 7.7, seed * 3.3))
     n1 = g.noise(posn, 2.2, 12.0, 0.7)
     wear_raw = g.math('ADD', edge, g.math('MULTIPLY', g.math('SUBTRACT', n1, 0.5), 0.7))
     worn = g.mr(wear_raw, 0.82, 0.97)
     chip = g.math('SUBTRACT', g.mr(wear_raw, 0.68, 0.82), worn, clamp=True)
     n2 = g.noise(posn, 16.0, 3.0, 0.5)
-    small_chips = g.math('MULTIPLY', g.mr(n2, 0.79, 0.84), g.mr(n1, 0.55, 0.7, 0.0, 0.8))
-    worn = g.math('MAXIMUM', worn, small_chips)
+    if OPT.get('small_chips', True):
+        small_chips = g.math('MULTIPLY', g.mr(n2, 0.79, 0.84), g.mr(n1, 0.55, 0.7, 0.0, 0.8))
+        worn = g.math('MAXIMUM', worn, small_chips)
     if OPT.get('wear', 1.0) < 1.0:
         worn = g.math('MULTIPLY', worn, OPT['wear'])
         chip = g.math('MULTIPLY', chip, OPT['wear'])
@@ -201,6 +231,9 @@ def build_bake_graph(m, scorches, seed):
     aov = ao.outputs['AO']
     n3 = g.noise(posn, 5.0, 6.0, 0.6)
     grime = g.math('MULTIPLY', g.mr(aov, 0.35, 0.95, 0.9, 0.0), g.mr(n3, 0.3, 0.7, 0.55, 1.0))
+    if OPT.get('edge_ao'):   # (only the convex edges wear: a crease is as 'sharp' to the bevel test, but sits in occlusion)
+        cvx = g.mr(aov, 0.72, 0.93)
+        worn = g.math('MULTIPLY', worn, cvx); chip = g.math('MULTIPLY', chip, cvx)
     # --- vertical streaks
     sv = g.vmath('MULTIPLY', posn, (9.0, 9.0, 0.45))
     streak = g.math('MULTIPLY', g.mr(g.noise(sv, 1.0, 3.0, 0.5), 0.52, 0.72), 0.45)
@@ -230,6 +263,8 @@ def build_bake_graph(m, scorches, seed):
     s_n = g.noise(sc, 1.0, 2.0, 0.4)
     scratch = g.mr(g.math('ABSOLUTE', g.math('SUBTRACT', s_n, 0.5)), 0.0, 0.012, 1.0, 0.0)
     scratch = g.math('MULTIPLY', scratch, g.mr(g.noise(posn, 1.3, 2.0, 0.5), 0.5, 0.62))
+    if OPT.get('scratch_k') is not None:
+        scratch = g.math('MULTIPLY', scratch, OPT['scratch_k'])
     # --- scorch marks: dark soot core + brown heat ring
     soot, ring = 0.0, 0.0
     for c, r in scorches:
@@ -239,7 +274,7 @@ def build_bake_graph(m, scorches, seed):
         soot = s_ if soot == 0.0 else g.math('MAXIMUM', soot, s_)
         ring = rg if ring == 0.0 else g.math('MAXIMUM', ring, rg)
     # --- colour
-    dark_paint = tuple(c * 0.45 for c in base)
+    dark_paint = tuple(c * 0.45 for c in base) if isinstance(base, tuple) else (0.02, 0.02, 0.022)
     col = base
     if tcls:
         mt = g.node('ShaderNodeMix', data_type='RGBA', blend_type='MULTIPLY', clamp_factor=True)
@@ -272,7 +307,7 @@ def build_bake_graph(m, scorches, seed):
         g.val(base, ins[0])
         g.link(grey.outputs[0], ins[1])
         col = [x for x in mul.outputs if x.type == 'RGBA'][0]
-    if pp is not None and OPT.get('decals'):   # the decals (place_decals): atlas cell = id − 1, 4 × 2
+    if OPT.get('decals'):   # the decals (place_decals): atlas cell = id − 1, 4 × 2
         sep = g.node('ShaderNodeSeparateXYZ')
         g.link(g.node('ShaderNodeAttribute', attribute_name='dl').outputs['Vector'], sep.inputs[0])
         u_, v_, i_ = sep.outputs[0], sep.outputs[1], sep.outputs[2]
@@ -281,7 +316,7 @@ def build_bake_graph(m, scorches, seed):
         uv = g.node('ShaderNodeCombineXYZ')
         g.link(g.math('DIVIDE', g.math('ADD', cx, g.math('MINIMUM', g.math('MAXIMUM', u_, 0.0), 1.0)), 4.0), uv.inputs[0])
         g.link(g.math('DIVIDE', g.math('ADD', g.math('SUBTRACT', 1.0, row), g.math('MINIMUM', g.math('MAXIMUM', v_, 0.0), 1.0)), 2.0), uv.inputs[1])
-        img = bpy.data.images.load(os.path.join(TEX, 'src', TEX_SRC['decals']), check_existing=True)
+        img = bpy.data.images.load(os.path.join(TEX, 'src', OPT.get('decal_src', TEX_SRC['decals'])), check_existing=True)
         dt = g.node('ShaderNodeTexImage', interpolation='Linear', extension='CLIP'); dt.image = img
         g.link(uv.outputs[0], dt.inputs['Vector'])
         inside = g.math('MULTIPLY', g.math('MULTIPLY', g.math('GREATER_THAN', u_, 0.0), g.math('LESS_THAN', u_, 1.0)),
@@ -444,8 +479,11 @@ def run(name):
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.remove_doubles(threshold=0.0005)   # glTF import splits verts at seams -> weld before unwrapping
+    if OPT.get('fill_holes'):   # the small open loops in the shells (gaps that read as breaks); the big joint openings stay
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.mesh.fill_holes(sides=OPT['fill_holes'])
     bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.001, area_weight=0.0,
+    bpy.ops.uv.smart_project(angle_limit=math.radians(OPT.get('uv_angle', 66)), island_margin=OPT.get('uv_margin', 0.001), area_weight=0.0,
                              scale_to_bounds=False)
     bpy.ops.object.mode_set(mode='OBJECT')
     for o in meshes:   # enlarge close-up parts' islands before packing (pack keeps relative scale)
@@ -458,9 +496,9 @@ def run(name):
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.select_all(action='SELECT')
     try:
-        bpy.ops.uv.pack_islands(rotate=True, margin=0.001, shape_method='CONCAVE', margin_method='FRACTION')
+        bpy.ops.uv.pack_islands(rotate=True, margin=OPT.get('uv_margin', 0.001), shape_method='CONCAVE', margin_method='FRACTION')
     except TypeError:
-        bpy.ops.uv.pack_islands(rotate=True, margin=0.001)
+        bpy.ops.uv.pack_islands(rotate=True, margin=OPT.get('uv_margin', 0.001))
     bpy.ops.object.mode_set(mode='OBJECT')
     # ---- images
     alb = bpy.data.images.new(name + '_albedo', RES, RES, alpha=False)
@@ -477,6 +515,16 @@ def run(name):
         scorches.append((tuple(o.matrix_world @ v.co), R.uniform(0.7, 1.3)))
     if OPT.get('per_piece'):
         assign_pieces(meshes)
+    elif OPT.get('decals'):
+        place_decals(meshes)
+    if OPT.get('obj_paint'):
+        for o in meshes:
+            if 'op' in o.data.attributes:
+                o.data.attributes.remove(o.data.attributes['op'])
+            a = o.data.attributes.new('op', 'FLOAT_COLOR', 'CORNER')
+            c = OPT['obj_paint'].get(o.name, (0.04, 0.04, 0.043))
+            for d in a.data:
+                d.color = (*c, 1.0)
     # ---- per-material bake graphs
     mats = {m for o in meshes for m in o.data.materials if m}
     graphs = {}
@@ -494,7 +542,7 @@ def run(name):
     sc.render.engine = 'CYCLES'
     sc.cycles.device = 'CPU'
     sc.cycles.samples = 24
-    sc.render.bake.margin = 8
+    sc.render.bake.margin = 6 if OPT.get('uv_margin', 0.001) > 0.002 else 8
     for img_t, key in ((alb, 1), (orm, 2)):
         for m, (g, a_sock, o_sock, em, img, out, orig) in graphs.items():
             g.val(a_sock if key == 1 else o_sock, em.inputs['Color'])
@@ -503,9 +551,9 @@ def run(name):
         for o in meshes:
             o.select_set(True)
         bpy.context.view_layer.objects.active = meshes[0]
-        bpy.ops.object.bake(type='EMIT', use_clear=True, margin=8)
+        bpy.ops.object.bake(type='EMIT', use_clear=True, margin=sc.render.bake.margin)
         os.makedirs(TEX, exist_ok=True)
-        path = os.path.join(TEX, '%s_%s.png' % (name, 'albedo' if key == 1 else 'orm'))
+        path = os.path.join(OUT['tex'] or TEX, '%s_%s.png' % (name, 'albedo' if key == 1 else 'orm'))
         img_t.filepath_raw = path
         img_t.file_format = 'PNG'
         img_t.save()
@@ -517,11 +565,11 @@ def run(name):
         if orig:
             m.node_tree.links.new(orig[0], out.inputs['Surface'])
     for o in meshes:   # (the per-piece bake attributes are not part of the model)
-        for nm in ('pp', 'pt', 'pm', 'dl'):
+        for nm in ('pp', 'pt', 'pm', 'dl', 'op'):
             if nm in o.data.attributes:
                 o.data.attributes.remove(o.data.attributes[nm])
     sc.render.engine = 'BLENDER_EEVEE'
-    bpy.ops.export_scene.gltf(filepath=os.path.join(ASSETS, name + '.glb'), export_format='GLB', export_yup=True,
+    bpy.ops.export_scene.gltf(filepath=os.path.join(OUT['glb'] or ASSETS, name + '.glb'), export_format='GLB', export_yup=True,
                               export_apply=False, export_materials='EXPORT', export_texcoords=True,
                               export_normals=True, export_image_format='NONE', export_extras=False,
                               export_cameras=False, export_lights=False, export_animations=False)
@@ -530,5 +578,7 @@ def run(name):
 
 if __name__ == '__main__':
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else ['gundam', 'enemy_ms']
+    if '--out' in argv:
+        i = argv.index('--out'); OUT['tex'] = OUT['glb'] = argv[i + 1]; os.makedirs(argv[i + 1], exist_ok=True); del argv[i:i + 2]
     for n in argv:
         run(n)

@@ -632,6 +632,8 @@ const _hm = new Float32Array(16);
 // articulated hand's closed-fist bore runs along its X at (y −1.3, z 0.55), so it is turned −90° about Y and shifted
 // to put that bore exactly on the haft.
 const _gm = new Float32Array(16), _gr = new Float32Array(16);
+// (2026-10-06) the grip hands in Sigma's scheme: black matte metal, dark gunmetal claws (assets/mech_hand.glb is tan / steel)
+const SIGMA_HAND = { armor: { base: [0.022, 0.022, 0.024], metal: 0.55, rough: 0.65, emissive: [0, 0, 0] }, claw: { base: [0.04, 0.04, 0.045], metal: 0.6, rough: 0.58, emissive: [0, 0, 0] } };
 function gripHand(R, ge, side, zOff) {
   if (!R.models.mech_hand) return;
   ge.hidden = { ...(ge.hidden || {}), ['hand_' + side]: 1 };
@@ -642,7 +644,7 @@ function gripHand(R, ge, side, zOff) {
   const h = R.add('mech_hand', _gm);
   if (!h) return;
   h.hidden = { [side === 'L' ? 'thumbR_1' : 'thumbL_1']: 1, [side === 'L' ? 'thumbR_2' : 'thumbL_2']: 1 };
-  h.seed = 5.5; h.wear = 1;
+  h.seed = 5.5; h.wear = 0.3; h.matOverride = SIGMA_HAND;
   const pose = {};
   for (let i = 0; i < 4; i++) { pose[`f${i}_1`] = [CURL * 1.2, 0, 0]; pose[`f${i}_2`] = [CURL * 1.3, 0, 0]; pose[`f${i}_3`] = [CURL * 1.0, 0, 0]; }
   const th = side === 'L' ? 'thumbL' : 'thumbR';
@@ -658,7 +660,7 @@ function drawPovHands(R, t, ge, s) {
     const e = R.add('mech_hand', _hm);
     if (!e) continue;
     e.hidden = { [side === 'L' ? 'thumbR_1' : 'thumbL_1']: 1, [side === 'L' ? 'thumbR_2' : 'thumbL_2']: 1 };
-    e.seed = 5.5; e.wear = 1; e.damage = 0.2 + 0.5 * u;
+    e.seed = 5.5; e.wear = 0.3; e.matOverride = SIGMA_HAND; e.damage = 0.2 + 0.5 * u;
     const pose = {};
     for (let i = 0; i < 4; i++) {
       const tr = (k) => noise1(film * (23 + i * 3) + k * 7 + (side === 'L' ? 0 : 50)) * 0.12 * strain;   // straining tremor

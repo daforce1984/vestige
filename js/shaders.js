@@ -917,7 +917,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
       base = vec3f(0.16, 0.165, 0.175) * (0.45 + 1.4 * sqrt(lum));
       rough = 0.46; metal = 0.75; texAO = mix(1.0, texAO, 0.4);   // one material all over (its texture's roughness / metal / AO were a patchwork from part to part; the albedo is flattened to its small detail: tools/build_rifles.py flatten_detail)
     }
-    if (texSet == 1) { metal = 0.3; rough = 0.4; }      // Sigma: one material all over, metalness 30 %, roughness 40 % (the texture's colour and AO kept)
+    // Sigma (2026-10-06): white and black, matte metal — the bake carries it (blender/bake_mechs.py MODEL_OPTS gundam); held matte here
+    if (texSet == 1) { rough = max(rough, 0.5); }
     if (texSet == 2) { metal = mix(metal, 1.0, 0.3); }   // VANGUARD: a little more metal (median 0.35 → 0.54, the texture's variation kept)
   }
   // cinematic hull detail (flagship: shade.z = material class 1 hull, 2 plate, 3 hull2, 4 greeble, 5 trim)

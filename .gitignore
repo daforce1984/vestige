@@ -8,3 +8,4 @@ assets/sfx_src/
 blender/previews/
 *.blend1
 render/
+blender/_bake_out/
