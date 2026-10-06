@@ -847,6 +847,31 @@ const enemyBoost = scalarTrack([[170, 1], [175.9, 1], [176.5, 0.6],
   ...[177.2, 177.85, 179.5, 180.9, 181.55, 182.25, 183.3, 184.85, 185.85, 186.86, 188.5].flatMap((t) => [[t - 0.02, 0.5], [t + 0.03, 1, 'lin'], [t + 0.35, 0.55]]),
   [183.8, 0.7], [184.3, 1], [187.8, 1], [189.5, 0.6], [190.83, 0.6], [190.9, 1, 'lin'], [191.3, 0.75], [192.4, 0.1], [200, 0.1]]);
 
+// THE COCKY SHOT (2026-10-06, scene 38 — its first shot, 176.75): it doesn't bother with a stance — the torso turned so
+// the right shoulder is thrust at him, chest open, chin up, the gun arm flung straight out on the line of fire, the left
+// arm hanging easy with the shield lowered; it fires like that
+const COCKY = (tw) => smooth(176.15, 176.4, tw) * (1 - smooth(177.05, 177.3, tw));
+const COCKY_YAW = 0.85, LEFT_EASY = { arm_L_upper: [8, 4, 14], arm_L_lower: [-18, 0, 0], hand_L: [10, 0, 0], shield: [0, 0, 0] };
+function cockyAim(s, tw, target, k, kick) {
+  s.pose = { ...s.pose };
+  const keep = {}; for (const p of ['torso', 'head', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'shield']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
+  const t0 = s.pose.torso || [0, 0, 0], h0 = s.pose.head || [0, 0, 0];
+  s.pose.torso = [t0[0] - 0.14, t0[1] + COCKY_YAW, t0[2] + 0.06];   // the right shoulder at him, the chest thrown open
+  s.pose.head = [h0[0] - 0.2, h0[1] - COCKY_YAW * 0.75, h0[2] - 0.08];   // looking down its nose at him
+  for (const p in LEFT_EASY) s.pose[p] = LEFT_EASY[p].map((x) => x * DEG);
+  // the gun arm straight out: the grip at arm's length from the right shoulder on the line to him, the barrel on him
+  let fk = duelFK(s, 'enemy_ms');
+  const pv = PIV.enemy_ms, S = M.transformPoint([0, 0, 0], fk.torso, sub(pv.arm_R_upper, pv.torso));
+  const Lr = V.dist(pv.arm_R_lower, pv.arm_R_upper) + V.dist(pv.hand_R, pv.arm_R_lower);
+  const hr = HAND_TO_RIFLE(), dS = nrm(sub(target, S)), hand = add(S, scl(dS, Lr * 1.02));   // (the hand itself at full stretch: the arm locked straight)
+  const d = dS, up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
+  const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
+  const b = VAN_BARREL, u0 = GUN_UP.enemy_ms, u = nrm(sub(u0, scl(b, V.dot(u0, b)))), x = V.cross([0, 0, 0], u, b);
+  const Rw = r3mul([...X, ...U, ...d], r3T([...x, ...u, ...b]));
+  armIK(s, fk, 'enemy_ms', 'R', hand, Rw);
+  if (kick > 0) kickArm(s, 'enemy_ms', Math.atan(kick));
+  poseSlerp(s, keep, k);
+}
 // TWO-HANDED AIM (the enemy's 8.6 m rifle): the rifle is PLACED — its grip in front of the chest, a little right of the
 // centre line, the barrel on the target, its top toward the chest's up — and both arms are solved onto it by IK: the
 // right fist on the grip, the left on the fore-end. (Swinging the gun arm alone left the fore-end out of the left arm's reach.)
@@ -1340,6 +1365,7 @@ function enemyState_(t) {
         for (const p in o) s.pose[p] = [0, 1, 2].map((c) => lerp(o[p][c], s.pose[p][c], kL)); }
     }
   }
+  if (COCKY(tw) > 0 && !(tw > CUT_T)) cockyAim(s, tw, enemyAim(tw), COCKY(tw), recoilKick(tw));
   if (tw < ENEMY_GRAB + 0.4) holsterDraw(s, tw);
   if (tw > CUT_T) {   // cut: the machine keeps the pose it was cut in (both halves), sagging only slowly toward limp — the aim
     const P0 = cutPose(), k = 0.6 * smooth(0, 2.2, tw - CUT_T);                    // IK switching off made the arms jump
