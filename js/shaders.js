@@ -1011,22 +1011,36 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   } else if (texSet == -1) {
     let moonK = 0.0;
     let q = i.lp;
+    // (2026-10-06) THE MOON'S OWN SURFACE on the rocks: they sat in front of the real moon (NASA LROC/LOLA, texMoon) with a
+    // dark procedural basalt and read as a cheaper material — now each rock wears the baked moon (its grey albedo: maria,
+    // highlands, rays; its crater slopes as bump), turned its own way per rock, over its own displaced shape
+    let qs0 = normalize(q);
+    let sa = inst.p1.w * 1.7; let ca = cos(sa); let sn = sin(sa);
+    let qs = normalize(vec3f(qs0.x * ca - qs0.z * sn, qs0.y * cos(sa * 0.6) + (qs0.x * sn + qs0.z * ca) * sin(sa * 0.6), (qs0.x * sn + qs0.z * ca) * cos(sa * 0.6) - qs0.y * sin(sa * 0.6)));
+    let mu = vec2f(atan2(qs.z, qs.x) / 6.2831853 + 0.5, acos(clamp(qs.y, -1.0, 1.0)) / 3.14159265);
+    let mt = textureSampleLevel(texMoon, texSmp, mu, 0.0);
     let big = fbm(q * 2.2 + inst.p1.w, 4);
     let mid = fbm(q * 7.0 + 3.1 + inst.p1.w, 3);
-    base = mix(vec3f(0.034, 0.032, 0.03), vec3f(0.1, 0.09, 0.08), smoothstep(0.3, 0.72, big));   // dark basalt .. dusty regolith (albedo ~0.05–0.12)
-    base *= mix(0.8, 1.12, mid);
-    base = mix(base, base * vec3f(1.15, 0.95, 0.8), smoothstep(0.55, 0.8, fbm(q * 3.5 + 9.0, 3)) * 0.5);   // iron-stained patches
-    base += vec3f(0.025) * smoothstep(0.85, 0.92, vnoise(q * 70.0 + inst.p1.w));                         // mineral grains
+    base = vec3f(mt.b) * mix(0.82, 1.05, mid) * vec3f(1.0, 0.985, 0.965);                                // the moon's grey regolith
+    base = mix(base, base * vec3f(1.08, 0.97, 0.88), smoothstep(0.6, 0.85, big) * 0.35);                  // (a faint warmth here and there: not the moon's twin)
+    base += vec3f(0.02) * smoothstep(0.85, 0.92, vnoise(q * 70.0 + inst.p1.w));                         // mineral grains
     rough = 0.93; metal = 0.0;
     // bump: height field gradient by central differences (fine pits and grit that the mesh cannot hold)
     let e = 0.004;
     let hq = fbm(q * 9.0 + 1.7, 3) * 0.6 + vnoise(q * 40.0) * 0.4;
     var g3 = vec3f(0.0);
-    if (moonK < 0.5) {                                                 // (the moon's bump comes from its craters: this grit was ×0.2 there and cost a third of the moon's pixels)
+    if (moonK < 0.5) {
       g3.x = (fbm((q + vec3f(e, 0.0, 0.0)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(e, 0.0, 0.0)) * 40.0) * 0.4 - hq) / e;
       g3.y = (fbm((q + vec3f(0.0, e, 0.0)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(0.0, e, 0.0)) * 40.0) * 0.4 - hq) / e;
       g3.z = (fbm((q + vec3f(0.0, 0.0, e)) * 9.0 + 1.7, 3) * 0.6 + vnoise((q + vec3f(0.0, 0.0, e)) * 40.0) * 0.4 - hq) / e;
     }
+    // the moon's crater slopes (tangent rg in its own frame), rotated back into the rock's model space
+    let t1 = normalize(cross(qs, select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(qs.y) > 0.9))); let t2 = cross(qs, t1);
+    let sl = t1 * mt.r + t2 * mt.g;
+    let ci = cos(sa * 0.6); let si = sin(sa * 0.6);
+    let y1 = sl.y * ci - sl.z * si; let z1 = sl.y * si + sl.z * ci;          // undo the tilt
+    let slm = vec3f(sl.x * ca + z1 * sn, y1, -sl.x * sn + z1 * ca);           // undo the turn
+    g3 = g3 * 0.5 - slm * 55.0;
     var gw = (inst.m * vec4f(g3, 0.0)).xyz;
     gw = gw / max(length(inst.m[0].xyz), 1e-3);
     gw = gw - n * dot(gw, n);
@@ -1148,13 +1162,15 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // THE MOON's photometry (2026-10-04): Lommel–Seeliger — flat to the limb, no soft roll-off — and almost no fill: shadows
   // fall black as they do in space (the generic diffuse + strong sky fill made it look soft and doughy)
   let lunar = texSet == -3;
-  let lsd = select(ndl, 2.0 * ndl / max(ndl + ndv, 1e-3), lunar);
+  let rocky = texSet == -1;   // (2026-10-06) the asteroids lit as the moon is — the same regolith photometry, no blue sky cast — so they sit with it
+  let lsd = select(ndl, 2.0 * ndl / max(ndl + ndv, 1e-3), lunar || rocky);
   // the moon takes ONE sun — the second (the one on the face the film sees) — when there is one: lit from both sides its
   // craters' shadows were filled in and the big basin read flat (2026-10-04)
   let sunK = select(1.0, 0.0, lunar && F.rimCol.w > 0.5);
   var col = F.sunCol.rgb * sh * lsd * sunK * (diffC / 3.14159 * 2.6 + min(specG, vec3f(40.0)) * select(1.0, 0.0, lunar));
   var amb = mix(F.ambDown.rgb, F.ambUp.rgb, n.y * 0.5 + 0.5) * F.sunCol.w * select(1.0, MOON_AMB, lunar);
   if (lunar) { amb = vec3f(dot(amb, vec3f(0.2126, 0.7152, 0.0722))); }   // (the moon grey: no blue cast from the sky)
+  if (rocky) { amb = mix(amb, vec3f(dot(amb, vec3f(0.2126, 0.7152, 0.0722))), 0.85) * 0.6; }
   col += (diffC + F0 * 0.3) * amb * ao * texAO;
   // environment reflection with a brushed-metal streak (anisotropic look along the hull's long axis)
   let Rv = reflect(-V, n);
@@ -1175,7 +1191,8 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let G2 = (ndl2 / (ndl2 * (1.0 - kq) + kq)) * (ndv / (ndv * (1.0 - kq) + kq));
     let Fh2 = F0 + (1.0 - F0) * pow(1.0 - max(dot(H2, V), 0.0), 5.0);
     let spec2 = D2 * G2 * Fh2 / max(4.0 * ndl2 * ndv, 1e-3);
-    col += select(F.fill.rgb, vec3f(dot(F.fill.rgb, vec3f(0.2126, 0.7152, 0.0722))) * MOON_SUN_K, lunar) * moonSh * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
+    let fillC = select(F.fill.rgb, mix(F.fill.rgb, vec3f(dot(F.fill.rgb, vec3f(0.2126, 0.7152, 0.0722))), 0.8), rocky);
+    col += select(fillC, vec3f(dot(F.fill.rgb, vec3f(0.2126, 0.7152, 0.0722))) * MOON_SUN_K, lunar) * moonSh * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar || rocky) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
   }
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;

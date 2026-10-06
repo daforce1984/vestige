@@ -383,7 +383,7 @@ export class Renderer {
       const model = {
         radius: Math.hypot(...g.bounds.max.map((v, i) => Math.max(Math.abs(v), Math.abs(g.bounds.min[i])))) * (s.scale || 1),
         name: s.name, detail: s.detail ?? 1, texSet: s.texSet || 0, texBit: s.texBit || 0, hullClass: s.hullDetail ? { hull: 1, plate: 2, hull2: 3, greeble: 4, trim: 5 } : s.venator || null, parts: g.parts, materials: g.materials, empties: g.empties, bounds: g.bounds,
-        baseVertex: vo / 8, baseIndex: io, entries: [], partIndex: {}, draws: [], prepass: !!s.prepass,
+        baseVertex: vo / 8, baseIndex: io, entries: [], partIndex: {}, draws: [], prepass: !!s.prepass, lodK: s.lodK || 3,
       };
       // ship engines burn BRIGHT: nozzle-face emission ×5 (HDR, so the bloom pass makes them glow); mechs keep theirs
       if (!/^(gundam|enemy_ms|mech_hand|mace)$/.test(s.name)) for (const mt of g.materials) {
@@ -519,7 +519,8 @@ export class Renderer {
       const full = this.models[name], L = (full ? full.bounds.max[2] - full.bounds.min[2] : 60) * Math.hypot(matrix[0], matrix[1], matrix[2]);   // (its length on screen: × the matrix scale)
       const dx = matrix[12] - this.camPos[0], dy = matrix[13] - this.camPos[1], dz = matrix[14] - this.camPos[2];
       const d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 > (L * 3) * (L * 3)) name = this.models[name + '_far'] && d2 > (L * 12) * (L * 12) ? name + '_far' : name + '_lod';   // (3× its length: was 5.5; past 12× a ~2–3k-triangle copy, <name>_far)
+      const lk = full ? full.lodK : 3;   // (lodK: how many of its lengths away before the decimated copy — MODELS)
+      if (d2 > (L * lk) * (L * lk)) name = this.models[name + '_far'] && d2 > (L * 12) * (L * 12) ? name + '_far' : name + '_lod';   // (3× its length: was 5.5; past 12× a ~2–3k-triangle copy, <name>_far)
     }
     const model = this.models[name];
     if (!model) return null;

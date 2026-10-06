@@ -31,7 +31,7 @@ const MODELS = [
   { name: 'moon', detail: 0, drawLast: true },
   { name: 'ion_frigate_lod', detail: 0 }, { name: 'assault_frigate_lod', detail: 0 }, ...['interceptor_lod', 'interceptor_b_lod', 'interceptor_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game_lod.glb', texSet: 6, texBit: 1024 })), ...['enemy_fighter_lod', 'enemy_fighter_b_lod', 'enemy_fighter_c_lod'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256, engines: [[0, 0.74, -4.89, 0.33]] })), { name: 'enemy_frigate_lod', detail: 0, url: 'assets/cargo_game_lod.glb', texSet: 8, texBit: 16384 }, { name: 'ion_frigate_far', detail: 0 }, { name: 'assault_frigate_far', detail: 0 }, { name: 'enemy_frigate_far', detail: 0, url: 'assets/cargo_game_far.glb', texSet: 8, texBit: 16384 },   // blender/make_lods.py (distance LOD; the light fighter's: 1.8k triangles)                                        // tools/make_moon.py
   { name: 'wound_rim', detail: 0 },                                   // tools/make_wound_rim.py
-  { name: 'asteroids', detail: 0, keep: ['ast0', 'ast1', 'ast2', 'ast3', 'ast4', 'ast5'] },   // tools/make_asteroids.py
+  { name: 'asteroids', detail: 0, lodK: 12, keep: ['ast0', 'ast1', 'ast2', 'ast3', 'ast4', 'ast5'] },   // tools/make_asteroids.py   (lodK 12: at 3× its size the swap to the 3k copy popped as the scene-95 camera drifted)
   { name: 'asteroids_lod', detail: 0, keep: ['ast0', 'ast1', 'ast2', 'ast3', 'ast4', 'ast5'] },   // (blender/decimate_glb.py 0.15: 3k triangles a rock)
   { name: 'debris', detail: 0.6, keep: ['rock0', 'rock1', 'rock2', 'rock3', 'hull0', 'hull1', 'hull2', 'hull3'] },
 ].map((m) => ({ ...m, url: m.url || `assets/${m.name}.glb` }));
