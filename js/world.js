@@ -2,6 +2,7 @@
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { fxOpts, explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, breakOff, chargeInflow, spark } from './fx.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
+import { bakeWreck, wreckPose } from './wreck.js';
 export { explosion };
 
 export const HIIG_ENGINE = [0.55, 0.8, 1.6];
@@ -872,6 +873,26 @@ export function dreadEmitter(R, t, entry) {
   return R.emptyWorld([0, 0, 0], 'enemy_dreadnought', entry, 'lance_emitter');
 }
 
+// the wreck: the pre-broken hull on its baked, colliding flight (js/wreck.js) — one entry for all 32 chunks
+let _wreck = null; const _wreckXf = {}, _wp = [0, 0, 0];
+export function prepWreck() {
+  if (_wreck) return;
+  _wreck = bakeWreck(1.65, EARTH_T - DREAD_DIE + 1, 77, 0.7);   // (1.65: its scale in main.js MODELS)
+}
+function drawDreadWreck(R, t) {
+  const model = R.models.enemy_dreadnought_chunks; if (!model) return;
+  const lt = t - DREAD_DIE;
+  prepWreck();
+  const base = mat(M.new(), dreadPos(DREAD_DIE), [0, 0, 1]);
+  const e = R.add('enemy_dreadnought_chunks', base); if (!e) return;
+  e.partXf = wreckPose(_wreck, lt, _wreckXf);
+  e.damage = 0.25; e.seed = 77; e.emissive = 0; e.tint = [3, 1, 0.3];   // (scorched: the lights are dead once it goes up)
+  if (lt < 6) _wreck.chunks.forEach((c, i) => {   // venting fire from a few of the chunks for a few seconds
+    const s = 77 * 7.31 + i * 3.17; if (hash(s + 7) <= 0.75) return;
+    const x = _wreckXf[c.name]; M.transformPoint(_wp, base, [x[12], x[13], x[14]]);
+    R.fire(_wp, 14 * (1 - lt / 6), 0.25 + 0.4 * (lt / 6), s, [1, 1, 1], 0.6);
+  });
+}
 function drawDreadnought(R, t, tmpM) {
   const Ld = modelLen(R, 'enemy_dreadnought'), sz = modelSize(R, 'enemy_dreadnought');
   const pos = dreadPos(t);
@@ -903,7 +924,8 @@ function drawDreadnought(R, t, tmpM) {
     }
   }
   if (t > DREAD_DIE + 0.4) {
-    if (t < EARTH_T) shatter(R, 'enemy_dreadnought_lod', mat(M.new(), dreadPos(DREAD_DIE), [0, 0, 1]), t, DREAD_DIE, 77, [3, 3, 4], 0.7, { tint: [3, 1, 0.3], noGlow: true });   // (its lights are dead once it goes up)
+    if (t < EARTH_T) drawDreadWreck(R, t);
+
     return;
   }
   const e = R.add('enemy_dreadnought', mat(tmpM, hin.u < 1 ? hin.pos : pos, fwd));

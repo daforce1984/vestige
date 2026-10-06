@@ -2,6 +2,8 @@ import { Renderer } from './renderer.js';
 import { frame, findShot, DURATION, SHOTS } from './shots.js';
 import { storyT, filmT, insertFilm, inSkip, TEAR_F0, TEAR_F1 } from './timemap.js';
 import { DUEL_CAMS } from './duel.js';
+import { DREAD_CHUNKS } from './dread_chunks.js';
+import { prepWreck } from './world.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
   'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
@@ -12,7 +14,8 @@ const MODELS = [
   ...['interceptor', 'interceptor_b', 'interceptor_c'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })),   // our fighters: assets/light_fighter.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_frigate', detail: 0, url: 'assets/cargo_game.glb', texSet: 8, texBit: 16384 },   // every enemy frigate: 'Cargo Spaceship' (blaice, CC BY 4.0) via tools/build_rifles.py
   { name: 'enemy_dreadnought', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game.glb', texSet: 7, texBit: 4096 },
-  { name: 'enemy_dreadnought_lod', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game_lod.glb', texSet: 7, texBit: 4096 },   // far away, and its wreck chunks (5.7k triangles)   // a little bigger than our flagship: 'Space Battleship Aquamarine' (Kai Xiang, CC BY 4.0) via tools/build_rifles.py
+  { name: 'enemy_dreadnought_chunks', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_chunks.glb', texSet: 7, texBit: 4096, keep: DREAD_CHUNKS.map((c) => c.name) },   // its wreck, pre-broken (tools/make_dread_chunks.py; flown by js/wreck.js)
+  { name: 'enemy_dreadnought_lod', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game_lod.glb', texSet: 7, texBit: 4096 },   // far away (5.7k triangles)   // a little bigger than our flagship: 'Space Battleship Aquamarine' (Kai Xiang, CC BY 4.0) via tools/build_rifles.py
   ...['enemy_fighter', 'enemy_fighter_b', 'enemy_fighter_c'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256, engines: [[0, 0.74, -4.89, 0.33]] })),   // every enemy fighter: assets/spaceship.glb (user-supplied) via tools/build_rifles.py
   { name: 'gundam', detail: 0, keep: MS_KEEP },
   { name: 'enemy_ms', detail: 0, keep: MS_KEEP, keepGeo: true },
@@ -259,6 +262,7 @@ async function boot() {
     await R.init();
     status.textContent = '모델 로딩…';
     await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png', 'assets/tex/light_fighter_game_albedo.png', 'assets/tex/light_fighter_game_orm.png', 'assets/tex/dreadnought_game_albedo.png', 'assets/tex/dreadnought_game_orm.png', 'assets/tex/cargo_game_albedo.png', 'assets/tex/cargo_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp'), R.loadMoonData('assets/tex/moon_lroc.png')]);
+    prepWreck();   // the dreadnought's wreck flight, baked now (~0.6 s) rather than as a hitch when it blows
     {
       // our flagship after the Buzz Hound corvette: its windows, lights and engines glow teal-green
       const mm = R.models.mothership, T = { window: [0.35, 1.0, 0.75], amber: [0.3, 1.0, 0.7], blue_light: [0.25, 1.0, 0.8], engine: [0.55, 1.0, 0.9] };
