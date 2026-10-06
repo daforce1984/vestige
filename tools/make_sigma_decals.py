@@ -1,7 +1,10 @@
-"""Sigma's decal atlas (2026-10-06, with the black matte scheme): assets/tex/src/sigma_decals.png, a 4 x 2 grid of 512 px
-RGBA cells, baked onto the mech by blender/bake_mechs.py (MODEL_OPTS gundam 'decals': cell index = id - 1).
-  1 'praise the sun' — a figure, arms flung up in a V, under a rayed sun (our own emblem: a gesture, not a copy of any
-    game's icon)   2 the sun alone (shoulders)   3 unit mark 'Σ'
+"""Sigma's decal atlas: assets/tex/src/sigma_decals.png, a 4 x 2 grid of 1024 px RGBA cells (sharp when baked), put on
+the mech by blender/bake_mechs.py (MODEL_OPTS gundam 'decals': cell index = id - 1).
+  1 the sun-god cult's emblem — a horned skull, skeletal arms raising a black-and-gold thorned sun (chest, backpack)
+  2 its shoulder badge — a skull whose cranium is a black sun, a blood-red eclipse behind (both shoulders)
+  3 unit mark 'Σ'
+Cells 1 and 2 are Codex-generated artwork, simplified to two colours here, (assets/tex/src/sigma_suncult_emblem.png / sigma_suncult_shoulder.png, made
+for this film; 2026-10-06); without them the first, plain versions are drawn (a figure under a sun, a sun).
 usage: uv run --with pillow tools/make_sigma_decals.py"""
 import math, os
 from PIL import Image, ImageDraw, ImageFont
@@ -9,7 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'assets', 'tex', 'src', 'sigma_decals.png')
 FONT = '/mnt/c/Windows/Fonts/bahnschrift.ttf'
-C, SS = 512, 4   # cell, supersampling
+C, SS = 1024, 2   # cell, supersampling
 GOLD, BONE = (240, 182, 52, 255), (232, 226, 210, 255)
 
 
@@ -32,8 +35,40 @@ def thick(d, a, b, w, s, fill):
 
 def cell(fn):
     im = Image.new('RGBA', (C * SS, C * SS), (0, 0, 0, 0))
-    fn(ImageDraw.Draw(im), SS)
+    fn(ImageDraw.Draw(im), SS * C / 512)   # (the drawings are laid out on a 512 grid)
     return im.resize((C, C), Image.LANCZOS)
+
+
+def simplify(im):
+    """(2026-10-06: 'too busy') two colours only — the black linework cut out (the armour shows through), the reds folded
+    into the gold, the bone kept — the shapes smoothed and specks smaller than a few pixels dropped"""
+    from PIL import ImageFilter
+    im = im.convert('RGBA'); px = im.load(); W, H = im.size
+    gold, bone = (226, 168, 52), (232, 226, 208)
+    a = Image.new('L', im.size, 0); col = Image.new('RGB', im.size); pa, pc = a.load(), col.load()
+    for y in range(H):
+        for x in range(W):
+            r, g, b, al = px[x, y]
+            if al < 128 or max(r, g, b) < 70: continue                       # transparent / black linework → cut out
+            sat = max(r, g, b) - min(r, g, b)
+            pc[x, y] = bone if sat < 60 and r > 150 else gold                 # bone stays bone; gold and red → gold
+            pa[x, y] = 255
+    a = a.filter(ImageFilter.GaussianBlur(2.2)).point(lambda v: 255 if v > 140 else 0)   # smoothed, the fine detail merged
+    a = a.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3))              # specks dropped
+    col = col.filter(ImageFilter.ModeFilter(7))                                          # flat colour areas
+    out = col.convert('RGBA'); out.putalpha(a)
+    return out
+
+
+def art(fname, fallback):
+    """a Codex artwork cell: simplified, its opaque bounds fitted into the cell (a small margin), or the drawn fallback"""
+    path = os.path.join(ROOT, 'assets', 'tex', 'src', fname)
+    if not os.path.exists(path):
+        return cell(fallback)
+    im = simplify(Image.open(path)); bb = im.getchannel('A').point(lambda a: 255 if a > 8 else 0).getbbox() or (0, 0, *im.size)
+    im = im.crop(bb); k = C * 0.94 / max(im.size); im = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
+    out = Image.new('RGBA', (C, C), (0, 0, 0, 0)); out.paste(im, ((C - im.width) // 2, (C - im.height) // 2), im)
+    return out
 
 
 def praise(d, s):
@@ -58,13 +93,13 @@ def sigma(d, s):
     except Exception:
         pass
     w = d.textlength('Σ', font=f)
-    d.text(((C * s - w) / 2, 40 * s), 'Σ', font=f, fill=BONE)
+    d.text(((512 * s - w) / 2, 40 * s), 'Σ', font=f, fill=BONE)
     d.rectangle([90 * s, 440 * s, 422 * s, 462 * s], fill=GOLD)
 
 
 atlas = Image.new('RGBA', (C * 4, C * 2), (0, 0, 0, 0))
-for i, f in enumerate([praise, sun_only, sigma]):
-    atlas.paste(cell(f), ((i % 4) * C, (i // 4) * C))
+for i, c in enumerate([art('sigma_suncult_emblem.png', praise), art('sigma_suncult_shoulder.png', sun_only), cell(sigma)]):
+    atlas.paste(c, ((i % 4) * C, (i // 4) * C))
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 atlas.save(OUT)
 print('saved', OUT, atlas.size)

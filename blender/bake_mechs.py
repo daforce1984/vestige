@@ -78,10 +78,12 @@ MODEL_OPTS['gundam'] = dict(paint_override=(0.021, 0.021, 0.023), paint_rough=0.
                             # (they held a quarter of it), more texels on the parts seen close and carrying decals
                             res=6144, squeeze_mats={'inner'}, detail_boost={'head': 1.8, 'torso': 1.6, 'arm_L_upper': 1.5, 'arm_R_upper': 1.5, 'backpack': 1.4},
                             decal_src='sigma_decals.png', decal_grid=(4, 2), mech_dark=(0.04, 0.58, 0.6),   # (the unpainted frame: dark gunmetal, matte)
-                            decals=[(1, 'torso', (0, -1, 0), (1, 0, 0), (0.72, 0.5, 0.66), 1.5),           # the emblem: chest, his left
-                                    (2, 'arm_L_upper', (1, 0, 0), (0, 1, 0), (0.5, 0.5, 0.74), 1.75),      # the cult's skull-sun badge on both shoulders
-                                    (2, 'arm_R_upper', (-1, 0, 0), (0, -1, 0), (0.5, 0.5, 0.74), 1.75),
-                                    (1, 'backpack', (0, 1, 0), (-1, 0, 0), (0.5, 0.5, 0.55), 1.9),         # the emblem large on the pack
+                            decals=[(1, 'torso', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.5), 1.0, (0.05, -2.1, 14.95), 0.8),   # the emblem: upper chest, centred above the reactor (the chest has no flat side panels — it was cut on the curve)
+                                    # the cult's skull-sun badge on both shoulders: centred on each rounded pauldron's outermost bulge and
+                                    # wrapped over its curve (8th item: depth taken below the outermost point — the default 0.45 kept a sliver)
+                                    (2, 'arm_L_upper', (1, 0, 0), (0, 1, 0), (0.5, 0.5, 0.5), 1.6, (6.6, 0.35, 15.0), 1.2),
+                                    (2, 'arm_R_upper', (-1, 0, 0), (0, -1, 0), (0.5, 0.5, 0.5), 1.6, (-6.4, 0.3, 15.0), 1.2),
+                                    (1, 'backpack', (0, 1, 0), (-1, 0, 0), (0.5, 0.5, 0.55), 1.8, None, 0.8),   # the emblem large on the pack
                                     (3, 'leg_L_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.62), 1.0),      # Σ on the shins
                                     (3, 'leg_R_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.62), 1.0)])
 TEX_SRC = {'decals': 'vanguard_decals.png', 'white': 'vestige_mech_white_armor_albedo_v1.png', 'frame': 'vestige_mech_dark_frame_albedo_v1.png',
@@ -445,12 +447,13 @@ def place_decals(meshes):
         d, ua = Vector(d).normalized(), Vector(ua).normalized(); va = d.cross(ua)   # (u right, v up, as seen looking at it along −d)
         P = [W @ v.co for v in me.vertices]
         lo = Vector([min(p[i] for p in P) for i in range(3)]); hi = Vector([max(p[i] for p in P) for i in range(3)])
-        c = Vector(cabs[0]) if cabs else Vector([lo[i] + (hi[i] - lo[i]) * frac[i] for i in range(3)])
+        c = Vector(cabs[0]) if cabs and cabs[0] is not None else Vector([lo[i] + (hi[i] - lo[i]) * frac[i] for i in range(3)])
+        depth = cabs[1] if len(cabs) > 1 else 0.45; nmin = 0.25 if depth > 0.6 else 0.55   # (curved: deeper, and the slopes too)
         N3 = W.to_3x3()
         cand = []
         for poly in me.polygons:
             n = (N3 @ poly.normal).normalized()
-            if n.dot(d) < 0.55:
+            if n.dot(d) < nmin:
                 continue
             q = W @ poly.center - c
             if abs(q.dot(ua)) < size * 0.6 and abs(q.dot(va)) < size * 0.6:
@@ -461,7 +464,7 @@ def place_decals(meshes):
         al = me.attributes['dl']
         k = 0
         for h, poly in cand:
-            if h < top - 0.45:                                   # (only the outermost skin facing that way)
+            if h < top - depth:                                  # (only the outermost skin facing that way)
                 continue
             for li, vi in zip(poly.loop_indices, poly.vertices):
                 q = W @ me.vertices[vi].co - c
