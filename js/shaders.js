@@ -222,7 +222,7 @@ fn skyColor(d0: vec3f) -> vec3f {
   var d = bendRay(d0, F.lensA, F.lensA2, &lglow, &lhole);
   d = bendRay(d, F.lensB, F.lensB2, &lglow, &lhole);
   var col = vec3f(0.0);
-  if (F.bg.x > 0.0) { col = nebula(d) * F.bg.x; }   // (uniform branch: no nebula, no cost)
+  if (F.bg.x > 0.0) { col = nebula(d) * F.bg.x * 0.55; col = mix(vec3f(dot(col, vec3f(0.2126, 0.7152, 0.0722))), col, 0.6); }   // (the gas thinned: ×0.55 — 2026-10-06)   // (uniform branch: no nebula, no cost; 40 % of its colour taken out — 2026-10-06)
   var stars = starLayer(d, 110.0, 0.0, 0.018) * 1.0 + starLayer(d, 260.0, 3.0, 0.008) * 0.45 + starLayer(d, 620.0, 11.0, 0.005) * 0.25;
   col += stars * F.bg.y;
   // sun
@@ -295,8 +295,9 @@ fn skyColor(d0: vec3f) -> vec3f {
 // ---------------------------------------------------------------- meshes
 // the moon's relief and craters: shared by the mesh shader (displacement) and the one-time bake (MOONBAKE)
 export const MOONFN = /* wgsl */ `
+const MOON_REAL_EXAG: f32 = 5.0;   // the real moon's relief exaggerated (it is ~1 % of the radius; our basin is ~17 %)
 const MOON_SUN_AZ: f32 = 1.2;   // the moon's sun turned this far (rad) about the face's centre from the scene sun's azimuth
-const MOON_SUN_EL: f32 = 0.52;  // the moon's sun: its elevation (rad, ~30°) over the middle of the face we see — each crater half in shadow
+const MOON_SUN_EL: f32 = 0.75;  // the moon's sun: its elevation (rad, ~30°) over the middle of the face we see — each crater half in shadow
 const MOON_HAZE: f32 = 0.14;    // how much of the space haze lies over the moon (more toward its limb) — light: the shadows stay near black (2026-10-06, after an Apollo far-side photo)
 const MOON_SUN_K: f32 = 1.9;    // its sunlight boosted: the lit slopes and rims bright against the black shadows
 const MOON_AMB: f32 = 0.06;     // its ambient (was 0.3): no sky to fill the shadows
@@ -332,7 +333,7 @@ fn basinD(q: vec3f) -> f32 {   // the basin's distance measure, its outline torn
 fn moonHN(q: vec3f) -> f32 {
   let bd = basinD(q);
   let rubble = exp(-pow((bd - 1.0) / 0.35, 2.0));
-  return moonHeight(q) + 0.0007 * (fbm(q * 40.0, 3) - 0.5) + 0.00035 * (1.0 + 3.0 * rubble) * (vnoise(q * 180.0) - 0.5);   // (gentle: the pores read as bread)
+  return moonHeight(q) + 0.0007 * (fbm(q * 40.0, 3) - 0.5) + 0.00035 * (1.0 + 3.0 * rubble) * (vnoise(q * 180.0) - 0.5) + 0.0005 * (vnoise(q * 420.0) - 0.5);   // (+ a fine regolith roughness 2026-10-06: it read as smooth plastic)   // (gentle: the pores read as bread)
 }
 // THE IMPACT'S SCOUR (2026-10-06): radial grooves gouged outward by the impact's blast — from the inner wall up over the
 // rim and fading out across the ejecta, broken and wobbling, two widths — and the walls worn: slumped, uneven terraces
@@ -355,7 +356,13 @@ fn moonHeight(q: vec3f) -> f32 {
   let jag = 0.6 + 0.8 * vnoise(q * 34.0);                                       // (the crest broken and jagged along its length)
   var h = mix(basinH(bd), basinH(bd) - 0.04 * exp(-abs(bd - 1.0) / 0.035) * (1.0 - jag), 1.0) * 0.12 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
   h += 0.12 * (0.06 * basinWear(q, bd) - 0.035 * basinScour(q, bd));   // (worn walls, scoured grooves)
+  h += 0.12 * 0.32 * exp(-pow(bd / 0.1, 2.0)) * (0.45 + 0.9 * vnoise(q * 70.0 + 5.0));   // a central peak cluster, rough
+  h += 0.12 * 0.035 * sin(bd * 38.0 + 4.0 * vnoise(q * 18.0)) * smoothstep(0.62, 0.9, bd) * (1.0 - smoothstep(0.96, 1.0, bd));   // slumped terraces down the inner wall
   var cover = 1.0 - smoothstep(0.12, 0.3, abs(bd - 1.05));   // (none on the basin's rim; inside it and outside, the small ones pit it — 2026-10-04)
+  // THE REAL MOON (2026-10-06): NASA's LOLA relief (moonReal; exaggerated MOON_REAL_EXAG) everywhere outside the basin —
+  // the impact wiped it inside (40 % left, so its floor keeps the same grain), where the procedural craters still pit the new floor
+  let rl = moonReal(q);
+  if (rl.y >= 0.0) { let rw = smoothstep(0.85, 1.25, bd); h += rl.x * mix(0.4, 1.0, rw); cover = max(cover, rw); }
   var sc = 14.0;
   for (var oc = 0; oc < 2; oc++) {
     let p = q * sc; let fl = floor(p); let off = step(vec3f(0.5), p - fl) - 1.0;
@@ -388,7 +395,7 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixe
   }
   var cover = 1.0 - smoothstep(0.12, 0.3, abs(bd - 1.05));   // (none on the basin's rim — later impacts pit its floor and walls, 2026-10-04)
   var sc = 14.0; var amp = 1.0;
-  for (var oc = 0; oc < 3; oc++) {   // (3 octaves: the finest pits made it read as a small rock — 2026-10-05)
+  for (var oc = 0; oc < 5; oc++) {   // (4 octaves again 2026-10-06: with the bowls lit, not painted black, the fine ones read as craters, not pores)
     if (oc > 0 && sc * pw > 0.25) { break; }                          // (craters under ~1.5 px: they only shimmer — skip the octave)
     let p = q * sc; let fl = floor(p); let off = step(vec3f(0.5), p - fl) - 1.0;
     var cov2 = 0.0;
@@ -396,7 +403,7 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixe
     for (var k = 0; k < 8; k++) {
       let c = fl + off + vec3f(f32(k & 1), f32((k >> 1) & 1), f32((k >> 2) & 1));
       let r3 = hash33(c + seed + f32(oc) * 17.0);
-      if (r3.z > 0.75) { continue; }   // (three cells in four hold a crater: a densely cratered surface, still none overlapping)
+      if (r3.z > 0.9) { continue; }   // (three cells in four hold a crater: a densely cratered surface, still none overlapping)
       let ctr = c + 0.25 + r3 * 0.5;
       let dmin = min(min(min(ctr.x - c.x, c.x + 1.0 - ctr.x), min(ctr.y - c.y, c.y + 1.0 - ctr.y)), min(ctr.z - c.z, c.z + 1.0 - ctr.z));
       let rad = dmin / 1.3 * (0.4 + 0.6 * r3.y);                      // (it and its rim fit inside its own cell)
@@ -421,6 +428,18 @@ fn moonCraters(q: vec3f, seed: f32, pw: f32, oc0: i32) -> MC {   // pw: the pixe
 export const MOONBAKE = COMMON + MOONFN + /* wgsl */ `
 struct BU { a: vec4f };   // x: the moon's radius (model units), y: its seed, z: texel angle, w: width
 @group(0) @binding(0) var<uniform> U: BU;
+@group(0) @binding(1) var lroc: texture_2d<f32>;   // assets/tex/moon_lroc.png (tools/make_moon_lroc.py): R,G elevation hi/lo, B albedo
+fn lrocTexel(ix: i32, iy: i32) -> vec2f {
+  let t = textureLoad(lroc, vec2i(((ix % 4096) + 4096) % 4096, clamp(iy, 0, 2047)), 0);
+  return vec2f((round(t.r * 255.0) * 256.0 + round(t.g * 255.0)) / 65535.0, t.b);
+}
+fn moonReal(q: vec3f) -> vec2f {   // (relief as a fraction of the radius, sRGB albedo) — bilinear on the decoded values
+  let fx = (atan2(q.z, q.x) / 6.2831853 + 0.5) * 4096.0 - 0.5; let fy = acos(clamp(q.y, -1.0, 1.0)) / 3.14159265 * 2048.0 - 0.5;
+  let x0 = i32(floor(fx)); let y0 = i32(floor(fy)); let fr = vec2f(fx - floor(fx), fy - floor(fy));
+  let a = mix(lrocTexel(x0, y0), lrocTexel(x0 + 1, y0), fr.x); let b = mix(lrocTexel(x0, y0 + 1), lrocTexel(x0 + 1, y0 + 1), fr.x);
+  let v = mix(a, b, fr.y);
+  return vec2f((v.x - 0.43323) * 19676.7 / 1737400.0 * MOON_REAL_EXAG, v.y);
+}
 @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
   let p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0))[i];
   return vec4f(p, 0.0, 1.0);
@@ -439,9 +458,14 @@ struct BU { a: vec4f };   // x: the moon's radius (model units), y: its seed, z:
   base = mix(base, base * vec3f(1.15, 0.95, 0.8), smoothstep(0.55, 0.8, fbm(q * 3.5 + 9.0, 3)) * 0.5);
   base += vec3f(0.025) * smoothstep(0.85, 0.92, vnoise(q * 70.0 + seed));
   base = base * 2.3 + vec3f(0.02);
-  let c0 = moonCraters(qs, 5.0, U.a.z, 2);
-  base *= mix(1.15, 0.42, smoothstep(0.45, 0.58, fbm(qs * 1.6 + 11.0, 4)));   // bright highlands, dark maria with crisp shores
-  base *= 1.0 + 0.3 * clamp(c0.rim, 0.0, 1.0);
+  var c0 = moonCraters(qs, 5.0, U.a.z, 2);
+  let rwq = smoothstep(0.85, 1.25, basinD(qs));   // (outside the basin: the real moon)
+  c0.g *= 1.0 - rwq; c0.rim *= 1.0 - rwq; c0.pit *= 1.0 - rwq;   // (its procedural craters only on the basin's new floor)
+  base *= mix(1.2, 0.38, smoothstep(0.42, 0.56, fbm(qs * 1.6 + 11.0, 4)));
+  base *= 0.82 + 0.36 * fbm(qs * 6.0 + 2.3, 3);
+  base *= 1.0 + 0.7 * clamp(c0.rim, 0.0, 1.0);
+  let rl0 = moonReal(qs);
+  base = mix(mix(base, vec3f(pow(rl0.y, 2.2) * 0.62), 0.6), vec3f(pow(rl0.y, 2.2) * 0.62), rwq);   // the real albedo (LROC): all of it outside the basin (its maria, rays, highlands), 60 % on the basin's floor so it has the same grain
   // (no darkening of the basin floor at all — 2026-10-06)
   { let bdq = basinD(qs); base *= 1.0 + 0.35 * basinScour(qs, bdq) - 0.5 * max(-basinWear(qs, bdq), 0.0); }   // (the scour's fresh, lighter rock; the worn slumps a little darker)   // (the basin floor only a shade darker: the round dark disc painted there read as a round shadow in the middle of the bowl — 2026-10-06)
   base *= 1.0 - 0.05 * c0.pit;   // (barely: the light's own half-shadow in each bowl shows the hole now — a dark pit painted in made every crater a black dot)                                                // crater bowls hold shadow (they read as holes whatever the light)
@@ -451,12 +475,13 @@ struct BU { a: vec4f };   // x: the moon's radius (model units), y: its seed, z:
   let hx = (moonHN(normalize(qs + t1 * eh)) - h0) / eh; let hy = (moonHN(normalize(qs + t2 * eh)) - h0) / eh;
   var nl = normalize(qs - t1 * hx - t2 * hy);
   let cg = c0.g - nl * dot(c0.g, nl);
-  nl = normalize(nl - cg * 0.18);
+  nl = normalize(nl - cg * 0.45);   // (the finer craters' walls 2.5× steeper in the normal: a lit wall and a shadowed one, crisp)
   let nq = max(dot(nl, qs), 0.05);
   return vec4f(dot(nl, t1) / nq, dot(nl, t2) / nq, base.g, moonHeight(qs));   // (a: the displacement height, for the vertex shader)
 }
 `;
 export const MESH = COMMON + MOONFN + /* wgsl */ `
+fn moonReal(q: vec3f) -> vec2f { return vec2f(0.0, -1.0); }   // (the real moon's data is baked: the mesh pass reads texMoon)
 struct Inst {
   m: mat4x4f,
   base: vec4f,   // rgb, metal
@@ -1173,7 +1198,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // close; the space haze of the backdrop (its sky light's colour) lifts its blacks and softens it, more toward the limb
   if (lunar) {
     let hz = MOON_HAZE * (0.75 + 0.5 * pow(1.0 - ndv, 2.0));
-    col = mix(col, F.ambUp.rgb * F.sunCol.w * MOON_HAZE_L, clamp(hz, 0.0, 0.9));
+    col = mix(col, vec3f(dot(F.ambUp.rgb, vec3f(0.2126, 0.7152, 0.0722))) * F.sunCol.w * MOON_HAZE_L, clamp(hz, 0.0, 0.9));   // (a grey haze: the sky-blue one tinted it blue)
   }
   col += inst.tint.rgb * hyper * 6.0;
   if (((inst.clipMin.w > 0.5 && inst.clipMin.w < 1.5) || inst.clipMin.w > 2.5) && inst.clipMax.w < 0.0) {   // beam-cut seam: deep molten orange, yellow-hot in the core

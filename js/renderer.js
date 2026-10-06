@@ -613,8 +613,18 @@ export class Renderer {
    */
   /** THE MOON BAKE: its whole procedural surface evaluated once into an equirect texture (MOONBAKE), in strips (each its
    *  own submit, so no single one holds the GPU long); the mesh shader then just reads it */
+  /** the real moon's surface for the bake (assets/tex/moon_lroc.png, NASA CGI Moon Kit — tools/make_moon_lroc.py) */
+  async loadMoonData(url) {
+    try {
+      const r = await fetch(url); if (!r.ok) return;
+      const bmp = await createImageBitmap(await r.blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+      const tex = this.device.createTexture({ size: [bmp.width, bmp.height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+      this.device.queue.copyExternalImageToTexture({ source: bmp }, { texture: tex }, [bmp.width, bmp.height]); bmp.close();
+      this.moonLroc = tex;
+    } catch (e) { /* the moon stays unbaked: no texMoon */ }
+  }
   _bakeMoon() {
-    const m = this.models.moon, e = m && m.entries[0]; if (!e || this._moonBaked) return;
+    const m = this.models.moon, e = m && m.entries[0]; if (!e || this._moonBaked || !this.moonLroc) return;   // (waits for the real moon's data)
     this._moonBaked = true;
     const dev = this.device, W = 4096, H = 2048, b = m.bounds;
     const radius = Math.max(...b.max.map((v, k) => Math.max(Math.abs(v), Math.abs(b.min[k])))) / 1.01;
@@ -623,7 +633,7 @@ export class Renderer {
     const pipe = dev.createRenderPipeline({ layout: 'auto', vertex: { module: mod, entryPoint: 'vs' }, fragment: { module: mod, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] }, primitive: { topology: 'triangle-list' } });
     const ubo = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     dev.queue.writeBuffer(ubo, 0, new Float32Array([radius, e.seed || 0, 2 * Math.PI / W, W]));
-    const bg = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubo } }] });
+    const bg = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubo } }, { binding: 1, resource: this.moonLroc.createView() }] });
     const view = tex.createView(), STRIPS = 16;
     for (let k = 0; k < STRIPS; k++) {
       const enc = dev.createCommandEncoder();
