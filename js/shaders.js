@@ -299,7 +299,11 @@ const MOON_REAL_EXAG: f32 = 5.0;   // the real moon's relief exaggerated (it is 
 const MOON_SUN_AZ: f32 = 1.2;   // the moon's sun turned this far (rad) about the face's centre from the scene sun's azimuth
 const MOON_SUN_EL: f32 = 0.75;  // the moon's sun: its elevation (rad, ~30°) over the middle of the face we see — each crater half in shadow
 const MOON_HAZE: f32 = 0.14;    // how much of the space haze lies over the moon (more toward its limb) — light: the shadows stay near black (2026-10-06, after an Apollo far-side photo)
-const MOON_SUN_K: f32 = 1.9;    // its sunlight boosted: the lit slopes and rims bright against the black shadows
+const MOON_SUN_K: f32 = 1.9;
+// (2026-10-06) the moon's own light, fixed: the scene's second sun went down to a glimmer (one hard key everywhere else) —
+// these are what its colour and the sky light gave the moon before
+const MOON_SUN_I: f32 = 1.28;
+const MOON_SKY_I: f32 = 0.834;    // its sunlight boosted: the lit slopes and rims bright against the black shadows
 const MOON_AMB: f32 = 0.06;     // its ambient (was 0.3): no sky to fill the shadows
 const MOON_HAZE_L: f32 = 0.14;  // the haze's brightness (× the sky light)
 struct MC { g: vec3f, rim: f32, ray: f32, basin: f32, pit: f32 };
@@ -1193,7 +1197,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let Fh2 = F0 + (1.0 - F0) * pow(1.0 - max(dot(H2, V), 0.0), 5.0);
     let spec2 = D2 * G2 * Fh2 / max(4.0 * ndl2 * ndv, 1e-3);
     let fillC = select(F.fill.rgb, mix(F.fill.rgb, vec3f(dot(F.fill.rgb, vec3f(0.2126, 0.7152, 0.0722))), 0.8), rocky);
-    col += select(fillC, vec3f(dot(F.fill.rgb, vec3f(0.2126, 0.7152, 0.0722))) * MOON_SUN_K, lunar) * moonSh * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar || rocky) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
+    col += select(fillC, vec3f(MOON_SUN_I), lunar) * moonSh * select(ndl2, 2.0 * ndl2 / max(ndl2 + ndv, 1e-3), lunar || rocky) * (diffC / 3.14159 * 2.6 + min(spec2, vec3f(40.0)) * select(1.0, 0.0, lunar)) * mix(0.6, 1.0, ao * texAO);
   }
   // interiors: scale the open-space light, then soot — blotchy burnt grime (point lights below still light it)
   col *= inst.shade.x;
@@ -1219,7 +1223,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   // close; the space haze of the backdrop (its sky light's colour) lifts its blacks and softens it, more toward the limb
   if (lunar) {
     let hz = MOON_HAZE * (0.75 + 0.5 * pow(1.0 - ndv, 2.0));
-    col = mix(col, vec3f(dot(F.ambUp.rgb, vec3f(0.2126, 0.7152, 0.0722))) * F.sunCol.w * MOON_HAZE_L, clamp(hz, 0.0, 0.9));   // (a grey haze: the sky-blue one tinted it blue)
+    col = mix(col, vec3f(MOON_SKY_I) * MOON_HAZE_L, clamp(hz, 0.0, 0.9));   // (a grey haze: the sky-blue one tinted it blue)
   }
   col += inst.tint.rgb * hyper * 6.0;
   if (((inst.clipMin.w > 0.5 && inst.clipMin.w < 1.5) || inst.clipMin.w > 2.5) && inst.clipMax.w < 0.0) {   // beam-cut seam: deep molten orange, yellow-hot in the core

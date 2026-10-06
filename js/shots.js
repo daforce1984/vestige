@@ -41,7 +41,7 @@ function againstPlanet(c, target, dist, lift, side, fov, roll = 0, lookBias = 0.
 }
 function spaceEnv(t) {
   if (t >= EARTH_T) return {   // home: the original dark space round Earth (the warm key, near-black sky, no nebula)
-    time: t, sunDir: SUN, sunCol: [2.5, 2.12, 1.62], ambUp: [0.2, 0.25, 0.34], ambDown: [0.16, 0.11, 0.07], ambient: 1.9,
+    time: t, sunDir: SUN, sunCol: [3.2, 2.72, 2.08], ambUp: [0.05, 0.06, 0.085], ambDown: [0.006, 0.005, 0.004], ambient: 1.9,   // (one hard key: the undersides near black)
     nebula: 0, stars: 0.8, sunDisc: 1, sun2Dir: null, sun2Col: [0.45, 0.56, 0.85],
     sky: [0.010, 0.011, 0.013, 0.6], planet: null, shadows: true, shadowCenter: [0, 0, 0], shadowRadius: 400,
   };
@@ -50,10 +50,12 @@ function spaceEnv(t) {
     // slate-blue space haze instead of pure black, gentle contrast
     // (2026-10-01, after the user's Homeworld 3 reference: a luminous blue-violet space — cool white key, a strong blue
     // skylight so the shadow sides read blue instead of black, a nebula backdrop instead of near-black)
-    time: t, sunDir: SUN, sunCol: [2.45, 2.32, 2.12], ambUp: [0.3, 0.4, 0.66], ambDown: [0.1, 0.11, 0.22], ambient: 2.1,   // sunCol: the upper sun is the strong key
+    // (2026-10-06) ONE HARD KEY: the upper sun stronger, the sky light cut to a quarter and the light from below to almost
+    // nothing, the second sun to a glimmer — the undersides, and everything turned from the key, fall near black
+    time: t, sunDir: SUN, sunCol: [3.3, 3.12, 2.85], ambUp: [0.075, 0.1, 0.165], ambDown: [0.005, 0.0055, 0.011], ambient: 2.1,   // sunCol: the upper sun is the key
     nebula: 1.15, stars: 0.6, sunDisc: 1,
     // a binary system: the second, blue-white sun on the far side lights what the first leaves dark (none at Earth)
-    sun2Dir: t < EARTH_T ? SUN2 : null, sun2Col: [0.5, 0.68, 1.15],   // the lower, blue-white sun: weaker than the upper one
+    sun2Dir: t < EARTH_T ? SUN2 : null, sun2Col: [0.06, 0.08, 0.14],   // the lower, blue-white sun: a glimmer now (the moon keeps its own light: shaders MOON_SUN_I)
     sky: [0.03, 0.045, 0.12, 1.0],   // deep blue-violet haze across the whole sky
     planet: null,                                    // no moon (only Earth at the end)
     shadows: true, shadowCenter: [0, 0, 0], shadowRadius: 400,
