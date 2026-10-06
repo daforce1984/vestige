@@ -57,15 +57,15 @@ MODEL_OPTS = {'enemy_ms': dict(wear=0.6, bare=(0.52, 0.52, 0.54), paint_rough=0.
                                        (4, 'leg_R_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.45), 1.4),    # CAUTION on the right shin
                                        (5, 'backpack', (0, 1, 0), (-1, 0, 0), (0.5, 0.5, 0.55), 1.7),       # SERVICE on the pack
                                        (6, 'pelvis', (0, 1, 0), (-1, 0, 0), (0.28, 0.5, 0.35), 1.1)])}      # kill tally: rear skirt, right
-# Sigma (2026-10-06): WHITE AND BLACK, MATTE METAL — the original's lighter paint tiers white, its darker tier black, the
-# frame a dark gunmetal, every one a matte metal (metal ~0.55, rough ~0.6);
+# Sigma (2026-10-06): BLACK AND CHARCOAL GREY, MATTE METAL — the head, chest, upper arms and shins charcoal, the rest
+# black, every one a matte metal (metal ~0.55, rough ~0.6);
 # the edge wear only on real convex edges (a tighter bevel test, held off the creases by AO) and far less of it, worn to a
 # dark steel; no speckle chips; small holes filled; the islands unwrapped with wider margins (the bake's bleed reached
 # the neighbouring islands: broken-looking seams); decals from tools/make_sigma_decals.py ('praise the sun')
 MODEL_OPTS['gundam'] = dict(paint_override=(0.021, 0.021, 0.023), paint_rough=0.65, paint_metal=0.55, paint_floor=0.0,
                             # by PART, not by the original paint tiers (those are scattered in small patches over every part: a
                             # white / black camouflage): each part's paint all white or all black, the frame dark gunmetal
-                            obj_paint={**{k: (0.6, 0.6, 0.58) for k in ('head', 'torso', 'arm_L_upper', 'arm_R_upper', 'leg_L_lower', 'leg_R_lower')},
+                            obj_paint={**{k: (0.075, 0.076, 0.08) for k in ('head', 'torso', 'arm_L_upper', 'arm_R_upper', 'leg_L_lower', 'leg_R_lower')},
                                        **{k: (0.022, 0.022, 0.024) for k in ('pelvis', 'backpack', 'arm_L_lower', 'arm_R_lower', 'hand_L', 'hand_R',
                                                                               'leg_L_upper', 'leg_R_upper', 'foot_L', 'foot_R', 'rifle', 'saber_hilt')}},
                             panel_var=0.04, wear=0.3, bare=(0.4, 0.4, 0.42), edge=(0.035, 0.975, 0.88), edge_ao=True,
