@@ -552,6 +552,9 @@ export class Renderer {
   arc(p0, p1, halfWidth, col, intensity = 1, seed = 0, rate = 9) { this.sprite(12, p0, [p1[0], p1[1], p1[2], 0], [halfWidth, seed, rate, 0], col, intensity); }   // arc discharge (shader lightning)
   /** an overdriven blade's energy RUNAWAY (shape 17): irregular surges racing from p0 up to p1, ragged plasma tongues
    *  licking off its sides out to `radius` */
+  /** a real-looking jet flame (shape 18) from the nozzle p0 to the tip p1, `radius` its widest half-width, `flow` how many
+   *  of its lengths the gas travels a second */
+  jetFlame(p0, p1, radius, col, intensity = 1, seed = 0, flow = 3) { this.sprite(18, p0, [p1[0], p1[1], p1[2], 0], [radius, seed, flow, 0], col, intensity); }
   surge(p0, p1, radius, col, intensity = 1, seed = 0) { this.sprite(17, p0, [p1[0], p1[1], p1[2], 0], [radius, seed, 0, 0], col, intensity); }
   ring(center, axU, axV, col, phase) { this.sprite(4, center, axU, axV, col, phase); }
   bayField(center, axU, axV, age, col, intensity) { this.sprite(11, center, [axU[0], axU[1], axU[2], age], axV, col, intensity); }

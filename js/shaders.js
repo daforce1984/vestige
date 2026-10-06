@@ -1295,7 +1295,7 @@ struct VO {
   var wp: vec3f;
   var uv = corner;
   var ext = vec2f(0.0);
-  if (shape == 3 || shape == 12 || shape == 17) {
+  if (shape == 3 || shape == 12 || shape == 17 || shape == 18) {
     // streak / beam capsule from a.xyz to b.xyz, radius c.x (12: arc discharge channel, same camera-facing ribbon)
     let p0 = s.a.xyz; let p1 = s.b.xyz; let r = s.c.x;
     let ax = p1 - p0;
@@ -1691,6 +1691,30 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     // two sides of a big beam in opposite screen directions and, at some angles, folded the image over its axis — a dark seam
     // down the middle of the flames and the overdriven saber
     dist = tanS * nz * glow * s.c.z * 0.02;
+  } else if (shape == 18) {
+    // A JET FLAME (2026-10-06 — the afterburner read as straight lines): narrow at the nozzle, flaring out, its edge
+    // ragged and bent by turbulence carried away from the nozzle, the tail torn into separate tongues and wisps; white-hot
+    // at the throat, the tint through the body, darkening as it cools; flickering. uv: along (world units), across −1..1
+    let L = i.ext.x; let r = i.ext.y; let u = clamp(i.uv.x / L, 0.0, 1.0); let v = i.uv.y;
+    if (i.uv.x < -r * 0.2 || i.uv.x > L + r * 0.5) { discard; }
+    let sd = s.c.y; let sp = s.c.z;                        // seed, flow speed (lengths per second)
+    let x = i.uv.x / r;                                    // along, in flame widths
+    let fl = t * sp * L / r;                               // the gas moving out of the nozzle
+    let n1 = vnoise(vec3f(x * 0.55 - fl * 0.55, v * 1.6, sd + t * 1.7));
+    let n2 = vnoise(vec3f(x * 1.3 - fl * 1.2, v * 3.2 + n1 * 1.5, sd * 1.7 + t * 3.1));
+    let n3 = vnoise(vec3f(x * 3.0 - fl * 2.6, v * 6.0 + n2 * 2.0, sd * 2.3 + t * 5.0));
+    let tb = n1 * 0.55 + n2 * 0.3 + n3 * 0.15;            // turbulence, finer toward the edges
+    let w = (0.22 + 0.78 * sqrt(u)) * (1.0 - 0.35 * u * u); // the envelope: a throat, flaring, then thinning
+    let bend = (n1 - 0.5) * 0.7 * u;                        // the whole plume snakes a little downstream
+    let d = abs(v - bend) / max(w, 0.02);
+    var body = smoothstep(1.05, 0.25, d + (tb - 0.5) * 0.9 * (0.3 + u));   // a ragged edge, more torn downstream
+    let tear = smoothstep(u * 1.05 - 0.05, u * 1.05 + 0.25, tb + 0.12);    // the tail breaks into tongues: only the gusts reach far
+    body *= tear * smoothstep(-0.02, 0.04, u);
+    let heat = clamp(body * (1.15 - u) * (0.75 + 0.5 * n2), 0.0, 1.4);
+    let core = exp(-pow((v - bend) / max(0.18 * (1.0 - u), 0.03), 2.0)) * pow(1.0 - u, 3.0) * smoothstep(-0.02, 0.05, u);   // the white-hot throat
+    let flick = 0.85 + 0.15 * sin(t * 61.0 + sd * 3.0) * sin(t * 37.0 + sd);
+    col = (tint * heat * (1.0 + 0.6 * n3) + vec3f(1.0, 0.97, 0.95) * core * 1.6 * length(tint) * 0.6) * s.d.a * flick;
+    dist = tanS * (n2 - 0.5) * body * 0.004 * s.d.a;
   } else if (shape == 17) {
     // ENERGY RUNAWAY on an overdriven blade (2026-10-06): the power it can't hold — irregular surges race up it (hilt →
     // tip), each one swelling the blade's envelope into ragged tongues of plasma that lick off its sides and stream
