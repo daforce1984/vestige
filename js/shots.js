@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
+  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -2212,7 +2212,7 @@ shot(120, 123.6, 'S9a nothing fires', (c) => {
 // close on one of OUR line ships as an enemy bolt kills it (world.js H_FEATURED: deaths chosen for these cameras)
 function lossCam(c, k, dist, ang, fov) {
   const f = H_FEATURED[k]; if (!f) return false;
-  const p = extraHPos(Math.min(c.t, f.t), f.i).pos;
+  const p = extraHPos(Math.min(c.worldT ?? c.t, f.t), f.i).pos;
   camLook(c, addv(p, [Math.sin(ang) * dist, dist * 0.3, Math.cos(ang) * dist]), p, fov, 0.08);
   c.env.shadowCenter = p; c.env.shadowRadius = 90;
   return f.t;
@@ -3337,8 +3337,9 @@ cut(131.8, 134, 'X hull skim', (c) => {
   camLook(c, motherPoint([0, 0, 0], t, [36, 112, -L * 0.3 + u * 140]), motherPoint([0, 0, 0], t, [-40, 80, L * 0.5]), 62, 0.2);   // low over the top deck
   shake(c, 0.4, 12); c.post.shakeBlur = 0.001; c.env.shadowRadius = 200;
 });
-cut(143.8, 145.4, 'X frigate dies close', (c) => { const td = lossCam(c, 2, 230, -0.9, 42); shake(c, td && c.t > td ? 1 : 0.3, 10); });
-cut(148.6, 150, 'X another loss', (c) => { const td = lossCam(c, 3, 260, 5.3, 38); shake(c, td && c.t > td ? 0.9 : 0.2, 9); });
+// (2026-10-06: swapped — 'another loss' first, shown LOSS_SWAP_DT later than its slot; 'frigate dies close' second, earlier)
+cut(143.8, 145.4, 'X another loss', (c) => { c.worldT = c.t + LOSS_SWAP_DT; const td = lossCam(c, 3, 260, 5.3, 38); shake(c, td && c.worldT > td ? 0.9 : 0.2, 9); });
+cut(148.6, 150, 'X frigate dies close', (c) => { c.worldT = c.t - LOSS_SWAP_DT; const td = lossCam(c, 2, 230, -0.9, 42); shake(c, td && c.worldT > td ? 1 : 0.3, 10); });
 cut(167.35, 169, 'X carnage over the planet', (c) => {   // (from 166.8: now holds on Sigma until the swatted bolt has burst)
   const { t, u } = c;
   // (recomposed: high three-quarter looking down across the battle, the planet's curve big behind it, a slow push)

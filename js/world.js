@@ -1343,6 +1343,10 @@ for (const f of EXTRA_H) {
 }
 const H_FEATURED_T = [124.4, 130.6, 144.6, 149.4];
 export const H_FEATURED = [];
+// (2026-10-06) scenes 23 and 25 swapped: the two cut-ins ('frigate dies close' 143.8–145.4, 'another loss' 148.6–150)
+// trade places in the film — each shows the world LOSS_SWAP_DT later / earlier than its slot (shots.js, ctx.worldT), and
+// those two ships' death sounds move with them (audio.js lossCues)
+export const LOSS_SWAP_DT = 4.8;
 // our losses: most line ships die when the SECOND enemy ion bolt lands on them (so every kill is a visible hit)
 {
   const hits = EXTRA_H.map(() => []);

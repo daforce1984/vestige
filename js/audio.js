@@ -15,7 +15,7 @@
 import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
-import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T } from './world.js';
+import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, H_FEATURED, LOSS_SWAP_DT } from './world.js';
 import { SHIELD_CLUNKS, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
@@ -810,8 +810,10 @@ function lossCues() {
   EXTRA_H.forEach((f, i) => {
     if (!f.die) return;
     const far = 0.15 + 0.3 * ((i * 7) % 5) / 5, pan = Math.sin(i * 2.3) * 0.6;
-    out.push([f.die, 'hl_big_explosion', { rate: 0.9, gain: 1.0, far, pan, prio: 8, duck: far < 0.25 ? 1.2 : 0 }]);
-    out.push([f.die + 0.4, 'metal_groan', { at: 2.8, dur: 2.2, fadeOut: 0.8, rate: 0.75, gain: 0.7, far: far + 0.1, pan, prio: 6 }]);
+    // (scenes 23 / 25 swapped: those two deaths are heard where they are now seen)
+    const die = f.die + (H_FEATURED[3] && i === H_FEATURED[3].i ? -LOSS_SWAP_DT : H_FEATURED[2] && i === H_FEATURED[2].i ? LOSS_SWAP_DT : 0);
+    out.push([die, 'hl_big_explosion', { rate: 0.9, gain: 1.0, far, pan, prio: 8, duck: far < 0.25 ? 1.2 : 0 }]);
+    out.push([die + 0.4, 'metal_groan', { at: 2.8, dur: 2.2, fadeOut: 0.8, rate: 0.75, gain: 0.7, far: far + 0.1, pan, prio: 6 }]);
   });
   return out;
 }
