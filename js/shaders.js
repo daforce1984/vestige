@@ -222,7 +222,7 @@ fn skyColor(d0: vec3f) -> vec3f {
   var d = bendRay(d0, F.lensA, F.lensA2, &lglow, &lhole);
   d = bendRay(d, F.lensB, F.lensB2, &lglow, &lhole);
   var col = vec3f(0.0);
-  if (F.bg.x > 0.0) { col = nebula(d) * F.bg.x * 0.55; col = mix(vec3f(dot(col, vec3f(0.2126, 0.7152, 0.0722))), col, 0.6); }   // (the gas thinned: ×0.55 — 2026-10-06)   // (uniform branch: no nebula, no cost; 40 % of its colour taken out — 2026-10-06)
+  if (F.bg.x > 0.0) { col = nebula(d) * F.bg.x * 0.275; col = mix(vec3f(dot(col, vec3f(0.2126, 0.7152, 0.0722))), col, 0.6); }   // (the gas thinned: ×0.55, then halved again → ×0.275 — 2026-10-06)   // (uniform branch: no nebula, no cost; 40 % of its colour taken out — 2026-10-06)
   var stars = starLayer(d, 110.0, 0.0, 0.018) * 1.0 + starLayer(d, 260.0, 3.0, 0.008) * 0.45 + starLayer(d, 620.0, 11.0, 0.005) * 0.25;
   col += stars * F.bg.y;
   // sun
