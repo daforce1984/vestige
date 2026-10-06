@@ -218,11 +218,11 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       const jl = len * (1.0 + 0.25 * hash(Math.floor(time * 24) * 1.3 + i)) * bk2, ck2 = k * bk2;
       // a real flame (renderer jetFlame, shape 18): a fat outer plume and a tighter, hotter inner one
       V.madd(tmp3, tmp, tmp2, jl * 1.25);
-      R.jetFlame(tmp, tmp3, Math.max(r * 2.4, jl * 0.2), [c[0] * 0.6 * bk2, c[1] * 0.6 * bk2, c[2] * 0.6 * bk2], 1.0, i * 3.7 + 1, 2.2);   // (wide: a flame is fat, not a line)
+      R.jetFlame(tmp, tmp3, Math.max(r * 1.8, jl * 0.15), [c[0] * 0.32 * bk2, c[1] * 0.32 * bk2, c[2] * 0.32 * bk2], 1.0, i * 3.7 + 1, 2.2);   // (a fat flame, not a line — but dim enough that he stays readable in front of it)
       V.madd(tmp3, tmp, tmp2, jl * 0.6);
-      R.jetFlame(tmp, tmp3, Math.max(r * 1.1, jl * 0.09), [(c[0] * 0.6 + 0.35) * ck2, (c[1] * 0.6 + 0.35) * ck2, (c[2] * 0.6 + 0.4) * ck2], 1.0, i * 5.1 + 9, 3.2);
-      R.glow(tmp, r * (2.0 + 0.8 * flick), [c[0] * 0.5 * bk2 + 0.25 * ck2, c[1] * 0.5 * bk2 + 0.25 * ck2, c[2] * 0.5 * bk2 + 0.25 * ck2], 0.3);
-      if (i === 0) R.light(tmp, 80, [0.5, 0.7, 1], 8 * bk2);
+      R.jetFlame(tmp, tmp3, Math.max(r * 0.9, jl * 0.07), [(c[0] * 0.35 + 0.15) * ck2, (c[1] * 0.35 + 0.15) * ck2, (c[2] * 0.35 + 0.2) * ck2], 1.0, i * 5.1 + 9, 3.2);
+      R.glow(tmp, r * (1.4 + 0.5 * flick), [c[0] * 0.25 * bk2 + 0.1 * ck2, c[1] * 0.25 * bk2 + 0.1 * ck2, c[2] * 0.25 * bk2 + 0.1 * ck2], 0.3);
+      if (i === 0) R.light(tmp, 80, [0.5, 0.7, 1], 4 * bk2);
     }
     if (opts && opts.past) {
       // curved plume: 8 samples of gas emitted over the last `span` seconds
