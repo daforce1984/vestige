@@ -15,7 +15,7 @@
 import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
-import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES } from './world.js';
+import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T } from './world.js';
 import { SHIELD_CLUNKS, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
@@ -37,7 +37,7 @@ export const STEM_SYNC_LAYER = true;
 export const SYNC_GAIN = 0.55;
 export const SYNC_KEEP_ALWAYS = ['braam', 'boom'];
 export const SYNC_KEEP_NEAR_HITS = ['riser', 'revswell', 'cymbal'];
-export const SYNC_HITS = [8.6, 120, 158, 216, 262, 268, 273, 280, 300];
+export const SYNC_HITS = [8.6, 120, 158, 216, 262, 268, CORE_HIT_T, 280, 300];
 export const STEM_GAIN = 0.8;
 export const STEM_XFADE = 2.0;
 export const PRELOAD = 20;                       // JIT-decode stems / long samples this far ahead (s)
@@ -211,7 +211,7 @@ export const CUES = [
   [267.42,'tear',       { dur: 0.58, vel: 0.95 }],   // the blade burning through
   [268,   'shatter',    { vel: 1, shards: 2, count: 46 }],
   [278,   'engulf',     { dur: 2.02, vel: 1 }],      // swallowed by the implosion light → 280 white-out
-  [273,   'crunch',     { vel: 1 }],
+  [CORE_HIT_T, 'crunch', { vel: 1 }],
   [278,   'implosion',  { dur: 2, vel: 0.8 }],
   [280,   'shockwave',  { vel: 0.8 }],
   [292,   'ionCharge',  { dur: 8, big: 1, vel: 0.45 }],
@@ -415,10 +415,18 @@ export const SAMPLE_CUES = [
   ...HB.map((t, i) => [t - 0.1, 'heartbeat:s' + (i % 3), { gain: 0.6 + 0.4 * i / HB.length, prio: 8, norand: true }]),
   // ---- WELL ASSAULT 262–273: berserk mech tears through the core's energy shield (no dialogue)
   [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar
-  [262.05,'servo',     { rate: 0.5, gain: 0.9, prio: 8, norand: true }],
+  [262.05,'metal_groan', { at: 2.8, dur: 1.4, fadeOut: 0.4, rate: 0.6, gain: 0.9, prio: 8, norand: true }],   // (2026-10-06: the servo whirr out) the frame straining
+  // THE ROAR (shots.js ROAR_T 265.3): head thrown back — a feral, tearing cry and the red shockwave bursting off him
+  [265.28, '@growl', { dur: 1.3, vel: 1.15 }],
+  [265.3, 'metal_groan', { at: 2.8, dur: 1.2, fadeOut: 0.35, rate: 1.3, gain: 1.0, prio: 9, norand: true }],
+  [265.3, 'shockwave', { gain: 1.0, rate: 0.9, prio: 9, duck: 1.5, norand: true }],
+  [265.3, '@boom', { bus: 'sfx', f: 30, vel: 0.9, dur: 2.0, verb: 0.4 }],
   [262,   'braam',     { rate: 0.85, gain: 1, prio: 9, duck: 2, norand: true }],
-  [265.98, 'saber_ignite', { rate: 0.55, gain: 1.4, prio: 9, norand: true }],                       // lit at ten times its output: deep, huge
-  [266.0, 'big_beam:fire', { rate: 0.7, gain: 0.9, prio: 9, duck: 1.2, norand: true }],
+  // lit at ten times its output (2026-10-06: no cry in it any more — the energy gathering and BURSTING out into the blade)
+  [266.0, 'beam_blast4', { at: 'hit', rate: 1.0, gain: 1.2, prio: 9, norand: true }],               // (its build-up from ~264.2, the burst on the light)
+  [265.97, 'hyperspace_boom:boom', { rate: 0.9, gain: 0.9, prio: 9, duck: 1.2, norand: true }],
+  [266.02, 'atomic_impact', { rate: 1.15, gain: 0.7, prio: 8, norand: true }],
+  [266.0, '@boom', { bus: 'sfx', f: 26, vel: 0.9, dur: 2.6, verb: 0.45 }],
   [267.1, 'hl_thruster', { dur: 0.4, rate: 1.4, gain: 0.9, fadeOut: 0.1, prio: 8, norand: true }],   // the lunge
   [267.42, 'shockwave', { dur: 1.4, fadeOut: 0.6, gain: 0.9, rate: 1.1, prio: 9, duck: 1.5, norand: true }],   // the tip goes in
   [267.42, 'energy_beam2', { rate: 0.5, gain: 1.2, dur: 0.6, fadeOut: 0.1, prio: 9, norand: true }],
@@ -429,13 +437,13 @@ export const SAMPLE_CUES = [
   [268.1, 'expl_debris', { gain: 0.8, rate: 1.3, prio: 7, norand: true }],
   ...Array.from({ length: 14 }, (_, i) => [268.03 + Math.pow(i / 13, 1.4) * 1.1, '@metalRing', { vel: 0.5 * (1 - i / 16), f0: 1800 + 900 * Math.sin(i * 2.7), dec: 0.35, pan: Math.sin(i * 1.9) * 0.7 }]),
   [268,   'whoosh_rev', { at: 'hit', rate: 1.2, gain: 0.6, prio: 7, norand: true }],
-  [270,   'whoosh:c',  { rate: 1.1, gain: 1, dur: 2.8, fadeOut: 0.3, prio: 8, norand: true }],   // rush into the core
-  [270,   'hl_thruster', { loop: true, dur: 2.8, rate: 1.1, rateTo: 1.5, gain: 0.8, fadeIn: 0.3, fadeOut: 0.1, prio: 8, norand: true }],
-  [273,   'hit_heavy', { gain: 1, prio: 9, duck: 2, norand: true }],
-  [273,   'braam2',    { at: 0.15, gain: 1, prio: 9, norand: true }],
-  [273,   'expl_metal', { gain: 1, rate: 0.8, prio: 9, norand: true }],
-  [273.1, 'metal_groan', { at: 2.8, dur: 3, fadeOut: 1, rate: 0.7, gain: 1, prio: 8, norand: true }],
-  [272.8, 'whoosh:b',  { rate: 1.3, gain: 0.8, prio: 8 }],
+  [268.2, 'whoosh:c',  { rate: 1.1, gain: 1, dur: CORE_HIT_T - 268.2, fadeOut: 0.3, prio: 8, norand: true }],   // straight on through, into the core
+  [268.2, 'hl_thruster', { loop: true, dur: CORE_HIT_T - 268.2, rate: 1.2, rateTo: 1.5, gain: 0.8, fadeIn: 0.2, fadeOut: 0.1, prio: 8, norand: true }],
+  [CORE_HIT_T, 'hit_heavy', { gain: 1, prio: 9, duck: 2, norand: true }],
+  [CORE_HIT_T, 'braam2',    { at: 0.15, gain: 1, prio: 9, norand: true }],
+  [CORE_HIT_T, 'expl_metal', { gain: 1, rate: 0.8, prio: 9, norand: true }],
+  [CORE_HIT_T + 0.1, 'metal_groan', { at: 2.8, dur: 3, fadeOut: 1, rate: 0.7, gain: 1, prio: 8, norand: true }],
+  [CORE_HIT_T - 0.2, 'whoosh:b',  { rate: 1.3, gain: 0.8, prio: 8 }],
   [280,   'whoosh_rev', { at: 'hit', rate: 0.75, gain: 1, prio: 9, norand: true }],
   [280,   'expl_nuke', { gain: 1.1, prio: 9, duck: 4, norand: true }],
   [280,   'boom_cine', { gain: 1, prio: 9, norand: true }],
@@ -808,17 +816,16 @@ function lossCues() {
   return out;
 }
 // Sigma's beam saber in the core assault (STORY time, all after the tear insert → plain filmT shift). Procedural voices
-// (audio-synth.js beamSaber*). shots.js: drawn at 270.2 (blade out over smooth(270.3, 270.6)), red while berserk
-// (fades 276–278), driven into the core at 273.0; the wide 275–278 is too far to hear it; back on him 278–280.2 (cyan
+// (audio-synth.js beamSaber*). shots.js: lit at 266 at ten times its output, red while berserk
+// (fades 276–278), driven into the core at CORE_HIT_T (270.74); the wide 275–278 is too far to hear it; back on him 278–280.2 (cyan
 // again), blade collapses over 279.6–280.1 into the white-out.
 export const SABER_GAIN = 1.0;
 function saberCues() {
   const G = SABER_GAIN, out = [];
-  out.push([270.22, '@beamSaberIgnite', { vel: 0.85 * G, red: 1 }]);
   out.push([270.3, '@beamSaberHum', { dur: 4.7, vel: 0.7 * G, red: 1, fadeIn: 0.3, fadeOut: 0.08,   // cut to the wide at 275.0
     swings: [[0.25, 0.7, 0.55], [1.35, 0.4, 0.6], [2.45, 1, 0.45]] }]);                        // levelling the blade, surge, the lunge
-  out.push([272.72, '@beamSaberSwing', { vel: 0.7 * G, red: 1, dur: 0.4 }]);                        // the thrust on the side angle
-  out.push([273.0, '@beamSaberClash', { vel: 1.0 * G, red: 1, grind: 1.9 }]);                        // into the core, burning in until the cut
+  out.push([CORE_HIT_T - 0.23, '@beamSaberSwing', { vel: 0.7 * G, red: 1, dur: 0.4 }]);              // the thrust on the side angle
+  out.push([CORE_HIT_T, '@beamSaberClash', { vel: 1.0 * G, red: 1, grind: 1.9 }]);                    // into the core, burning in until the cut
   out.push([278.0, '@beamSaberHum', { dur: 1.7, vel: 0.5 * G, fadeIn: 0.05, fadeOut: 0.12 }]);      // cyan again, behind him in the engulf
   out.push([279.6, '@beamSaberRetract', { vel: 0.6 * G, dur: 0.5 }]);
   return out;

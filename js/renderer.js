@@ -549,6 +549,9 @@ export class Renderer {
   smoke(p, radius, age, seed, col, opacity = 1) { this.sprite(2, p, [radius, seed * 3.1, age, seed], Z4, col, opacity); }
   beam(p0, p1, radius, col, intensity = 1, sharp = 20, distort = 0, flow = 1) { this.sprite(3, p0, [p1[0], p1[1], p1[2], 0], [radius, sharp, distort, flow], col, intensity); }
   arc(p0, p1, halfWidth, col, intensity = 1, seed = 0, rate = 9) { this.sprite(12, p0, [p1[0], p1[1], p1[2], 0], [halfWidth, seed, rate, 0], col, intensity); }   // arc discharge (shader lightning)
+  /** an overdriven blade's energy RUNAWAY (shape 17): irregular surges racing from p0 up to p1, ragged plasma tongues
+   *  licking off its sides out to `radius` */
+  surge(p0, p1, radius, col, intensity = 1, seed = 0) { this.sprite(17, p0, [p1[0], p1[1], p1[2], 0], [radius, seed, 0, 0], col, intensity); }
   ring(center, axU, axV, col, phase) { this.sprite(4, center, axU, axV, col, phase); }
   bayField(center, axU, axV, age, col, intensity) { this.sprite(11, center, [axU[0], axU[1], axU[2], age], axV, col, intensity); }
   plume(nozzle, axis, halfW, col, intensity) { this.sprite(10, nozzle, axis, halfW, col, intensity); }

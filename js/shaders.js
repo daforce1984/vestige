@@ -1277,7 +1277,7 @@ struct VO {
   var wp: vec3f;
   var uv = corner;
   var ext = vec2f(0.0);
-  if (shape == 3 || shape == 12) {
+  if (shape == 3 || shape == 12 || shape == 17) {
     // streak / beam capsule from a.xyz to b.xyz, radius c.x (12: arc discharge channel, same camera-facing ribbon)
     let p0 = s.a.xyz; let p1 = s.b.xyz; let r = s.c.x;
     let ax = p1 - p0;
@@ -1666,6 +1666,35 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     col = (vec3f(1.0) * core * core * 0.9 + tint * (core + glow * 0.8)) * s.d.a * flow;
     let nz = vnoise(vec3f(ax * 0.05, dd * 3.0, t * 8.0)) - 0.5;
     dist = vec2f(nz, i.uv.y) * glow * s.c.z * 0.02;
+  } else if (shape == 17) {
+    // ENERGY RUNAWAY on an overdriven blade (2026-10-06): the power it can't hold — irregular surges race up it (hilt →
+    // tip), each one swelling the blade's envelope into ragged tongues of plasma that lick off its sides and stream
+    // toward the tip, threaded with bright crawling filaments; between surges it settles back to a thin seethe
+    let L = i.ext.x; let r = i.ext.y;
+    let x = i.uv.x / r; let v = i.uv.y;                     // along (in envelope radii, from the hilt), across (-1..1)
+    let u = i.uv.x / L;
+    if (u < -0.02 || u > 1.08) { discard; }
+    let sd = s.c.y;
+    // surges: bright packets travelling up the blade at uneven speeds — sparse, irregular in spacing and strength
+    let pk = clamp(smoothstep(0.52, 0.8, vnoise(vec3f(x * 0.18 - t * 5.5, sd, t * 0.5))) * 1.4
+      + smoothstep(0.6, 0.85, vnoise(vec3f(x * 0.4 - t * 11.0, sd + 7.3, t * 1.1))), 0.0, 1.6);
+    let ends = smoothstep(-0.02, 0.06, u) * (1.0 - 0.6 * smoothstep(0.8, 1.06, u));
+    // tongues: separate licks of plasma torn off the blade, leaning toward the tip — each its own blob, most of the
+    // envelope empty between them; a thin seethe hugs the blade all the way
+    let lk = smoothstep(0.45, 0.78, vnoise(vec3f(x * 1.1 - t * 17.0 - abs(v) * 3.5, v * 2.2 + sd * 2.0, t * 2.6)));
+    let w = (0.06 + (0.12 + 0.7 * lk) * pk) * ends;
+    let grain = 0.45 + 0.55 * vnoise(vec3f(x * 3.2 - t * 32.0, v * 7.0 + sd, t * 6.0));
+    let body = exp(-pow(abs(v) / max(w, 0.015), 1.6) * 2.5) * grain;
+    let seethe = exp(-pow(abs(v) / 0.07, 2.0)) * (0.5 + 0.5 * pk) * ends;
+    // filaments: thin bright threads crawling up through the surges
+    let fq = 1.0 - abs(vnoise(vec3f(x * 0.7 - t * 16.0, v * 4.0 + sd, t * 2.5)) * 2.0 - 1.0);
+    let fil = pow(fq, 16.0) * step(abs(v), w) * pk;
+    let flick = 0.8 + 0.2 * sin(t * 90.0 + x * 0.7 + sd);
+    let heat = body * (0.25 + 0.75 * pk) + seethe * 0.6 + fil * 1.4;
+    col = (tint * heat + vec3f(1.0, 0.8, 0.7) * pow(clamp(body * pk * 0.5, 0.0, 1.2), 2.0) * 0.4) * s.d.a * flick
+      * smoothstep(1.0, 0.8, abs(v));
+    let nz = vnoise(vec3f(x * 0.4 - t * 10.0, v * 2.0, t * 4.0)) - 0.5;
+    dist = vec2f(nz, v) * body * pk * 0.01 * s.d.a;
   } else if (shape == 4) {
     // shock ring (oriented quad), b/c = axes, d.a = ring position 0..1
     let r = length(i.uv);

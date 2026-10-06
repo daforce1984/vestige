@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel, ionCharge, EARTH_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
+  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -121,10 +121,10 @@ function berserkZ(t) {
     const T = THRUST_T - 262, w = sat((t - 262) / T), z0 = DIVE_END_Z, z1 = THRUST_Z, v0 = CHARGE_V, v1 = CHARGE_V * 1.2;
     return (2 * w ** 3 - 3 * w * w + 1) * z0 + (w ** 3 - 2 * w * w + w) * T * v0 + (-2 * w ** 3 + 3 * w * w) * z1 + (w ** 3 - w * w) * T * v1;
   }
-  if (t < 268) return lerp(THRUST_Z, THRUST_Z + 6, easeOut(sat((t - THRUST_T) / (268 - THRUST_T))));   // the blade drives in; the barrier gives
-  if (t < 270) return lerp(THRUST_Z + 6, hitZ + 30, (t - 268) / 2);                    // through the shards
-  if (t < 272.95) return lerp(hitZ + 30, -36, easeIn(sat((t - 270) / 2.95)));        // accelerating ram at the core
-  return -36 + 5 * easeOut(sat((t - 272.95) / 0.35)) + 1.5 * smooth(273.3, 277.5, t);  // drives in and keeps grinding (no rebound)
+  // (2026-10-06) and on: straight THROUGH the barrier at the thrust's speed (~46 m/s), never checked — the dome breaks
+  // round him as he punches through (268) — and the blade into the core at CORE_HIT_T, the body's way carried in after it
+  if (t < CORE_HIT_T) return lerp(THRUST_Z, -36, (t - THRUST_T) / (CORE_HIT_T - THRUST_T));
+  return -36 + 7.5 * easeOut(sat((t - CORE_HIT_T) / 0.5)) + 1.5 * smooth(CORE_HIT_T + 0.5, 277.5, t);   // drives in (its speed carried) and keeps grinding (no rebound)
 }
 // the thrust: the ram's two-handed levelled grip, drawn back hard (elbows back, torso coiled), then driven straight in
 function thrustPose(t) {
@@ -134,6 +134,18 @@ function thrustPose(t) {
   for (const sd of ['L', 'R']) { out['arm_' + sd + '_lower'][0] -= 0.75 * wind; out['arm_' + sd + '_upper'][0] += 0.35 * wind; out['arm_' + sd + '_upper'][0] -= 0.15 * lunge; }
   out.leg_L_upper[0] += 0.4 * lunge - 0.3 * wind; out.leg_R_upper[0] += 0.5 * lunge - 0.2 * wind;
   return out;
+}
+// THE ROAR (2026-10-06): mid-charge he throws his head back, chest arched, arms flung wide — a red shockwave bursts off him
+// (shot B2) — then hunches back into the charge and the draw
+// (scene 82 plays from 265.1 — timemap cuts 263.3–265.1 — so it comes right as the shot opens, gone again by the 266 ignition)
+export const ROAR_T = 265.3;
+const roarK = (t) => smooth(ROAR_T - 0.2, ROAR_T, t) * (1 - smooth(ROAR_T + 0.45, ROAR_T + 0.75, t));
+function roarPose(t) {
+  const sh = smooth(ROAR_T - 0.05, ROAR_T + 0.08, t) * (1 - smooth(ROAR_T + 0.4, ROAR_T + 0.7, t)), q = (k) => noise1(t * 31 + k) * 0.08 * sh;   // (shaking with it)
+  return { torso: [-0.45 + q(1), q(2), 0], head: [-1.05 + q(3), q(4), 0], pelvis: [-0.15, 0, 0],
+    arm_L_upper: [-0.35, 0.35, 1.35 + q(5)], arm_L_lower: [-0.55, 0, 0], hand_L: [0.2, 0, 0.3],
+    arm_R_upper: [-0.35, -0.35, -1.35 - q(6)], arm_R_lower: [-0.55, 0, 0], hand_R: [0.2, 0, -0.3],
+    leg_L_upper: [0.25, 0, 0.25], leg_L_lower: [0.5, 0, 0], leg_R_upper: [0.35, 0, -0.25], leg_R_lower: [0.6, 0, 0] };
 }
 // heavy shield strikes: each hit has its own wind-up → snap → follow-through → recovery (radians; partial poses)
 const STRIKES = [
@@ -225,12 +237,12 @@ export function ramBase() {
   _RAM = pose; _RAM._cost = best;
   return _RAM;
 }
-// the ram over time: braced on the approach, compression at impact (272.95), then straining/grinding against the core
+// the ram over time: braced on the approach, compression at impact (CORE_HIT_T), then straining/grinding against the core
 function ramPose(t) {
   const b = ramBase(), out = {};
   for (const k in b) if (k[0] !== '_') out[k] = b[k].slice();
-  const hit = Math.exp(-Math.max(0, t - 272.95) * 5) * (t > 272.95 ? 1 : 0);
-  const grind = smooth(273.2, 274, t);
+  const hit = Math.exp(-Math.max(0, t - CORE_HIT_T) * 5) * (t > CORE_HIT_T ? 1 : 0);
+  const grind = smooth(CORE_HIT_T + 0.25, CORE_HIT_T + 1.05, t);
   out.torso[0] += 0.25 * hit + 0.1 * grind; out.head[0] += 0.2 * hit;
   out.arm_L_lower[0] -= 0.35 * hit; out.arm_R_lower[0] -= 0.35 * hit;           // elbows buckle on impact
   for (const k of ['arm_L_upper', 'arm_R_upper', 'torso', 'leg_L_upper', 'leg_R_upper']) {
@@ -318,7 +330,7 @@ export function gundamState(t) {
   { const d = duelHero(t); if (d) return d; }
   const r = gundamStateRaw(t, s);
   // the beam RIFLE from the launch to the dive; he puts it away on his back at 257.6–258.3 (over the shoulder) and
-  // draws the beam SABER at 270.2 for the ram into the core
+  // draws the beam SABER at 265.9: ten times its output, through the barrier and into the core
   r.weapon = t < 170 ? 'back' : t < FLING_T ? 'rifle' : t < 263 ? 'flung' : t < 265.9 ? 'none' : 'saber';   // (the rifle flung away before the well: FLING_T)
   if (t < 262) r.saber = 0;
   return r;
@@ -411,7 +423,7 @@ function gundamStateRaw(t, s) {
       s.pose.arm_R_lower = [lerp(lerp(b0[0], -1.8, wd), -0.1, fl), 0, 0];
     }
   } else if (t < 278) {
-    // BERSERK: feral lunges into the shield (263.4 / 265.0 / 266.6), shatter 268, rush 270–272.8, slash 273
+    // BERSERK: the roar (ROAR_T), the blade at ten times its output (266), the thrust through the barrier (267.42) and on into the core (CORE_HIT_T)
     const z = berserkZ(t);
     const jk = smooth(262, 262.6, t);   // (the feral shake builds in: no step off the dive)
     s.pos = addv(WELL, [noise1(t * 9) * 2.5 * berserkJitter(t) * jk, lerp(-10, -6, smooth(262, 263, t)) + noise1(t * 8 + 3) * 2 * berserkJitter(t) * jk, z]);
@@ -421,7 +433,7 @@ function gundamStateRaw(t, s) {
       arm_L_upper: [-1.2 - hit * 0.5, 0.2, 0.55], arm_L_lower: [-1.3 + hit * 1.0, 0, 0], hand_L: [0.5, 0, 0],
       arm_R_upper: [-1.25 - hit * 0.5, -0.2, -0.55], arm_R_lower: [-1.2 + hit * 1.0, 0, 0], hand_R: [0.5, 0, 0],
       leg_L_upper: [-0.9, 0, 0.2], leg_L_lower: [1.5, 0, 0], leg_R_upper: [-0.4, 0, -0.2], leg_R_lower: [1.1, 0, 0], foot_L: [0.5, 0, 0], foot_R: [0.4, 0, 0] };
-    if (t < 272.4) {
+    if (t < CORE_HIT_T - 0.55) {
       for (const k in s.pose) delete s.pose[k];
       const w = smooth(262, 262.6, t);
       const fl = blendPose('flight', 'flight', 0, {});
@@ -430,10 +442,11 @@ function gundamStateRaw(t, s) {
         s.pose[k] = [lerp(a[0], b[0], w), lerp(a[1], b[1], w), lerp(a[2], b[2], w)];
       }
       mixPose(s.pose, thrustPose(t), smooth(265.4, 265.95, t));   // the saber in both hands: drawn back, the thrust
-      if (t > 270.2) mixPose(s.pose, ramPose(t), smooth(270.2, 271.0, t));
+      mixPose(s.pose, roarPose(t), roarK(t));                     // head flung back, arms thrown wide: the roar
+      if (t > 268) mixPose(s.pose, ramPose(t), smooth(268.0, 268.8, t));
     } else { for (const k in s.pose) delete s.pose[k]; Object.assign(s.pose, ramPose(t)); }
     s.saber = smooth(266.0, 266.25, t);
-    s.saberPow = 1 + 9 * smooth(265.98, 266.3, t) * (1 - smooth(268.3, 269.6, t));   // TEN times its output for the thrust
+    s.saberPow = 1 + 9 * smooth(265.98, 266.3, t) * (1 - smooth(276, 277.5, t));   // TEN times its output — through the barrier and into the core (2026-10-06: was cut back at 268.3)
     s.thr = 1; s.damage = 0.15 + smooth(262, 278, t) * 0.25;
     s.berserk = smooth(262, 262.4, t) * (1 - smooth(276, 278, t));
   } else if (t < 292) {
@@ -820,8 +833,10 @@ export function drawGundam(R, t, s, opts = {}) {
     const th = pw <= 2 ? pw : 2 + (pw - 2) * 0.12, tip = madd(a, dir, 13 * k * (1 + (MEGA_LEN - 1) * mega));
     const col = bz > 0.05 ? [3.4, 0.5, 0.3] : [0.8, 2.2, 3.2];
     R.beam(a, tip, 0.5 * th, [col[0] * k, col[1] * k, col[2] * k], 0.5 * pw, 26, 1.5, 1.2);   // (pw: output — 2 = full power, twice as thick; 10 = the barrier thrust)
-    R.beam(a, tip, 1.5 * th, [col[0] * k, col[1] * k, col[2] * k], 0.04 * pw, 3, 2, 0.8);
-    if (mega > 0) { R.beam(a, tip, 2.2 * th, [0.3 * k * mega, 0.8 * k * mega, 1.6 * k * mega], 0.03 * pw, 2, 2.5, 1.5); R.glow(a, 3 + 5 * mega, [1.5 * mega, 3 * mega, 5 * mega], 0.5); }   // the overdriven blade: a wide corona, the hilt blazing
+    const flat = 1 - 0.75 * mega;   // (2026-10-06: overdriven, the even halo gives way to the runaway below — it read as a flat glowing sheet)
+    R.beam(a, tip, 1.5 * th, [col[0] * k, col[1] * k, col[2] * k], 0.04 * pw * flat, 3, 2, 0.8);
+    if (mega > 0) { R.beam(a, tip, 2.2 * th, [0.3 * k * mega, 0.8 * k * mega, 1.6 * k * mega], 0.03 * pw * flat, 2, 2.5, 1.5); R.glow(a, 3 + 5 * mega, [1.5 * mega, 3 * mega, 5 * mega], 0.5); }   // the overdriven blade: a wide corona, the hilt blazing
+    if (mega > 0) R.surge(a, tip, 3.4 * th, [col[0] * 0.8 * k, col[1] * 0.6 * k, col[2] * 0.6 * k], 1.6 * mega, 3.7);   // its energy running away: surges racing up it, plasma tearing off the sides
     R.light(lerpv(a, tip, 0.5), 40 * pw, bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 4 * k * pw);
     GUN.saber = [a, tip];
     if (s.saberL && t > TRANS_PASS - SWING_PRE - 0.002 && t < TRANS_PASS + SWING_POST + 0.02) {   // the swing's afterimage: a fan of fading blades along the path it just swept
@@ -2559,6 +2574,22 @@ shot(263.3, 266.95, 'B2 the blade at ten times its output', (c) => {
   c.env.rim = [0.6, 1.0, 1.9, 1.4]; c.env.fill = [0.3, 0.32, 0.4, 0.5];
   c.post.lensA = { enable: 0 };
   c.env.shadowCenter = g.pos; c.env.shadowRadius = 200;
+  // THE ROAR (2026-10-06): head thrown back — a red shockwave bursts off him: a hard flash at the chest, rings racing out
+  // (one flat, one tilted, one upright), the space round him buckling, and red light washing over everything near
+  const lr = t - ROAR_T;
+  if (lr > -0.02 && lr < 1.6) {
+    const R = c.R, cp = addv(g.pos, [0, 7.5, 0]), k = Math.exp(-Math.max(0, lr) * 3.2), e = easeOut(sat(lr / 1.1));
+    R.glow(cp, 4 + 26 * easeOut(sat(lr / 0.35)), [5 * k, 0.7 * k, 0.35 * k], 0.45);
+    R.light(cp, 220, [1, 0.15, 0.08], 18 * k);
+    for (const [u, v, d] of [[[1, 0, 0], [0, 0, 1], 0], [[1, 0, 0], [0, 0.6, 0.8], 0.06], [[0, 1, 0], [0, 0, 1], 0.12]]) {
+      const ph = sat((lr - d) / 1.1); if (ph <= 0 || ph >= 1) continue;
+      const Rr = 110, a = Math.pow(1 - ph, 1.4);
+      R.ring(cp, [u[0] * Rr, u[1] * Rr, u[2] * Rr], [v[0] * Rr, v[1] * Rr, v[2] * Rr], [7 * a, 0.9 * a, 0.5 * a], easeOut(ph));
+    }
+    if (lr < 0.9) R.ripple(cp, 12 + 120 * e, [0.5, 0.5, 0.5], (1 - lr / 0.9) * 2.2);
+    shake(c, 1.8 * k, 18);
+    c.post.flash = Math.max(c.post.flash, 0.16 * Math.exp(-Math.max(0, lr) * 9));
+  }
 });
 // the thrust: wide and low off his left, the whole blade and the dome's face in frame — he lunges, the tip goes in and
 // the barrier cracks open from the point in one blow
@@ -2575,7 +2606,7 @@ shot(266.95, 268.05, 'B2b the thrust — one blow through the barrier', (c) => {
   c.post.lensA = { enable: 0 };
   c.env.shadowCenter = g.pos; c.env.shadowRadius = 200;
 });
-shot(268, 270, 'B3 SHATTER', (c) => {
+shot(268, 269.4, 'B3 SHATTER', (c) => {
   c.env.sunDisc = 0.12;
   const { t, u } = c;
   const g = gundamState(t);
@@ -2584,25 +2615,26 @@ shot(268, 270, 'B3 SHATTER', (c) => {
   c.post.flash = Math.max(0, 0.18 - (t - 268) * 0.6);
   c.post.lensA = { enable: 0 };
 });
-shot(270, 275, 'B4 the rush', (c) => {
+shot(269.4, 275, 'B4 the rush', (c) => {
   c.env.sunDisc = 0.12;
   const { t, u } = c;
   const g = gundamState(t);
   // third-person chase, accelerating into the core; the last second before impact cuts to a side angle that shows the
   // two-handed ram (saber levelled, body behind it) driving into the core
-  if (t < 272.2) {
-    const back = lerp(34, 18, easeIn(sat((t - 270) / 2.2)));
-    camLook(c, addv(g.pos, [3, 11, -back]), addv(WELL, [0, 0, 0]), lerp(52, 72, easeIn(sat((t - 270) / 2.2))), 0.05 * Math.sin(t * 3));
+  const sw = CORE_HIT_T - 0.75;   // (2026-10-06: he comes on at full speed — the chase is short, the side angle catches the blade going in)
+  if (t < sw) {
+    const back = lerp(34, 18, easeIn(sat((t - 269.4) / (sw - 269.4))));
+    camLook(c, addv(g.pos, [3, 11, -back]), addv(WELL, [0, 0, 0]), lerp(52, 72, easeIn(sat((t - 269.4) / (sw - 269.4)))), 0.05 * Math.sin(t * 3));
   } else {
-    camLook(c, addv(g.pos, [-42 + (t - 272.2) * 4, 9, -6]), addv(g.pos, [0, 5, 10]), 46, -0.06);
+    camLook(c, addv(g.pos, [-42 + (t - sw) * 4, 9, -6]), addv(g.pos, [0, 5, 10]), 46, -0.06);
   }
-  shake(c, 0.4 + (t > 272.8 ? 1.4 : 0), 14);
+  shake(c, 0.4 + (t > CORE_HIT_T - 0.15 ? 1.4 : 0), 14);
   c.post.lensA = wellLens(c, wellMass(t) * 1.4, 3, true, 1.2);
   c.post.mbNear = 80;
-  c.post.flash = t > 272.95 && t < 273.15 ? 0.12 * (1 - (t - 272.95) / 0.2) : 0;
+  c.post.flash = t > CORE_HIT_T && t < CORE_HIT_T + 0.2 ? 0.12 * (1 - (t - CORE_HIT_T) / 0.2) : 0;
   c.env.shadowCenter = g.pos; c.env.shadowRadius = 150;
   // the saber drives into the core: crater flash, shock ring, sparks and plates thrown back at the camera
-  const R = c.R, lt = t - 273;
+  const R = c.R, lt = t - CORE_HIT_T - 0.05;
   if (lt > 0 && lt < 2) {
     const hp = addv(WELL, [0, -4, -24]);
     const k = Math.exp(-lt * 3);
@@ -3177,10 +3209,10 @@ function drawLanceAndCannon(R, t, c) {
 
 // ---------------- implosion + shockwave
 function drawImplosion(R, t, c) {
-  if (t < 272.6 || t > 300) return;
-  // ring breaking explosions after the slash
+  if (t < CORE_HIT_T - 0.35 || t > 300) return;
+  // ring breaking explosions after the blade goes in
   for (let i = 0; i < 10; i++) {
-    const t0 = 272.9 + i * 0.45;
+    const t0 = CORE_HIT_T - 0.05 + i * 0.45;
     const ang = i * 0.63 + 0.3;
     const p = addv(WELL, [Math.cos(ang) * 110, Math.sin(ang) * 110, 0]);
     explosion(R, t, t0, p, 26, 700 + i, 'ship');
