@@ -359,7 +359,7 @@ fn moonHeight(q: vec3f) -> f32 {
   let jag = 0.6 + 0.8 * vnoise(q * 34.0);                                       // (the crest broken and jagged along its length)
   var h = mix(basinH(bd), basinH(bd) - 0.012 * rimFlat(bd) * (1.0 - jag), 1.0) * 0.12 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
   h += 0.12 * (0.06 * basinWear(q, bd) - 0.035 * basinScour(q, bd)) * (1.0 - 0.85 * rimFlat(bd));   // (worn walls, scoured grooves — mostly kept off the rim's flat top)
-  h += 0.12 * 0.32 * exp(-pow(bd / 0.1, 2.0)) * (0.45 + 0.9 * vnoise(q * 70.0 + 5.0));   // a central peak cluster, rough
+  h += 0.12 * 0.1 * exp(-pow(bd / 0.26, 2.0)) * (0.6 + 0.8 * vnoise(q * 40.0 + 5.0));   // a central rise, low and spread wide (2026-10-06: the narrow 0.32 peak stuck up out of the bowl)
   h += 0.12 * 0.035 * sin(bd * 38.0 + 4.0 * vnoise(q * 18.0)) * smoothstep(0.62, 0.9, bd) * (1.0 - smoothstep(0.96, 1.0, bd));   // slumped terraces down the inner wall
   var cover = 1.0 - smoothstep(0.12, 0.3, abs(bd - 1.05));   // (none on the basin's rim; inside it and outside, the small ones pit it — 2026-10-04)
   // THE REAL MOON (2026-10-06): NASA's LOLA relief (moonReal; exaggerated MOON_REAL_EXAG) everywhere outside the basin —

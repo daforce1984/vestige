@@ -663,12 +663,15 @@ export function breathe(pose, t, amt = 1) {
 // placed for scene 12 (B4 standoff): its vast limb rises behind both fleets in the upper half of that frame
 const MOON_DIR = V.norm([0, 0, 0], [-0.9595, 0.0814, -0.2696]);
 const MOON_POS = V.madd([0, 0, 0], [2443, 834, -774], MOON_DIR, 110000), MOON_R = 42000;
-const _moonM = M.new(), _moonQ = [0, 0, 0, 1];
+const _moonM = M.new();
+// its orientation: Euler (0.4, 1.1, 0.2), then turned so the giant basin sits a little lower-left as scene 30 sees it
+// (2026-10-06: −0.17 rad about the up of scene 30's line of sight to the moon, +0.15 about its right)
+const MOON_Q = [0.271926, 0.402748, -0.052150, 0.872428];
 export function drawWorld(R, t, opts = {}) {
   R._time = t; _R = R;
   const tmpM = M.new();
   if (t >= 40 && t < EARTH_T && R.models.moon) {
-    M.fromTRS(_moonM, MOON_POS, Q.fromEuler(_moonQ, 0.4, 1.1, 0.2), MOON_R);
+    M.fromTRS(_moonM, MOON_POS, MOON_Q, MOON_R);
     const mo = R.add('moon', _moonM);
     if (mo) { mo.texSet = -3; mo.seed = 1.7; }
   }
