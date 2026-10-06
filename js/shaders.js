@@ -319,7 +319,10 @@ fn basinH(d: f32) -> f32 {
     h = 0.01 - 1.4 * pow(max(1.0 - d * d, 0.0), 0.6);   // (deeper again 2026-10-06: −0.91 → −1.4)
                                      // the bowl: ROUND, deepest in the middle, its sides steepening toward the rim (2026-10-04: was a flat floor, a steep wall and a central peak)
   }
-  return h + 0.04 * exp(-abs(d - 1.0) / 0.035);                               // the rim: a sharp, low crest (a third of what it was: it stood up like a wall — 2026-10-04)
+  return h + 0.04 * rimFlat(d);   // (2026-10-06: a narrow FLAT band along the rim's top — was a sharp crest)
+}
+fn rimFlat(d: f32) -> f32 {   // the rim's top: up the inner wall's last lip, flat across 1.0 … 1.07, down onto the ejecta
+  return smoothstep(0.965, 1.0, d) * (1.0 - smoothstep(1.07, 1.13, d));
 }
 // THE MOON'S RELIEF as real geometry (2026-10-03): height (fraction of its radius) of the giant basin and the two coarsest
 // crater octaves — the vertex shader displaces the mesh by it, the fragment takes its normal from it (the same cells and
@@ -354,7 +357,7 @@ fn basinWear(q: vec3f, bd: f32) -> f32 {   // slumps on the walls (signed, fract
 fn moonHeight(q: vec3f) -> f32 {
   let bd = basinD(q);
   let jag = 0.6 + 0.8 * vnoise(q * 34.0);                                       // (the crest broken and jagged along its length)
-  var h = mix(basinH(bd), basinH(bd) - 0.04 * exp(-abs(bd - 1.0) / 0.035) * (1.0 - jag), 1.0) * 0.12 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
+  var h = mix(basinH(bd), basinH(bd) - 0.012 * rimFlat(bd) * (1.0 - jag), 1.0) * 0.12 + 0.004 * (vnoise(q * 26.0) - 0.5) * smoothstep(0.45, 0.85, bd) * (1.0 - smoothstep(0.98, 1.05, bd));   // (slumped inner wall)
   h += 0.12 * (0.06 * basinWear(q, bd) - 0.035 * basinScour(q, bd));   // (worn walls, scoured grooves)
   h += 0.12 * 0.32 * exp(-pow(bd / 0.1, 2.0)) * (0.45 + 0.9 * vnoise(q * 70.0 + 5.0));   // a central peak cluster, rough
   h += 0.12 * 0.035 * sin(bd * 38.0 + 4.0 * vnoise(q * 18.0)) * smoothstep(0.62, 0.9, bd) * (1.0 - smoothstep(0.96, 1.0, bd));   // slumped terraces down the inner wall
@@ -362,7 +365,7 @@ fn moonHeight(q: vec3f) -> f32 {
   // THE REAL MOON (2026-10-06): NASA's LOLA relief (moonReal; exaggerated MOON_REAL_EXAG) everywhere outside the basin —
   // the impact wiped it inside (40 % left, so its floor keeps the same grain), where the procedural craters still pit the new floor
   let rl = moonReal(q);
-  if (rl.y >= 0.0) { let rw = smoothstep(0.85, 1.25, bd); h += rl.x * mix(0.4, 1.0, rw); cover = max(cover, rw); }
+  if (rl.y >= 0.0) { let rw = smoothstep(0.85, 1.25, bd); h += rl.x * mix(0.4, 1.0, rw) * (1.0 - 0.7 * rimFlat(bd)); cover = max(cover, rw); }   // (the real relief mostly kept off the rim's flat top)
   var sc = 14.0;
   for (var oc = 0; oc < 2; oc++) {
     let p = q * sc; let fl = floor(p); let off = step(vec3f(0.5), p - fl) - 1.0;
