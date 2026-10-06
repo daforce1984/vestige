@@ -49,8 +49,12 @@ MODEL_OPTS = {'enemy_ms': dict(wear=0.6, bare=(0.52, 0.52, 0.54), paint_rough=0.
                                accent=(0.14, (1.0, 0.55, 0.03), 0.55, 0.05, 'white'),   # hazard yellow #F3B928: that share of the SMALL armour pieces (< 0.9 m², sparingly — the sheet uses it on edges and vents)
                                # decal: (atlas id, object, world direction it faces, u axis, centre as bbox fractions (x, y, z), size m)
                                # (Blender axes: forward −Y, up +Z, the model's left +X)
-                               decals=[(1, 'arm_R_upper', (-1, 0, 0), (0, -1, 0), (0.5, 0.5, 0.74), 1.7),   # '07' both shoulders
-                                       (1, 'arm_L_upper', (1, 0, 0), (0, 1, 0), (0.5, 0.5, 0.74), 1.7),
+                               # (2026-10-06: '07' off the shoulders' narrow outer sides — 0.82 m deep, it was cut and smeared over
+                               # the bevels — onto the FRONT faces of the shoulder blocks (flat, 1.9 × 1.2 m) and big on the
+                               # shield's flat outer plate (6.8 × 3.1 m); an optional 7th item: the centre, absolute, Blender axes)
+                               decals=[(1, 'arm_R_upper', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.5), 1.15, (-3.39, -0.73, 15.76)),   # '07' on both shoulder fronts
+                                       (1, 'arm_L_upper', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.5), 1.15, (3.39, -0.73, 15.76)),
+                                       (1, 'shield', (1, 0, 0), (0, 1, 0), (0.5, 0.5, 0.5), 2.7, (4.61, -0.01, 10.6)),          # and big on the shield
                                        (2, 'torso', (0, -1, 0), (1, 0, 0), (0.7, 0.5, 0.62), 1.4),           # emblem: chest, its left
                                        (3, 'leg_L_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.78), 1.3),    # warning stripes on the knees
                                        (3, 'leg_R_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.78), 1.3),
@@ -70,10 +74,13 @@ MODEL_OPTS['gundam'] = dict(paint_override=(0.021, 0.021, 0.023), paint_rough=0.
                                                                               'leg_L_upper', 'leg_R_upper', 'foot_L', 'foot_R', 'rifle', 'saber_hilt')}},
                             panel_var=0.04, wear=0.3, bare=(0.4, 0.4, 0.42), edge=(0.035, 0.975, 0.88), edge_ao=True,
                             small_chips=False, scratch_k=0.25, fill_holes=12, uv_angle=50, uv_margin=0.004,
-                            decal_src='sigma_decals.png', mech_dark=(0.04, 0.58, 0.6),   # (the unpainted frame: dark gunmetal, matte)
+                            # SHARPER (2026-10-06): a 6144² atlas, the inner bodies (drawn untextured) squeezed out of it
+                            # (they held a quarter of it), more texels on the parts seen close and carrying decals
+                            res=6144, squeeze_mats={'inner'}, detail_boost={'head': 1.8, 'torso': 1.6, 'arm_L_upper': 1.5, 'arm_R_upper': 1.5, 'backpack': 1.4},
+                            decal_src='sigma_decals.png', decal_grid=(4, 2), mech_dark=(0.04, 0.58, 0.6),   # (the unpainted frame: dark gunmetal, matte)
                             decals=[(1, 'torso', (0, -1, 0), (1, 0, 0), (0.72, 0.5, 0.66), 1.5),           # the emblem: chest, his left
-                                    (2, 'arm_L_upper', (1, 0, 0), (0, 1, 0), (0.5, 0.5, 0.74), 1.4),       # the sun on both shoulders
-                                    (2, 'arm_R_upper', (-1, 0, 0), (0, -1, 0), (0.5, 0.5, 0.74), 1.4),
+                                    (2, 'arm_L_upper', (1, 0, 0), (0, 1, 0), (0.5, 0.5, 0.74), 1.75),      # the cult's skull-sun badge on both shoulders
+                                    (2, 'arm_R_upper', (-1, 0, 0), (0, -1, 0), (0.5, 0.5, 0.74), 1.75),
                                     (1, 'backpack', (0, 1, 0), (-1, 0, 0), (0.5, 0.5, 0.55), 1.9),         # the emblem large on the pack
                                     (3, 'leg_L_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.62), 1.0),      # Σ on the shins
                                     (3, 'leg_R_lower', (0, -1, 0), (1, 0, 0), (0.5, 0.5, 0.62), 1.0)])
@@ -430,7 +437,7 @@ def place_decals(meshes):
         if 'dl' in o.data.attributes:
             o.data.attributes.remove(o.data.attributes['dl'])
         o.data.attributes.new('dl', 'FLOAT_VECTOR', 'CORNER')
-    for did, name, d, ua, frac, size in OPT.get('decals', []):
+    for did, name, d, ua, frac, size, *cabs in OPT.get('decals', []):
         o = by.get(name)
         if o is None:
             continue
@@ -438,7 +445,7 @@ def place_decals(meshes):
         d, ua = Vector(d).normalized(), Vector(ua).normalized(); va = d.cross(ua)   # (u right, v up, as seen looking at it along −d)
         P = [W @ v.co for v in me.vertices]
         lo = Vector([min(p[i] for p in P) for i in range(3)]); hi = Vector([max(p[i] for p in P) for i in range(3)])
-        c = Vector([lo[i] + (hi[i] - lo[i]) * frac[i] for i in range(3)])
+        c = Vector(cabs[0]) if cabs else Vector([lo[i] + (hi[i] - lo[i]) * frac[i] for i in range(3)])
         N3 = W.to_3x3()
         cand = []
         for poly in me.polygons:
@@ -487,11 +494,19 @@ def run(name):
                              scale_to_bounds=False)
     bpy.ops.object.mode_set(mode='OBJECT')
     for o in meshes:   # enlarge close-up parts' islands before packing (pack keeps relative scale)
-        f = DETAIL_BOOST.get(o.name)
+        f = OPT.get('detail_boost', DETAIL_BOOST).get(o.name)
         if f:
             uv = o.data.uv_layers.active.data
             for d in uv:
                 d.uv = d.uv * f
+        sq = OPT.get('squeeze_mats')
+        if sq:   # (faces drawn untextured: their islands shrunk to almost nothing, the atlas space goes to the armour)
+            uv = o.data.uv_layers.active.data
+            for poly in o.data.polygons:
+                mt = o.data.materials[poly.material_index] if poly.material_index < len(o.data.materials) else None
+                if mt and mt.name in sq:
+                    for li in poly.loop_indices:
+                        uv[li].uv = uv[li].uv * 0.02
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.select_all(action='SELECT')
@@ -501,9 +516,10 @@ def run(name):
         bpy.ops.uv.pack_islands(rotate=True, margin=OPT.get('uv_margin', 0.001))
     bpy.ops.object.mode_set(mode='OBJECT')
     # ---- images
-    alb = bpy.data.images.new(name + '_albedo', RES, RES, alpha=False)
+    res = OPT.get('res', RES)
+    alb = bpy.data.images.new(name + '_albedo', res, res, alpha=False)
     alb.colorspace_settings.name = 'sRGB'
-    orm = bpy.data.images.new(name + '_orm', RES, RES, alpha=False)
+    orm = bpy.data.images.new(name + '_orm', res, res, alpha=False)
     orm.colorspace_settings.name = 'Non-Color'
     # ---- scorch centres picked on the surface (world space)
     R = random.Random(hash(name) & 0xffff)
