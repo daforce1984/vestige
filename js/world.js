@@ -599,6 +599,7 @@ export const CO_TURRET = Array.from({ length: 10 }, (_, i) => 8.5 + i * 0.52 + h
 // the bandits' 24 shots in the strike chase (shots.js 'S10a', picture + sound): each burst walks onto the next wingman
 // (wingman k dies at STRIKE_DIE[k]); shots landing in his last 0.8 s and every third shot HIT, the rest go wide
 const STRIKE_DIE = [null, 139.7, 137.9, 136.1];
+export const STRIKE_FLIGHT = 0.07;   // a bandit's bolt: muzzle → target (s) — fast lasers (2026-10-07: was 0.2)
 export const STRIKE_SHOTS = Array.from({ length: 24 }, (_, n) => {
   const tf = 134.3 + n * 0.26, tgtK = tf < 136.1 ? 3 : tf < 137.9 ? 2 : tf < 139.7 ? 1 : 0;
   const die = STRIKE_DIE[tgtK];

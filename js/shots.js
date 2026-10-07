@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drawBoxWreck, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
+  STRIKE_FLIGHT, EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drawBoxWreck, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -2281,7 +2281,8 @@ shot(127.8, 134, 'S9c wide battle', (c) => {
   c.env.shadowRadius = 700; c.env.shadowCenter = [0, 0, -500];
 });
 // interceptor strafing run along the enemy line, chased by a red fighter (scripted so it always reads)
-function strafeRun(t) { return [-520 + (t - 134) * 150, 40 + Math.sin(t * 1.3) * 18, -980 + Math.sin(t * 0.7) * 30]; }
+// (2026-10-07: 240 m/s, was 150 — the same stretch of the enemy line, run faster)
+function strafeRun(t) { return [-840 + (t - 134) * 240, 40 + Math.sin(t * 1.3) * 18, -980 + Math.sin(t * 0.7) * 30]; }
 // the strike leader's four-ship finger formation is jumped from behind; three wingmen die one after another
 // [side, up, back] in the leader's frame, death time (null = the leader survives)
 const STRIKE = [[0, 0, 0, null], [-15, -2, 11, 139.7], [17, 1, 13, 137.9], [32, -3, 25, 136.1]];
@@ -2324,8 +2325,8 @@ shot(134, 141, 'S10a dogfight chase', (c) => {
     const from = strikePos(tf, BANDITS[n % 3]).p;
     if (hit) {
       const vict = STRIKE[tgtK];
-      if (lt < 0.2) { bolt(R, t, tf, tf + 0.2, from, strikePos(tf + 0.2, vict).p, 12, 0.2, [3, 1.2, 0.4], 1); continue; }
-      const li = lt - 0.2;
+      if (lt < STRIKE_FLIGHT) { bolt(R, t, tf, tf + STRIKE_FLIGHT, from, strikePos(tf + STRIKE_FLIGHT, vict).p, 34, 0.24, [3.4, 1.3, 0.45], 1); continue; }
+      const li = lt - STRIKE_FLIGHT;
       if (li > 0.6 || (vict[3] && t > vict[3])) continue;
       const tp = V.madd([0, 0, 0], strikePos(t, vict).p, randDir([0, 0, 0], n * 3.7), 1.3);
       const kf = Math.exp(-li * 9);
@@ -2338,18 +2339,31 @@ shot(134, 141, 'S10a dogfight chase', (c) => {
         spark(R, madd(tp, d, (1.5 + 8 * hash(n + i * 3)) * easeOut(u)), 0.45 + 0.35 * (1 - u), [b, b * 0.7, b * 0.35]);
       }
     } else {
-      const tp = strikePos(tf + 0.2, STRIKE[tgtK]).p;
+      const tp = strikePos(tf + STRIKE_FLIGHT, STRIKE[tgtK]).p;
       const to = V.add([0, 0, 0], tp, [(hash(n) - 0.5) * 16, (hash(n + 1) - 0.5) * 11, 0]);   // wide
-      const dir = V.norm([0, 0, 0], V.sub([0, 0, 0], to, from)), sp = V.dist(to, from) / 0.2, FAR = 4000;
-      bolt(R, t, tf, tf + FAR / sp, from, madd(from, dir, FAR), 12, 0.2, [3, 1.2, 0.4], 1);
+      const dir = V.norm([0, 0, 0], V.sub([0, 0, 0], to, from)), sp = V.dist(to, from) / STRIKE_FLIGHT, FAR = 4000;
+      bolt(R, t, tf, tf + FAR / sp, from, madd(from, dir, FAR), 34, 0.24, [3.4, 1.3, 0.45], 1);
     }
   }
   const v = lead.v;
   const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], v, [0, 1, 0]));
   const roll = Math.sin(t * 1.7) * 0.6;
   const cam = V.add([0, 0, 0], V.madd([0, 0, 0], V.madd([0, 0, 0], lead.p, v, -128), sd, -22), [0, 26, 0]);   // behind the bandits
-  camLook(c, cam, V.madd([0, 0, 0], lead.p, v, 10), 46, roll * 0.25);
-  shake(c, 0.35, 12);
+  camLook(c, cam, V.madd([0, 0, 0], lead.p, v, 10), 54, roll * 0.25);
+  shake(c, 0.45, 14);
+  // SPEED (2026-10-07): space dust and tiny debris hanging in the battle space, streaking past the lens as they run
+  // through it (fixed in the world on a lattice along the run; each drawn as its 1/24 s motion streak)
+  { const SP = 240, cx = cam[0], cell = 26;
+    for (let j = -4; j < 26; j++) {
+      const gi = Math.floor(cx / cell) + j;
+      for (let q = 0; q < 3; q++) {
+        const h1 = hash(gi * 7.1 + q * 3.3), h2 = hash(gi * 2.9 + q * 11.7), h3 = hash(gi * 5.3 + q * 1.9);
+        const p = [gi * cell + h1 * cell, cam[1] + (h2 - 0.5) * 70, cam[2] + (h3 - 0.5) * 90];
+        const dx = p[0] - cx; if (dx < -40 || dx > 600) continue;
+        const near = 1 - sat(Math.hypot(p[1] - cam[1], p[2] - cam[2]) / 50), b = (0.25 + 0.5 * near) * sat(1 - dx / 600);
+        R.beam(p, [p[0] - SP / 24, p[1], p[2]], 0.05 + 0.08 * near, [0.55 * b, 0.6 * b, 0.75 * b], 0.6, 8);
+      }
+    } }
   for (const w of STRIKE) if (w[3] && c.t > w[3] && c.t < w[3] + 0.6) shake(c, 0.9 * Math.exp(-(c.t - w[3]) * 5), 14);
   c.env.shadowCenter = lead.p; c.env.shadowRadius = 90;
   c.post.shakeBlur = 0.0006;

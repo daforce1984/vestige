@@ -17,7 +17,7 @@ import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, H_FEATURED, LOSS_SWAP_DT } from './world.js';
 import { SHIELD_CLUNKS, DRONE_L0, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
-import { DOG_SHOTS, STRIKE_SHOTS, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
+import { DOG_SHOTS, STRIKE_SHOTS, STRIKE_FLIGHT, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, inSkip, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
 // The Score clock is FILM time. Every table below (CUES, SAMPLE_CUES, SECTIONS, AUTOMATION, ION_SHOTS, DUEL_EVENTS,
@@ -359,7 +359,7 @@ export const SAMPLE_CUES = [
   ...STRIKE_SHOTS.flatMap((d) => {
     const pan = [-0.3, 0.1, 0.4][d.n % 3];
     const out = [[d.tf, '@blaster', { vel: 0.55, f0: 1500 + 400 * ((d.n * 0.37) % 1), pan }]];
-    if (d.hit) out.push([d.tf + 0.2, '@sparkBurst', { vel: 0.45, pan: pan * 0.5 }]);
+    if (d.hit) out.push([d.tf + STRIKE_FLIGHT, '@sparkBurst', { vel: 0.45, pan: pan * 0.5 }]);
     return out;
   }),
   ...DOG_SHOTS.filter((d) => d.tf > 141 && d.tf < 150 && d.k < 6).flatMap((d) => {
