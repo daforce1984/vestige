@@ -863,12 +863,12 @@ function cockyAim(s, tw, target, k, kick) {
   let fk = duelFK(s, 'enemy_ms');
   const pv = PIV.enemy_ms, S = M.transformPoint([0, 0, 0], fk.torso, sub(pv.arm_R_upper, pv.torso));
   const Lr = V.dist(pv.arm_R_lower, pv.arm_R_upper) + V.dist(pv.hand_R, pv.arm_R_lower);
-  const hr = HAND_TO_RIFLE(), dS = nrm(sub(target, S)), hand = add(S, scl(dS, Lr * 1.02));   // (the hand itself at full stretch: the arm locked straight)
+  const dS = nrm(sub(target, S)), hand = add(S, scl(dS, Lr * 1.02));   // (the hand itself at full stretch: the arm locked straight)
   const d = dS, up0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0]));
   const U = nrm(sub(up0, scl(d, V.dot(up0, d)))), X = V.cross([0, 0, 0], U, d);
   const b = VAN_BARREL, u0 = GUN_UP.enemy_ms, u = nrm(sub(u0, scl(b, V.dot(u0, b)))), x = V.cross([0, 0, 0], u, b);
   const Rw = r3mul([...X, ...U, ...d], r3T([...x, ...u, ...b]));
-  armIK(s, fk, 'enemy_ms', 'R', hand, Rw);
+  armIK(s, fk, 'enemy_ms', 'R', hand, r3mul(Rw, r3T(vanR0())));   // (the hand turned so the grip helpers put the barrel on him)
   if (kick > 0) kickArm(s, 'enemy_ms', Math.atan(kick));
   poseSlerp(s, keep, k);
 }
@@ -908,12 +908,53 @@ function guardIK(s, tw) {   // the shield raised in front of its head, its face 
   s.pose.shield = s.pose.shield.map((v) => v * k);
 }
 const TWO_HAND = (tw) => (1 - smooth(178.4, 178.55, tw) * (1 - smooth(179.05, 179.25, tw))) * (1 - smooth(183.25, 183.3, tw) * (1 - smooth(183.8, 184.1, tw))) * smooth(SHIELD_HIT_T + 0.3, SHIELD_HIT_T + 0.55, tw);   // (one-handed while the shield is on its left forearm: the rifle went through it)
-const HAND_TO_RIFLE = () => ENEMY_HOLE;
-// VANGUARD's fist: the centre of its hole (hand-local, measured from the mesh — the fingers curl round hand Z) = where its
-// rifle's grip sits; its left fist (mirrored) takes the handguard from below, palm up, knuckle line along the barrel
-export const ENEMY_HOLE = [0.82, -2.1, -0.36];
+// GRIP HELPERS (2026-10-07): HOW VANGUARD HOLDS ITS RIFLE — the rifle's pistol grip (its centre and axis, rifle frame:
+// assets/rifle1_game.glb, the barrel −Y, up +Z) and the right fist's hole (its centre and axis, hand_R frame, measured
+// from the mesh: the fingers curl round hand Z). Whenever the rifle is in the hand it is placed FROM these — the grip's
+// centre in the fist's centre, its axis along the hole (enemyRifleMat) — so it is always held by the grip; enemyGripError
+// checks it (FILM.gripCheck() walks the whole film). (the old hand offset was set by eye: the fist sat on the receiver, behind
+// the grip, the fingertips past it.)
+// (the pistol grip behind the trigger, raked back ~30°: rifle frame, found on its side silhouette — the slanted handle at
+// y ≈ 0 is the foregrip)
+export const VAN_GRIP = { p: [0, 3.22, 0.02], axis: [0, -0.507, 0.862] };
+export const VAN_FIST = { p: [0.3, -1.6, 0], axis: [0, 0, 1] };
+let _vanR0 = null;   // the rifle turned so its grip's axis runs along the fist's hole (3×3, columns), lazily (helpers below)
+const vanR0 = () => _vanR0 || (_vanR0 = r3between(nrm(VAN_GRIP.axis), nrm(VAN_FIST.axis)));
+const vanOff = () => sub(VAN_FIST.p, r3v(vanR0(), VAN_GRIP.p));   // the rifle's origin in the hand (no extra turn)
+/** the rifle's world matrix in a hand: hand · T(fist) · R(extra turn about the grip) · R0 · T(−grip) */
+export function enemyRifleMat(out, handM, r = [0, 0, 0]) {
+  const qe = Q.fromEuler([0, 0, 0, 1], r[0], r[1], r[2]), q0 = qFromCols(vanR0()), q = Q.mul([0, 0, 0, 1], qe, q0);
+  M.fromTRS(out, VAN_FIST.p, q, 1);
+  return M.mul(out, handM, M.mul(out, out, M.fromTRS(M.new(), [-VAN_GRIP.p[0], -VAN_GRIP.p[1], -VAN_GRIP.p[2]], [0, 0, 0, 1], 1)));
+}
+/** where the hand must be for the rifle to sit at (Rw: its world rotation, O: its origin in the world): { P, Hw } */
+export function handFromRifle(Rw, O) {
+  const Hw = r3mul(Rw, r3T(vanR0()));
+  return { Hw, P: sub(O, r3v(Hw, vanOff())) };
+}
+/** how far the rifle's grip is from the fist (m) and how far their axes are apart (deg) — 0, 0 whenever it is held right */
+export function enemyGripError(fk) {
+  const gP = M.transformPoint([0, 0, 0], fk.rifle, VAN_GRIP.p), fP = M.transformPoint([0, 0, 0], fk.hand_R, VAN_FIST.p);
+  const gA = nrm(M.transformDir([0, 0, 0], fk.rifle, VAN_GRIP.axis)), fA = nrm(M.transformDir([0, 0, 0], fk.hand_R, VAN_FIST.axis));
+  return { dist: V.dist(gP, fP), angle: Math.acos(clamp(V.dot(gA, fA), -1, 1)) / DEG };
+}
+/** the whole hold checked (FILM.gripCheck): from the moment it takes the rifle off its thigh to when it flings it away,
+ *  the fist on the grip (in hand: the rifle placed from the fist) — and at the grab, the fist on the HOLSTERED grip */
+export function enemyGripCheck(dt = 0.02) {
+  let worst = { dist: 0, angle: 0, t: null };
+  for (let t = ENEMY_GRAB; t < 190.8; t += dt) {
+    const e = enemyRaw_(t); if (!e) continue;
+    const g = enemyGripError(duelFK(e, 'enemy_ms'));
+    if (g.dist > worst.dist || g.angle > worst.angle) worst = { dist: Math.max(worst.dist, g.dist), angle: Math.max(worst.angle, g.angle), t: +t.toFixed(2) };
+  }
+  const e = enemyRaw_(ENEMY_GRAB), fk = duelFK(e, 'enemy_ms'), H = M.mul(M.new(), fk.leg_R_upper, enemyHolsterLocal());
+  const gP = M.transformPoint([0, 0, 0], H, VAN_GRIP.p), fP = M.transformPoint([0, 0, 0], fk.hand_R, VAN_FIST.p);
+  const gA = nrm(M.transformDir([0, 0, 0], H, VAN_GRIP.axis)), fA = nrm(M.transformDir([0, 0, 0], fk.hand_R, VAN_FIST.axis));
+  return { held: worst, grab: { dist: V.dist(gP, fP), angle: Math.acos(clamp(V.dot(gA, fA), -1, 1)) / DEG } };
+}
+// its left fist (mirrored) takes the handguard from below, palm up, knuckle line along the barrel
 const ENEMY_HOLE_L = [-0.82, -0.29, -0.36], E_SUP_R = [0, 0, -1, 1, 0, 0, 0, -1, 0], E_FORE = [0, -1.75, 0.35];   // (hand X = rifle −Z, hand Y = rifle X, hand Z = the barrel −Y)
-const E_POCKET = [-2.7, 4.7, 1.0], E_STOCK = 4.4;   // the right shoulder's pocket (torso frame) and how far ahead of it the grip sits along the line of fire
+const E_POCKET = [-2.7, 4.7, 1.0], E_STOCK = 2.3;   // the right shoulder's pocket (torso frame) and how far ahead of it the grip sits along the line of fire (the butt 2.15 behind the grip: in the pocket)
 function aim2H(s, target, k, kL, gripL = [-0.35, 3.9, 2.3]) {
   s.pose = { ...s.pose };
   const keep = {}; for (const p of ['arm_L_upper', 'arm_L_lower', 'hand_L', 'arm_R_upper', 'arm_R_lower', 'hand_R']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
@@ -925,8 +966,8 @@ function aim2H(s, target, k, kL, gripL = [-0.35, 3.9, 2.3]) {
   const b = VAN_BARREL, u0 = GUN_UP.enemy_ms, u = nrm(sub(u0, scl(b, V.dot(u0, b)))), x = V.cross([0, 0, 0], u, b);
   // world rotation taking the rifle frame (x, u, b) onto (X, U, d)
   const Rw = r3mul([...X, ...U, ...d], r3T([...x, ...u, ...b]));
-  const hr = HAND_TO_RIFLE();
-  armIK(s, fk, 'enemy_ms', 'R', sub(grip, r3v(Rw, hr)), Rw);
+  const hf = handFromRifle(Rw, sub(grip, r3v(Rw, VAN_GRIP.p)));   // (the rifle placed by its grip, the hand on it: grip helpers)
+  armIK(s, fk, 'enemy_ms', 'R', hf.P, hf.Hw);
   fk = duelFK(s, 'enemy_ms');
   { const Rr = r3(fk.rifle), HwL = r3mul(Rr, E_SUP_R), PL = sub(M.transformPoint([0, 0, 0], fk.rifle, E_FORE), r3v(HwL, ENEMY_HOLE_L));   // the left fist under the handguard
     armIK(s, fk, 'enemy_ms', 'L', PL, HwL); }
@@ -1378,14 +1419,16 @@ function enemyState_(t) {
 // for it, rips it out at ENEMY_GRAB and swings it up into the aim (the joints slerped from the holster grip to the aim)
 export const ENEMY_HOLSTER_T = [-1.32, -1.1, -0.3];   // leg_R_upper frame: outside the thigh (its outer face at x −0.87)
 let _hol = null;
-export const enemyHolsterLocal = () => _hol || (_hol = M.fromTRS(new Float32Array(16), ENEMY_HOLSTER_T, Q.fromEuler([0, 0, 0, 1], -0.4, 0, -0.12), 1));
+// (the rifle's frame in the thigh's: its GRIP at ENEMY_HOLSTER_T — the grip helpers' grip centre, so the hand finds it there)
+export const enemyHolsterLocal = () => _hol || (_hol = M.mul(new Float32Array(16), M.fromTRS(new Float32Array(16), ENEMY_HOLSTER_T, Q.fromEuler([0, 0, 0, 1], -0.4, 0, -0.12), 1), M.fromTRS(new Float32Array(16), [-VAN_GRIP.p[0], -VAN_GRIP.p[1], -VAN_GRIP.p[2]], [0, 0, 0, 1], 1)));
 const holsterW = (tw) => smooth(ENEMY_GRAB - 0.3, ENEMY_GRAB - 0.03, tw) * (1 - smooth(ENEMY_GRAB + 0.03, ENEMY_GRAB + 0.34, tw));
 function holsterDraw(s, tw) {
   const w = holsterW(tw); if (w <= 0) return;
   const keep = {}; for (const p of ['arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle']) keep[p] = (s.pose[p] || [0, 0, 0]).slice();
   s.pose = { ...s.pose }; s.pose.rifle = [0, 0, 0];
   const fk = duelFK(s, 'enemy_ms'), H = M.mul(M.new(), fk.leg_R_upper, enemyHolsterLocal()), Rh = r3(H);
-  armIK(s, fk, 'enemy_ms', 'R', sub(M.transformPoint([0, 0, 0], H, [0, 0, 0]), r3v(Rh, ENEMY_HOLE)), Rh);
+  const hf = handFromRifle(Rh, M.transformPoint([0, 0, 0], H, [0, 0, 0]));   // (the hand onto the holstered rifle's grip)
+  armIK(s, fk, 'enemy_ms', 'R', hf.P, hf.Hw);
   poseSlerp(s, keep, w);
 }
 // ============================================================================ forward kinematics (same math as renderer + msMatrix)
@@ -1454,9 +1497,7 @@ export function duelFK(s, model) {
     out.muzzleDir = nrm(M.transformDir([0, 0, 0], out.rifle, [0, 0, 1]));
   }
   if (model === 'enemy_ms') {   // VANGUARD: its rifle is a posed part on hand_R; muzzle + barrel direction from the rifle frame
-    const r = s.pose.rifle || [0, 0, 0];
-    Q.fromEuler(q, r[0], r[1], r[2]);
-    out.rifle = M.mul(M.new(), out.hand_R, M.fromTRS(M.new(), ENEMY_HOLE, q, 1));   // (its grip in the middle of the fist: ENEMY_HOLE)
+    out.rifle = enemyRifleMat(M.new(), out.hand_R, s.pose.rifle);   // (its grip in the fist: the grip helpers)
     out.muzzle = M.transformPoint([0, 0, 0], out.rifle, VAN_MUZZLE);
     out.muzzleDir = nrm(M.transformDir([0, 0, 0], out.rifle, VAN_BARREL));
     const sr = s.pose && s.pose.shield;                             // the shield part rides the forearm (pivot at the elbow), swivelling on its mount

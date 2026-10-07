@@ -1,7 +1,7 @@
 import { Renderer } from './renderer.js';
 import { frame, findShot, DURATION, SHOTS } from './shots.js';
 import { storyT, filmT, insertFilm, inSkip, TEAR_F0, TEAR_F1 } from './timemap.js';
-import { DUEL_CAMS } from './duel.js';
+import { DUEL_CAMS, enemyGripCheck } from './duel.js';
 import { DREAD_CHUNKS } from './dread_chunks.js';
 import { ION_FRIGATE_CHUNKS } from './ion_frigate_chunks.js';
 import { prepWreck, prepWrecks } from './world.js';
@@ -302,6 +302,7 @@ async function boot() {
       return { film, js: med(js), total: med(tot), draws: R.stats.draws, inst: R.stats.inst, sprites: R.stats.sprites };
     }, unfreeze() { frozen = null; }, get shutter() { return shutter; }, set shutter(v) { shutter = v; lastFrame = -1; },
     seek, pause, play: () => play(now()), shots: () => findShot(now()).name,
+    gripCheck: enemyGripCheck,   // VANGUARD's fist on its rifle's grip (duel.js grip helpers): worst error while held + at the grab
     stats: () => ({ ...R.stats, fps, w: R.width, h: R.height, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null }),
   };
 }
