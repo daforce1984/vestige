@@ -855,7 +855,7 @@ export function drawWorld(R, t, opts = {}) {
   if (!opts.noWell && t < IMPLODE + 0.2) drawWell(R, t, tmpM);
 
   // ---------------- dogfight
-  if (t > 116 && t < 250) drawDogfight(R, t, tmpM, opts.clearLens);
+  if (t > 116 && t < EARTH_T) drawDogfight(R, t, tmpM, opts.clearLens);   // (past 250 only the wrecks: they never vanish)
 
   // ---------------- combat effects
   drawIonVolleys(R, t);
@@ -1072,25 +1072,7 @@ function drawDreadnought(R, t, tmpM) {
       const aim = V.norm([0, 0, 0], V.sub([0, 0, 0], motherPoint([0, 0, 0], t, LANCE_HIT), em));
       const u1 = V.norm([0, 0, 0], V.cross([0, 0, 0], aim, [0, 1, 0])), u2 = V.cross([0, 0, 0], u1, aim);
       // (the coil stack is real geometry now — dread_lance.glb — its apertures glow via matOverride)
-      // ARC DISCHARGE (shader lightning, sprite 12): the six crown terminals arc to each other and into the core,
-      // the coil stack flashes over to the guide rails; density, reach and rate climb with the charge
-      const tipW = (k) => M.transformPoint([0, 0, 0], e.m, DREAD_HORNS[k].map((v) => v * 1.65));
-      const AC = [LANCE_COL[0] * 1.6, LANCE_COL[1] * 1.3, LANCE_COL[2] * 1.8];
-      for (let k = 0; k < 6; k++) {
-        const on = ch > 0.08 + k * 0.05;
-        if (!on) continue;
-        const a = tipW(k);
-        // (2026-10-07: no arcs terminal to terminal round the crown, nor across it — they drew a hexagon)
-        if (ch > 0.35) R.arc(a, em, 4.5, AC, 1.1 * ch, 31 + k, 9 + 9 * ch);         // terminal into the core
-      }
-      for (let j = 0; j < 6; j++) {                                                    // coil stack flash-overs to the rails
-        if (ch < 0.25 + j * 0.1) continue;
-        const z = [70, 100, 130, 160, 190, 115][j] * 1.65, r = 12 * 1.65;   // (along the Aquamarine's bow cannon, its axis at y −15)
-        const sgn = j % 2 ? 1 : -1, ang = hash(Math.floor(t * 3 + j)) * 6.283;
-        const p0 = M.transformPoint([0, 0, 0], e.m, [Math.cos(ang) * r, -15 * 1.65 + Math.sin(ang) * r * 0.6, z]);
-        const p1 = M.transformPoint([0, 0, 0], e.m, [0, (-15 + sgn * 12) * 1.65, z + (hash(j + 3) - 0.5) * 12]);
-        R.arc(p0, p1, 5, AC, 0.7 * ch, 71 + j, 6 + 6 * ch);
-      }
+      // (2026-10-08: no arc discharge while it charges — the crackling lightning round the crown and the coil stack is gone)
       // (no spiral vortex drawn into the core and no outer core glow: the orb in the bore carries the charge)
       const pulseP = (t - 200) * (1 + 5 * ch * ch);
       const pa = pulseP % 1;
@@ -1150,11 +1132,13 @@ function drawDogfight(R, t, tmpM, clearLens) {
   const a = [0, 0, 0], b = [0, 0, 0], v = [0, 0, 0];
   const skip = clearLens && R.camPos ? lensClearPairs(R.camPos, clearLens) : null;
   GUN.pairs = [];
+  const live = t < 250;                       // (the dogfight is over by then; the baked wrecks drift on until the scene leaves)
   for (let k = 0; k < PAIRS.length; k++) {
     const p = PAIRS[k];
     if (skip && skip.has(k)) continue;
     const launch = 116 + k * 0.35;
     if (t < launch) continue;
+    if (!live && !(t >= p.die)) continue;
     fighterPos(a, k, t);           // target
     fighterPos(b, k, t - 0.9);     // chaser
     const hiChase = p.hiigChases;
@@ -1163,6 +1147,11 @@ function drawDogfight(R, t, tmpM, clearLens) {
     const alive = t < p.die;
     // velocity for orientation
     fighterPos(v, k, t + 0.05); V.sub(v, v, a);
+    if (!live) {   // only the wreck now
+      const pd = fighterPos([0, 0, 0], k, p.die), vd = V.sub([0, 0, 0], fighterPos([0, 0, 0], k, p.die + 0.05), pd);
+      drawBoxWreck(R, targetName, mat(M.new(), pd, vd, [0, 1, 0], Math.sin(p.die * 1.3 + k) * 0.6), t, p.die, 200 + k);
+      continue;
+    }
     if (alive) {
       const e = R.add(targetName, mat(tmpM, a, v, [0, 1, 0], Math.sin(t * 1.3 + k) * 0.6));
       engineGlows(R, targetName, e, hiChase ? ENEMY_ENGINE : HIIG_ENGINE, 0.6, 1, 2.5, { past: dogPast(k, 0, t) });
@@ -1178,6 +1167,7 @@ function drawDogfight(R, t, tmpM, clearLens) {
   }
   // laser shots: a HIT strikes the target's hull (flash + sparks + a scorch glow riding on it); a MISS keeps going
   for (const sh of DOG_SHOTS) {
+    if (!live) break;
     if (sh.tf > t || sh.tf < t - 12) continue;
     if (skip && skip.has(sh.k)) continue;
     const k = sh.k, p = PAIRS[k], lt = t - sh.tf;

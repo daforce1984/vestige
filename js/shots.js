@@ -2070,8 +2070,8 @@ function drawColdOpenAction(R, t, cam, tgt) {
   const upv = V.cross([0, 0, 0], side, fwd);
   for (let k = 0; k < CO_FLY.length; k++) {
     const [t0, , , , enemy] = CO_FLY[k];
-    if (t < t0 || t > t0 + 4.5) continue;
     const die = CO_BOOM.find((b) => b[1] === k);
+    if (t < t0 || (t > t0 + 4.5 && !(die && t > die[0]))) continue;   // (a wreck stays: its pieces never vanish)
     const p = coFighter(t, k, cam, fwd, side);
     if (die && t > die[0]) {
       const pd = coFighter(die[0], k, cam, fwd, side), vd = V.sub([0, 0, 0], coFighter(die[0] + 0.05, k, cam, fwd, side), pd);
