@@ -196,4 +196,29 @@ def hangar():
         for y in (-18, 30):
             mb.box((sd * 9.0, y, 0.8), (2.4, 3.0, 1.6), 'rib', bevel=0.1)
             mb.box((sd * 9.0, y - 1.3, 1.45), (2.0, 0.2, 0.5), 'guide')
-    return [mb.to_object('hangar')]
+    obj = mb.to_object('hangar')
+    atlas_uvs(obj)
+    return [obj]
+
+
+# THE SURFACE DETAIL (2026-10-07, after Sigma's rifle: tools/make_hangar_atlas.py → assets/tex/hangar_*.png, shaders.js
+# texSet 9): every face box-projected (world metres / its tile size) into its material's tiling cell of the 3 x 3 atlas;
+# the cell in v / 10 (glTF v = 1 - Blender v, so it is written flipped)
+CELL = {'wall': (0, 4.5), 'wall2': (1, 3.0), 'grate': (2, 1.2), 'deck': (3, 4.5), 'deck_dark': (3, 4.5), 'rib': (4, 2.5),
+        'pipe': (5, 2.5), 'pipe_y': (5, 2.5), 'hazard_k': (8, 4.0), 'hazard': (8, 4.0), 'rail': (6, 1.0), 'lamp': (7, 2.0),
+        'guide': (8, 4.0), 'signal': (8, 4.0)}
+
+
+def atlas_uvs(obj):
+    me = obj.data
+    uv = me.uv_layers.new(name='UVMap') if not me.uv_layers else me.uv_layers[0]
+    for poly in me.polygons:
+        name = me.materials[poly.material_index].name if poly.material_index < len(me.materials) else ''
+        cell, tile = CELL.get(name.split('.')[0], (8, 4.0))
+        n = poly.normal; ax = max(range(3), key=lambda k: abs(n[k]))
+        a, b = [(1, 2), (0, 2), (0, 1)][ax]
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            u, v = co[a] / tile, co[b] / tile
+            f = v - math.floor(v / 10.0) * 10.0                 # (0..10 inside the cell's band)
+            uv.data[li].uv = (u, 1.0 - (cell * 10.0 + min(f, 9.999)))

@@ -1946,6 +1946,7 @@ function drawHangar(R, t, phase) {
     guide: { base: [0.2, 0.4, 0.6], metal: 0, rough: 0.4, emissive: guideE },
   };
   e.seed = 2; e.emissive = 1;
+  e.tint = phase === 'launch' ? [0.55 + 0.4 * on, 0.75 + 0.2 * on, 1.0] : [1.0, 0.13, 0.07];   // (the light inlays in its panels: red on standby, cold white for the launch — texSet 9)
   // lamp point lights along the ceiling
   for (let i = 0; i < 3; i++) {                    // three hard pools of light down the bay, darkness between
     const z = -45 + i * 30;

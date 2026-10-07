@@ -81,12 +81,12 @@ def tri_count(obj):
     return sum(len(p.vertices) - 2 for p in obj.data.polygons)
 
 
-def export_glb(path):
+def export_glb(path, uv=False):   # (uv: keep the UVs — the launch bay's atlas, 2026-10-07)
     bpy.ops.export_scene.gltf(
         filepath=path, export_format='GLB', export_yup=True, export_apply=True,
         export_materials='EXPORT', export_extras=False, export_cameras=False,
         export_lights=False, use_selection=False, export_animations=False,
-        export_texcoords=False, export_normals=True, export_tangents=False,
+        export_texcoords=uv, export_normals=True, export_tangents=False,
         export_image_format='NONE')
 
 

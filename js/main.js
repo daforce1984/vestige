@@ -28,7 +28,7 @@ const MODELS = [
   { name: 'hero_rifle', detail: 0, url: 'assets/rifle2_game.glb' },   // Sigma's rifle: assets/rifle2.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_rifle', detail: 0, url: 'assets/rifle1_game.glb' },  // VANGUARD's rifle: assets/rifle1.glb (user-supplied), drawn on its rifle part
   { name: 'gravity_well', detail: 2.5, keep: ['ring', 'core', 'pylons'], resphere: ['core'] },   // (its core rebuilt as a smooth sphere)
-  { name: 'hangar', detail: 0, metalize: true },
+  { name: 'hangar', detail: 0, metalize: true, texSet: 9, texBit: 1 << 16 },   // (texSet 9: its surface detail atlas, after Sigma's rifle — tools/make_hangar_atlas.py)
   { name: 'shield_drone', detail: 0.4 },   // VANGUARD's shield drone (blender/shield_drone.py, 2026-10-07), in the shield part's frame
   { name: 'mace', detail: 0 },
   { name: 'dock_rig', detail: 0.5, keep: ['frame', 'clampL', 'clampR', 'door', 'mouth'], hullDetail: true },
@@ -274,7 +274,7 @@ async function boot() {
   try {
     await R.init();
     status.textContent = '모델 로딩…';
-    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png', 'assets/tex/light_fighter_game_albedo.png', 'assets/tex/light_fighter_game_orm.png', 'assets/tex/dreadnought_game_albedo.png', 'assets/tex/dreadnought_game_orm.png', 'assets/tex/cargo_game_albedo.png', 'assets/tex/cargo_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp'), R.loadMoonData('assets/tex/moon_lroc.png')]);
+    await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png', 'assets/tex/light_fighter_game_albedo.png', 'assets/tex/light_fighter_game_orm.png', 'assets/tex/dreadnought_game_albedo.png', 'assets/tex/dreadnought_game_orm.png', 'assets/tex/cargo_game_albedo.png', 'assets/tex/cargo_game_orm.png', 'assets/tex/hangar_albedo.png', 'assets/tex/hangar_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp'), R.loadMoonData('assets/tex/moon_lroc.png')]);
     prepWreck();   // the dreadnought's wreck flight, baked now (~0.6 s) rather than as a hitch when it blows
     prepWrecks(R);   // every frigate / fighter wreck's flight, too (in the background, one per idle slice)
     setTimeout(() => prepHalfBlasts(R), 50);   // VANGUARD's two halves blowing apart (scene 71), baked too

@@ -539,6 +539,8 @@ fn crushW(w: vec3f, inst: Inst) -> vec3f {
 @group(0) @binding(18) var texM7: texture_2d<f32>;
 @group(0) @binding(20) var texA8: texture_2d<f32>;   // the enemy frigates (cargo_game)
 @group(0) @binding(21) var texM8: texture_2d<f32>;
+@group(0) @binding(22) var texA9: texture_2d<f32>;   // the launch bay's surface detail (a 3×3 atlas of tiling cells, after Sigma's rifle: tools/make_hangar_atlas.py)
+@group(0) @binding(23) var texM9: texture_2d<f32>;
 @group(0) @binding(19) var texMoon: texture_2d<f32>;   // the moon, baked once (equirect: normal slopes rg, albedo b, height a) — MOONBAKE
 
 struct VO {
@@ -889,6 +891,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   let tA8 = textureSample(texA8, texSmp, i.uv); let tM8 = textureSample(texM8, texSmp, i.uv);
   let cell7 = floor(i.uv.y / 10.0); let uv7 = (vec2f(cell7 % 3.0, floor(cell7 / 3.0)) + 0.004 + 0.992 * fract(vec2f(i.uv.x, i.uv.y - cell7 * 10.0))) / 3.0;   // (wrapped inside its cell)
   let tA7 = textureSampleGrad(texA7, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0); let tM7 = textureSampleGrad(texM7, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0);
+  let tA9 = textureSampleGrad(texA9, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0); let tM9 = textureSampleGrad(texM9, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0);   // (the same cell scheme)
   let faceN = normalize(cross(dpdx(i.wp), dpdy(i.wp)));           // facet normal for crumpled metal
   let cut = cutAway(i, inst);
   var tornEdge = cut.x;
@@ -913,9 +916,14 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   var texGlow = vec3f(0.0);
   if (texSet > 0 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01) {
     var ta = select(tA2, tA1, texSet == 1); var tm = select(tM2, tM1, texSet == 1);
-    if (texSet == 3) { ta = tA3; tm = tM3; } else if (texSet == 4) { ta = tA4; tm = tM4; } else if (texSet == 5) { ta = tA5; tm = tM5; } else if (texSet == 6) { ta = tA6; tm = tM6; } else if (texSet == 7) { ta = tA7; tm = tM7; } else if (texSet == 8) { ta = tA8; tm = tM8; }
+    if (texSet == 3) { ta = tA3; tm = tM3; } else if (texSet == 4) { ta = tA4; tm = tM4; } else if (texSet == 5) { ta = tA5; tm = tM5; } else if (texSet == 6) { ta = tA6; tm = tM6; } else if (texSet == 7) { ta = tA7; tm = tM7; } else if (texSet == 8) { ta = tA8; tm = tM8; } else if (texSet == 9) { ta = tA9; tm = tM9; }
     base = pow(ta.rgb, vec3f(2.2)); texAO = tm.r; rough = tm.g; metal = tm.b;
-    if (texSet >= 3) { texGlow = pow(ta.rgb, vec3f(2.2)) * ta.a * select(select(14.0, 3.0, texSet == 7), 6.0, texSet == 8) * inst.p1.z; }   // the emissive inlays, bright (the dreadnought's toned down; all follow the entry's emissive, 0 once it is wrecked)
+    if (texSet == 9) {   // THE LAUNCH BAY (2026-10-07): its own material colours, the atlas's detail multiplied on (panel lines, slots, louvres, bolts), its light inlays in the alert colour (the entry's tint)
+      let lum = dot(pow(ta.rgb, vec3f(2.2)), vec3f(0.2126, 0.7152, 0.0722));
+      base = inst.base.rgb * (0.3 + 1.6 * sqrt(lum)); rough = clamp(inst.emis.w * (0.75 + 0.5 * tm.g / 0.55), 0.2, 0.95); metal = inst.base.w; texAO = mix(1.0, tm.r, 0.75);
+    }
+    if (texSet >= 3 && texSet != 9) { texGlow = pow(ta.rgb, vec3f(2.2)) * ta.a * select(select(14.0, 3.0, texSet == 7), 6.0, texSet == 8) * inst.p1.z; }   // the emissive inlays, bright (the dreadnought's toned down; all follow the entry's emissive, 0 once it is wrecked)
+    if (texSet == 9) { texGlow = inst.tint.rgb * ta.a * 5.0 * inst.p1.z; }
     if (texSet == 7) {   // the dreadnought in ONE colour: steel grey, only the texture's light/dark left in it (the panel detail stays)
       let lum = dot(pow(ta.rgb, vec3f(2.2)), vec3f(0.2126, 0.7152, 0.0722));
       base = vec3f(0.16, 0.165, 0.175) * (0.45 + 1.4 * sqrt(lum));

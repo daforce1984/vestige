@@ -44,7 +44,7 @@ def main():
         getattr(importlib.import_module(mod), fn)()
         tris = sum(lib.tri_count(o) for o in bpy.context.scene.objects if o.type == 'MESH')
         path = os.path.join(ASSETS, n + '.glb')
-        lib.export_glb(path)
+        lib.export_glb(path, uv=n in ('hangar',))
         print('BUILT %-18s tris=%7d  %.1fs' % (n, tris, time.time() - t), flush=True)
 
 
