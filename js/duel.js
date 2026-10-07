@@ -2578,8 +2578,13 @@ export const DUEL_CAMS = [
     return { pos: at(H, -120, -10, 8, T), target: pan(up(ep(T), 2), up(ep(t), 2), 0.75), fov: 11, handheld: 0.05 }; } },
   { t0: 182.45, t1: 183.15, name: 'D13 high angle over the exchange', fn: (t, u) => { const T = 182.45, M = mid(T);
     return { pos: at(M, -30, 70, 230, T), target: pan(M, mid(t), 0.6), fov: 34, handheld: 0.05 }; } },
-  { t0: 183.15, t1: 183.9, snap: 1.8, roll: 0.1, name: 'D14 low CU — the shield drone shot away', slowmo: true, fn: (t, u) => { const T = 183.2, E = ep(T);
-    return { pos: at(E, -12, 16, -8, T), target: pan(up(E, 2), up(ep(t), 2), 0.7), fov: 40, handheld: 0.05 }; } },
+  // (2026-10-07: it was framed low behind VANGUARD — the shield at the frame's edge, its hit off screen) in front of the
+  // shield's face, out to the side of the line of fire, VANGUARD beyond it; the lens follows the plate as it is blown away
+  { t0: 183.15, t1: 183.9, snap: 1.8, roll: 0.08, name: 'D14 the shield drone shot away — framed on it, VANGUARD beyond', slowmo: true, fn: (t, u) => {
+      const T = SHIELD_HIT_T, e = enemyRaw_(T), C = e && e.shieldW ? M.transformPoint([0, 0, 0], e.shieldW, SHIELD_C) : up(ep(T), 6);
+      const d = nrm(flat(sub(hp(T), ep(T)), 0)), sd = [d[2], 0, -d[0]], fly = Math.max(0, t - T - 0.03);
+      const tgt = add(lrp(C, up(ep(t), 4), 0.22), scl(d, -9 * fly));   // (the plate goes off away from him, back past VANGUARD)
+      return { pos: add(add(add(C, scl(d, 15)), scl(sd, 17)), [0, 3, 0]), target: tgt, fov: 42, handheld: 0.04, baseShake: 0.02 }; } },
   { t0: 183.9, t1: 184.42, name: 'D15a CU — its rifle transforms and charges', slowmo: true, fn: (t, u) => { const F = enemyRifleFrame(t), c = add(F.p, scl(F.dir, 3.5));
     return { pos: add(add(add(c, scl(F.side, 12 - 2 * u)), scl(F.up, 1.5)), scl(F.dir, 3.5 - 1 * u)), target: add(c, scl(F.dir, 0.5 * u)), fov: 44, handheld: 0.03, baseShake: 0.02 }; } },   // out beside the barrel, ahead of it
   { t0: 184.42, t1: 184.475, roll: 0.03, name: 'D15b head-on to it — it fires the charged shot straight out of frame at him', slowmo: true, fn: (t, u) => {
