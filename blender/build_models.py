@@ -27,7 +27,7 @@ BUILDERS = {
     'gundam': ('mobile_suits', 'gundam'),
     'enemy_ms': ('mobile_suits', 'enemy_ms'),
     'gravity_well': ('environment', 'gravity_well'),
-    'hangar': ('environment', 'hangar'),
+    'hangar': ('hangar_v2', 'hangar'),   # v2 (2026-10-07) after the Codex concept assets/tex/src/hangar_concept_v1.png; v1 kept in environment.py
     'debris': ('environment', 'debris'),
 }
 

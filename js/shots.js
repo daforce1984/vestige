@@ -1854,6 +1854,8 @@ function drawHangar(R, t, phase) {
     if (phase === 'launch') R.light(lp, 26, [1, 0.93, 0.82], 2.6 * on * flick);
     else R.light(lp, 26, [1, 0.12, 0.08], 1.2 * (0.6 + 0.4 * Math.sin(t * 3 + i)));
   }
+  // (hangar v2, 2026-10-07) on standby the red alert washes the walls and catwalks too (the concept's red-lit armour)
+  if (phase !== 'launch') for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) R.light(addv(HANGAR, [sd * 8.5, 9 + 6 * (i % 2), -50 + i * 18]), 20, [1, 0.14, 0.08], 2.0);
   // cinematic key + fill on the mech in its cradle
   R.light(addv(HANGAR, [12, 14, 16]), 34, [1, 0.9, 0.8], phase === 'launch' ? 1.6 : 0.8);          // key on the mech only
   R.light(addv(HANGAR, [-9, 5, -6]), 22, [0.35, 0.5, 0.9], 0.6);                                      // cold rim
@@ -3107,7 +3109,7 @@ export function frame(R, film) {
     R._time = t;
     drawHangar(R, t, ctx.hangar);
     const gs = gundamHangarState(t, ctx.hangar);
-    drawGundam(R, t, gs, { noTrail: true });
+    if (!globalThis.__noHero) drawGundam(R, t, gs, { noTrail: true });   // (__noHero: dev — the empty bay for design references)
   }
   if (globalThis.__camMod) globalThis.__camMod(ctx, t);   // (dev: a test camera for CDP checks — unset in the film)
   return ctx;

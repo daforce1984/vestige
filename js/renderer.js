@@ -478,7 +478,7 @@ export class Renderer {
         mt.base = mt.base.map((v) => v * (lum > 0.45 ? 0.62 : 0.8));
       }
       if (s.metalize) for (const mt of g.materials) {
-        if (mt.emissive[0] + mt.emissive[1] + mt.emissive[2] > 0.01) continue;
+        if (mt.emissive[0] + mt.emissive[1] + mt.emissive[2] > 0.01 || /^(hazard|pipe_y)$/.test(mt.name)) continue;   // (the yellow accents stay yellow)
         mt.metal = 0.85; mt.rough = Math.min(Math.max(mt.rough, 0.3), 0.45); mt.base = mt.base.map((v) => Math.min(0.26, Math.max(0.1, v * 0.4)));   // dark gunmetal bay
       }
       for (const mt of g.materials) if (/^core/i.test(mt.name)) mt.emissive = mt.emissive.map((v) => v * 0.18);
