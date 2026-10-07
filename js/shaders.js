@@ -1340,6 +1340,13 @@ struct VO {
     let cs = vec2f(cos(rot), sin(rot));
     let c = vec2f(corner.x * cs.x - corner.y * cs.y, corner.x * cs.y + corner.y * cs.x);
     wp = s.a.xyz + (F.camRight.xyz * c.x + F.camUp.xyz * c.y) * r;
+    if (shape == 1 || shape == 2 || shape == 14) {   // (not the glows: big light halos pushed forward washed over what should hide them)
+      // (2026-10-07) a fireball / flame / smoke puff / glow is a volume, its billboard flat through the middle: wreck pieces
+      // passing through it cut it with a hard line. The billboard is moved to the FRONT of the volume (toward the camera
+      // by ~its radius, never past half the way to the lens): what is in front still hides it, what is inside no longer slices it
+      let tc = F.camPos.xyz - s.a.xyz; let dc = length(tc);
+      wp += tc / max(dc, 1e-4) * min(r * 0.6, dc * 0.4);
+    }
   }
   var o: VO;
   o.pos = F.viewProj * vec4f(wp, 1.0);
