@@ -466,6 +466,12 @@ function gundamStateRaw(t, s) {
     { const rp = ramPose(278), lp = blendPose('limp', 'limp', 0, {}); for (const k in s.pose) delete s.pose[k];
       Object.assign(s.pose, rp); mixPose(s.pose, lp, smooth(278.3, 281, t)); }
     if (t > 279.9) ragdoll(s.pose, 280.0, t, 1.3, 9);                // thrown by the blast: limbs flail, then float
+    if (t > 279.78 && t < 280.3) {   // (2026-10-07) THE BLAST HURLS HIM — glimpsed: flung back off the core straight at the lens, tumbling, limbs thrown loose
+      const lt = t - 279.78, n = V.norm([0, 0, 0], [0.32, 0.22, -1]);
+      s.pos = madd(s.pos, n, 95 * lt + 40 * lt * lt);
+      s.pitch += lt * 9; s.roll += lt * 6.5;
+      ragdoll(s.pose, 279.78, t, 2.4, 9);
+    }
     s.saber = 1 - smooth(279.6, 280.1, t);
     s.thr = 0; s.damage = 0.22;
     s.eye = 0.6 + 0.4 * Math.sin(t * 30);
@@ -2691,7 +2697,7 @@ shot(269.4, 275, 'B4 the rush', (c) => {
 });
 shot(278, 280.2, 'S17d engulfed', (c) => {
   const { t, u } = c;
-  const g = gundamState(Math.min(t, 280.2));
+  const g = gundamState(Math.min(t, 279.78));   // (the camera stays where it was when the blast hurls him: he flies past it)
   c.closeCore = true;
   // low front three-quarter on the mech; the core's light swells behind it and eats the silhouette
   camLook(c, addv(g.pos, [12, 7, -36]), addv(g.pos, [0, 3, 0]), 40 - u * 6, -0.06);   // behind: its back against the light
@@ -2701,7 +2707,7 @@ shot(278, 280.2, 'S17d engulfed', (c) => {
   c.env.rim = [1.0 * (0.3 + k), 0.85 * (0.3 + k), 1.2 * (0.3 + k), 1.2];   // backlit by the core (kept low so the fire reads)
   c.env.ambient = 0.5; c.env.fill = [0.08, 0.07, 0.09, 0.2];
   c.post.exposure = 0.72 + k * 0.08;
-  c.post.flash = t > 280.0 ? Math.min(0.9, (t - 280.0) * 5) : 0;
+  c.post.flash = t > 280.08 ? Math.min(0.9, (t - 280.08) * 7) : 0;   // (a beat later: he is glimpsed first)
   c.post.lensA = { enable: 0 };
   c.env.sunDisc = 0.05;
   const R = c.R;
