@@ -15,6 +15,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 A = lambda p: os.path.join(ROOT, 'assets', p)
 
 ONLY = sys.argv[1:]   # (names given: build only those)
+def fix_winding(P, N, I):
+    """turn every triangle whose winding disagrees with its vertex normals (inside-out in the renderer) the right way round"""
+    T = I.reshape(-1, 3).copy()
+    fn = np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]]); vn = N[T].sum(1)
+    bad = (fn * vn).sum(1) < 0
+    T[bad, 1], T[bad, 2] = T[bad, 2].copy(), T[bad, 1].copy()
+    return T.reshape(-1)
+
+
 def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, skip=(), empties=None, tex=True, post=None):
     if ONLY and name not in ONLY: return
     prims, g, blob = load(A(src))
@@ -53,6 +62,7 @@ def build(src, name, grip, R, S, cell, emissive_mask, engines=(), wrap=False, sk
         P.append(np.vstack([c0 - [0, 0, 0.02], ring])); N.append(np.tile([0., 0., -1.], (13, 1))); U.append(np.zeros((13, 2)))
         I.append(np.array([[base, base + 1 + j, base + 1 + (j + 1) % 12] for j in range(12)]).reshape(-1)); base += 13
     P = np.concatenate(P).astype(np.float32); N = np.concatenate(N).astype(np.float32); U = np.concatenate(U).astype(np.float32); I = np.concatenate(I).astype(np.uint32)
+    I = fix_winding(P, N, I)   # (2026-10-07: faces wound against their own normals read inside-out — the enemy frigates had 141)
     data = P.tobytes() + N.tobytes() + U.tobytes() + I.tobytes()
     o = [0, len(P.tobytes()), len(P.tobytes()) + len(N.tobytes()), len(P.tobytes()) + len(N.tobytes()) + len(U.tobytes())]
     em = [Node(name=k, translation=(S * ((np.array(v) - grip) @ R.T)).tolist()) for k, v in (empties or {}).items()]

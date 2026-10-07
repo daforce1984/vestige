@@ -561,9 +561,13 @@ export function assaultFrigate(t, i) {
   const drift = V.add([0, 0, 0], [Math.sin(t * 0.21 + i) * 2, Math.sin(t * 0.19 + i * 2) * 1.5, 0], homeOffset([0, 0, 0], t + 1));
   return { pos: V.add([0, 0, 0], f.p, drift), fwd: yawDir(yaw), yaw };
 }
+// (2026-10-07) every enemy frigate is ADVANCING on us from the moment it arrives — engines burning, ~2.8 m/s down the +z
+// line toward our fleet (was 1.5 m/s and only from 105: they sat with idle nozzles)
+export const E_ADVANCE = 2.8;
+const advance = (t, arrive) => (t > arrive ? (t - arrive) * E_ADVANCE : 0);
 export function enemyFrigate(t, i) {
   const f = EF[i];
-  const drift = [Math.sin(t * 0.23 + i) * 3, Math.sin(t * 0.2 + i * 2) * 2, Math.min(0, 0) + (t > 105 ? (t - 105) * 1.5 : 0)];
+  const drift = [Math.sin(t * 0.23 + i) * 3, Math.sin(t * 0.2 + i * 2) * 2, advance(t, f.arrive)];
   return { pos: V.add([0, 0, 0], f.p, drift), fwd: [0, 0, 1] };
 }
 export function dreadPos(t) {
@@ -831,7 +835,8 @@ export function drawWorld(R, t, opts = {}) {
     e.revealZ = rz; e.revealDir = dir; e.revealWidth = 1.5; e.tint = [2, 0.3, 0.2]; e.seed = f.seed; e.stretch = hin.u < 1 ? stretchIn(hin.u) : 0;
     if (f.die) e.damage = sat((t - (f.die - 4)) / 4) * 0.5;
     if (win) hyperWindow(R, win.c, st.fwd, szE[0] * 0.8 + 6, szE[1] * 0.9 + 6, HYPER_RED, win.a);
-    engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 0.8);
+    e.forceThrottle = hin.u >= 1;   // (advancing: the drives burn, plumes and all)
+    engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 0.85);
     GUN.efAlive.push({ i, pos: st.pos, e });
   });
 
@@ -1472,7 +1477,7 @@ export function extraHPos(t, i) {
 }
 export function extraEPos(t, i) {
   const f = EXTRA_E[i];
-  return { pos: V.add([0, 0, 0], f.p, [Math.sin(t * 0.23 + i) * 3, Math.sin(t * 0.2 + i) * 2, t > 105 ? (t - 105) * 1.5 : 0]), fwd: [0, 0, 1] };
+  return { pos: V.add([0, 0, 0], f.p, [Math.sin(t * 0.23 + i) * 3, Math.sin(t * 0.2 + i) * 2, advance(t, f.arrive)]), fwd: [0, 0, 1] };
 }
 export function extraEAlive(t, i) {
   const f = EXTRA_E[i];
@@ -1509,8 +1514,10 @@ export function drawExtras(R, t) {
     const e = R.add(f.type, mat(tmpM, pos, st.fwd));
     if (!e) return;
     e.revealZ = rz; e.revealDir = dir; e.revealWidth = 1.5; e.seed = f.seed; e.stretch = str;
-    if (t > 218) e.damage = 0.15 * hash(i);
-    if (f.die) e.damage = Math.max(e.damage, sat((t - (f.die - 6)) / 6) * 0.55);   // burning before it goes
+    // (2026-10-07) scorched only once it has really been hit — from the first bolt that lands on it (f.hits), burning up to
+    // its death; never before (it used to start 6 s ahead of the death, and every survivor got random scorch after 218)
+    const h0 = f.hits && f.hits.length ? f.hits[0] : null;
+    if (h0 !== null && t > h0) e.damage = f.die ? 0.2 + 0.35 * sat((t - h0) / Math.max(0.5, f.die - h0)) : 0.2;
     if (win) hyperWindow(R, win.c, st.fwd, sz[0] * 0.8 + 6, sz[1] * 0.9 + 6, HYPER_BLUE, win.a);
     engineGlows(R, f.type, e, HIIG_ENGINE, 1, 0.6);
   });
@@ -1537,7 +1544,8 @@ export function drawExtras(R, t) {
     e.revealZ = hin.revealZ; e.revealDir = hin.dir; e.revealWidth = 1.5; e.tint = [2, 0.3, 0.2]; e.seed = f.seed; e.stretch = hin.u < 1 ? stretchIn(hin.u) : 0;
     if (f.die) e.damage = sat((t - (f.die - 5)) / 5) * 0.5;
     if (hin.alpha > 0) hyperWindow(R, hin.W, st.fwd, szE[0] * 0.8 + 6, szE[1] * 0.9 + 6, HYPER_RED, hin.alpha);
-    engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 0.8);
+    e.forceThrottle = hin.u >= 1;   // (advancing: the drives burn)
+    engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 0.85);
   });
   drawTracerWalls(R, t);
 }
