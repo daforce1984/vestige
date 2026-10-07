@@ -18,6 +18,24 @@ const POST_FLOATS = 92;
 const BLOOM_LEVELS = 6;
 const SAMPLES = 4;
 const HDR = 'rgba16float';
+const ENV_SIZE = 256, ENV_MIPS = 6;   // the captured environment cube (render(): env.envCube) — 256² faces, mips down to 8²
+// cube face cameras (WebGPU / D3D cube convention: +X −X +Y −Y +Z −Z); the projection is mirrored in x so a right-handed
+// lookAt lands each face the way the sampler reads it
+const ENV_FACES = [[[1, 0, 0], [0, 1, 0]], [[-1, 0, 0], [0, 1, 0]], [[0, 1, 0], [0, 0, -1]], [[0, -1, 0], [0, 0, 1]], [[0, 0, 1], [0, 1, 0]], [[0, 0, -1], [0, 1, 0]]];
+const ENV_MIP_WGSL = /* wgsl */ `
+@group(0) @binding(0) var src: texture_2d<f32>;
+@group(0) @binding(1) var smp: sampler;
+@vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  let p = vec2f(f32((i << 1u) & 2u), f32(i & 2u)) * 2.0 - 1.0; return vec4f(p, 0.0, 1.0);
+}
+@fragment fn fs(@builtin(position) fp: vec4f) -> @location(0) vec4f {
+  let sz = vec2f(textureDimensions(src));
+  let uv = fp.xy * 2.0 / sz;                                  // the 2×2 source block's centre
+  let o = 0.75 / sz;                                          // a 4-tap tent a little wider than the block: smoother blur down the chain
+  let c = textureSampleLevel(src, smp, uv + vec2f(-o.x, -o.y), 0.0) + textureSampleLevel(src, smp, uv + vec2f(o.x, -o.y), 0.0)
+        + textureSampleLevel(src, smp, uv + vec2f(-o.x, o.y), 0.0) + textureSampleLevel(src, smp, uv + vec2f(o.x, o.y), 0.0);
+  return vec4f(c.rgb * 0.25, 1.0);
+}`;
 
 // uniform load-time scale: vertices, part rest transforms, empties and bounds (everything derived stays consistent)
 // a part that is a sphere, rebuilt as a smooth high-resolution UV sphere (same centre, radius and material): the low-poly
@@ -246,6 +264,7 @@ export class Renderer {
         ...[9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((b) => ({ binding: b, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } })),   // the rifles (texSet 3 / 4)
         ...[20, 21, 22, 23].map((b) => ({ binding: b, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } })),   // the enemy frigates (texSet 8), the launch bay (texSet 9)
         { binding: 19, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },   // the moon's bake (MOONBAKE; its height displaces the mesh)
+        { binding: 24, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: 'cube' } },   // the captured environment cube
       ],
     });
     const meshLayout = dev.createPipelineLayout({ bindGroupLayouts: [this.meshBGL] });
@@ -343,6 +362,28 @@ export class Renderer {
     this.texSmp = dev.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: 8 });
     this.modelTex = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map(() => dev.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT }));
     this.moonTex = dev.createTexture({ size: [1, 1], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT });   // (placeholder until the moon is baked)
+    // THE ENVIRONMENT CUBE (2026-10-07): the scene around a point captured into a cube with a blurred mip chain — metal
+    // reflects the real surroundings (render(): env.envCube = { pos, id, gain, every }; a new id captures all six faces, then one face is refreshed every `every` frames)
+    {
+      const RA = GPUTextureUsage.RENDER_ATTACHMENT, TB = GPUTextureUsage.TEXTURE_BINDING;
+      this.envCube = dev.createTexture({ size: [ENV_SIZE, ENV_SIZE, 6], format: HDR, mipLevelCount: ENV_MIPS, usage: TB | RA | GPUTextureUsage.COPY_DST });
+      this.envCubeView = this.envCube.createView({ dimension: 'cube' });
+      this.envCap = dev.createTexture({ size: [ENV_SIZE, ENV_SIZE, 6], format: HDR, usage: RA | GPUTextureUsage.COPY_SRC });
+      this.envCapViews = [0, 1, 2, 3, 4, 5].map((f) => this.envCap.createView({ dimension: '2d', baseArrayLayer: f, arrayLayerCount: 1 }));
+      this.envMS = dev.createTexture({ size: [ENV_SIZE, ENV_SIZE], format: HDR, sampleCount: SAMPLES, usage: RA }).createView();
+      this.envMSDepth = dev.createTexture({ size: [ENV_SIZE, ENV_SIZE], format: 'depth32float', sampleCount: SAMPLES, usage: RA | TB }).createView();
+      this.envDepth1 = dev.createTexture({ size: [ENV_SIZE, ENV_SIZE], format: 'depth32float', usage: RA | TB }).createView();   // (resolved: the sprites' soft depth)
+      this.envDist = dev.createTexture({ size: [ENV_SIZE, ENV_SIZE], format: 'rg16float', usage: RA }).createView();
+      const mipMod = mod(ENV_MIP_WGSL, 'envMip');
+      this.envMipPipe = dev.createRenderPipeline({ layout: 'auto', label: 'envMip', vertex: { module: mipMod, entryPoint: 'vs' }, fragment: { module: mipMod, entryPoint: 'fs', targets: [{ format: HDR }] } });
+      this.envMipSteps = [];
+      for (let f = 0; f < 6; f++) for (let k = 1; k < ENV_MIPS; k++) {
+        const v = (mip) => this.envCube.createView({ dimension: '2d', baseArrayLayer: f, arrayLayerCount: 1, baseMipLevel: mip, mipLevelCount: 1 });
+        this.envMipSteps.push({ face: f, dst: v(k), bg: dev.createBindGroup({ layout: this.envMipPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: v(k - 1) }, { binding: 1, resource: this.linSmp }] }) });
+      }
+      this._envF = new Float32Array(FRAME_BYTES / 4); this._envId = null; this._envFace = 0; this._envTick = 0;
+      this.envDrBG = null;   // (made on first use: the depth-resolve and sprite pipelines are built further down)
+    }
     this._makeMeshBG();
     this.shadowBG = dev.createBindGroup({
       layout: this.shadowBGL,
@@ -403,7 +444,7 @@ export class Renderer {
       layout: this.meshBGL,
       entries: [{ binding: 0, resource: { buffer: this.frameUBO } }, { binding: 1, resource: { buffer: this.instBuf } },
         { binding: 2, resource: this.shadowView }, { binding: 3, resource: this.cmpSmp }, { binding: 4, resource: this.texSmp },
-        ...this.modelTex.map((tx, k) => ({ binding: k < 14 ? 5 + k : 6 + k, resource: tx.createView() }))   /* (slots 14..17 → bindings 20..23: 19 is the moon) */, { binding: 19, resource: this.moonTex.createView() }],
+        ...this.modelTex.map((tx, k) => ({ binding: k < 14 ? 5 + k : 6 + k, resource: tx.createView() }))   /* (slots 14..17 → bindings 20..23: 19 is the moon) */, { binding: 19, resource: this.moonTex.createView() }, { binding: 24, resource: this.envCubeView }],
     });
   }
   /** load model textures (slot 0/1 hero albedo/orm, 2/3 enemy albedo/orm). Missing files keep the placeholder. */
@@ -863,8 +904,8 @@ export class Renderer {
     const pl = env.planet;
     if (pl) { f[80] = pl.dir[0]; f[81] = pl.dir[1]; f[82] = pl.dir[2]; f[83] = env.planetInSky ? pl.radius : 0; f[84] = pl.col[0]; f[85] = pl.col[1]; f[86] = pl.col[2]; f[87] = pl.earth ? 1 : 0; }
     else { f[83] = 0; }
-    f[88] = view[0]; f[89] = view[4]; f[90] = view[8]; f[91] = 0;
-    f[92] = view[1]; f[93] = view[5]; f[94] = view[9]; f[95] = 0;
+    f[88] = view[0]; f[89] = view[4]; f[90] = view[8]; f[91] = env.envCube ? env.envCube.gain ?? 1 : 0;   // (w: the environment cube's weight)
+    f[92] = view[1]; f[93] = view[5]; f[94] = view[9]; f[95] = ENV_MIPS - 1;
     const rc = env.rim || [0.3, 0.4, 0.8, 0.5];
     // (no rim light and no camera fill anywhere any more) — those two slots now carry the SECOND SUN
     const s2 = env.sun2Dir, s2c = env.sun2Col;
@@ -956,6 +997,9 @@ export class Renderer {
       }
       return any;
     };
+    const ec = env.envCube;   // a new cube: all six faces now; then one face every `every` frames, round and round (no hitches)
+    if (ec && ec.id !== this._envId) { this._envId = ec.id; this._envFace = 0; this._envTick = 0; this._captureEnv(ec.pos, f, drawAll, [0, 1, 2, 3, 4, 5]); }
+    else if (ec && ++this._envTick >= (ec.every || 2)) { this._envTick = 0; this._captureEnv(ec.pos, f, drawAll, [this._envFace]); this._envFace = (this._envFace + 1) % 6; }
     if (env.shadows !== false && n) {
       const sp_ = enc.beginRenderPass({ label: 'shadow', colorAttachments: [], depthStencilAttachment: { view: this.shadowView, depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } });
       sp_.setPipeline(this.shadowPipe); sp_.setBindGroup(0, this.shadowBG); drawAll(sp_, -1, true); sp_.end();
@@ -1003,6 +1047,61 @@ export class Renderer {
     }
     if (prof) { const n = this.qLabels.length * 2; enc0.resolveQuerySet(this.qs, 0, n, this.qRes, 0); enc0.copyBufferToBuffer(this.qRes, 0, this.qRead, 0, n * 8); }
     dev.queue.submit([enc.finish()]);
+  }
+
+  /** Capture the scene around `pos` into the environment cube: six 90° views (sky, sun discs, every mesh — no sprites, no
+   *  shadows), each its own submit with its own frame uniforms, then the blurred mip chain. The main frame's uniforms are
+   *  written back afterwards (queue order keeps every submit on its own values). */
+  _captureEnv(pos, f, drawAll, faces) {
+    const dev = this.device, g = this._envF;
+    if (!this.envDrBG) {
+      this.envDrBG = dev.createBindGroup({ layout: this.drPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: this.envMSDepth }] });
+      this.envSprBG = dev.createBindGroup({ layout: this.sprPipe.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: this.frameUBO } }, { binding: 1, resource: { buffer: this.sprBuf } }, { binding: 2, resource: this.envDepth1 }] });
+    }
+    const view = this._envV || (this._envV = M.new()), proj = this._envP || (this._envP = M.new());
+    const vp = this._envVP || (this._envVP = M.new()), ivp = this._envIVP || (this._envIVP = M.new());
+    M.perspective(proj, Math.PI / 2, 1, 0.5, f[75] || 200000); proj[0] = -proj[0];
+    for (const face of faces) {
+      const [d, up] = ENV_FACES[face];
+      M.lookAt(view, pos, [pos[0] + d[0], pos[1] + d[1], pos[2] + d[2]], up);
+      M.mul(vp, proj, view); M.invert(ivp, vp);
+      g.set(f); g.set(vp, 0); g.set(ivp, 16);
+      g[48] = pos[0]; g[49] = pos[1]; g[50] = pos[2]; g[55] = 0; g[91] = 0;     // (no shadow map: it is the main camera's; no cube in the cube)
+      g[68] = g[69] = ENV_SIZE; g[70] = g[71] = 1 / ENV_SIZE; g[78] = (Math.PI / 2) / ENV_SIZE;
+      g[88] = view[0]; g[89] = view[4]; g[90] = view[8]; g[92] = view[1]; g[93] = view[5]; g[94] = view[9];
+      g[111] = 0; g[119] = 0;                                                       // no lensing
+      dev.queue.writeBuffer(this.frameUBO, 0, g);
+      const enc = dev.createCommandEncoder();
+      const p = enc.beginRenderPass({ label: 'envCube' + face,
+        colorAttachments: [{ view: this.envMS, resolveTarget: this.envCapViews[face], loadOp: 'clear', storeOp: 'discard', clearValue: [0, 0, 0, 1] }],
+        depthStencilAttachment: { view: this.envMSDepth, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } });
+      p.setPipeline(this.skyPipe); p.setBindGroup(0, this.skyBG);
+      p.setVertexBuffer(0, this.celVB); p.setIndexBuffer(this.celIB, 'uint32'); p.drawIndexed(this.celCount);
+      if (this.celN) { p.setPipeline(this.celPipe); p.setBindGroup(0, this.celBG); p.setVertexBuffer(0, this.celVB); p.setIndexBuffer(this.celIB, 'uint32'); p.drawIndexed(this.celCount, this.celN); }
+      p.setPipeline(this.meshPipe); p.setBindGroup(0, this.meshBG); drawAll(p, 0);
+      p.setPipeline(this.depthPrePipe);
+      if (drawAll(p, 1)) { p.setPipeline(this.meshEqPipe); drawAll(p, 1); }
+      p.end();
+      if (this.nSprites) {   // the glows too (the charge, arcs, engine fire): the brightest things metal can show
+        const dr = enc.beginRenderPass({ label: 'envDepth', colorAttachments: [], depthStencilAttachment: { view: this.envDepth1, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } });
+        dr.setPipeline(this.drPipe); dr.setBindGroup(0, this.envDrBG); dr.draw(3); dr.end();
+        const sp = enc.beginRenderPass({ label: 'envSprites',
+          colorAttachments: [{ view: this.envCapViews[face], loadOp: 'load', storeOp: 'store' }, { view: this.envDist, loadOp: 'clear', storeOp: 'discard', clearValue: [0, 0, 0, 0] }],
+          depthStencilAttachment: { view: this.envDepth1, depthReadOnly: true } });
+        sp.setPipeline(this.sprPipe); sp.setBindGroup(0, this.envSprBG); sp.draw(6, this.nSprites); sp.end();
+      }
+      dev.queue.submit([enc.finish()]);
+    }
+    const enc = dev.createCommandEncoder();
+    for (const face of faces) enc.copyTextureToTexture({ texture: this.envCap, origin: [0, 0, face] }, { texture: this.envCube, origin: [0, 0, face] }, [ENV_SIZE, ENV_SIZE, 1]);
+    for (const st of this.envMipSteps) {
+      if (!faces.includes(st.face)) continue;
+      const p = enc.beginRenderPass({ label: 'envMip', colorAttachments: [{ view: st.dst, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }] });
+      p.setPipeline(this.envMipPipe); p.setBindGroup(0, st.bg); p.draw(3); p.end();
+    }
+    dev.queue.submit([enc.finish()]);
+    dev.queue.writeBuffer(this.frameUBO, 0, f);
   }
 
   /** ?prof only: GPU milliseconds per pass of the last frame rendered ({label: ms}) */

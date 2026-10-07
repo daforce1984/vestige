@@ -2190,6 +2190,9 @@ function hangarEnv(c, phase) {
   e.ambUp = [0.025, 0.025, 0.03]; e.ambDown = [0.012, 0.012, 0.015];
   e.shadows = false; e.sunDisc = 0; e.planet = null; e.fill = [0.05, 0.05, 0.06, 0.15];
   e.interior = HANGAR;
+  // (2026-10-07) the bay's metal reflects the bay itself: a cube captured high in the middle of it (box-projected in the
+  // shader, BAY_CUBE), a face refreshed every other frame (the lights change, Sigma moves)
+  e.envCube = { pos: [HANGAR[0], HANGAR[1] + 19, HANGAR[2] - 16], id: 'bay', gain: 1.6 };
   e.rim = phase === 'launch' ? [0.3, 0.45, 0.8, 0.35] : [0.8, 0.12, 0.1, 0.35];
 }
 // ---- escorts: three interceptors cruising slowly near the arrival point (scale reference, Dune-style)
@@ -2359,6 +2362,9 @@ shot(110, 120, 'B5 ion muzzle charge', (c) => {
   camLook(c, cam, tgt, lerp(lerp(40, 46, kb), 58, kc), 0.06);
   handheld(c, 0.3);
   c.env.shadowCenter = st.pos; c.env.shadowRadius = 70;
+  // (2026-10-07) the gun's metal reflects its real surroundings: a cube captured beside the barrel (renderer _captureEnv),
+  // following the fill front, a face refreshed every other frame
+  c.env.envCube = { pos: G(zF - 2, 10, 4.5), id: 'B5', gain: 1.8 };
   const R = c.R;
   // the charge climbs... stalls... and the gravity well pulls it back out of the coils (nothing will fire at 120)
   const k = sat((t - 110) / 6) * 0.85 * (1 - 0.8 * smooth(116.2, 119.5, t));

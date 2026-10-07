@@ -47,6 +47,8 @@ def palette():
     reg('greeble', (0.055, 0.057, 0.064), 0.65, 0.55)   # machinery, recesses
     reg('trim', (0.200, 0.202, 0.212), 0.90, 0.32)      # bare machined metal: rails, pipes, collars
     reg('coil', (0.420, 0.200, 0.110), 1.00, 0.34)      # copper accelerator / focusing windings
+    reg('coil2', (0.300, 0.130, 0.070), 1.00, 0.24)     # the windings' outer turns: polished, a shade darker
+    reg('insul', (0.030, 0.028, 0.026), 0.00, 0.62)     # resin spacers / insulators between the winding packs
     reg('accent', (0.070, 0.120, 0.215), 0.40, 0.42)    # restrained slate-blue trim stripes
     reg('exhaust', (0.300, 0.265, 0.300), 1.00, 0.36)   # heat-tinted nozzle metal
     reg('glass', (0.020, 0.032, 0.050), 0.30, 0.08)     # sensor domes / canopy
@@ -190,16 +192,51 @@ def coil_ring(mb, s, big=False):
             a = (k + 0.5) / 8 * 2 * math.pi
             n = Vector((math.cos(a), 0, math.sin(a)))
             obox(mb, Vector(c) + n * 2.05, n, (0.35, 0.75, 0.22), 'trim', lift=0.0)
-    else:     # copper coil: three winding packs between two retaining rings, clamp lugs outside
-        annulus(mb, c, ax, 0.76, 1.3, 0.62, 'greeble', seg=36)                  # former
+    else:     # copper coil (2026-10-07, more detail for the charge close-up): three winding packs on a former, each pack's
+        # outer layer laid as separate round turns, resin spacers between the packs, two retaining rings tied together by
+        # eight clamp bars with bolt heads, a terminal block with its lead
+        annulus(mb, c, ax, 0.76, 1.3, 0.62, 'greeble', seg=40)                  # former
         for ds in (-0.2, 0.0, 0.2):
-            annulus(mb, (0, Y(s + ds), BZ), ax, 1.28, 1.62, 0.17, 'coil', seg=36)
-        for ds in (-0.34, 0.34):
-            annulus(mb, (0, Y(s + ds), BZ), ax, 0.76, 1.72, 0.08, 'trim', seg=36)
-        for k in range(4):
-            a = (k + 0.5) / 4 * 2 * math.pi
+            annulus(mb, (0, Y(s + ds), BZ), ax, 1.28, 1.52, 0.17, 'coil', seg=40)   # the pack's inner layers
+            for t in (-0.054, 0.0, 0.054):                                       # its outer layer: three round turns
+                turn(mb, s + ds + t, 1.545, 0.029)
+        for ds in (-0.1, 0.1):                                                   # resin spacers between the packs
+            for k in range(12):
+                a = (k + 0.25) / 12 * 2 * math.pi
+                n = Vector((math.cos(a), 0, math.sin(a)))
+                obox(mb, Vector((0, Y(s + ds), BZ)) + n * 1.5, n, (0.1, 0.035, 0.1), 'insul', lift=0.0)
+        for ds in (-0.34, 0.34):                                                 # retaining rings, a machined step on each
+            annulus(mb, (0, Y(s + ds), BZ), ax, 0.76, 1.72, 0.08, 'trim', seg=40)
+            annulus(mb, (0, Y(s + ds * 1.13), BZ), ax, 1.0, 1.58, 0.03, 'hull2', seg=40)
+        for k in range(8):                                                       # clamp bars over the packs, bolted at both rings
+            a = (k + 0.5) / 8 * 2 * math.pi
             n = Vector((math.cos(a), 0, math.sin(a)))
-            obox(mb, Vector(c) + n * 1.62, n, (0.22, 0.7, 0.14), 'trim', lift=0.0)
+            p0 = Vector(c) + n * 1.62
+            obox(mb, p0, n, (0.16, 0.72, 0.09), 'trim', lift=0.0)
+            obox(mb, p0 + n * 0.08, n, (0.08, 0.5, 0.04), 'hull2', lift=0.0)
+            for ds in (-0.3, 0.3):
+                q = p0 + n * 0.09 + Vector((0, -ds, 0))
+                mb.cyl(q, q + n * 0.05, 0.035, 0.035, 'greeble', seg=6)
+        # terminal block on the lower flank (where the capacitor feed comes up): an insulated stand-off with two lugs
+        for sg in (1, -1):
+            a = math.radians(-35)
+            n = Vector((sg * math.cos(a), 0, math.sin(a)))
+            p0 = Vector(c) + n * 1.62
+            obox(mb, p0, n, (0.26, 0.3, 0.16), 'insul', lift=0.0, bevel=0.02)
+            for ds in (-0.07, 0.07):
+                q = p0 + n * 0.16 + Vector((0, -ds, 0))
+                mb.cyl(q, q + n * 0.08, 0.04, 0.03, 'coil', seg=8)
+
+
+def turn(mb, s, R, a, seg=44, cs=6):
+    """One round turn of conductor around the barrel axis: a torus (centre radius R, wire radius a) at station s."""
+    rings = []
+    for j in range(cs):
+        th = j / cs * 2 * math.pi
+        r, dy = R + a * math.cos(th), a * math.sin(th)
+        rings.append([Vector((math.cos(i / seg * 2 * math.pi) * r, Y(s) + dy, BZ + math.sin(i / seg * 2 * math.pi) * r))
+                      for i in range(seg)])
+    mb.loft(rings, 'coil2', wrap=True)
 
 
 def cap_module(mb, s0, s1, sg, SB):
@@ -822,7 +859,32 @@ def ion_frigate():
         print('SITES rejected:', S.rej, flush=True)
     obj = mb.to_object('ion_frigate', smooth_angle=26)
     print('emissive discs re-oriented:', fix_normals(obj), flush=True)
+    smooth_turns(obj)
     return [obj]
+
+
+def smooth_turns(obj):
+    """The coils' round turns shade smooth (their 60-degree facets would read as hexagonal wire at the 26-degree cut)."""
+    me = obj.data
+    names = [m.name for m in me.materials]
+    if 'coil2' not in names:
+        return
+    mi = names.index('coil2')
+    sharp = me.attributes.get('sharp_edge')
+    if sharp is None:
+        return
+    cnt = {}
+    for p in me.polygons:
+        if p.material_index == mi:
+            for ek in p.edge_keys:
+                cnt[ek] = cnt.get(ek, 0) + 1
+    n = 0
+    for e in me.edges:
+        if cnt.get(e.key, 0) == 2 and sharp.data[e.index].value:
+            sharp.data[e.index].value = False
+            n += 1
+    me.update()
+    print('coil turns smoothed:', n, flush=True)
 
 
 if __name__ == '__main__' and 'ships_ion_frigate' in ' '.join(sys.argv):

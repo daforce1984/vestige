@@ -74,6 +74,15 @@ fn envRefl(r: vec3f, rough: f32) -> vec3f {
   }
   return c;
 }
+// where a reflected ray leaves the launch bay's box (the parallax correction for the captured cube in the bay)
+const BAY_CUBE = vec3f(0.0, 19.0, -16.0);   // the bay cube's capture point, from the bay centre (shots.js hangarEnv)
+fn interiorHit(p: vec3f, r: vec3f) -> vec3f {
+  let c = F.interior.xyz;
+  let lo = c + vec3f(-12.0, -1.0, -62.0); let hi = c + vec3f(12.0, 23.0, 30.0);
+  let rs = select(r, sign(r + vec3f(1e-9)) * 1e-5, abs(r) < vec3f(1e-5));
+  let tf = max((lo - p) / rs, (hi - p) / rs);
+  return p + r * max(min(min(tf.x, tf.y), tf.z), 0.0);
+}
 // box-projected hangar interior (the "cube" the hangar metal reflects): walls, lamp rows, floor stripes
 fn envInterior(p: vec3f, r: vec3f, rough: f32) -> vec3f {
   let c = F.interior.xyz;
@@ -541,6 +550,7 @@ fn crushW(w: vec3f, inst: Inst) -> vec3f {
 @group(0) @binding(21) var texM8: texture_2d<f32>;
 @group(0) @binding(22) var texA9: texture_2d<f32>;   // the launch bay's surface detail (a 3×3 atlas of tiling cells, after Sigma's rifle: tools/make_hangar_atlas.py)
 @group(0) @binding(23) var texM9: texture_2d<f32>;
+@group(0) @binding(24) var envCube: texture_cube<f32>;   // the environment captured round the subject (renderer _captureEnv), weight F.camRight.w, top mip F.camUp.w
 @group(0) @binding(19) var texMoon: texture_2d<f32>;   // the moon, baked once (equirect: normal slopes rg, albedo b, height a) — MOONBAKE
 
 struct VO {
@@ -1201,6 +1211,13 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   let reflK = fres * (1.0 - rough * 0.8) * brushed * mix(0.2, 0.85, metal) * rockK;
   var envC = envRefl(Rv, rough);
   if (F.interior.w > 0.5) { envC = envInterior(i.wp, Rv, rough); }
+  if (F.camRight.w > 0.0) {   // (2026-10-07) the real surroundings in the metal: the captured cube, blurrier with roughness
+    // (in the bay: box-projected — the ray's exit point on the bay's walls seen from the capture point)
+    let cdir = select(Rv, interiorHit(i.wp, Rv) - (F.interior.xyz + BAY_CUBE), F.interior.w > 0.5);
+    let cubeS = textureSampleLevel(envCube, texSmp, cdir, clamp(sqrt(rough) * 1.25, 0.0, 1.0) * F.camUp.w).rgb;
+    let cubeC = cubeS * min(1.0, 2.0 / max(max(cubeS.r, max(cubeS.g, cubeS.b)), 1e-4));   // (glows in it held to a sheen, not a white-out)
+    envC = mix(envC, cubeC, min(F.camRight.w, 1.0)) * max(F.camRight.w, 1.0);
+  }
   col += envC * reflK * ao * mix(0.35, 1.0, sh);
   // the SECOND SUN (a real star in the sky, no rim / fill tricks any more): same GGX light, no shadow map of its own
   if (F.rimCol.w > 0.5) {
