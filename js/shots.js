@@ -286,10 +286,14 @@ function recoveryPos(t) {
   // until the cut at 340 he simply accelerates straight ahead (S21b); F0 then picks him up gliding into the bay,
   // decelerating along the bay axis onto the pad (no waypoints, no swerves)
   if (t < 340) return gundamDrift(t);
-  const L0 = [-150, 4, 57], u = sat((t - 340) / 2.45);
-  const e = 1 - Math.pow(1 - u, 2.2);                                   // arrives with speed bleeding off smoothly
-  const x = V.lerp([0, 0, 0], L0, DOCK.pad, e);
-  if (t > 342.45) x[1] -= 0.2 * Math.sin((t - 342.45) * 9) * Math.exp(-(t - 342.45) * 5);   // clunks down onto the pad
+  // (2026-10-07: it read as one constant glide) in at speed, the retros bleeding it off hard — almost stopped a few metres
+  // short of the pad and a little high (341.7) — then, nearly still, the heavy turn round to face out (341.55–342.65),
+  // then backed down onto the pad (342.35–342.9) and the clunk
+  const L0 = [-150, 4, 57], STOP = [DOCK.pad[0] - 5, DOCK.pad[1] + 2, DOCK.pad[2]];
+  const u = sat((t - 340) / 1.9), e = 1 - Math.pow(1 - u, 2.4);
+  let x = V.lerp([0, 0, 0], L0, STOP, e);
+  x = V.lerp([0, 0, 0], x, DOCK.pad, easeInOut(sat((t - 342.3) / 0.65)));
+  if (t > 342.9) x[1] -= 0.2 * Math.sin((t - 342.9) * 9) * Math.exp(-(t - 342.9) * 5);   // clunks down onto the pad
   return motherPoint([0, 0, 0], t, x);
 }
 // the fly-by point off the melted flank: 85 m out from the wound along the hull normal, a little above
@@ -346,6 +350,7 @@ function gundamStateRaw(t, s) {
     blendPose('flight', 'flight', 0, s.pose);
     s.pitch = 0.5; s.thr = 1;
     s.roll = Math.sin(t * 0.8) * 0.3;
+    s.launchBurn = 1 - smooth(160.6, 162.2, t);   // (2026-10-07) out of the bay on full afterburner, easing off as he climbs away
   } else if (t < 180) {
     s.pos = strafePos(t);
     const e1 = enemyMS1(t).pos;
@@ -489,19 +494,19 @@ function gundamStateRaw(t, s) {
       const velDir = V.len(vel) > 0.05 ? V.norm([0, 0, 0], vel) : driftFwd;
       // straight ahead until the cut; in the bay: into the bay, then a slow, heavy turn round to face out
       let f = t < 340 ? creepDir().slice() : velDir;
-      if (t > 341.0) {                                         // yaw from 'into the bay' (+X local) round to 'facing out' (-X)
-        const k = easeInOut(sat((t - 341.0) / 1.6));
+      if (t > 341.65) {                                        // yaw from 'into the bay' (+X local) round to 'facing out' (-X) — once he has nearly stopped
+        const k = easeInOut(sat((t - 341.65) / 1.1));
         const yaw = lerp(Math.PI / 2, Math.PI * 1.5, k);
         const loc = [Math.sin(yaw), 0, Math.cos(yaw)];
         const wd = V.norm([0, 0, 0], motherDir(t, loc));
-        f = V.norm([0, 0, 0], V.lerp([0, 0, 0], f, wd, smooth(341.0, 341.5, t)));
+        f = V.norm([0, 0, 0], V.lerp([0, 0, 0], f, wd, smooth(341.65, 341.9, t)));
       }
       s.fwd = f;
-      const land = smooth(341.8, 342.5, t);
+      const land = smooth(342.3, 342.85, t);
       s.roll += 0.05 * Math.sin(t * 0.9) * smooth(336, 337.5, t) * (1 - smooth(339.5, 341, t));
       if (land > 0) { const cur = s.pose, st = {}; blendPose('flight', 'stand', land, st); for (const k in st) cur[k] = st[k]; }   // keep the waking blend until landing
       s.boostK = smooth(336.2, 339.2, t) * (1 - smooth(339.8, 340.2, t));   // the burn builds slowly with the speed
-      s.thr = t < 340.2 ? 1 : t < 342.1 ? 0.6 + 0.4 * Math.sin(t * 20) * 0.2 : 0.6 * (1 - smooth(342.1, 342.5, t));   // braking flare, then cut
+      s.thr = t < 340.2 ? 1 : t < 342.6 ? 0.6 + 0.4 * Math.sin(t * 20) * 0.2 : 0.6 * (1 - smooth(342.6, 342.95, t));   // braking flare, the turn on the thrusters, then cut
       if (t > 343.7) s.vis = false;                            // behind the closed doors
     }
   }
@@ -819,9 +824,9 @@ export function drawGundam(R, t, s, opts = {}) {
   const pastHero = opts.pastState || ((tau) => { const cutAt = t >= 340 ? 340 : t >= 163 && t < 170 ? 163 : -1e9, q = gundamState(Math.max(t - tau, cutAt)); return { m: msMatrix(new Float32Array(16), q.vis ? q : s), pose: (q.vis ? q : s).pose }; });
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
   const bk = s.boostK ?? (inDuel ? sat((s.boost - 0.62) / 0.38) : 0);   // duel quick-boosts: the nozzles flare
-  const cb = s.circusBurn || 0;   // (2026-10-06) fleeing through the Itano circus: the boosters flat out — plumes ×1.35 the size, + afterburner jets (fx.js burnK; toned down so he stays readable)
+  const lb = s.launchBurn || 0, cb = Math.max(s.circusBurn || 0, lb);   // (launch: the plumes far bigger and longer too)   // (2026-10-06) fleeing through the Itano circus: the boosters flat out — plumes ×1.35 the size, + afterburner jets (fx.js burnK; toned down so he stays readable)
   e.burnK = cb;
-  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.9 + 0.6 * cb, 1.2 + 0.4 * cb, 2.6], (inDuel ? 1.3 : 0.9) * (1 + 0.9 * bk) * (1 + 0.35 * cb), Math.max(s.thr * (inDuel ? driveK(s) : 1), cb), ((inDuel ? 2.4 : 1.2) + 2.2 * bk) * (1 + 0.4 * cb), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
+  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.9 + 0.6 * cb, 1.2 + 0.4 * cb, 2.6], (inDuel ? 1.3 : 0.9) * (1 + 0.9 * bk) * (1 + 0.35 * cb) * (1 + 1.6 * lb), Math.max(s.thr * (inDuel ? driveK(s) : 1), cb), ((inDuel ? 2.4 : 1.2) + 2.2 * bk) * (1 + 0.4 * cb) * (1 + 2.5 * lb), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
   const eye = emitWorld(R, 'gundam', e, 'eye');
   if (!s.fpv && eye && eyeK > 0.05) R.glow(eye, (s.visorFlare !== undefined ? 0.4 : 0.55 + bz * 2.4) * Math.min(eyeK, 1.2), [lerp(0.5, 5, bz) * eyeK, lerp(1.6, 0.3, bz) * eyeK, lerp(1.0, 0.2, bz) * eyeK], 0.35);   // visor: a small glint (a big ball read as a stray light next to him)
   if (!s.fpv && eyeK > 0.05 && (s.visorFlare !== undefined)) {        // visor band glow: every emitter point + a light spill
@@ -1883,6 +1888,7 @@ function gundamHangarState(t, phase) {
   const gk = 1 - smooth(158.15, 158.45, t);
   if (gk > 0) s.pos[1] += (footRest() - footMin(s)) * gk;
   s.thr = t > 157.6 ? 1 : 0.15 * smooth(155, 156, t);
+  s.launchBurn = smooth(157.65, 157.95, t);   // (2026-10-07) the catapult run on full afterburner (drawGundam: big plumes + fx.js burnK)
   return s;
 }
 // the lowest point of Sigma's feet (world y): the corners of each foot's box (part-local, assets/gundam.glb)

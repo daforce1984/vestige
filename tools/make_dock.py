@@ -59,6 +59,55 @@ F.box('dock_metal', -64.0, -61.8, 14.0, 16.5, 49.5, 64.5)                       
 F.box('dock_metal', -70.5, -63.0, 15.0, 16.2, 56.0, 58.0)                        # gantry boom
 F.box('dock_light', -70.4, -69.6, 14.7, 15.0, 56.3, 57.7)                        # boom lamp
 for z in (53.5, 60.5): F.box('dock_trim', -62.6, -62.0, -11.0, 14.0, z - 0.3, z + 0.3)   # conduits
+# ---- (2026-10-07) THE BAY'S INSIDE, no longer bare: the back wall (x -62) panelled between ribs, two catwalks with
+# railings, pipe bundles and cable trays, consoles with lit screens and vent grilles; the side bulkheads (z 23 / 91)
+# ribbed, a sealed hatch and pipe runs on each; a crane rail with its trolley and light strips under the ceiling (y 25);
+# floor grating seams. All of it against the walls, clear of where Sigma docks (z 49–65, x < -63.5).
+BW = -62.0
+for z in range(24, 91, 3):                                                       # back-wall ribs
+    if 47 < z < 67: continue
+    F.box('trim', BW - 0.7, BW, -12.0, 25.0, z - 0.25, z + 0.25)
+for y in (-6.0, 0.0, 6.0, 12.0, 18.0):                                           # panel seams
+    for z0, z1 in ((23.5, 48.5), (65.5, 90.5)):
+        F.box('hull', BW - 0.3, BW, y - 0.08, y + 0.08, z0, z1)
+for y in (1.0, 13.0):                                                            # catwalks + railings (either side of the cradle)
+    for z0, z1 in ((23.5, 48.0), (66.0, 90.5)):
+        F.box('dock_metal', BW - 2.6, BW, y - 0.15, y + 0.15, z0, z1)
+        F.box('dock_trim', BW - 2.6, BW - 2.45, y + 0.15, y + 1.25, z0, z1)
+        F.box('dock_trim', BW - 2.6, BW - 2.45, y + 0.6, y + 0.68, z0, z1)
+        for z in range(int(z0) + 1, int(z1), 3): F.box('dock_trim', BW - 2.6, BW - 2.45, y + 0.15, y + 1.25, z - 0.06, z + 0.06)
+        F.box('hazard', BW - 2.62, BW - 2.58, y - 0.15, y + 0.15, z0, z1)
+for k, y in enumerate((-9.5, -8.6, -7.7, 22.0, 22.9)):                          # pipe bundles along the back wall
+    F.box('dock_trim' if k % 2 else 'dock_metal', BW - 1.6, BW - 0.8, y - 0.35, y + 0.35, 23.5, 90.5)
+for z0, z1 in ((23.5, 48.0), (66.0, 90.5)):                                       # cable trays under the catwalks
+    F.box('dock_metal', BW - 1.2, BW - 0.4, -0.4, -0.1, z0, z1)
+    F.box('dock_metal', BW - 1.2, BW - 0.4, 11.6, 11.9, z0, z1)
+for z in (28.0, 36.0, 42.0, 72.0, 80.0, 86.0):                                    # consoles with lit screens
+    F.box('dock_metal', BW - 1.4, BW, 1.15, 2.6, z - 1.0, z + 1.0)
+    F.box('dock_light', BW - 1.45, BW - 1.4, 1.9, 2.5, z - 0.8, z + 0.8)
+    F.box('dock_metal', BW - 0.9, BW, 13.15, 14.8, z - 0.8, z + 0.8)
+    F.box('amber', BW - 0.95, BW - 0.9, 14.1, 14.6, z - 0.6, z + 0.6)
+for z in (31.0, 45.0, 69.0, 83.0):                                                # vent grilles
+    for k in range(6): F.box('trim', BW - 0.35, BW, 5.0 + k * 0.5, 5.25 + k * 0.5, z - 2.0, z + 2.0)
+for zw, sg in ((23.0, 1), (91.0, -1)):                                            # side bulkheads
+    for x in (-73.0, -70.5, -68.0, -65.5, -63.0):
+        F.box('trim', x - 0.3, x + 0.3, -12.0, 25.0, zw, zw + 0.6 * sg) if sg > 0 else F.box('trim', x - 0.3, x + 0.3, -12.0, 25.0, zw - 0.6, zw)
+    zf = zw + 0.15 * sg
+    F.box('dock_metal', -69.5, -64.5, -12.0, -3.0, min(zw, zf), max(zw, zf) + 0.0 if sg > 0 else zw)   # sealed hatch
+    F.box('hazard', -69.6, -64.4, -3.2, -2.8, min(zw, zw + 0.25 * sg), max(zw, zw + 0.25 * sg))
+    F.box('dock_light', -67.4, -66.6, -2.6, -2.2, min(zw, zw + 0.3 * sg), max(zw, zw + 0.3 * sg))
+    for x in (-72.0, -71.2):                                                    # vertical pipe runs
+        F.box('dock_metal', x - 0.3, x + 0.3, -12.0, 25.0, min(zw + 0.7 * sg, zw + 1.3 * sg), max(zw + 0.7 * sg, zw + 1.3 * sg))
+F.box('dock_metal', -73.5, -62.5, 23.6, 24.4, 30.0, 31.0)                         # ceiling crane rails (beyond the gantry)
+F.box('dock_metal', -73.5, -62.5, 23.6, 24.4, 83.0, 84.0)
+F.box('dock_metal', -69.0, -66.0, 22.4, 23.6, 29.5, 31.5)                         # a crane trolley, parked
+F.box('dock_trim', -67.8, -67.2, 17.0, 22.4, 30.2, 30.8)
+for z in range(26, 90, 6):                                                        # light strips under the ceiling
+    if 47 < z < 67: continue
+    F.box('dock_light', -71.0, -64.0, 24.6, 24.75, z - 0.3, z + 0.3)
+for x in (-72.0, -69.0, -66.0, -63.0):                                            # floor grating seams
+    F.box('trim', x - 0.08, x + 0.08, -12.0, -11.9, 23.5, 48.5)
+    F.box('trim', x - 0.08, x + 0.08, -12.0, -11.9, 65.5, 90.5)
 frame = node('frame', F, [0, 0, 0])
 
 # ---- shoulder clamps: hinge on the pillar tops; rest pose = closed (arm reaching out over the shoulder)
@@ -102,6 +151,18 @@ for z in (-13.0, -5.0, 3.0, 10.0):                                              
     for y in (-17.75, 17.75):
         D.box('trim', X0 - 0.55, X0 - 0.4, y - 0.3, y + 0.3, z - 0.8, z + 0.8)
         D.box('amber', X0 - 0.65, X0 - 0.55, y - 0.18, y + 0.18, z - 0.6, z + 0.6)
+# (2026-10-07) its INNER face (x -71.0, toward the bay): a stiffener grid, two hydraulic actuators, cable runs, a seal strip
+XI = -71.0
+for z in (-14.0, -7.0, 0.0, 7.0, 14.0):
+    D.box('trim', XI, XI + 0.5, -17.5, 17.5, z - 0.3, z + 0.3)
+for y in (-12.0, -4.0, 4.0, 12.0):
+    D.box('trim', XI, XI + 0.4, y - 0.25, y + 0.25, -16.5, 16.5)
+for y in (-9.0, 9.0):
+    D.box('dock_metal', XI, XI + 1.1, y - 0.6, y + 0.6, -15.5, -2.0)
+    D.box('dock_trim', XI + 0.2, XI + 0.9, y - 0.35, y + 0.35, -2.0, 6.0)
+    D.box('hazard', XI + 1.1, XI + 1.15, y - 0.6, y + 0.6, -15.5, -13.5)
+D.box('dock_metal', XI, XI + 0.35, 15.0, 15.8, -16.5, 16.5)
+D.box('dock_light', XI + 0.5, XI + 0.55, -17.0, 17.0, 16.2, 16.6)
 door = node('door', D, [0, 7.0, 0])
 
 # ---- bay mouth frame (fixed, standing on the box face x = -71): header, jambs and a sill on the landing ledge,
