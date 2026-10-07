@@ -51,6 +51,29 @@
   #start .go:disabled { opacity: .4; cursor: wait; }
   #start .btns { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
   #status { font-size: 13px; color: var(--dim); letter-spacing: .05em; min-height: 1.2em; }
+  #gallery { position: fixed; inset: 0; z-index: 80; background: rgba(3,6,12,.96); display: none; flex-direction: column; color: #cfe3ff; font-family: 'Rajdhani', sans-serif; }
+  #gallery.on { display: flex; }
+  #gallery .head { display: flex; align-items: baseline; gap: 16px; padding: 18px 28px 10px; border-bottom: 1px solid rgba(127,178,255,.2); }
+  #gallery .head b { font-size: 22px; letter-spacing: .2em; color: #fff; }
+  #gallery .head span { color: #7f93ad; font-size: 13px; letter-spacing: .05em; }
+  #gallery .x { margin-left: auto; background: transparent; border: 1px solid rgba(127,178,255,.5); color: #cfe3ff; width: 34px; height: 30px; cursor: pointer; font-size: 15px; border-radius: 3px; }
+  #gallery .x:hover { background: rgba(127,178,255,.15); }
+  #gallery .grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; padding: 22px 28px 40px; align-content: start; }
+  #gallery figure { margin: 0; cursor: zoom-in; background: rgba(20,30,50,.5); border: 1px solid rgba(127,178,255,.18); border-radius: 4px; overflow: hidden; transition: border-color .15s, transform .15s; }
+  #gallery figure:hover { border-color: rgba(127,178,255,.6); transform: translateY(-2px); }
+  #gallery figure img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #0a0e16; }
+  #gallery figcaption { padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 2px; }
+  #gallery figcaption b { font-size: 15px; color: #e6f1ff; letter-spacing: .04em; }
+  #gallery figcaption span { font-size: 12px; color: #7f93ad; }
+  #gallery .big { position: fixed; inset: 0; background: rgba(0,0,0,.94); display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+  #gallery .big.on { display: flex; }
+  #gallery .big img { max-width: 92vw; max-height: 84vh; object-fit: contain; cursor: default; box-shadow: 0 0 40px rgba(0,0,0,.8); }
+  #gallery .big .cap { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
+  #gallery .big .cap b { font-size: 18px; color: #fff; letter-spacing: .06em; } #gallery .big .cap span { font-size: 13px; color: #9fb4d0; } #gallery .big .cap em { font-style: normal; font-size: 12px; color: #5d6577; }
+  #gallery .big .x { position: absolute; top: 18px; right: 24px; }
+  #gallery .nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(20,30,50,.6); border: 1px solid rgba(127,178,255,.4); color: #cfe3ff; width: 44px; height: 64px; font-size: 30px; cursor: pointer; border-radius: 4px; }
+  #gallery .nav.prev { left: 2vw; } #gallery .nav.next { right: 2vw; }
+  #gallery .nav:hover { background: rgba(60,110,170,.7); }
   #start .keys { font-size: 12px; color: #5d6577; letter-spacing: .05em; }
   #progress { position: fixed; left: 0; right: 0; bottom: 0; height: 6px; cursor: pointer; opacity: 0; transition: opacity .3s; }
   #progress:hover { opacity: 1; }
@@ -89,7 +112,7 @@
 <div id="start">
   <h1>VESTIGE</h1>
   <div class="sub">6:22</div>
-  <div class="btns"><button class="go" disabled>▶ 재생</button><button class="go" id="duelBtn" disabled>⚔ 메카 전투씬만 보기</button></div>
+  <div class="btns"><button class="go" disabled>▶ 재생</button><button class="go" id="duelBtn" disabled>⚔ 메카 전투씬만 보기</button><button class="go" id="refBtn">🖼 참조 이미지</button></div>
   <div id="status">WebGPU 초기화…</div>
   <div class="keys">24fps · Space 일시정지 · ←/→ 씬 이동 · Shift+←/→ 5초 · F 전체화면 · H UI 숨김 · 사운드를 켜 주세요</div>
 </div>

@@ -2,6 +2,7 @@ import { Renderer } from './renderer.js';
 import { frame, findShot, DURATION, SHOTS } from './shots.js';
 import { storyT, filmT, insertFilm, inSkip, TEAR_F0, TEAR_F1 } from './timemap.js';
 import { DUEL_CAMS, enemyGripCheck } from './duel.js';
+import { openGallery, galleryOpen, galleryKey } from './gallery.js';
 import { DREAD_CHUNKS } from './dread_chunks.js';
 import { prepWreck, prepWrecks } from './world.js';
 
@@ -331,7 +332,9 @@ $('#start .go').addEventListener('click', () => startFilm(clockOffset >= DURATIO
 // the mech battle on its own: from the swatted bolt (scene 30) through the duel to the last blast
 const DUEL_FROM = 150.0, DUEL_UNTIL = 195.2;   // story   // (2026-10-07) from Sigma getting ready to launch (scene 26, S11a hangar lights) — was 165.9, the bolt he swats away on the way in
 $('#duelBtn').addEventListener('click', () => startFilm(filmT(DUEL_FROM), filmT(DUEL_UNTIL)));
+$('#refBtn').addEventListener('click', openGallery);   // the reference images (js/gallery.js)
 document.addEventListener('keydown', (e) => {
+  if (galleryOpen()) { galleryKey(e); return; }   // (the reference gallery has the keyboard while open)
   if (e.target && e.target.tagName === 'SELECT') return;   // (the scene picker has the keyboard)
   if (e.code === 'Space') { e.preventDefault(); if (!$('#start').classList.contains('hidden')) return; if (playing) pause(); else play(now()); }   // (not from the main menu: the film starts from its buttons)
   else if (e.code === 'Escape') { if (playing) pause(); }
