@@ -260,12 +260,12 @@ function mixPose(pose, tgt, k) {
 // elevator-door grip: each hand rolled about its finger axis so the palm faces OUTWARD, fingers hooked round the edge
 export let HAND_YAW = 0.9;
 export function setHandYaw(v) { HAND_YAW = v; }
-function berserkHitK(t) { let k = 0; for (const h of [...B_HITS, 268]) if (t >= h) k = Math.max(k, Math.exp(-(t - h) * 6)); return k; }
+function berserkHitK(t) { let k = 0; for (const h of B_HITS) if (t >= h) k = Math.max(k, Math.exp(-(t - h) * 6)); return k; }
 function berserkJitter(t) { return 1 + berserkHitK(t) * 3; }
 export function shieldState(t) {
   // crack 0..1 grows with each hit; shattered after 268
   let crack = 0; B_HITS.forEach((h, i) => { if (t >= h) crack = (i + 1) / B_HITS.length * 0.85; });
-  return { on: t > 261 && t < 268.05, crack, hit: berserkHitK(t), shattered: t >= 268, up: smooth(261, 262, t) };
+  return { on: t > 261 && t < THRUST_T + 0.05, crack, hit: berserkHitK(t), shattered: t >= THRUST_T, up: smooth(261, 262, t) };   // (2026-10-08: it breaks the instant the blade touches it)
 }
 // docking path in flagship-local space (the port launch bay is x∈[-74,-62], y∈[-17,26], z∈[22,92])
 const DOCK = { wide: [-395, 63, 97], out: [-165, 15, 67], mouth: [-84, 1, 57], pad: [-66.2, -2.5, 57] };
@@ -458,6 +458,7 @@ function gundamStateRaw(t, s) {
     s.saberPow = 1 + 9 * smooth(265.98, 266.3, t) * (1 - smooth(276, 277.5, t));   // TEN times its output — through the barrier and into the core (2026-10-06: was cut back at 268.3)
     s.thr = 1; s.damage = 0.15 + smooth(262, 278, t) * 0.25;
     s.berserk = smooth(262, 262.4, t) * (1 - smooth(276, 278, t));
+    s.redBurn = smooth(266.55, 266.95, t) * (1 - smooth(CORE_HIT_T, CORE_HIT_T + 0.6, t));   // (2026-10-08) the red charge: every booster flat out
   } else if (t < 292) {
     const u = easeOut(sat((t - IMPLODE) / 10));
     // spent: no spin — the body goes slack and drifts backward, still facing the core (we see its back against the light)
@@ -833,8 +834,11 @@ export function drawGundam(R, t, s, opts = {}) {
   const inDuel = t > 169.5 && t < 200;                         // in the fight no plume history: it read as weapon trails
   const bk = s.boostK ?? (inDuel ? sat((s.boost - 0.62) / 0.38) : 0);   // duel quick-boosts: the nozzles flare
   const lb = s.launchBurn || 0, cb = Math.max(s.circusBurn || 0, lb);   // (launch: the plumes far bigger and longer too)   // (2026-10-06) fleeing through the Itano circus: the boosters flat out — plumes ×1.35 the size, + afterburner jets (fx.js burnK; toned down so he stays readable)
-  e.burnK = cb;
-  if (s.thr > 0.02) engineGlows(R, 'gundam', e, [0.9 + 0.6 * cb, 1.2 + 0.4 * cb, 2.6], (inDuel ? 1.3 : 0.9) * (1 + 0.9 * bk) * (1 + 0.35 * cb) * (1 + 1.6 * lb), Math.max(s.thr * (inDuel ? driveK(s) : 1), cb), ((inDuel ? 2.4 : 1.2) + 2.2 * bk) * (1 + 0.4 * cb) * (1 + 2.5 * lb), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
+  const rb = s.redBurn || 0;   // (2026-10-08) the berserk charge into the well: the boosters burn RED, flat out, afterburner and all
+  e.burnK = Math.max(cb, 1.5 * rb);
+  const ecol = [lerp(0.9 + 0.6 * cb, 3.4, rb), lerp(1.2 + 0.4 * cb, 0.38, rb), lerp(2.6, 0.18, rb)];
+  if (rb > 0.01) R.light(M.transformPoint([0, 0, 0], R.partWorld('gundam', e, 'torso'), [0, 2, -6]), 160, [1, 0.18, 0.08], 14 * rb);   // its red light on everything round him
+  if (s.thr > 0.02) engineGlows(R, 'gundam', e, ecol, (inDuel ? 1.3 : 0.9) * (1 + 0.9 * bk) * (1 + 0.35 * cb) * (1 + 1.6 * lb) * (1 + 0.7 * rb), Math.max(s.thr * (inDuel ? driveK(s) : 1), cb), ((inDuel ? 2.4 : 1.2) + 2.2 * bk) * (1 + 0.4 * cb) * (1 + 2.5 * lb) * (1 + 1.8 * rb), s.fpv || opts.noTrail || inDuel || (s.berserk || 0) > 0.05 ? null : { past: pastHero, particles: !(t > 318 && t < 347) });   // no ember sparks while he comes to / flies home
   const eye = emitWorld(R, 'gundam', e, 'eye');
   if (!s.fpv && eye && eyeK > 0.05) R.glow(eye, (s.visorFlare !== undefined ? 0.4 : 0.55 + bz * 2.4) * Math.min(eyeK, 1.2), [lerp(0.5, 5, bz) * eyeK, lerp(1.6, 0.3, bz) * eyeK, lerp(1.0, 0.2, bz) * eyeK], 0.35);   // visor: a small glint (a big ball read as a stray light next to him)
   if (!s.fpv && eyeK > 0.05 && (s.visorFlare !== undefined)) {        // visor band glow: every emitter point + a light spill
@@ -856,7 +860,7 @@ export function drawGundam(R, t, s, opts = {}) {
     R.beam(a, tip, 1.5 * th, [col[0] * k, col[1] * k, col[2] * k], 0.04 * pw * flat, 3, 2, 0.8);
     if (mega > 0) { R.beam(a, tip, 2.2 * th, [0.3 * k * mega, 0.8 * k * mega, 1.6 * k * mega], 0.03 * pw * flat, 2, 2.5, 1.5); R.glow(a, 3 + 5 * mega, [1.5 * mega, 3 * mega, 5 * mega], 0.5); }   // the overdriven blade: a wide corona, the hilt blazing
     if (mega > 0) R.surge(a, tip, 3.4 * th, [col[0] * 0.8 * k, col[1] * 0.6 * k, col[2] * 0.6 * k], 1.6 * mega, 3.7);   // its energy running away: surges racing up it, plasma tearing off the sides
-    R.light(lerpv(a, tip, 0.5), 40 * pw, bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 4 * k * pw);
+    R.light(lerpv(a, tip, 0.5), 40 * Math.min(pw, 3), bz > 0.05 ? [1, 0.25, 0.1] : [0.4, 0.8, 1], 4 * k * Math.min(pw, 2));   // (2026-10-08: capped — at ten times its output it was a 400 m, ×40 light that washed the core's shell white)
     GUN.saber = [a, tip];
     if (s.saberL && t > TRANS_PASS - SWING_PRE - 0.002 && t < TRANS_PASS + SWING_POST + 0.02) {   // the swing's afterimage: a fan of fading blades along the path it just swept
       const fk0 = duelFK(duelHero(t), 'gundam').hand_L, inv = M.invert(M.new(), fk0), la = M.transformPoint([0, 0, 0], inv, a), ld = M.transformDir([0, 0, 0], inv, dir);
@@ -2784,31 +2788,56 @@ shot(263.3, 266.95, 'B2 the blade at ten times its output', (c) => {
     c.post.flash = Math.max(c.post.flash, 0.16 * Math.exp(-Math.max(0, lr) * 9));
   }
 });
-// the thrust: wide and low off his left, the whole blade and the dome's face in frame — he lunges, the tip goes in and
-// the barrier cracks open from the point in one blow
-shot(266.95, 268.05, 'B2b the thrust — one blow through the barrier', (c) => {
+// THE ONE TAKE (2026-10-08): wide off his left as he comes on, every booster burning red and flat out — the blade touches
+// the dome and the barrier simply breaks round him, no resistance — the camera swings in behind him down the line into the
+// core and round to his side as the blade goes in, all in one shot (was B2b / B3 SHATTER / B4 the rush)
+const ONE_TAKE = [   // [t, camera offset from him, aim offset from him, fov]
+  [266.95, [-62, 12, -6], [0, 4, 40], 46], [267.42, [-58, 12, -22], [0, 4, 50], 48], [268.3, [-44, 11, -40], [0, 4, 70], 52],
+  [269.25, [-24, 10, -38], [0, 4, 90], 60], [270.15, [-40, 9, -12], [0, 5, 14], 48], [272.3, [-33, 8, -3], [0, 5, 10], 44]];
+function oneTake(t) {
+  const K = ONE_TAKE; let i = 0; while (i < K.length - 2 && t > K[i + 1][0]) i++;
+  const u = sat((t - K[i][0]) / (K[i + 1][0] - K[i][0]));
+  const cr = (a, b, c, d) => a.map((_, k) => 0.5 * (2 * b[k] + (-a[k] + c[k]) * u + (2 * a[k] - 5 * b[k] + 4 * c[k] - d[k]) * u * u + (-a[k] + 3 * b[k] - 3 * c[k] + d[k]) * u * u * u));   // Catmull-Rom: no stop at the keys
+  const P = (j) => K[Math.max(0, Math.min(K.length - 1, j))];
+  return { off: cr(P(i - 1)[1], P(i)[1], P(i + 1)[1], P(i + 2)[1]), aim: cr(P(i - 1)[2], P(i)[2], P(i + 1)[2], P(i + 2)[2]), fov: cr([P(i - 1)[3]], [P(i)[3]], [P(i + 1)[3]], [P(i + 2)[3]])[0] };
+}
+shot(266.95, 272.3, 'B2b one take — the red charge through the barrier into the core', (c) => {
   c.env.sunDisc = 0.12;
   const { t } = c;
-  const g = gundamState(t), P = addv(WELL, [g.pos[0] - WELL[0], g.pos[1] - WELL[1] + 4.2, -SHIELD_R]);
-  camLook(c, addv(P, [-120 + (t - 266.95) * 8, 20, -70]), addv(P, [0, -2, -34]), 44, -0.05);   // (him, the whole blade and the dome's face)
+  const g = gundamState(t), ot = oneTake(t);
+  camLook(c, addv(g.pos, ot.off), addv(g.pos, ot.aim), ot.fov, -0.05 + 0.04 * Math.sin(t * 1.3));
   const hk = berserkHitK(t);
-  shake(c, 0.25 + hk * 2.6, 16);
-  c.post.flash = t > THRUST_T ? 0.2 * Math.exp(-(t - THRUST_T) * 8) : 0;
+  shake(c, 0.35 + hk * 2.2 + (t > CORE_HIT_T - 0.15 ? 1.4 * Math.exp(-Math.max(0, t - CORE_HIT_T) * 2) : 0) + 0.3 * smooth(266.6, 267.0, t), 16);
+  c.post.flash = (t > THRUST_T ? 0.2 * Math.exp(-(t - THRUST_T) * 8) : 0) + (t > CORE_HIT_T && t < CORE_HIT_T + 0.2 ? 0.12 * (1 - (t - CORE_HIT_T) / 0.2) : 0);
   c.post.shakeBlur = 0.003 * hk;
+  c.post.mbNear = 80;
   c.env.rim = [0.6, 1.0, 1.9, 1.6]; c.env.fill = [0.3, 0.32, 0.4, 0.5];
-  c.post.lensA = { enable: 0 };
+  const lk = smooth(THRUST_T + 0.2, 269.2, t);   // past the barrier the well's pull bends the view
+  c.post.lensA = lk > 0.01 ? wellLens(c, wellMass(t) * 1.4 * lk, 3, true, 1.2) : { enable: 0 };
   c.env.shadowCenter = g.pos; c.env.shadowRadius = 200;
+  // the saber drives into the core: crater flash, shock ring, sparks and plates thrown back
+  const R = c.R, lt = t - CORE_HIT_T - 0.05;
+  if (lt > 0 && lt < 2) {
+    const hp = addv(WELL, [0, -4, -24]);
+    const k = Math.exp(-lt * 3);
+    R.glow(hp, 5 + 12 * easeOut(sat(lt / 0.3)), [3 * k, 0.9 * k, 0.4 * k], 0.5);
+    R.light(hp, 120, [1, 0.4, 0.2], 10 * k);
+    if (lt < 0.6) R.ripple(hp, 10 + 120 * easeOut(lt / 0.6), [0.4, 0.4, 0.4], (1 - lt / 0.6) * 2);
+    for (let i = 0; i < 40; i++) {
+      const d = randDir([0, 0, 0], i * 3.1 + 7); if (d[2] > 0) d[2] = -d[2];
+      const life = 0.4 + hash(i) * 0.8; if (lt > life) continue;
+      const a = lt / life, p = madd(hp, d, (10 + 50 * hash(i + 2)) * easeOut(a));
+      spark(R, p, 0.7 + 0.6 * (1 - a), [5 * (1 - a), 2.5 * (1 - a), 1 * (1 - a)]);
+    }
+    for (let i = 0; i < 14; i++) {
+      const d = randDir([0, 0, 0], i * 4.7 + 2); d[2] = -Math.abs(d[2]) - 0.5;
+      M.fromTRS(_dbM, madd(hp, V.norm(d, d), 3 + (20 + 30 * hash(i + 9)) * lt), Q.fromEuler(_dbQ, lt * 4 + i, lt * 2, lt * 3 + i), 0.12 + 0.1 * hash(i));
+      const de = R.add('debris', _dbM);
+      if (de) { de.hidden = debrisOnly(R, 'hull' + (i % 4)); de.damage = 0.6; }
+    }
+  }
 });
-shot(268, 269.4, 'B3 SHATTER', (c) => {
-  c.env.sunDisc = 0.12;
-  const { t, u } = c;
-  const g = gundamState(t);
-  camLook(c, addv(g.pos, [-40 - u * 40, 20, -90 - u * 30]), addv(WELL, [0, 0, -40]), 50 + u * 8, -0.1);
-  shake(c, 1.6 * Math.exp(-(t - 268) * 1.8), 12);
-  c.post.flash = Math.max(0, 0.18 - (t - 268) * 0.6);
-  c.post.lensA = { enable: 0 };
-});
-shot(269.4, 275, 'B4 the rush', (c) => {
+shot(272.3, 275, 'B4 the rush', (c) => {   // (cut: the one take above carries the rush)
   c.env.sunDisc = 0.12;
   const { t, u } = c;
   const g = gundamState(t);
@@ -3254,34 +3283,15 @@ function drawShield(R, t, c) {
   const rel = V.sub([0, 0, 0], addv(g.pos, [0, 9, 0]), WELL);
   const iuv = [V.dot(rel, right) / SHIELD_R, V.dot(rel, upv) / SHIELD_R];
   const near = clamp((V.dist(cam.pos, WELL) - SHIELD_R) / 90, 0.35, 1);
-  const tear = smooth(THRUST_T, 268.0, t);   // the hole the blade burns open
+  const tear = smooth(THRUST_T, THRUST_T + 0.05, t);   // (2026-10-08) no burning through: it gives the instant the tip touches
   let lastHit = -1; for (const h of B_HITS) if (t >= h) lastHit = h;
   const hitAge = lastHit < 0 ? 9 : t - lastHit;
   // at 268 the whole grid lights once and dies away (the barrier collapses)
   const flash = 0;                                          // (the old whole-grid flash is replaced by the collapse wave)
-  const alive = t < 268 ? sh.up : Math.exp(-Math.max(0, t - 268.9) * 4);
-  const collapse = t >= 268 ? t - 268 : 0;
-  R.shield(WELL, SHIELD_R, iuv, flash, t >= 268 ? 1 : tear, hitAge, [0.35, 0.7, 1.8], alive * (0.9 + tear * 0.5) * near, collapse);
-  if (t > THRUST_T && t < 268.4) {   // the tip in the barrier: a blinding point, lightning racing out across the dome from it
-    const lt = t - THRUST_T, P = addv(WELL, [g.pos[0] - WELL[0], g.pos[1] - WELL[1] + 4.2, -SHIELD_R]), k = (0.6 + 0.4 * smooth(0, 0.58, lt)) * (1 - smooth(0.58, 0.98, lt));
-    R.glow(P, 8 + 18 * k, [2.5 * k, 4 * k, 8 * k], 0.5); R.light(P, 260, [0.5, 0.8, 1.6], 30 * k);
-    if (lt < 0.5) R.ripple(P, 10 + 120 * easeOut(lt / 0.5), [0.3, 0.5, 1], (1 - lt / 0.5) * 1.5);
-    for (let a = 0; a < 16; a++) {   // jagged arcs along the surface, re-rolled every few frames, reaching further as it gives
-      const sd = a * 7.31 + Math.floor(t * 40) * 1.7, th = a / 16 * 2 * Math.PI + (hash(sd) - 0.5) * 0.4, len = (20 + 70 * hash(sd + 1)) * (0.4 + 0.6 * smooth(0, 0.58, lt));
-      let prev = P;
-      for (let j = 1; j <= 6; j++) {
-        const r = len * j / 6, q = [P[0] + Math.cos(th) * r + (hash(sd + j) - 0.5) * r * 0.25, P[1] + Math.sin(th) * r + (hash(sd + j + 9) - 0.5) * r * 0.25, 0];
-        q[2] = WELL[2] - Math.sqrt(Math.max(0, SHIELD_R * SHIELD_R - (q[0] - WELL[0]) ** 2 - (q[1] - WELL[1]) ** 2));   // (on the dome)
-        R.beam(prev, q, 0.25 * k, [2 * k, 3.2 * k, 6 * k], 1, 12); prev = q;
-      }
-    }
-  }
-  if (t > THRUST_T - 0.03 && t < 268.6) {   // the barrier pierced: space itself buckles round the point (shape 16)
-    const lt = t - THRUST_T, P = addv(WELL, [g.pos[0] - WELL[0], g.pos[1] - WELL[1] + 4.2, -SHIELD_R]);
-    const k = smooth(-0.03, 0.08, lt) * (1 - smooth(0.9, 1.18, lt));
-    R.anomaly(P, 28 + 70 * easeOut(sat(lt / 0.9)), [0.6, 0.45, 1.2], 1.6 * k, 5);
-    R.anomaly(P, 14 + 20 * sat(lt / 0.5), [0.9, 0.6, 1.4], 2.2 * k, 9);   // (the tighter knot right at the tip)
-  }
+  const alive = t < THRUST_T ? sh.up : Math.exp(-Math.max(0, t - THRUST_T - 0.9) * 4);
+  const collapse = t >= THRUST_T ? t - THRUST_T : 0;
+  R.shield(WELL, SHIELD_R, iuv, flash, t >= THRUST_T ? 1 : tear, hitAge, [0.35, 0.7, 1.8], alive * (0.9 + tear * 0.5) * near, collapse);
+  // (2026-10-08: no blinding point, no lightning racing over the dome, no buckling space at the tip — no resistance at all)
   if (collapse > 0 && collapse < 1.6) {
     // shock ring at the wound and glowing hex shards thrown off the dome surface
     const tp = madd(WELL, V.norm([0, 0, 0], rel), SHIELD_R);

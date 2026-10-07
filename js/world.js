@@ -1104,9 +1104,9 @@ function drawWell(R, t, tmpM) {
     const c = [WELL[0], WELL[1] - 4, WELL[2] - 22];
     e.crush = [c[0], c[1], c[2], 34, 0.7 * (1 - Math.exp(-(t - ch) * 14)) + 0.7 * smooth(ch + 0.4, 279.5, t), 0, 0.05];
   }
-  if (t > CORE_HIT_T - 0.45) {
-    e.damage = sat((t - CORE_HIT_T + 0.45) / 4);
-    e.flash = Math.max(0, 1 - (t - CORE_HIT_T + 0.15) * 2) * 2;
+  if (t > CORE_HIT_T) {   // (2026-10-08: from the blow itself, a short flash — it used to light white 0.45 s ahead of it and wash the whole shell out: the one take shows that second now)
+    e.damage = sat((t - CORE_HIT_T) / 4);
+    e.flash = 0.18 * Math.exp(-(t - CORE_HIT_T) * 9);
   }
   R.light(WELL, 1200, [0.9, 0.8, 0.75], 0.55 * on);          // (1.2 washed the whole flagship when it sat near the well)
 }

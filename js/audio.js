@@ -37,7 +37,7 @@ export const STEM_SYNC_LAYER = true;
 export const SYNC_GAIN = 0.55;
 export const SYNC_KEEP_ALWAYS = ['braam', 'boom'];
 export const SYNC_KEEP_NEAR_HITS = ['riser', 'revswell', 'cymbal'];
-export const SYNC_HITS = [8.6, 120, 158, 216, 262, 268, CORE_HIT_T, 280, 300];
+export const SYNC_HITS = [8.6, 120, 158, 216, 262, 267.42, CORE_HIT_T, 280, 300];   // (267.42: the barrier breaks at the touch)
 export const STEM_GAIN = 0.8;
 export const STEM_XFADE = 2.0;
 export const PRELOAD = 20;                       // JIT-decode stems / long samples this far ahead (s)
@@ -206,9 +206,7 @@ export const CUES = [
   [266.05, 'beamSaberHum', { dur: 4.2, vel: 0.9, fadeIn: 0.1, fadeOut: 0.3 }],
   [267.1, 'beamSaberSwing', { vel: 1, dur: 0.45 }],   // the lunge
   [267.42, 'shieldHit', { vel: 1, pan: 0 }],
-  [267.44, 'shieldStrain', { dur: 0.55, f0: 700, f1: 1800, vel: 0.6 }],
-  [267.42,'tear',       { dur: 0.58, vel: 0.95 }],   // the blade burning through
-  [268,   'shatter',    { vel: 1, shards: 2, count: 46 }],
+  [267.43, 'shatter',    { vel: 1, shards: 2, count: 46 }],   // (2026-10-08) no strain, no burning through: it breaks at the touch
   [278,   'engulf',     { dur: 2.02, vel: 1 }],      // swallowed by the implosion light → 280 white-out
   [CORE_HIT_T, 'crunch', { vel: 1 }],
   [278,   'implosion',  { dur: 2, vel: 0.8 }],
@@ -430,15 +428,15 @@ export const SAMPLE_CUES = [
   [267.1, 'hl_thruster', { dur: 0.4, rate: 1.4, gain: 0.9, fadeOut: 0.1, prio: 8, norand: true }],   // the lunge
   [267.42, 'shockwave', { dur: 1.4, fadeOut: 0.6, gain: 0.9, rate: 1.1, prio: 9, duck: 1.5, norand: true }],   // the tip goes in
   [267.42, 'energy_beam2', { rate: 0.5, gain: 1.2, dur: 0.6, fadeOut: 0.1, prio: 9, norand: true }],
-  [268,   'boom_cine', { gain: 1.1, prio: 9, duck: 2.5, norand: true }],               // SHATTER
+  [267.43, 'boom_cine', { gain: 1.1, prio: 9, duck: 2.5, norand: true }],               // SHATTER
   // barrier collapse: the energy dies with a deep power-down, a shock hit, and a glassy cascade as cells blow out
-  [268.02, 'power_down', { rate: 0.55, gain: 1.1, prio: 9, norand: true }],
-  [268.05, 'shockwave', { gain: 0.9, rate: 0.8, prio: 8, norand: true }],
-  [268.1, 'expl_debris', { gain: 0.8, rate: 1.3, prio: 7, norand: true }],
-  ...Array.from({ length: 14 }, (_, i) => [268.03 + Math.pow(i / 13, 1.4) * 1.1, '@metalRing', { vel: 0.5 * (1 - i / 16), f0: 1800 + 900 * Math.sin(i * 2.7), dec: 0.35, pan: Math.sin(i * 1.9) * 0.7 }]),
-  [268,   'whoosh_rev', { at: 'hit', rate: 1.2, gain: 0.6, prio: 7, norand: true }],
-  [268.2, 'whoosh:c',  { rate: 1.1, gain: 1, dur: CORE_HIT_T - 268.2, fadeOut: 0.3, prio: 8, norand: true }],   // straight on through, into the core
-  [268.2, 'hl_thruster', { loop: true, dur: CORE_HIT_T - 268.2, rate: 1.2, rateTo: 1.5, gain: 0.8, fadeIn: 0.2, fadeOut: 0.1, prio: 8, norand: true }],
+  [267.45, 'power_down', { rate: 0.55, gain: 1.1, prio: 9, norand: true }],
+  [267.48, 'shockwave', { gain: 0.9, rate: 0.8, prio: 8, norand: true }],
+  [267.53, 'expl_debris', { gain: 0.8, rate: 1.3, prio: 7, norand: true }],
+  ...Array.from({ length: 14 }, (_, i) => [267.46 + Math.pow(i / 13, 1.4) * 1.1, '@metalRing', { vel: 0.5 * (1 - i / 16), f0: 1800 + 900 * Math.sin(i * 2.7), dec: 0.35, pan: Math.sin(i * 1.9) * 0.7 }]),
+  [267.43, 'whoosh_rev', { at: 'hit', rate: 1.2, gain: 0.6, prio: 7, norand: true }],
+  [267.6, 'whoosh:c',  { rate: 1.1, gain: 1, dur: CORE_HIT_T - 267.6, fadeOut: 0.3, prio: 8, norand: true }],   // straight on through, into the core
+  [266.6, 'hl_thruster', { loop: true, dur: CORE_HIT_T - 266.6, rate: 1.2, rateTo: 1.6, gain: 1.0, fadeIn: 0.3, fadeOut: 0.1, prio: 8, norand: true }],
   [CORE_HIT_T, 'hit_heavy', { gain: 1, prio: 9, duck: 2, norand: true }],
   [CORE_HIT_T, 'braam2',    { at: 0.15, gain: 1, prio: 9, norand: true }],
   [CORE_HIT_T, 'expl_metal', { gain: 1, rate: 0.8, prio: 9, norand: true }],
