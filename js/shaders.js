@@ -1051,11 +1051,12 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let ci = cos(sa * 0.6); let si = sin(sa * 0.6);
     let y1 = sl.y * ci - sl.z * si; let z1 = sl.y * si + sl.z * ci;          // undo the tilt
     let slm = vec3f(sl.x * ca + z1 * sn, y1, -sl.x * sn + z1 * ca);           // undo the turn
-    g3 = g3 * 0.5 * fineK - slm * 40.0 * slopeK;
+    g3 = g3 * 0.2 * fineK - slm * 40.0 * slopeK;   // (2026-10-07: the grit's share cut — close up the normals read too busy)
     var gw = (inst.m * vec4f(g3, 0.0)).xyz;
     gw = gw / max(length(inst.m[0].xyz), 1e-3);
     gw = gw - n * dot(gw, n);
-    n = normalize(n - gw * 0.022 * (1.0 - 0.8 * moonK));
+    n = normalize(n - gw * 0.009 * (1.0 - 0.8 * moonK));   // (2026-10-07: bump strength 0.022 → 0.009 — scene 98's close rocks were all grain)
+    if (moonK < 0.5) { let nr = normalize((inst.m * vec4f(qs0, 0.0)).xyz); n = normalize(mix(n, nr, 0.3)); }   // (and the mesh's own folds softened: the shading normal leans 30% toward the rock's radial — silhouette unchanged)
     texAO = mix(mix(0.55, 1.0, smoothstep(0.2, 0.6, hq)), 1.0, moonK * 0.85);   // pits hold shadow (barely, on the moon)
     base = mix(base, base * 2.3 + vec3f(0.02), moonK);
     if (moonK > 0.5) {
