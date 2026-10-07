@@ -11,6 +11,7 @@ const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper'
 const MODELS = [
   { name: 'mothership', detail: 4.5, prepass: true, hullDetail: true },   // layered greebles: depth prepass keeps close-ups at 24 fps
   { name: 'ion_frigate', detail: 0.9 },
+  { name: 'wreck_interior', detail: 0, url: 'assets/wreck_interior.glb' },   // a generic craft interior inside broken fighters (tools/make_wreck_interior.py)
   { name: 'ion_frigate_chunks', detail: 0.9, url: 'assets/ion_frigate_chunks.glb', keep: ION_FRIGATE_CHUNKS.map((c) => c.name) },   // its wreck, pre-broken (tools/make_chunks.py, from the LOD copy; flown by js/wreck.js)
   { name: 'assault_frigate', detail: 0.8 },
   ...['interceptor', 'interceptor_b', 'interceptor_c'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })),   // our fighters: assets/light_fighter.glb (user-supplied) via tools/build_rifles.py

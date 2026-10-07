@@ -881,7 +881,7 @@ export function dreadEmitter(R, t, entry) {
 // BAKED WRECKS (2026-10-06): any pre-broken ship (chunks: tools/make_chunks.py) or any model cut into box cells at draw
 // time (the third-party fighters), flying apart on a baked, colliding, tumbling flight (js/wreck.js, baked once per wreck,
 // a few ms), with small explosions popping where the pieces tore off (pops) and the torn faces hot for a while
-const _bakes = new Map(), _xfs = new Map();
+const _bakes = new Map(), _xfs = new Map(), _cells = new Map();
 function wreckFor(key, chunks, dur, seed, speed, spin) {
   let b = _bakes.get(key); if (!b) { b = bakeWreck(1, dur, seed, speed, chunks, spin); _bakes.set(key, b); } return b;
 }
@@ -899,14 +899,18 @@ export function drawChunkWreck(R, model, chunks, base, t, t0, seed, o = {}) {
   const lt = t - t0, bake = wreckFor(model + seed, chunks, 12, seed, o.speed ?? 1, o.spin ?? 1);
   const xf = _xfs.get(model + seed) || {}; _xfs.set(model + seed, xf);
   const e = R.add(model, base); if (!e) return;
-  e.partXf = wreckPose(bake, lt, xf); e.damage = 0.45; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
+  e.partXf = wreckPose(bake, lt, xf); e.damage = 0.3; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
+  if (chunks[0] && chunks[0].cell) {   // the cut faces glowing hot — and they stay hot (a clean cut box per section: its faces are the cuts)
+    let cp = _cells.get(model); if (!cp) { cp = {}; for (const c of chunks) cp[c.name] = c.cell.map((v, k) => v + (k < 3 ? -0.02 : 0.02)); _cells.set(model, cp); }
+    e.clipParts = cp; e.clipHeat = -(0.75 + 0.45 * Math.exp(-lt * 0.6));
+  }
   wreckPops(R, t, t0, base, bake, xf, seed, o.pops ?? 6, (o.popSize ?? 7));
   if (lt < 4) for (let i = 0; i < bake.n; i += 3) {   // the torn faces still burning
     const x = xf[chunks[i].name]; const wp = M.transformPoint([0, 0, 0], base, [x[12], x[13], x[14]]);
     R.fire(wp, (o.popSize ?? 7) * 0.5 * (1 - lt / 4), 0.3 + lt / 8, seed + i, [1, 1, 1], 0.5);
   }
 }
-const _bw = new Float32Array(16), _bc = new Float32Array(16);
+const _bw = new Float32Array(16), _bc = new Float32Array(16), _bi = new Float32Array(16);
 /** a model (fighter) broken into box cells on a baked flight: each cell drawn clipped, tumbling fast */
 export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   const model = R.models[name]; if (!model || t < t0) return;
@@ -916,11 +920,20 @@ export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   const bake = wreckFor(key, chunks, 6, seed, o.speed ?? 1.4, o.spin ?? 4);
   const xf = _xfs.get(key) || {}; _xfs.set(key, xf);
   wreckPose(bake, lt, xf);
+  // the inside: a generic interior (our own, tools/make_wreck_interior.py) scaled into the hull, clipped with each piece
+  const b = model.bounds, bc = [0, 1, 2].map((k) => (b.min[k] + b.max[k]) / 2), bh = [0, 1, 2].map((k) => (b.max[k] - b.min[k]) / 2 * [0.3, 0.5, 0.75][k]);   // (the fuselage, not the wingspan: it stuck out past the hull)
   for (const ch of chunks) {
     M.fromTRS(_bc, [-ch.c[0], -ch.c[1], -ch.c[2]], [0, 0, 0, 1], 1); M.mul(_bw, xf[ch.name], _bc); M.mul(_bw, base, _bw);
     const e = R.add(name, _bw); if (!e) continue;
-    e.clip = ch.box; e.clipHeat = Math.max(0.1, 1 - lt / 1.2) * 1.1;   // (the torn edges cool in about a second) e.damage = 0.35; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
+    e.clip = ch.box; e.clipHeat = -(0.4 + 0.25 * Math.exp(-lt * 0.8));   // (clean flat cuts — negative: no jagged tear — and they stay hot; a small craft: a thin glow)
+    e.damage = 0.35; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
     if (o.texSet) e.texSet = o.texSet;
+    if (R.models.wreck_interior) {
+      M.identity(_bi); _bi[0] = bh[0]; _bi[5] = bh[1]; _bi[10] = bh[2]; _bi[12] = bc[0]; _bi[13] = bc[1]; _bi[14] = bc[2];
+      M.mul(_bi, _bw, _bi);
+      const ei = R.add('wreck_interior', _bi);
+      if (ei) { ei.clip = ch.box.map((v, k) => (v - bc[k % 3]) / bh[k % 3]); ei.clipHeat = -0.02; ei.seed = seed; }   // (no glow of its own: its units are the craft's half-size, the band would swallow it)
+    }
   }
   wreckPops(R, t, t0, base, bake, xf, seed, o.pops ?? 3, o.popSize ?? 2.2);
 }
