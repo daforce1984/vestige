@@ -2,7 +2,7 @@
 import { bakeWreck, wreckPose } from './wreck.js';
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { fxOpts, explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { RIFLE_T, RIFLE_Q, enemyRifleMat, enemyHolsterLocal, droneThrust, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX, energyShards, SHARD_LIFE, eyeSputter, EYE_POPS } from './duel.js';
+import { RIFLE_T, RIFLE_Q, enemyRifleMat, enemyHolsterLocal, droneThrust, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX, energyShards, SHARD_LIFE, eyeSputter, EYE_POPS, droneAccel } from './duel.js';
 import { storyT, filmT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -1039,7 +1039,7 @@ function drawBigShield(R, e, s, t) {
   if (!_bsHide) { _bsHide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'shield') _bsHide[p.name] = 1; }
   const Ms = R.partWorld('enemy_ms', e, 'shield');
   e.hidden = { ...(e.hidden || {}), shield: 1 };
-  droneJets(R, s.shieldW, droneThrust(t), t);
+  droneJets(R, s.shieldW, droneThrust(t), t, droneAccel(t));
   if (s.droneFx && s.droneFx.rcs) for (const q of s.droneFx.rcs) {   // attitude-thruster puffs (scene 35's trim): a white jet of gas off the edge
     const c = M.transformPoint([0, 0, 0], s.shieldW, SHIELD_FACE), p = V.madd([0, 0, 0], c, q.dir, 2.0), k = q.k;
     R.jetFlame(p, V.madd([0, 0, 0], p, q.dir, 1.2 + 2.6 * k), 0.22 + 0.25 * k, [1.6 * k, 1.7 * k, 1.9 * k], 1.0, 7, 3.5);
@@ -1064,15 +1064,35 @@ function drawBigShield(R, e, s, t) {
 }
 // its thrusters: four nozzles on the back of the plate (shield frame −X), flames out behind it
 const DRONE_JETS = [[0.77, 0.55, 1.07], [0.77, 0.55, -0.73], [0.87, -3.25, 0.97], [0.87, -3.25, -0.63]];   // (the four flush nozzles of blender/shield_drone.py v2: their exits)
-function droneJets(R, W, k, t) {
-  if (k <= 0.01) return;
-  const back = V.norm([0, 0, 0], M.transformDir([0, 0, 0], W, [-1, 0, 0]));
+// VECTORED THRUST (2026-10-07): it flies on its jets — the thrust goes where its own flight needs it (duel.js droneAccel,
+// m/s²): the four back nozzles gimbal their flames up to 55° off straight back to push along it; when it must push back
+// against its face the forward ports fire; sideways / up / down the rim vents do (the gas always thrown the other way)
+const DRONE_FWD = [[1.3, 1.3, 1.37], [1.3, 1.3, -1.03], [1.3, -2.9, 1.42], [1.3, -2.9, -1.08]];   // forward ports (shield frame)
+const DRONE_SIDE = { zp: [0.8, -0.55, 1.97], zn: [0.8, -0.55, -1.63], yp: [1.1, 1.7, 0.17], yn: [0.95, -6.95, 0.17] };   // rim vents: +Z / -Z side, top, tip
+const A_FULL = 60;   // m/s² that reads as full burn (its orbit asks ~47)
+function droneJets(R, W, kScript, t, A) {
+  const X = V.norm([0, 0, 0], M.transformDir([0, 0, 0], W, [1, 0, 0])), Y = V.norm([0, 0, 0], M.transformDir([0, 0, 0], W, [0, 1, 0])), Z = V.norm([0, 0, 0], M.transformDir([0, 0, 0], W, [0, 0, 1]));
+  if (kScript <= 0.01) return;   // (docked / gone)
+  const am = V.len(A || [0, 0, 0]), T = am > 1e-3 ? V.scale([0, 0, 0], A, 1 / am) : X;   // the thrust's direction (along its acceleration)
+  const k = Math.min(1.8, Math.max(kScript, am / A_FULL));
+  const tx = V.dot(T, X), flick = (i) => 0.85 + 0.15 * Math.sin(t * 61 + i * 2.1);
+  // the back nozzles: flame opposite the thrust, kept within 55° of straight back (-X)
+  let fd = V.scale([0, 0, 0], T, -1); const c = V.dot(fd, V.scale([0, 0, 0], X, -1)), cMin = Math.cos(55 * DEG);
+  if (c < cMin) { const perp = V.madd([0, 0, 0], fd, X, c); const pl = V.len(perp); fd = pl > 1e-4 ? V.norm([0, 0, 0], V.madd([0, 0, 0], V.scale([0, 0, 0], X, -cMin), perp, Math.sin(55 * DEG) / pl)) : V.scale([0, 0, 0], X, -1); }
+  const kb = k * Math.max(0.25, Math.min(1, (tx + 0.4) / 0.9));   // (the more its thrust leans back against its face, the less the back nozzles can give)
   DRONE_JETS.forEach((q, i) => {
-    const p = M.transformPoint([0, 0, 0], W, q), fl = k * (0.85 + 0.15 * Math.sin(t * 61 + i * 2.1)), L = 1.2 + 3.4 * fl;
-    R.jetFlame(p, V.madd([0, 0, 0], p, back, L), 0.28 + 0.3 * fl, [1.6 * fl, 0.75 * fl, 0.3 * fl], 1.0, i * 4.3 + 2, 3);
+    const p = M.transformPoint([0, 0, 0], W, q), fl = kb * flick(i), L = 1.2 + 3.4 * fl;
+    R.jetFlame(p, V.madd([0, 0, 0], p, fd, L), 0.28 + 0.3 * fl, [1.6 * fl, 0.75 * fl, 0.3 * fl], 1.0, i * 4.3 + 2, 3);
     R.glow(p, 0.35 + 0.5 * fl, [2.2 * fl, 1.2 * fl, 0.5 * fl], 0.4);
   });
-  R.light(M.transformPoint([0, 0, 0], W, [-1.5, -2.3, 0.2]), 14, [1, 0.6, 0.3], 1.5 * k);
+  const small = (pl, dir, kk, i) => { if (kk < 0.05) return; const p = M.transformPoint([0, 0, 0], W, pl), fl = kk * flick(i + 7);
+    R.jetFlame(p, V.madd([0, 0, 0], p, dir, 0.8 + 2.4 * fl), 0.16 + 0.18 * fl, [1.5 * fl, 0.8 * fl, 0.35 * fl], 1.0, i * 2.9 + 11, 3.2); R.glow(p, 0.25 + 0.3 * fl, [1.8 * fl, 1.0 * fl, 0.45 * fl], 0.3); };
+  const kf = k * Math.max(0, -tx - 0.15) / 0.85;                  // pushing back: the forward ports (flame out of the face)
+  DRONE_FWD.forEach((q, i) => small(q, X, kf, i));
+  const ty = V.dot(T, Y), tz = V.dot(T, Z);                     // sideways / up / down: the rim vents (flame the other way)
+  small(DRONE_SIDE.zn, V.scale([0, 0, 0], Z, -1), k * Math.max(0, tz - 0.2), 20); small(DRONE_SIDE.zp, Z, k * Math.max(0, -tz - 0.2), 21);
+  small(DRONE_SIDE.yn, V.scale([0, 0, 0], Y, -1), k * Math.max(0, ty - 0.2), 22); small(DRONE_SIDE.yp, Y, k * Math.max(0, -ty - 0.2), 23);
+  R.light(M.transformPoint([0, 0, 0], W, [-1.5, -2.3, 0.2]), 14, [1, 0.6, 0.3], 1.5 * kb);
 }
 function drawLostShield(R, t) {
   const t0 = SHIELD_HIT_T + 0.03;

@@ -1488,6 +1488,13 @@ export const droneThrust = (tw) => tw < DRONE_L0 || tw > SHIELD_HIT_T + 0.03 ? 0
 const frameFrom = (n, U0) => { const Y = nrm(sub(U0, scl(n, V.dot(U0, n)))); return [...n, ...Y, ...V.cross([0, 0, 0], n, Y)]; };   // face (+X) along n, long axis up
 const rotAx = (a, ang) => { const s2 = Math.sin(ang / 2); return colsFromQ([a[0] * s2, a[1] * s2, a[2] * s2, Math.cos(ang / 2)]); };
 const slerpR = (A, B, k) => colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(A), qFromCols(B), k));
+/** the drone's acceleration (world, m/s²) at t, from its own flight (its face centre over ±h) — what its thrusters must give it
+ *  (shots.js vectors them to it) */
+export function droneAccel(t, h = 0.04) {
+  const at = (x) => { const a = duelEnemy1(x), e = a && a.vis !== false ? a : duelEnemy2(x); return e && e.shieldW ? M.transformPoint([0, 0, 0], e.shieldW, SHIELD_C) : null; };
+  const p0 = at(t - h), p1 = at(t), p2 = at(t + h); if (!p0 || !p1 || !p2) return [0, 0, 0];
+  return [0, 1, 2].map((k) => (p2[k] - 2 * p1[k] + p0[k]) / (h * h));
+}
 function shieldDrone(tw, s) {
   s.droneFx = null;
   const fk = duelFK({ ...s, shieldW: null }, 'enemy_ms');
