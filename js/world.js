@@ -883,7 +883,7 @@ export function dreadEmitter(R, t, entry) {
 // a few ms), with small explosions popping where the pieces tore off (pops) and the torn faces hot for a while
 const _bakes = new Map(), _xfs = new Map(), _cells = new Map();
 function wreckFor(key, chunks, dur, seed, speed, spin) {
-  let b = _bakes.get(key); if (!b) { b = bakeWreck(1, dur, seed, speed, chunks, spin); _bakes.set(key, b); } return b;
+  let b = _bakes.get(key); if (!b) { b = bakeWreck(1, dur, seed, speed, chunks, spin, 2); _bakes.set(key, b); } return b;   // (2 substeps: plenty for pieces flying apart)
 }
 function wreckPops(R, t, t0, base, bake, xf, seed, n, size) {   // small blasts at the broken spots, one after another
   for (let j = 0; j < n; j++) {
@@ -896,7 +896,7 @@ function wreckPops(R, t, t0, base, bake, xf, seed, n, size) {   // small blasts 
   }
 }
 export function drawChunkWreck(R, model, chunks, base, t, t0, seed, o = {}) {
-  const lt = t - t0, bake = wreckFor(model + seed, chunks, 12, seed, o.speed ?? 1, o.spin ?? 1);
+  const lt = t - t0, bake = wreckFor(model + seed, chunks, 8, seed, o.speed ?? 1, o.spin ?? 1);
   const xf = _xfs.get(model + seed) || {}; _xfs.set(model + seed, xf);
   const e = R.add(model, base); if (!e) return;
   e.partXf = wreckPose(bake, lt, xf); e.damage = 0.3; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
@@ -910,32 +910,35 @@ export function drawChunkWreck(R, model, chunks, base, t, t0, seed, o = {}) {
     R.fire(wp, (o.popSize ?? 7) * 0.5 * (1 - lt / 4), 0.3 + lt / 8, seed + i, [1, 1, 1], 0.5);
   }
 }
-const _bw = new Float32Array(16), _bc = new Float32Array(16), _bi = new Float32Array(16);
-/** a model (fighter) broken into box cells on a baked flight: each cell drawn clipped, tumbling fast */
+/** a fighter coming apart: its pre-cut copy (<type>_cells: renderer cellSplit, our interior inside) — ONE entry for the whole
+ *  wreck, the pieces placed by the baked flight (partXf), each drawing only its own triangles, the cut faces glowing */
+const cellsOf = (name) => (name.startsWith('enemy_fighter') ? 'enemy_fighter_cells' : name.startsWith('interceptor') ? 'interceptor_cells' : name + '_cells');
+function boxWreckBake(R, name, seed, o = {}) {
+  const cn = cellsOf(name), model = R.models[cn]; if (!model || !model.cells) return null;
+  return { cn, model, bake: wreckFor(cn + '#' + seed, model.cells, 3, seed, o.speed ?? 1.4, o.spin ?? 4) };   // (3 s baked: they scatter fast; then carried on)
+}
 export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
-  const model = R.models[name]; if (!model || t < t0) return;
+  if (t < t0) return;
   const lt = t - t0; if (lt > (o.life ?? 10)) return;
-  const key = name + '#' + seed;
-  let chunks = _bakes.get(key + 'c'); if (!chunks) { chunks = boxChunks(model.bounds, o.grid || [3, 2, 3], seed); _bakes.set(key + 'c', chunks); }
-  const bake = wreckFor(key, chunks, 6, seed, o.speed ?? 1.4, o.spin ?? 4);
-  const xf = _xfs.get(key) || {}; _xfs.set(key, xf);
-  wreckPose(bake, lt, xf);
-  // the inside: a generic interior (our own, tools/make_wreck_interior.py) scaled into the hull, clipped with each piece
-  const b = model.bounds, bc = [0, 1, 2].map((k) => (b.min[k] + b.max[k]) / 2), bh = [0, 1, 2].map((k) => (b.max[k] - b.min[k]) / 2 * [0.3, 0.5, 0.75][k]);   // (the fuselage, not the wingspan: it stuck out past the hull)
-  for (const ch of chunks) {
-    M.fromTRS(_bc, [-ch.c[0], -ch.c[1], -ch.c[2]], [0, 0, 0, 1], 1); M.mul(_bw, xf[ch.name], _bc); M.mul(_bw, base, _bw);
-    const e = R.add(name, _bw); if (!e) continue;
-    e.clip = ch.box; e.clipHeat = -(0.4 + 0.25 * Math.exp(-lt * 0.8));   // (clean flat cuts — negative: no jagged tear — and they stay hot; a small craft: a thin glow)
-    e.damage = 0.35; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
-    if (o.texSet) e.texSet = o.texSet;
-    if (R.models.wreck_interior) {
-      M.identity(_bi); _bi[0] = bh[0]; _bi[5] = bh[1]; _bi[10] = bh[2]; _bi[12] = bc[0]; _bi[13] = bc[1]; _bi[14] = bc[2];
-      M.mul(_bi, _bw, _bi);
-      const ei = R.add('wreck_interior', _bi);
-      if (ei) { ei.clip = ch.box.map((v, k) => (v - bc[k % 3]) / bh[k % 3]); ei.clipHeat = -0.02; ei.seed = seed; }   // (no glow of its own: its units are the craft's half-size, the band would swallow it)
-    }
-  }
-  wreckPops(R, t, t0, base, bake, xf, seed, o.pops ?? 3, o.popSize ?? 2.2);
+  const w = boxWreckBake(R, name, seed, o); if (!w) return;
+  const key = w.cn + '#' + seed, xf = _xfs.get(key) || {}; _xfs.set(key, xf);
+  const e = R.add(w.cn, base); if (!e) return;
+  e.partXf = wreckPose(w.bake, lt, xf);
+  let cp = _cells.get(w.cn); if (!cp) { cp = {}; for (const c of w.model.cells) cp[c.name] = [...c.lo.map((v) => v - 0.02), ...c.hi.map((v) => v + 0.02)]; _cells.set(w.cn, cp); }
+  e.clipParts = cp; e.clipHeat = -(0.4 + 0.25 * Math.exp(-lt * 0.8));   // (clean flat cuts, staying hot)
+  e.damage = 0.35; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
+  wreckPops(R, t, t0, base, w.bake, xf, seed, o.pops ?? 3, o.popSize ?? 2.2);
+}
+/** every wreck's flight baked at load (they used to be baked the first time each one was drawn: a hitch mid-shot) */
+export function prepWrecks(R) {   // (one per idle slice after load: nothing blocks; a wreck not baked yet bakes when first drawn)
+  const jobs = [];
+  for (const [, k] of CO_BOOM) jobs.push(() => boxWreckBake(R, fighterModel(CO_FLY[k][4], k), 900 + k));   // (the cold open's kills first: they come first)
+  PAIRS.forEach((p, k) => { if (p.die) jobs.push(() => boxWreckBake(R, fighterModel(p.hiigChases, k), 200 + k)); });
+  EXTRA_H.forEach((f, i) => { if (f.die && f.type === 'ion_frigate') jobs.push(() => wreckFor('ion_frigate_chunks' + (60 + i), ION_FRIGATE_CHUNKS, 8, 60 + i, 1.1, 2.2)); });
+  for (let k = 1; k < 4; k++) jobs.push(() => boxWreckBake(R, fighterModel(false, k), 620 + k));   // (the strike wingmen)
+  const t0 = performance.now();
+  const next = () => { const j = jobs.shift(); if (!j) { console.log('[wrecks] all baked in the background,', (performance.now() - t0).toFixed(0), 'ms'); return; } j(); setTimeout(next, 0); };
+  setTimeout(next, 0);
 }
 // the wreck: the pre-broken hull on its baked, colliding flight (js/wreck.js) — one entry for all 32 chunks
 let _wreck = null; const _wreckXf = {}, _wp = [0, 0, 0];

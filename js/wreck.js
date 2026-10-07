@@ -12,7 +12,7 @@ const REST = 0.35, FRIC = 0.25;      // restitution, friction of a chunk hitting
 /** bake the flight: returns { n, steps, track: Float32Array(steps*n*7) [x y z qx qy qz qw], chunks, endV, endW }
  *  chunks: [{ name, c, lo, hi }] (model units; × scale) — DREAD_CHUNKS, ION_FRIGATE_CHUNKS, or boxChunks() for a model
  *  drawn clipped; spin: × the tumble rate; after `dur` wreckPose carries each piece on with its last velocity and spin */
-export function bakeWreck(scale, dur, seed = 77, speed = 0.7, chunks = DREAD_CHUNKS, spin = 1) {
+export function bakeWreck(scale, dur, seed = 77, speed = 0.7, chunks = DREAD_CHUNKS, spin = 1, sub = SUB) {
   const C = chunks, n = C.length;
   let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
   for (const c of C) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], (c.c[k] + c.lo[k]) * scale); hi[k] = Math.max(hi[k], (c.c[k] + c.hi[k]) * scale); }
@@ -45,10 +45,10 @@ export function bakeWreck(scale, dur, seed = 77, speed = 0.7, chunks = DREAD_CHU
   const invI = (b, v) => { const l = mtv(b.rot, v); return mv(b.rot, [l[0] * b.Ib[0], l[1] * b.Ib[1], l[2] * b.Ib[2]]); };   // world inverse inertia
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-  const h = DT / SUB;
+  const h = DT / sub;
   for (let st = 0; st < steps; st++) {
     for (let i = 0; i < n; i++) { const b = B[i], o = (st * n + i) * 7; track.set(b.x, o); track.set(b.q, o + 3); }
-    for (let sub = 0; sub < SUB; sub++) {
+    for (let si = 0; si < sub; si++) {
       for (const b of B) rotOf(b);
       const W = B.map((b) => b.sph.map((p) => { const q = mv(b.rot, p); return [b.x[0] + q[0], b.x[1] + q[1], b.x[2] + q[2]]; }));
       for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {

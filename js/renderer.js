@@ -5,6 +5,7 @@
 import { BG, MESH, MOONBAKE, DEPTH_RESOLVE, SPRITE, LENS, BLOOM, FINAL, BLIT, CELESTIAL } from './shaders.js';
 import { M, V, Q } from './math.js';
 import { parseGLB } from './gltf.js';
+import { boxChunks } from './wreck.js';
 // mechs get no rim light and no camera-side fill light (they read as lit by the lens) — Sigma, the RONINs, the mace, the hands
 const NO_RIM = new Set(['gundam', 'enemy_ms', 'mace', 'mech_hand']);
 
@@ -44,6 +45,53 @@ function scaleGLB(g, k) {
   g.bounds.min = g.bounds.min.map((v) => v * k); g.bounds.max = g.bounds.max.map((v) => v * k);
 }
 
+// A MODEL CUT INTO ITS WRECK PIECES (2026-10-07: the fighters' wrecks drew the whole craft once per piece, clipped — 18 craft
+// per wreck): the box cells of its bounds (wreck.js boxChunks, one fixed cut per model), each its own part holding only the
+// triangles that reach into it (the renderer's clipParts cut them clean at the cell's faces), plus a generic interior of our
+// own (opts.interior, scaled into the fuselage: opts.fuse × the half-size) — one entry draws the whole wreck, the parts
+// placed by partXf from the baked flight. g.cells: the chunk list for the physics (names = part names)
+function cellSplit(g, opts, gi) {
+  const cells = boxChunks(g.bounds, opts.grid, opts.seed || 7), V0 = g.verts, I0 = g.indices;
+  const tris = [];   // [x0..z2, nx.., u.., mat] in model space
+  const xf = (m, x, y, z) => [m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]];
+  const xn = (m, x, y, z) => { const v = [m[0] * x + m[4] * y + m[8] * z, m[1] * x + m[5] * y + m[9] * z, m[2] * x + m[6] * y + m[10] * z], l = Math.hypot(...v) || 1; return v.map((c) => c / l); };
+  const take = (G, P, matOff, place) => {
+    for (const pt of G.parts) for (const gr of pt.groups) for (let k = gr.first; k < gr.first + gr.count; k += 3) {
+      const t = { p: [], n: [], uv: [], mat: gr.mat + matOff };
+      for (let j = 0; j < 3; j++) { const v = G.indices[k + j] * 8, W = place(pt.worldRest);
+        t.p.push(xf(W, G.verts[v], G.verts[v + 1], G.verts[v + 2])); t.n.push(xn(W, G.verts[v + 3], G.verts[v + 4], G.verts[v + 5])); t.uv.push([G.verts[v + 6], G.verts[v + 7]]); }
+      tris.push(t);
+    }
+  };
+  take(g, null, 0, (w) => w);
+  const materials = g.materials.slice();
+  if (gi) {
+    const b = g.bounds, fu = opts.fuse || [0.3, 0.5, 0.75], S = M.new();
+    S[0] = (b.max[0] - b.min[0]) / 2 * fu[0]; S[5] = (b.max[1] - b.min[1]) / 2 * fu[1]; S[10] = (b.max[2] - b.min[2]) / 2 * fu[2];
+    S[12] = (b.min[0] + b.max[0]) / 2; S[13] = (b.min[1] + b.max[1]) / 2; S[14] = (b.min[2] + b.max[2]) / 2;
+    take(gi, null, materials.length, (w) => M.mul(M.new(), S, w));
+    materials.push(...gi.materials);
+  }
+  const parts = [{ name: '__root', parent: -1, rest: M.new(), worldRest: M.new(), groups: [] }];
+  const vs = [], is = [];
+  for (const c of cells) {
+    const lo = c.box.slice(0, 3), hi = c.box.slice(3, 6), by = new Map();
+    for (const t of tris) {
+      let ok = true;
+      for (let a = 0; a < 3 && ok; a++) { const mn = Math.min(t.p[0][a], t.p[1][a], t.p[2][a]), mx = Math.max(t.p[0][a], t.p[1][a], t.p[2][a]); if (mx < lo[a] || mn > hi[a]) ok = false; }
+      if (!ok) continue;
+      (by.get(t.mat) || by.set(t.mat, []).get(t.mat)).push(t);
+    }
+    const part = { name: c.name, parent: 0, rest: M.fromTRS(M.new(), c.c, [0, 0, 0, 1], 1), worldRest: M.fromTRS(M.new(), c.c, [0, 0, 0, 1], 1), groups: [] };
+    for (const [mat, list] of by) {
+      const first = is.length;
+      for (const t of list) for (let j = 0; j < 3; j++) { is.push(vs.length / 8); vs.push(t.p[j][0] - c.c[0], t.p[j][1] - c.c[1], t.p[j][2] - c.c[2], ...t.n[j], ...t.uv[j]); }
+      part.groups.push({ mat, first, count: is.length - first });
+    }
+    parts.push(part);
+  }
+  return { parts, materials, empties: {}, verts: new Float32Array(vs), indices: new Uint32Array(is), bounds: g.bounds, cells };
+}
 // front-to-back triangle order inside every draw group (by centroid along `axis`, e.g. [1,0,0] = +X first) so early-Z
 // rejects hidden layers — used for the interior bay, which is always seen from outside the starboard hull
 function sortTriangles(g, axis) {
@@ -367,8 +415,13 @@ export class Renderer {
       try {
         const r = await fetch(s.url);
         if (!r.ok) throw new Error(r.status);
-        const g = parseGLB(await r.arrayBuffer(), new Set(s.keep || []));
+        let g = parseGLB(await r.arrayBuffer(), new Set(s.keep || []));
         if (s.scale && s.scale !== 1) scaleGLB(g, s.scale);
+        if (s.cells) {   // broken into its wreck pieces at load (in memory only: nothing is written — third-party files stay as they are)
+          let gi = null;
+          if (s.cells.interior) { try { const ri = await fetch(s.cells.interior); if (ri.ok) gi = parseGLB(await ri.arrayBuffer()); } catch (e) { /* no interior */ } }
+          g = cellSplit(g, s.cells, gi);
+        }
         if (s.sortAxis) sortTriangles(g, s.sortAxis);
         if (s.resphere) for (const pn of s.resphere) resphere(g, pn, 192, 96);
         return { s, g };
@@ -408,7 +461,8 @@ export class Renderer {
       model.partWorld = g.parts.map(() => M.new());
       model.poseQ = g.parts.map(() => [0, 0, 0, 1]);
       model.tris = g.indices.length / 3;
-      if (s.keepGeo) model.geo = { verts: g.verts, indices: g.indices, parts: g.parts };   // (kept on the CPU: the waist cut's real cross-section)
+      if (s.keepGeo) model.geo = { verts: g.verts, indices: g.indices, parts: g.parts };
+      if (g.cells) model.cells = g.cells;   // (kept on the CPU: the waist cut's real cross-section)
       this.models[s.name] = model;
       this.modelList.push(model);
       model.emitPoints = {};

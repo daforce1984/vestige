@@ -4,14 +4,17 @@ import { storyT, filmT, insertFilm, inSkip, TEAR_F0, TEAR_F1 } from './timemap.j
 import { DUEL_CAMS } from './duel.js';
 import { DREAD_CHUNKS } from './dread_chunks.js';
 import { ION_FRIGATE_CHUNKS } from './ion_frigate_chunks.js';
-import { prepWreck } from './world.js';
+import { prepWreck, prepWrecks } from './world.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
   'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
 const MODELS = [
   { name: 'mothership', detail: 4.5, prepass: true, hullDetail: true },   // layered greebles: depth prepass keeps close-ups at 24 fps
   { name: 'ion_frigate', detail: 0.9 },
-  { name: 'wreck_interior', detail: 0, url: 'assets/wreck_interior.glb' },   // a generic craft interior inside broken fighters (tools/make_wreck_interior.py)
+  { name: 'wreck_interior', detail: 0, url: 'assets/wreck_interior.glb' },
+  // the fighters' wrecks: each craft cut into its pieces at load, in memory (renderer cellSplit), with our own interior inside
+  { name: 'interceptor_cells', detail: 0, url: 'assets/light_fighter_game_lod.glb', texSet: 6, texBit: 1024, cells: { grid: [3, 2, 3], seed: 11, interior: 'assets/wreck_interior.glb' } },
+  { name: 'enemy_fighter_cells', detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256, cells: { grid: [3, 2, 3], seed: 13, interior: 'assets/wreck_interior.glb' } },   // a generic craft interior inside broken fighters (tools/make_wreck_interior.py)
   { name: 'ion_frigate_chunks', detail: 0.9, url: 'assets/ion_frigate_chunks.glb', keep: ION_FRIGATE_CHUNKS.map((c) => c.name) },   // its wreck, pre-broken (tools/make_chunks.py, from the LOD copy; flown by js/wreck.js)
   { name: 'assault_frigate', detail: 0.8 },
   ...['interceptor', 'interceptor_b', 'interceptor_c'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })),   // our fighters: assets/light_fighter.glb (user-supplied) via tools/build_rifles.py
@@ -266,6 +269,7 @@ async function boot() {
     status.textContent = '모델 로딩…';
     await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png', 'assets/tex/light_fighter_game_albedo.png', 'assets/tex/light_fighter_game_orm.png', 'assets/tex/dreadnought_game_albedo.png', 'assets/tex/dreadnought_game_orm.png', 'assets/tex/cargo_game_albedo.png', 'assets/tex/cargo_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp'), R.loadMoonData('assets/tex/moon_lroc.png')]);
     prepWreck();   // the dreadnought's wreck flight, baked now (~0.6 s) rather than as a hitch when it blows
+    prepWrecks(R);   // every frigate / fighter wreck's flight, too (in the background, one per idle slice)
     {
       // our flagship after the Buzz Hound corvette: its windows, lights and engines glow teal-green
       const mm = R.models.mothership, T = { window: [0.35, 1.0, 0.75], amber: [0.3, 1.0, 0.7], blue_light: [0.25, 1.0, 0.8], engine: [0.55, 1.0, 0.9] };
