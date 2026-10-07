@@ -11,7 +11,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  STRIKE_FLIGHT, S10_SWAP_DT, EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drawBoxWreck, drainOutflow, fighterModel, ionCharge, queueIonCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
+  STRIKE_FLIGHT, S10_SWAP_DT, EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drawBoxWreck, drainOutflow, fighterModel, ionCharge, queueIonCharge, EARTH_T, CORE_HIT_T, THRUST_T, LAUNCH_T, HOVER_T, HOVER_Z, HOVER_V, LAUNCH_Z, LAUNCH_A, CORE_Z, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -112,27 +112,25 @@ const tmpM = M.new();
 
 // ---------------- berserk choreography helpers (film 262–278)
 const SHIELD_R = 150;
-const B_HITS = [267.42];   // (2026-09-30) one blow: the beam saber at ten times its output, thrust straight through the barrier
-export const THRUST_T = 267.42, MEGA_LEN = 2.5;   // the blade tip reaches the shield; the blade 2.5× its length at full output
+const B_HITS = [THRUST_T];   // (2026-09-30) one blow: the beam saber at ten times its output, thrust straight through the barrier
+export { THRUST_T }; export const MEGA_LEN = 2.5;   // the blade tip reaches the shield; the blade 2.5× its length at full output
 const THRUST_Z = -SHIELD_R - 5 - 13 * MEGA_LEN;
 const DIVE_END_Z = -420, CHARGE_V = 38;   // the dive hands over to the charge at 262 here, at this speed (m/s along the axis)   // his z when the tip touches the dome (hilt ~5 m ahead of him)
 function berserkZ(t) {
-  const hitZ = -SHIELD_R - 8;
-  // ONE CHARGE from the dive to the barrier: never stopping, never backing off — he keeps driving in, accelerating, draws
-  // the blade back on the run and puts it straight through at the end of it
-  if (t < THRUST_T) {   // Hermite: leaves the dive's end at its speed, reaches the barrier at the thrust's
-    const T = THRUST_T - 262, w = sat((t - 262) / T), z0 = DIVE_END_Z, z1 = THRUST_Z, v0 = CHARGE_V, v1 = CHARGE_V * 1.2;
+  // (2026-10-08) the charge from the dive pulls up short of the dome (Hermite to a near-stop at HOVER_T), creeps while he
+  // gathers himself, then LAUNCHES: constant hard acceleration, through the barrier, the blade into the core like a missile
+  if (t < HOVER_T) {
+    const T = HOVER_T - 262, w = sat((t - 262) / T), z0 = DIVE_END_Z, z1 = HOVER_Z, v0 = CHARGE_V, v1 = HOVER_V;
     return (2 * w ** 3 - 3 * w * w + 1) * z0 + (w ** 3 - 2 * w * w + w) * T * v0 + (-2 * w ** 3 + 3 * w * w) * z1 + (w ** 3 - w * w) * T * v1;
   }
-  // (2026-10-06) and on: straight THROUGH the barrier at the thrust's speed (~46 m/s), never checked — the dome breaks
-  // round him as he punches through (268) — and the blade into the core at CORE_HIT_T, the body's way carried in after it
-  if (t < CORE_HIT_T) return lerp(THRUST_Z, -36, (t - THRUST_T) / (CORE_HIT_T - THRUST_T));
-  return -36 + 7.5 * easeOut(sat((t - CORE_HIT_T) / 0.5)) + 1.5 * smooth(CORE_HIT_T + 0.5, 277.5, t);   // drives in (its speed carried) and keeps grinding (no rebound)
+  if (t < LAUNCH_T) return HOVER_Z + HOVER_V * (t - HOVER_T);
+  if (t < CORE_HIT_T) { const tau = t - LAUNCH_T; return LAUNCH_Z + HOVER_V * tau + 0.5 * LAUNCH_A * tau * tau; }
+  return CORE_Z + 7.5 * easeOut(sat((t - CORE_HIT_T) / 0.5)) + 1.5 * smooth(CORE_HIT_T + 0.5, 277.5, t);   // slammed in (its speed carried) and keeps grinding (no rebound)
 }
 // the thrust: the ram's two-handed levelled grip, drawn back hard (elbows back, torso coiled), then driven straight in
 function thrustPose(t) {
   const out = ramPose(t);
-  const wind = smooth(266.2, 267.0, t) * (1 - smooth(267.18, 267.36, t)), lunge = smooth(267.18, 267.36, t) * (1 - smooth(268.2, 269.5, t));   // (drawn back on the run, the thrust straight out of it)
+  const wind = smooth(266.2, 267.0, t) * (1 - smooth(LAUNCH_T - 0.06, LAUNCH_T + 0.1, t)), lunge = smooth(LAUNCH_T - 0.06, LAUNCH_T + 0.1, t) * (1 - smooth(THRUST_T + 0.6, THRUST_T + 2, t));   // (held drawn back through the hover, the thrust out of the launch)   // (drawn back on the run, the thrust straight out of it)
   out.torso[0] -= 0.55 * wind; out.head[0] += 0.3 * wind; out.torso[0] += 0.25 * lunge;
   for (const sd of ['L', 'R']) { out['arm_' + sd + '_lower'][0] -= 0.75 * wind; out['arm_' + sd + '_upper'][0] += 0.35 * wind; out['arm_' + sd + '_upper'][0] -= 0.15 * lunge; }
   out.leg_L_upper[0] += 0.4 * lunge - 0.3 * wind; out.leg_R_upper[0] += 0.5 * lunge - 0.2 * wind;
@@ -452,13 +450,13 @@ function gundamStateRaw(t, s) {
       }
       mixPose(s.pose, thrustPose(t), smooth(265.4, 265.95, t));   // the saber in both hands: drawn back, the thrust
       mixPose(s.pose, roarPose(t), roarK(t));                     // head flung back, arms thrown wide: the roar
-      if (t > 268) mixPose(s.pose, ramPose(t), smooth(268.0, 268.8, t));
+      if (t > THRUST_T) mixPose(s.pose, ramPose(t), smooth(THRUST_T, THRUST_T + 0.3, t));
     } else { for (const k in s.pose) delete s.pose[k]; Object.assign(s.pose, ramPose(t)); }
     s.saber = smooth(266.0, 266.25, t);
     s.saberPow = 1 + 9 * smooth(265.98, 266.3, t) * (1 - smooth(276, 277.5, t));   // TEN times its output — through the barrier and into the core (2026-10-06: was cut back at 268.3)
     s.thr = 1; s.damage = 0.15 + smooth(262, 278, t) * 0.25;
     s.berserk = smooth(262, 262.4, t) * (1 - smooth(276, 278, t));
-    s.redBurn = smooth(266.55, 266.95, t) * (1 - smooth(CORE_HIT_T, CORE_HIT_T + 0.6, t));   // (2026-10-08) the red charge: every booster flat out
+    s.redBurn = (0.3 * smooth(266.55, 266.95, t) + 0.25 * smooth(267.5, LAUNCH_T - 0.1, t) + 0.75 * smooth(LAUNCH_T - 0.04, LAUNCH_T + 0.06, t)) * (1 - smooth(CORE_HIT_T, CORE_HIT_T + 0.6, t));   // (2026-10-08) red: held low through the hover, building, then everything at the launch
   } else if (t < 292) {
     const u = easeOut(sat((t - IMPLODE) / 10));
     // spent: no spin — the body goes slack and drifts backward, still facing the core (we see its back against the light)
@@ -2788,12 +2786,13 @@ shot(263.3, 266.95, 'B2 the blade at ten times its output', (c) => {
     c.post.flash = Math.max(c.post.flash, 0.16 * Math.exp(-Math.max(0, lr) * 9));
   }
 });
-// THE ONE TAKE (2026-10-08): wide off his left as he comes on, every booster burning red and flat out — the blade touches
-// the dome and the barrier simply breaks round him, no resistance — the camera swings in behind him down the line into the
-// core and round to his side as the blade goes in, all in one shot (was B2b / B3 SHATTER / B4 the rush)
-const ONE_TAKE = [   // [t, camera offset from him, aim offset from him, fov]
-  [266.95, [-62, 12, -6], [0, 4, 40], 46], [267.42, [-58, 12, -22], [0, 4, 50], 48], [268.3, [-44, 11, -40], [0, 4, 70], 52],
-  [269.25, [-24, 10, -38], [0, 4, 90], 60], [270.15, [-40, 9, -12], [0, 5, 14], 48], [272.3, [-33, 8, -3], [0, 5, 10], 44]];
+// THE ONE TAKE (2026-10-08): wide off his left as he pulls up short of the dome — hanging there, the blade drawn back, the
+// red boosters building, the camera easing round behind him — then he FIRES OFF like a missile: the camera is left behind,
+// he streaks away down the line, the barrier breaks round him without a check and the blade slams into the core; the
+// camera races in after him and comes round to his side, all in one shot (was B2b / B3 SHATTER / B4 the rush)
+const ONE_TAKE = [   // the hover: [t, camera offset from him, aim offset from him, fov]
+  [266.95, [-62, 12, -6], [0, 4, 26], 46], [267.9, [-56, 11, -20], [0, 4, 34], 46], [268.9, [-42, 10, -34], [0, 4, 44], 46],
+  [LAUNCH_T, [-30, 9, -42], [0, 4, 56], 46], [LAUNCH_T + 1, [-28, 9, -44], [0, 4, 60], 46]];
 function oneTake(t) {
   const K = ONE_TAKE; let i = 0; while (i < K.length - 2 && t > K[i + 1][0]) i++;
   const u = sat((t - K[i][0]) / (K[i + 1][0] - K[i][0]));
@@ -2804,19 +2803,43 @@ function oneTake(t) {
 shot(266.95, 272.3, 'B2b one take — the red charge through the barrier into the core', (c) => {
   c.env.sunDisc = 0.12;
   const { t } = c;
-  const g = gundamState(t), ot = oneTake(t);
-  camLook(c, addv(g.pos, ot.off), addv(g.pos, ot.aim), ot.fov, -0.05 + 0.04 * Math.sin(t * 1.3));
-  const hk = berserkHitK(t);
-  shake(c, 0.35 + hk * 2.2 + (t > CORE_HIT_T - 0.15 ? 1.4 * Math.exp(-Math.max(0, t - CORE_HIT_T) * 2) : 0) + 0.3 * smooth(266.6, 267.0, t), 16);
-  c.post.flash = (t > THRUST_T ? 0.2 * Math.exp(-(t - THRUST_T) * 8) : 0) + (t > CORE_HIT_T && t < CORE_HIT_T + 0.2 ? 0.12 * (1 - (t - CORE_HIT_T) / 0.2) : 0);
-  c.post.shakeBlur = 0.003 * hk;
+  const g = gundamState(t);
+  if (t < LAUNCH_T) {
+    const ot = oneTake(t);
+    camLook(c, addv(g.pos, ot.off), addv(g.pos, ot.aim), ot.fov, -0.05 + 0.04 * Math.sin(t * 1.3));
+  } else {
+    // left behind at the launch: the camera lurches after him far slower than he goes (he streaks away from it), then
+    // races in once he has struck and settles at his side
+    const gL = gundamState(LAUNCH_T), ot = oneTake(LAUNCH_T), c0 = addv(gL.pos, ot.off);
+    const chase = Math.pow(sat((t - LAUNCH_T) / (CORE_HIT_T + 0.5 - LAUNCH_T)), 1.5);
+    const settle = easeInOut(sat((t - CORE_HIT_T) / 1.1));
+    const lag = V.lerp([0, 0, 0], c0, addv(g.pos, [-26, 8, -40]), chase);
+    const cam = V.lerp([0, 0, 0], lag, addv(g.pos, [-33, 8, -3]), settle);
+    const aim = V.lerp([0, 0, 0], addv(g.pos, [0, 4, 12]), addv(g.pos, [0, 5, 10]), settle);
+    const punch = Math.exp(-Math.max(0, t - LAUNCH_T) * 3) * sat((t - LAUNCH_T) / 0.05);   // the lens punches out with the launch
+    camLook(c, cam, aim, lerp(42 + 14 * punch, 46, settle), -0.05);
+    const rush = sat((t - LAUNCH_T) / 0.15) * (1 - smooth(CORE_HIT_T, CORE_HIT_T + 0.3, t));
+    c.post.radial = { pos: g.pos, strength: 0.07 * rush };   // the world streaking toward him
+  }
+  const hk = berserkHitK(t), lt0 = t - LAUNCH_T;
+  const build = smooth(267.2, LAUNCH_T, t) * (t < LAUNCH_T ? 1 : 0);   // the hover: shaking harder as the boosters build
+  shake(c, 0.3 + 0.9 * build + hk * 2.2 + (lt0 > 0 ? 2.4 * Math.exp(-lt0 * 6) : 0) + (t > CORE_HIT_T - 0.05 ? 2.2 * Math.exp(-Math.max(0, t - CORE_HIT_T) * 2.5) : 0), 18);
+  c.post.flash = (lt0 > 0 ? 0.1 * Math.exp(-lt0 * 12) : 0) + (t > THRUST_T ? 0.16 * Math.exp(-(t - THRUST_T) * 10) : 0) + (t > CORE_HIT_T && t < CORE_HIT_T + 0.2 ? 0.12 * (1 - (t - CORE_HIT_T) / 0.2) : 0);
+  c.post.shakeBlur = 0.003 * hk + (lt0 > 0 ? 0.004 * Math.exp(-lt0 * 5) : 0);
   c.post.mbNear = 80;
   c.env.rim = [0.6, 1.0, 1.9, 1.6]; c.env.fill = [0.3, 0.32, 0.4, 0.5];
-  const lk = smooth(THRUST_T + 0.2, 269.2, t);   // past the barrier the well's pull bends the view
+  const lk = smooth(THRUST_T + 0.1, CORE_HIT_T + 0.4, t);   // past the barrier the well's pull bends the view
   c.post.lensA = lk > 0.01 ? wellLens(c, wellMass(t) * 1.4 * lk, 3, true, 1.2) : { enable: 0 };
   c.env.shadowCenter = g.pos; c.env.shadowRadius = 200;
-  // the saber drives into the core: crater flash, shock ring, sparks and plates thrown back
-  const R = c.R, lt = t - CORE_HIT_T - 0.05;
+  const R = c.R;
+  if (lt0 > 0 && lt0 < 0.8) {   // the launch: a hard red blast off his back, a shock ring left hanging where he was
+    const gL = gundamState(LAUNCH_T), bp = addv(gL.pos, [0, 6, -8]), k = Math.exp(-lt0 * 5);
+    R.glow(bp, 4 + 9 * easeOut(sat(lt0 / 0.2)), [3 * k, 0.45 * k, 0.2 * k], 0.3);
+    R.light(bp, 160, [1, 0.2, 0.08], 20 * k);
+    if (lt0 < 0.5) { R.ripple(bp, 8 + 90 * easeOut(lt0 / 0.5), [0.5, 0.4, 0.4], (1 - lt0 / 0.5) * 2); R.ring(bp, [40 * easeOut(lt0 / 0.5), 0, 0], [0, 40 * easeOut(lt0 / 0.5), 0], [3 * (1 - lt0 / 0.5), 0.5 * (1 - lt0 / 0.5), 0.3 * (1 - lt0 / 0.5)], lt0); }
+  }
+  // the saber slams into the core: crater flash, shock ring, sparks and plates thrown back
+  const lt = t - CORE_HIT_T - 0.05;
   if (lt > 0 && lt < 2) {
     const hp = addv(WELL, [0, -4, -24]);
     const k = Math.exp(-lt * 3);
@@ -3273,7 +3296,7 @@ function drawDodgeBolt(R, t) {
 // ---------------- energy shield around the well core (261–268), shatter 268–271
 function drawShield(R, t, c) {
   // hexagons only: lit around hits, torn open by the hands, then the whole grid flashes and fades at 268
-  if (t < 261 || t > 269.6) return;
+  if (t < 261 || t > THRUST_T + 2.2) return;
   const sh = shieldState(t);
   const cam = c.cam;
   const f = V.norm([0, 0, 0], V.sub([0, 0, 0], cam.target, cam.pos));

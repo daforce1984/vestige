@@ -51,6 +51,13 @@ export const DREAD_DIE = 306;
 // speed (shots.js berserkZ, ~46 m/s from the tip touching it at 267.42) — no check at the dome — and the blade goes in here
 // (was 272.95, after a slow drift through the shards and a second run)
 export const CORE_HIT_T = 270.74;
+// (2026-10-08) THE LAUNCH: he stops dead short of the dome (from 266.9, a slow creep, the blade drawn back, the boosters
+// building), then at LAUNCH_T fires off like a missile — constant hard acceleration from HOVER_V, the dome breaking the
+// instant the tip touches it (THRUST_T, solved from the motion), the blade into the core at CORE_HIT_T at ~400 m/s
+export const HOVER_T = 266.9, HOVER_Z = -262, HOVER_V = 4, LAUNCH_T = 269.7, BERSERK_THRUST_Z = -150 - 5 - 13 * 2.5, CORE_Z = -36;
+export const LAUNCH_Z = HOVER_Z + HOVER_V * (LAUNCH_T - HOVER_T);
+export const LAUNCH_A = 2 * ((CORE_Z - LAUNCH_Z) - HOVER_V * (CORE_HIT_T - LAUNCH_T)) / (CORE_HIT_T - LAUNCH_T) ** 2;
+export const THRUST_T = LAUNCH_T + (-HOVER_V + Math.sqrt(HOVER_V * HOVER_V + 2 * LAUNCH_A * (BERSERK_THRUST_Z - LAUNCH_Z))) / LAUNCH_A;
 export const LANCE_FIRE = 216;
 export const MAIN_FIRE = 300;
 export const IMPLODE = 280;

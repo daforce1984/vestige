@@ -15,7 +15,7 @@
 import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
-import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, H_FEATURED, LOSS_SWAP_DT, swap2224, wreckPopTimes } from './world.js';
+import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, THRUST_T, LAUNCH_T, H_FEATURED, LOSS_SWAP_DT, swap2224, wreckPopTimes } from './world.js';
 import { SHIELD_CLUNKS, DRONE_L0, DRONE_DESC, DRONE_PUFF_T, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT, EYE_POPS, EYE_DEAD } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, STRIKE_FLIGHT, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
@@ -37,7 +37,7 @@ export const STEM_SYNC_LAYER = true;
 export const SYNC_GAIN = 0.55;
 export const SYNC_KEEP_ALWAYS = ['braam', 'boom'];
 export const SYNC_KEEP_NEAR_HITS = ['riser', 'revswell', 'cymbal'];
-export const SYNC_HITS = [8.6, 120, 158, 216, 262, 267.42, CORE_HIT_T, 280, 300];   // (267.42: the barrier breaks at the touch)
+export const SYNC_HITS = [8.6, 120, 158, 216, 262, THRUST_T, CORE_HIT_T, 280, 300];   // (THRUST_T: the barrier breaks at the touch)
 export const STEM_GAIN = 0.8;
 export const STEM_XFADE = 2.0;
 export const PRELOAD = 20;                       // JIT-decode stems / long samples this far ahead (s)
@@ -204,9 +204,9 @@ export const CUES = [
   [262,   'wellHum',    { dur: 16, vel: 0.5 }],
   [266.0, 'beamSaberIgnite', { vel: 1 }],            // the blade at ten times its output
   [266.05, 'beamSaberHum', { dur: 4.2, vel: 0.9, fadeIn: 0.1, fadeOut: 0.3 }],
-  [267.1, 'beamSaberSwing', { vel: 1, dur: 0.45 }],   // the lunge
-  [267.42, 'shieldHit', { vel: 1, pan: 0 }],
-  [267.43, 'shatter',    { vel: 1, shards: 2, count: 46 }],   // (2026-10-08) no strain, no burning through: it breaks at the touch
+  [LAUNCH_T - 0.05, 'beamSaberSwing', { vel: 1, dur: 0.45 }],   // the lunge out of the launch
+  [THRUST_T, 'shieldHit', { vel: 1, pan: 0 }],
+  [THRUST_T + 0.01, 'shatter',    { vel: 1, shards: 2, count: 46 }],   // (2026-10-08) no strain, no burning through: it breaks at the touch
   [278,   'engulf',     { dur: 2.02, vel: 1 }],      // swallowed by the implosion light → 280 white-out
   [CORE_HIT_T, 'crunch', { vel: 1 }],
   [278,   'implosion',  { dur: 2, vel: 0.8 }],
@@ -425,17 +425,18 @@ export const SAMPLE_CUES = [
   [265.97, 'hyperspace_boom:boom', { rate: 0.9, gain: 0.9, prio: 9, duck: 1.2, norand: true }],
   [266.02, 'atomic_impact', { rate: 1.15, gain: 0.7, prio: 8, norand: true }],
   [266.0, '@boom', { bus: 'sfx', f: 26, vel: 0.9, dur: 2.6, verb: 0.45 }],
-  [267.1, 'hl_thruster', { dur: 0.4, rate: 1.4, gain: 0.9, fadeOut: 0.1, prio: 8, norand: true }],   // the lunge
-  [267.42, 'shockwave', { dur: 1.4, fadeOut: 0.6, gain: 0.9, rate: 1.1, prio: 9, duck: 1.5, norand: true }],   // the tip goes in
-  [267.42, 'energy_beam2', { rate: 0.5, gain: 1.2, dur: 0.6, fadeOut: 0.1, prio: 9, norand: true }],
-  [267.43, 'boom_cine', { gain: 1.1, prio: 9, duck: 2.5, norand: true }],               // SHATTER
+  [LAUNCH_T - 0.02, 'boom_cine', { gain: 1.2, prio: 9, duck: 2, norand: true }],   // THE LAUNCH
+  [LAUNCH_T, 'whoosh_rev', { at: 'hit', rate: 1.5, gain: 0.9, prio: 9, norand: true }],
+  [LAUNCH_T, 'hl_thruster', { dur: 1.1, rate: 1.6, gain: 1.1, fadeOut: 0.2, prio: 9, norand: true }],
+  [THRUST_T, 'shockwave', { dur: 1.4, fadeOut: 0.6, gain: 0.9, rate: 1.1, prio: 9, duck: 1.5, norand: true }],   // the tip goes in
+  [THRUST_T, 'energy_beam2', { rate: 0.5, gain: 1.2, dur: 0.6, fadeOut: 0.1, prio: 9, norand: true }],
+  [THRUST_T + 0.01, 'boom_cine', { gain: 1.1, prio: 9, duck: 2.5, norand: true }],               // SHATTER
   // barrier collapse: the energy dies with a deep power-down, a shock hit, and a glassy cascade as cells blow out
-  [267.45, 'power_down', { rate: 0.55, gain: 1.1, prio: 9, norand: true }],
-  [267.48, 'shockwave', { gain: 0.9, rate: 0.8, prio: 8, norand: true }],
-  [267.53, 'expl_debris', { gain: 0.8, rate: 1.3, prio: 7, norand: true }],
-  ...Array.from({ length: 14 }, (_, i) => [267.46 + Math.pow(i / 13, 1.4) * 1.1, '@metalRing', { vel: 0.5 * (1 - i / 16), f0: 1800 + 900 * Math.sin(i * 2.7), dec: 0.35, pan: Math.sin(i * 1.9) * 0.7 }]),
-  [267.43, 'whoosh_rev', { at: 'hit', rate: 1.2, gain: 0.6, prio: 7, norand: true }],
-  [267.6, 'whoosh:c',  { rate: 1.1, gain: 1, dur: CORE_HIT_T - 267.6, fadeOut: 0.3, prio: 8, norand: true }],   // straight on through, into the core
+  [THRUST_T + 0.03, 'power_down', { rate: 0.55, gain: 1.1, prio: 9, norand: true }],
+  [THRUST_T + 0.06, 'shockwave', { gain: 0.9, rate: 0.8, prio: 8, norand: true }],
+  [THRUST_T + 0.11, 'expl_debris', { gain: 0.8, rate: 1.3, prio: 7, norand: true }],
+  ...Array.from({ length: 14 }, (_, i) => [THRUST_T + 0.04 + Math.pow(i / 13, 1.4) * 1.1, '@metalRing', { vel: 0.5 * (1 - i / 16), f0: 1800 + 900 * Math.sin(i * 2.7), dec: 0.35, pan: Math.sin(i * 1.9) * 0.7 }]),
+  [LAUNCH_T + 0.05, 'whoosh:c',  { rate: 1.4, gain: 1, dur: CORE_HIT_T - LAUNCH_T - 0.05, fadeOut: 0.3, prio: 8, norand: true }],   // straight on through, into the core
   [266.6, 'hl_thruster', { loop: true, dur: CORE_HIT_T - 266.6, rate: 1.2, rateTo: 1.6, gain: 1.0, fadeIn: 0.3, fadeOut: 0.1, prio: 8, norand: true }],
   [CORE_HIT_T, 'hit_heavy', { gain: 1, prio: 9, duck: 2, norand: true }],
   [CORE_HIT_T, 'braam2',    { at: 0.15, gain: 1, prio: 9, norand: true }],
