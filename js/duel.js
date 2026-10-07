@@ -641,6 +641,16 @@ const THIGH_P = [-0.87, -2.2, 0.3], PAULDRON_P = [2.3, 1.5, 0];
 export const SANDE0 = 191.3, SANDE1 = 192.2, CUT_T = 192.05;
 export const CUT_Y = 3.7;   // (above the pelvis block's top, so the halves don't overlap)
 export const CUT_SPLIT = CUT_T + 0.04;
+// ITS EYE DIES (2026-10-07, scene 71): from the split its visor sputters — dropping out and catching, a few bright pops
+// (each one a crackle, audio.js), fading — and goes dark at EYE_DEAD. shots.js lets the whole upper half's lights follow it
+export const EYE_DEAD = CUT_SPLIT + 1.35, EYE_POPS = [0.1, 0.27, 0.41, 0.58, 0.73, 0.9, 1.04, 1.2].map((x) => CUT_SPLIT + x);
+export function eyeSputter(t) {
+  if (t < CUT_SPLIT) return 1;
+  if (t >= EYE_DEAD) return 0;
+  const fade = 1 - (t - CUT_SPLIT) / (EYE_DEAD - CUT_SPLIT), on = hsh(Math.floor(t * 45)) > 0.42 ? 0.85 : 0.06;
+  let pop = 0; for (const p of EYE_POPS) pop = Math.max(pop, Math.exp(-Math.abs(t - p) * 45));
+  return Math.min(1.8, fade * (on + 1.3 * pop));
+}
 let _cutArms = null;
 /** the cut plane (torso-local y = CUT_Y) in each upper arm's own frame at the cut: its local y there (arms hang along the torso) */
 export function cutArms() {
@@ -1422,7 +1432,7 @@ function enemyState_(t) {
   s.boost = enemyBoost(tw);
   s.thr = tw > CUT_T ? 0 : clamp(0.4 + s.boost * 0.6, 0, 1);
   s.damage = 0.3 * smooth(CUT_T, CUT_T + 1, t);
-  s.eye = tw > CUT_T + 0.1 ? Math.max(0, 1 - (tw - CUT_T - 0.1) / 1.2) * (Math.sin(t * 50) > -0.2 ? 1 : 0.2) : 1;
+  s.eye = eyeSputter(tw);   // (cut in half: it sputters out)
   finish(s, _epose, f, false);
   const ak = ENEMY_AIM(tw);
   if (ak > 0 && !(tw > CUT_T)) {   // the rifle levelled on where he is going, in both hands — the muzzle kicks up with the body on each shot

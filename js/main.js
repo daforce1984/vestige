@@ -1,5 +1,5 @@
 import { Renderer } from './renderer.js';
-import { frame, findShot, DURATION, SHOTS } from './shots.js';
+import { frame, findShot, DURATION, SHOTS, prepHalfBlasts } from './shots.js';
 import { storyT, filmT, insertFilm, inSkip, TEAR_F0, TEAR_F1 } from './timemap.js';
 import { DUEL_CAMS, enemyGripCheck } from './duel.js';
 import { openGallery, galleryOpen, galleryKey } from './gallery.js';
@@ -277,6 +277,7 @@ async function boot() {
     await Promise.all([R.loadModels(MODELS), loadSubs(), R.loadModelTextures(['assets/tex/gundam_albedo.png', 'assets/tex/gundam_orm.png', 'assets/tex/enemy_ms_albedo.png', 'assets/tex/enemy_ms_orm.png', 'assets/tex/rifle2_game_albedo.png', 'assets/tex/rifle2_game_orm.png', 'assets/tex/rifle1_game_albedo.png', 'assets/tex/rifle1_game_orm.png', 'assets/tex/spaceship_game_albedo.png', 'assets/tex/spaceship_game_orm.png', 'assets/tex/light_fighter_game_albedo.png', 'assets/tex/light_fighter_game_orm.png', 'assets/tex/dreadnought_game_albedo.png', 'assets/tex/dreadnought_game_orm.png', 'assets/tex/cargo_game_albedo.png', 'assets/tex/cargo_game_orm.png']), R.loadPlanet('assets/planet/earth_day_night.webp', 'assets/planet/earth_clouds.webp'), R.loadMoonData('assets/tex/moon_lroc.png')]);
     prepWreck();   // the dreadnought's wreck flight, baked now (~0.6 s) rather than as a hitch when it blows
     prepWrecks(R);   // every frigate / fighter wreck's flight, too (in the background, one per idle slice)
+    setTimeout(() => prepHalfBlasts(R), 50);   // VANGUARD's two halves blowing apart (scene 71), baked too
     {
       // our flagship after the Buzz Hound corvette: its windows, lights and engines glow teal-green
       const mm = R.models.mothership, T = { window: [0.35, 1.0, 0.75], amber: [0.3, 1.0, 0.7], blue_light: [0.25, 1.0, 0.8], engine: [0.55, 1.0, 0.9] };

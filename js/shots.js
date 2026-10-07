@@ -1,7 +1,8 @@
 // Shot list: camera + shot-specific content for every second of the film.
+import { bakeWreck, wreckPose } from './wreck.js';
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { fxOpts, explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { RIFLE_T, RIFLE_Q, enemyRifleMat, enemyHolsterLocal, droneThrust, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX, energyShards, SHARD_LIFE } from './duel.js';
+import { RIFLE_T, RIFLE_Q, enemyRifleMat, enemyHolsterLocal, droneThrust, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX, energyShards, SHARD_LIFE, eyeSputter, EYE_POPS } from './duel.js';
 import { storyT, filmT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -900,7 +901,8 @@ function drawBreakup(R, t, idx) {
 // frozen in the pose it had at the hit, tumbling about the hit point and drifting off along the shot
 const _wing = {}, _wT = new Float32Array(16), _wA = new Float32Array(16), _wB = new Float32Array(16), _wQ = [0, 0, 0, 1];
 // its rifle, flung away as it opens up for the ultimate: the rifle part alone, frozen at the release, spinning off
-const RIFLE_DROP_T = 190.8, _rif = {}, _rT = new Float32Array(16), _rA = new Float32Array(16), _rB = new Float32Array(16), _rQ = [0, 0, 0, 1];
+const RIFLE_DROP_T = 193.6,   // (2026-10-07: = HALF_BLAST.lower — it keeps its rifle through the ultimate and the cut; the lower half's blast throws it)
+  _rifNone = 0, _rif = {}, _rT = new Float32Array(16), _rA = new Float32Array(16), _rB = new Float32Array(16), _rQ = [0, 0, 0, 1];
 // VANGUARD's rifle (assets/rifle2_game.glb) drawn on the rifle part of an enemy_ms pose (m, pose); `pre` shifts it in world
 function enemyRifleAt(R, m, pose, pre) {
   const hw = R.partWorld('enemy_ms', { m, pose, stretch: 0 }, 'hand_R');   // on its fist through the same grip helpers as duel.js (enemyRifleMat)
@@ -911,11 +913,12 @@ function enemyRifleAt(R, m, pose, pre) {
 }
 function drawDroppedRifle(R, t) {
   if (!_rif.m) {
-    const s0 = enemyMS2(RIFLE_DROP_T), s1 = enemyMS2(RIFLE_DROP_T + 0.05);
-    _rif.m = msMatrix(new Float32Array(16), s0); _rif.pose = JSON.parse(JSON.stringify(s0.pose));
-    const fk = duelFK(s0, 'enemy_ms'); _rif.pivot = M.transformPoint([0, 0, 0], fk.rifle, [0, 0, 0]);
-    const vs = V.scale([0, 0, 0], V.sub([0, 0, 0], s1.pos, s0.pos), 1 / 0.05), side = V.norm([0, 0, 0], V.sub([0, 0, 0], _rif.pivot, s0.pos));
-    _rif.v = V.madd([0, 0, 0], V.madd([0, 0, 0], vs, side, 9), [0, 1, 0], -3);
+    const s0 = enemyMS2(RIFLE_DROP_T);   // (in the lower half's fist when it blows: thrown out of the blast, tumbling)
+    _rif.m = halfMatrix(new Float32Array(16), s0, -1, RIFLE_DROP_T - CUT_SPLIT); _rif.pose = JSON.parse(JSON.stringify(s0.pose));
+    const hw = R.partWorld('enemy_ms', { m: _rif.m, pose: _rif.pose, stretch: 0 }, 'hand_R'), rw = enemyRifleMat(new Float32Array(16), hw, _rif.pose.rifle);
+    _rif.pivot = [rw[12], rw[13], rw[14]];
+    const ctr = [_rif.m[12], _rif.m[13], _rif.m[14]], side = V.norm([0, 0, 0], V.sub([0, 0, 0], _rif.pivot, ctr));
+    _rif.v = V.madd([0, 0, 0], V.scale([0, 0, 0], side, 26), [0, 1, 0], 5);
     _rif.hide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'rifle') _rif.hide[p.name] = 1;
   }
   const lt = t - RIFLE_DROP_T; if (lt < 0 || lt > 8) return;
@@ -1160,6 +1163,56 @@ function bladeFront(t) {
   let v = V.sub([0, 0, 0], V.sub([0, 0, 0], b.p, a.p), V.sub([0, 0, 0], b.o, a.o)); v = madd(v, a.d, -V.dot(v, a.d));
   return (_bf = V.len(v) > 1e-6 ? { p: a.p, v: V.norm([0, 0, 0], v), a: a.h, b: a.tip } : null);
 }
+// EACH HALF BLOWS APART ON A BAKED FLIGHT (2026-10-07; was shatter's live grid of copies): its own parts are the pieces —
+// placed as they were at the blast, flung by js/wreck.js (colliding, tumbling, baked once; prepHalfBlasts at load) and
+// drawn as ONE entry whose parts are moved by partXf; the cut parts stay clipped to their side of the blade's plane
+const PIECE_C = { pelvis: [0, 0, 0], torso: [0, 3, 0], head: [0, 1.2, 0], backpack: [0, -0.5, -2.5], arm_L_upper: [0, -1.7, 0], arm_R_upper: [0, -1.7, 0],
+  arm_L_lower: [0, -1.5, 0], arm_R_lower: [0, -1.5, 0], hand_L: [0, -0.9, 0], hand_R: [0, -0.9, 0], leg_L_upper: [0, -2.1, 0], leg_R_upper: [0, -2.1, 0],
+  leg_L_lower: [0, -2.9, 0], leg_R_lower: [0, -2.9, 0], foot_L: [0, -0.3, 0.6], foot_R: [0, -0.3, 0.6] };
+const PIECE_E = { pelvis: [3, 2, 2.5], torso: [8, 3.5, 4], head: [2.2, 2.6, 2.4], backpack: [4.8, 6, 5], arm_L_upper: [1.8, 3.5, 1.8], arm_R_upper: [1.8, 3.5, 1.8],
+  arm_L_lower: [1.8, 3.2, 1.8], arm_R_lower: [1.8, 3.2, 1.8], hand_L: [1.5, 2, 1.2], hand_R: [1.5, 2, 1.2], leg_L_upper: [2.2, 4.3, 2.4], leg_R_upper: [2.2, 4.3, 2.4],
+  leg_L_lower: [2, 5.9, 2.4], leg_R_lower: [2, 5.9, 2.4], foot_L: [2, 1.2, 3.5], foot_R: [2, 1.2, 3.5] };
+const _hb = {};
+function halfBake(R, half) {
+  if (_hb[half]) return _hb[half];
+  const model = R.models.enemy_ms; if (!model) return null;
+  const tb = half > 0 ? HALF_BLAST.upper : HALF_BLAST.lower, sb = enemyMS2(tb); if (!sb) return null;
+  const ent = { m: M.fromTRS(new Float32Array(16), [0, 0, 0], [0, 0, 0, 1], 1), pose: sb.pose, stretch: 0 };
+  const P0 = {}, chunks = [];
+  for (const p of model.parts) P0[p.name] = new Float32Array(R.partWorld('enemy_ms', ent, p.name));   // (each part as it was at the blast, model space)
+  for (const name in PIECE_C) {
+    if (!P0[name] || (half > 0 ? LOWER[name] && !SPLIT[name] : !LOWER[name] && !SPLIT[name])) continue;   // (this half's parts; the cut ones in both)
+    const c = M.transformPoint([0, 0, 0], P0[name], PIECE_C[name]), h = PIECE_E[name].map((v) => v / 2);
+    chunks.push({ name, c, lo: h.map((v) => -v), hi: h });
+  }
+  const bake = bakeWreck(1, 4, half > 0 ? 91 : 57, half > 0 ? 2.2 : 2.6, chunks, 2.6, 2);
+  return (_hb[half] = { tb, sb, P0, chunks, bake, xf: {}, D: {}, px: {} });
+}
+export function prepHalfBlasts(R) { halfBake(R, -1); setTimeout(() => halfBake(R, 1), 0); }
+function drawHalfBlast(R, t, half, hide, CP) {
+  const H = halfBake(R, half); if (!H) return;
+  const base = halfMatrix(_halfM[half], H.sb, half, H.tb - CUT_SPLIT), lt = t - H.tb;
+  wreckPose(H.bake, lt, H.xf);
+  const model = R.models.enemy_ms, I = M.fromTRS(new Float32Array(16), [0, 0, 0], [0, 0, 0, 1], 1);
+  for (const ch of H.chunks) {   // where each piece is now (model space): its baked motion about where it was
+    const T = M.fromTRS(new Float32Array(16), [-ch.c[0], -ch.c[1], -ch.c[2]], [0, 0, 0, 1], 1);
+    H.D[ch.name] = M.mul(H.D[ch.name] || new Float32Array(16), H.xf[ch.name], M.mul(new Float32Array(16), T, H.P0[ch.name]));
+  }
+  for (let i = 1; i < model.parts.length; i++) {   // → partXf: each part under its parent
+    const p = model.parts[i], par = p.parent > 0 ? model.parts[p.parent].name : null;
+    const Dp = H.D[p.name] || H.P0[p.name], Dq = par ? (H.D[par] || H.P0[par]) : I;
+    H.px[p.name] = M.mul(H.px[p.name] || new Float32Array(16), M.invert(new Float32Array(16), Dq), Dp);
+  }
+  const e = R.add('enemy_ms', base); if (!e) return;
+  e.partXf = H.px; e.pose = H.sb.pose; e.hidden = hide; e.seed = half > 0 ? 91 : 57; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0;
+  e.damage = 0.45; e.emissive = 0; e.tint = [2, 0.4, 0.3];
+  if (CP) { e.clipParts = {}; for (const k in CP) e.clipParts[k] = half > 0 ? CP[k] : [-CP[k][0], -CP[k][1], -CP[k][2], -CP[k][3]]; e.clipHeat = -Math.max(0.25, 1.2 * Math.exp(-lt * 0.5)); }
+  if (lt < 5) for (const ch of H.chunks) {   // the pieces burning as they go
+    if (hash(ch.c[0] * 3.1 + half) < 0.45) continue;
+    const D = H.D[ch.name], wp = M.transformPoint([0, 0, 0], base, [D[12], D[13], D[14]]);
+    R.fire(wp, 2.4 * (1 - lt / 5), 0.3 + lt / 8, (half > 0 ? 91 : 57) + ch.c[1], [1, 1, 1], 0.5);
+  }
+}
 function drawHalves(R, t, s) {
   const ev = DUEL_EVENTS.find((x) => x.slash), P = ev.pos, lt = s.cutK;
   const up = R.models.enemy_ms.parts, hideUp = {}, hideLo = {};
@@ -1168,16 +1221,20 @@ function drawHalves(R, t, s) {
   for (const half of [1, -1]) {
     const tb = half > 0 ? HALF_BLAST.upper : HALF_BLAST.lower;
     const hide = { ...(half > 0 ? hideUp : hideLo), shield: 1, rifle: 1 };
-    if (t >= tb) {                                                    // this half has come apart: its chunks fly off its drift
-      const sb = enemyMS2(tb) || s;
-      halfMatrix(_halfM[half], sb, half, tb - CUT_SPLIT);
-      shatter(R, 'enemy_ms', _halfM[half], t, tb, half > 0 ? 91 : 57, half > 0 ? [3, 3, 3] : [2, 3, 2], 2.4,
-        { tint: [2, 0.4, 0.3], pose: sb.pose, texSet: R.texLoaded & 4 ? 2 : 0, hidden: hide });
-      continue;
-    }
+    if (t >= tb) { drawHalfBlast(R, t, half, hide, CP); continue; }   // this half has come apart: its own parts flung on their baked flight
+
     const e = R.add('enemy_ms', halfMatrix(new Float32Array(16), s, half, lt));
     if (!e) continue;
     e.pose = s.pose; e.seed = 10; e.wear = 1; e.texSet = R.texLoaded & 4 ? 2 : 0; e.damage = s.damage;
+    const ek = eyeSputter(t); e.emissive = ek;   // (its lights sputter out with the eye — scene 71)
+    if (half > 0 && ek > 0.02) {                // the visor: dropping out, catching, popping bright, going dark
+      const pts = R.models.enemy_ms.emitPoints.eye || [];
+      for (let i = 0; i < pts.length; i++) { const p = emitWorld(R, 'enemy_ms', e, 'eye', i); if (p) R.glow(p, 0.3 + 0.25 * Math.min(1, ek), [2.6 * ek, 0.5 * ek, 0.7 * ek], 0.2); }
+      for (const pt of EYE_POPS) { const a = t - pt; if (a < 0 || a > 0.12) continue;   // each pop throws a few sparks off the visor
+        const p = emitWorld(R, 'enemy_ms', e, 'eye'); if (!p) break;
+        for (let k = 0; k < 6; k++) { const d = randDir([0, 0, 0], pt * 31 + k), b = 3 * (1 - a / 0.12); spark(R, madd(p, d, 0.3 + 4 * a), 0.3, [b, b * 0.6, b * 0.9]); } }
+    }
+    if (half < 0 && t < RIFLE_DROP_T) enemyRifleAt(R, e.m, s.pose);   // its rifle still in its fist (the lower half holds the right hand)
     e.hidden = CP ? (half > 0 ? { shield: 1, rifle: 1, pelvis: 1, leg_L_upper: 1, leg_L_lower: 1, foot_L: 1, leg_R_upper: 1, leg_R_lower: 1, foot_R: 1 } : { shield: 1, rifle: 1 }) : hide;   // every part drawn in both halves, each clipped to its side of the blade's plane (the hips and legs, wholly below it, only in the lower)
     if (half < 0 || !CP) meltHole(e, 'enemy', t, 'leg_R_upper');   // (the melt hole replaces that part's clip: the lower half only)
     e.clipInv = false; e.clipHeat = -(0.5 + 1.6 * Math.exp(-lt * 1.0)) * (0.35 + 0.65 * sat((t - CUT_SEAM_T) / (CUT_SPLIT - CUT_SEAM_T)));   // the molten rim of the cut: thick, white-hot, cooling to red (shader band; w < 0: a clean beam cut)
@@ -1197,6 +1254,7 @@ function drawHalves(R, t, s) {
     }
     else { const CA = cutArms(), box = (y) => (half > 0 ? [-30, y, -30, 30, 40, 30] : [-30, -40, -30, 30, y, 30]); e.clipParts = { torso: box(CUT_Y), arm_L_upper: box(CA.arm_L_upper), arm_R_upper: box(CA.arm_R_upper) }; }
   }
+  if (t >= RIFLE_DROP_T) drawDroppedRifle(R, t);   // (the lower half's blast throws it)
   if (t < HALF_BLAST.upper) R.light(P, 40, [1, 0.45, 0.2], 6 * Math.exp(-lt * 1.5));   // the molten cut glows
   return null;
 }
