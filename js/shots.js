@@ -1276,7 +1276,7 @@ function drawHalves(R, t, s) {
         if (V.len(vl) < 1e-6) continue; vl = V.norm([0, 0, 0], vl);
         const b1 = V.norm([0, 0, 0], V.cross([0, 0, 0], n, Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), b2 = V.cross([0, 0, 0], n, b1);
         const ang = Math.atan2(V.dot(vl, b2), V.dot(vl, b1)), f = madd(V.scale([0, 0, 0], b1, Math.cos(ang)), b2, Math.sin(ang));
-        e.clipParts[k] = [n[0], n[1], n[2], n[3], ang, V.dot(pl, f) + CUT_LEAD];   // (led by the blade's own width: where it has gone in is already molten)
+        e.clipParts[k] = Object.assign([n[0], n[1], n[2], n[3], ang, V.dot(pl, f) + CUT_LEAD], { isPlane: true });   // (led by the blade's own width: where it has gone in is already molten)
       }
     }
     else { const CA = cutArms(), box = (y) => (half > 0 ? [-30, y, -30, 30, 40, 30] : [-30, -40, -30, 30, y, 30]); e.clipParts = { torso: box(CUT_Y), arm_L_upper: box(CA.arm_L_upper), arm_R_upper: box(CA.arm_R_upper) }; }

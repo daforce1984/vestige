@@ -55,7 +55,10 @@ TOP = 5.0                    # the top deck's ceiling
 Z0, Z1 = -36.0, 3.0
 CW = 1.15                    # corridor half-width
 REACT = (-36.0, -29.0)       # the reactor room, aft, two decks high
-for fl in FL + [TOP]:
+# (2026-10-07) NO big flat slabs: the wreck's pieces carry solid cores now (renderer cellSplit fill), and the decks, corridor
+# walls and bulkheads read as loose plates flying about — only the equipment, frames, tanks, reactor and pipes are kept
+PLATES = False
+for fl in (FL + [TOP] if PLATES else []):
     if fl == FL[1]:          # (the middle deck has a well over the reactor)
         bx(-X, X, fl - 0.25, fl, REACT[1], Z1, 'deck'); bx(-X, -2.8, fl - 0.25, fl, Z0, REACT[1], 'deck'); bx(2.8, X, fl - 0.25, fl, Z0, REACT[1], 'deck')
     else: bx(-X, X, fl - 0.25, fl, Z0, Z1, 'deck')
@@ -111,8 +114,9 @@ for d, fl in enumerate(FL):
             if d < 2 and zb <= REACT[1]: continue            # (the reactor room spans the lower two decks)
             door = za + 1.0 + rng.uniform(0, 3.2)
             xw0, xw1 = (CW, CW + 0.15) if s > 0 else (-CW - 0.15, -CW)
-            bx(xw0, xw1, y0, y1, za, door, 'wall'); bx(xw0, xw1, y0, y1, door + 1.3, zb, 'wall'); bx(xw0, xw1, y0 + 2.3, y1, door, door + 1.3, 'wall')
-            bx(min(s * CW, s * X), max(s * CW, s * X), y0, y1, zb - 0.1, zb + 0.05, 'wall')      # bulkhead
+            if PLATES:
+                bx(xw0, xw1, y0, y1, za, door, 'wall'); bx(xw0, xw1, y0, y1, door + 1.3, zb, 'wall'); bx(xw0, xw1, y0 + 2.3, y1, door, door + 1.3, 'wall')
+                bx(min(s * CW, s * X), max(s * CW, s * X), y0, y1, zb - 0.1, zb + 0.05, 'wall')      # bulkhead
             room(CW + 0.15 if s > 0 else -X, X if s > 0 else -CW - 0.15, y0, y1, za + 0.05, zb - 0.1, KINDS[int(rng.integers(0, 4))])
     bx(-0.25, 0.25, y1 - 0.1, y1 - 0.04, Z0, Z1, 'light')
     cyl((-0.75, y1 - 0.25, Z0), (-0.75, y1 - 0.25, Z1), 0.1, 'pipe', 6); cyl((0.75, y1 - 0.25, Z0), (0.75, y1 - 0.25, Z1), 0.07, 'pipe', 6)
@@ -131,7 +135,7 @@ bx(-X, X, FL[1] - 0.15, FL[1], REACT[0], REACT[0] + 1.0, 'warn')
 G0, G1 = 4.5, 30.0
 for z in np.arange(G0, G1, 3.0):                            # frames
     bx(-3.0, -2.75, -3.6, 2.6, z - 0.15, z + 0.15, 'frame'); bx(2.75, 3.0, -3.6, 2.6, z - 0.15, z + 0.15, 'frame'); bx(-3.0, 3.0, 2.4, 2.65, z - 0.15, z + 0.15, 'frame')
-bx(-2.6, 2.6, -3.6, -3.4, G0, G1 - 6, 'deck')                # catwalk
+if PLATES: bx(-2.6, 2.6, -3.6, -3.4, G0, G1 - 6, 'deck')                # catwalk
 cyl((0, 0.9, G0), (0, 0.9, G1), 0.55, 'reactor', 12)        # the ion conduit
 for z in np.arange(G0 + 1, G1 - 1, 2.0): cyl((0, 0.9, z - 0.15), (0, 0.9, z + 0.15), 1.0, 'machine', 12)   # its collars
 for s in (-1, 1):                                            # capacitor banks either side, lit strips

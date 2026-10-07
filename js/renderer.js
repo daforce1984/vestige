@@ -74,8 +74,30 @@ function cellSplit(g, opts, gi) {
   }
   const parts = [{ name: '__root', parent: -1, rest: M.new(), worldRest: M.new(), groups: [] }];
   const vs = [], is = [];
-  for (const c of cells) {
+  // SOLID CORES (2026-10-07): opts.fill = [[z0, z1, halfX, y0, y1], ...] slabs of the hull's inside — every cell gets a lump
+  // of wreckage filling (most of) its share of them, a little irregular, so a piece reads as a chunk, not a hollow plate
+  let coreMat = -1;
+  if (opts.fill) { coreMat = materials.length; materials.push({ name: 'wreck_core', base: [0.07, 0.072, 0.08], metal: 0.6, rough: 0.6, emissive: [0, 0, 0] }); }
+  const coreTris = (c, ci) => {
+    const out = [], lo = c.box.slice(0, 3), hi = c.box.slice(3, 6), hh = (k) => { const x = Math.sin(ci * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
+    for (const [z0, z1, hx, y0, y1] of opts.fill) {
+      const a = [Math.max(lo[0], -hx), Math.max(lo[1], y0), Math.max(lo[2], z0)], b = [Math.min(hi[0], hx), Math.min(hi[1], y1), Math.min(hi[2], z1)];
+      if (b[0] - a[0] < 0.6 || b[1] - a[1] < 0.6 || b[2] - a[2] < 0.6) continue;
+      const m = [0, 1, 2].map((k) => (a[k] + b[k]) / 2), h = [0, 1, 2].map((k) => (b[k] - a[k]) / 2 * (0.62 + 0.3 * hh(k)));
+      const P = (sx, sy, sz) => [m[0] + sx * h[0] * (1 - 0.12 * hh(3 + sx + sz)), m[1] + sy * h[1] * (1 - 0.12 * hh(5 + sy + sx)), m[2] + sz * h[2] * (1 - 0.12 * hh(7 + sz + sy))];   // (corners nudged: no perfect box)
+      const F = [[[-1, -1, -1], [-1, 1, -1], [-1, 1, 1], [-1, -1, 1], [-1, 0, 0]], [[1, -1, -1], [1, -1, 1], [1, 1, 1], [1, 1, -1], [1, 0, 0]],
+        [[-1, -1, -1], [-1, -1, 1], [1, -1, 1], [1, -1, -1], [0, -1, 0]], [[-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1], [0, 1, 0]],
+        [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [0, 0, -1]], [[-1, -1, 1], [-1, 1, 1], [1, 1, 1], [1, -1, 1], [0, 0, 1]]];
+      for (const f of F) {
+        const q = f.slice(0, 4).map((v) => P(...v)), n = f[4];
+        out.push({ p: [q[0], q[1], q[2]], n: [n, n, n], uv: [[0, 0], [1, 0], [1, 1]], mat: coreMat }, { p: [q[0], q[2], q[3]], n: [n, n, n], uv: [[0, 0], [1, 1], [0, 1]], mat: coreMat });
+      }
+    }
+    return out;
+  };
+  for (const [ci, c] of cells.entries()) {
     const lo = c.box.slice(0, 3), hi = c.box.slice(3, 6), by = new Map();
+    if (coreMat >= 0) for (const t of coreTris(c, ci)) (by.get(t.mat) || by.set(t.mat, []).get(t.mat)).push(t);
     for (const t of tris) {
       let ok = true;
       for (let a = 0; a < 3 && ok; a++) { const mn = Math.min(t.p[0][a], t.p[1][a], t.p[2][a]), mx = Math.max(t.p[0][a], t.p[1][a], t.p[2][a]); if (mx < lo[a] || mn > hi[a]) ok = false; }
@@ -788,7 +810,8 @@ export class Renderer {
           const cl = e.clipParts ? (e.clipParts[model.parts[d.part].name] || null) : e.clip && (!e.clipPart || model.parts[d.part].name === e.clipPart) ? e.clip : null;   // clipParts: {part: box} several parts, each its own box   // clipPart: only that part (part-local box)
           const ml = e.melt && (!e.meltPart || model.parts[d.part].name === e.meltPart) ? e.melt : null;   // [cx, cy, cz, radius, depth, heat] (model-local; meltPart: that part only, part-local)
           if (ml) { I[o + 40] = ml[0]; I[o + 41] = ml[1]; I[o + 42] = ml[2]; I[o + 43] = 2; I[o + 44] = ml[3]; I[o + 45] = ml[4]; I[o + 46] = 0; I[o + 47] = ml[5]; }
-          else if (cl && (cl.length === 4 || cl.length === 6)) { I[o + 40] = cl[0]; I[o + 41] = cl[1]; I[o + 42] = cl[2]; I[o + 43] = 3; I[o + 44] = cl[3]; I[o + 45] = cl.length === 6 ? cl[4] : 0; I[o + 46] = cl.length === 6 ? cl[5] : 1e5; I[o + 47] = e.clipHeat ?? 1; }   // [nx, ny, nz, d (, front angle, front offset)]: a plane cut (part-local); the front: only behind the blade is melted
+          else if (cl && (cl.length === 4 || (cl.length === 6 && cl.isPlane))) {   // (a 6-long box [lo, hi] is a BOX — only the blade's marked plane is a plane: 2026-10-07, the wreck pieces were being cut by a nonsense plane)
+ I[o + 40] = cl[0]; I[o + 41] = cl[1]; I[o + 42] = cl[2]; I[o + 43] = 3; I[o + 44] = cl[3]; I[o + 45] = cl.length === 6 ? cl[4] : 0; I[o + 46] = cl.length === 6 ? cl[5] : 1e5; I[o + 47] = e.clipHeat ?? 1; }   // [nx, ny, nz, d (, front angle, front offset)]: a plane cut (part-local); the front: only behind the blade is melted
           else if (cl) { I[o + 40] = cl[0]; I[o + 41] = cl[1]; I[o + 42] = cl[2]; I[o + 43] = e.clipInv ? -1 : 1; I[o + 44] = cl[3]; I[o + 45] = cl[4]; I[o + 46] = cl[5]; I[o + 47] = e.clipHeat ?? 1; }
           else { I[o + 43] = 0; }
           I[o + 48] = d.matName === 'inner' ? 0 : e.texSet || 0;   // (a mech's inner body: plain dark metal, untextured — tools/fill_mech_interior.py)
