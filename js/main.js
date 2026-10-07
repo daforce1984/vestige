@@ -328,7 +328,7 @@ async function startFilm(from, until = null) {
 }
 $('#start .go').addEventListener('click', () => startFilm(clockOffset >= DURATION ? 0 : clockOffset));
 // the mech battle on its own: from the swatted bolt (scene 30) through the duel to the last blast
-const DUEL_FROM = 165.9, DUEL_UNTIL = 195.2;   // story   // from the bolt Sigma swats away on the way in
+const DUEL_FROM = 150.0, DUEL_UNTIL = 195.2;   // story   // (2026-10-07) from Sigma getting ready to launch (scene 26, S11a hangar lights) — was 165.9, the bolt he swats away on the way in
 $('#duelBtn').addEventListener('click', () => startFilm(filmT(DUEL_FROM), filmT(DUEL_UNTIL)));
 document.addEventListener('keydown', (e) => {
   if (e.target && e.target.tagName === 'SELECT') return;   // (the scene picker has the keyboard)
