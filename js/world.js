@@ -1069,10 +1069,9 @@ function drawDreadnought(R, t, tmpM) {
       for (let k = 0; k < 6; k++) {
         const on = ch > 0.08 + k * 0.05;
         if (!on) continue;
-        const a = tipW(k), b = tipW((k + 1) % 6);
-        R.arc(a, b, 3.2, AC, 0.9 * ch, 11 + k, 7 + 7 * ch);                          // terminal to terminal round the crown
+        const a = tipW(k);
+        // (2026-10-07: no arcs terminal to terminal round the crown, nor across it — they drew a hexagon)
         if (ch > 0.35) R.arc(a, em, 4.5, AC, 1.1 * ch, 31 + k, 9 + 9 * ch);         // terminal into the core
-        if (ch > 0.7 && k % 2 === 0) R.arc(a, tipW((k + 3) % 6), 6, AC, 0.8 * ch, 51 + k, 12);   // across the crown
       }
       for (let j = 0; j < 6; j++) {                                                    // coil stack flash-overs to the rails
         if (ch < 0.25 + j * 0.1) continue;
