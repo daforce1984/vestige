@@ -881,17 +881,10 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   let pnl = panel(i.lp, normalize(i.ln), max(inst.p0.z, 0.25), inst.p1.w);
   let pwLP = length(fwidth(i.lp));                                    // pixel footprint in model metres (uniform flow)
   let curv = length(fwidth(normalize(i.ln))) / max(pwLP, 1e-4);   // edge sharpness (uniform flow)
-  // baked PBR textures (sampled in uniform control flow, selected below)
-  let tA1 = textureSample(texA1, texSmp, i.uv); let tM1 = textureSample(texM1, texSmp, i.uv);
-  let tA2 = textureSample(texA2, texSmp, i.uv); let tM2 = textureSample(texM2, texSmp, i.uv);
-  let tA3 = textureSample(texA3, texSmp, i.uv); let tM3 = textureSample(texM3, texSmp, i.uv);
-  let tA4 = textureSample(texA4, texSmp, i.uv); let tM4 = textureSample(texM4, texSmp, i.uv);
-  let tA5 = textureSample(texA5, texSmp, i.uv); let tM5 = textureSample(texM5, texSmp, i.uv);
-  let tA6 = textureSample(texA6, texSmp, i.uv); let tM6 = textureSample(texM6, texSmp, i.uv);
-  let tA8 = textureSample(texA8, texSmp, i.uv); let tM8 = textureSample(texM8, texSmp, i.uv);
-  let cell7 = floor(i.uv.y / 10.0); let uv7 = (vec2f(cell7 % 3.0, floor(cell7 / 3.0)) + 0.004 + 0.992 * fract(vec2f(i.uv.x, i.uv.y - cell7 * 10.0))) / 3.0;   // (wrapped inside its cell)
-  let tA7 = textureSampleGrad(texA7, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0); let tM7 = textureSampleGrad(texM7, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0);
-  let tA9 = textureSampleGrad(texA9, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0); let tM9 = textureSampleGrad(texM9, texSmp, uv7, dpdx(i.uv) / 3.0, dpdy(i.uv) / 3.0);   // (the same cell scheme)
+  // baked PBR textures (2026-10-07: only the entry's own set is sampled — explicit gradients, taken here in uniform control
+  // flow, make that legal inside the branch; every textured fragment used to fetch all nine sets, 18 samples)
+  let duvx = dpdx(i.uv); let duvy = dpdy(i.uv);
+  let cell7 = floor(i.uv.y / 10.0); let uv7 = (vec2f(cell7 % 3.0, floor(cell7 / 3.0)) + 0.004 + 0.992 * fract(vec2f(i.uv.x, i.uv.y - cell7 * 10.0))) / 3.0;   // (wrapped inside its cell: the dreadnought's and the launch bay's atlases)
   let faceN = normalize(cross(dpdx(i.wp), dpdy(i.wp)));           // facet normal for crumpled metal
   let cut = cutAway(i, inst);
   var tornEdge = cut.x;
@@ -915,8 +908,17 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
   var moonL = vec3f(0.0);   // the moon's light direction (world; lowered over its basin)
   var texGlow = vec3f(0.0);
   if (texSet > 0 && dot(inst.emis.rgb, vec3f(1.0)) < 0.01) {
-    var ta = select(tA2, tA1, texSet == 1); var tm = select(tM2, tM1, texSet == 1);
-    if (texSet == 3) { ta = tA3; tm = tM3; } else if (texSet == 4) { ta = tA4; tm = tM4; } else if (texSet == 5) { ta = tA5; tm = tM5; } else if (texSet == 6) { ta = tA6; tm = tM6; } else if (texSet == 7) { ta = tA7; tm = tM7; } else if (texSet == 8) { ta = tA8; tm = tM8; } else if (texSet == 9) { ta = tA9; tm = tM9; }
+    var ta = vec4f(0.5); var tm = vec4f(1.0, 0.5, 0.0, 1.0);
+    let gx3 = duvx / 3.0; let gy3 = duvy / 3.0;
+    if (texSet == 1) { ta = textureSampleGrad(texA1, texSmp, i.uv, duvx, duvy); tm = textureSampleGrad(texM1, texSmp, i.uv, duvx, duvy); }
+    else if (texSet == 2) { ta = textureSampleGrad(texA2, texSmp, i.uv, duvx, duvy); tm = textureSampleGrad(texM2, texSmp, i.uv, duvx, duvy); }
+    else if (texSet == 3) { ta = textureSampleGrad(texA3, texSmp, i.uv, duvx, duvy); tm = textureSampleGrad(texM3, texSmp, i.uv, duvx, duvy); }
+    else if (texSet == 4) { ta = textureSampleGrad(texA4, texSmp, i.uv, duvx, duvy); tm = textureSampleGrad(texM4, texSmp, i.uv, duvx, duvy); }
+    else if (texSet == 5) { ta = textureSampleGrad(texA5, texSmp, i.uv, duvx, duvy); tm = textureSampleGrad(texM5, texSmp, i.uv, duvx, duvy); }
+    else if (texSet == 6) { ta = textureSampleGrad(texA6, texSmp, i.uv, duvx, duvy); tm = textureSampleGrad(texM6, texSmp, i.uv, duvx, duvy); }
+    else if (texSet == 7) { ta = textureSampleGrad(texA7, texSmp, uv7, gx3, gy3); tm = textureSampleGrad(texM7, texSmp, uv7, gx3, gy3); }
+    else if (texSet == 8) { ta = textureSampleGrad(texA8, texSmp, i.uv, duvx, duvy); tm = textureSampleGrad(texM8, texSmp, i.uv, duvx, duvy); }
+    else if (texSet == 9) { ta = textureSampleGrad(texA9, texSmp, uv7, gx3, gy3); tm = textureSampleGrad(texM9, texSmp, uv7, gx3, gy3); }
     base = pow(ta.rgb, vec3f(2.2)); texAO = tm.r; rough = tm.g; metal = tm.b;
     if (texSet == 9) {   // THE LAUNCH BAY (2026-10-07): its own material colours, the atlas's detail multiplied on (panel lines, slots, louvres, bolts), its light inlays in the alert colour (the entry's tint)
       let lum = dot(pow(ta.rgb, vec3f(2.2)), vec3f(0.2126, 0.7152, 0.0722));

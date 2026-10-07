@@ -28,7 +28,7 @@ const MODELS = [
   { name: 'hero_rifle', detail: 0, url: 'assets/rifle2_game.glb' },   // Sigma's rifle: assets/rifle2.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_rifle', detail: 0, url: 'assets/rifle1_game.glb' },  // VANGUARD's rifle: assets/rifle1.glb (user-supplied), drawn on its rifle part
   { name: 'gravity_well', detail: 2.5, keep: ['ring', 'core', 'pylons'], resphere: ['core'] },   // (its core rebuilt as a smooth sphere)
-  { name: 'hangar', detail: 0, metalize: true, texSet: 9, texBit: 1 << 16 },   // (texSet 9: its surface detail atlas, after Sigma's rifle — tools/make_hangar_atlas.py)
+  { name: 'hangar', detail: 0, metalize: true, prepass: true, texSet: 9, texBit: 1 << 16 },   // (prepass: its layered walls, catwalks and railings shaded once a pixel — 211 → 87 ms in scene 6)   // (texSet 9: its surface detail atlas, after Sigma's rifle — tools/make_hangar_atlas.py)
   { name: 'shield_drone', detail: 0.4 },   // VANGUARD's shield drone (blender/shield_drone.py, 2026-10-07), in the shield part's frame
   { name: 'mace', detail: 0 },
   { name: 'dock_rig', detail: 0.5, keep: ['frame', 'clampL', 'clampR', 'door', 'mouth'], hullDetail: true },
