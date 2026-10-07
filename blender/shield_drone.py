@@ -1,5 +1,5 @@
 """VANGUARD's SHIELD DRONE, revision 2 (2026-10-07), after the Codex sheet assets/tex/src/shield_drone_concept_v2.png
-(revision 1: shield_drone_concept_v1.png): a THIN plate (~0.4 m at the rim, half of v1), gently CURVED — convex across its
+(revision 1: shield_drone_concept_v1.png): a THIN plate (~0.34 m in the middle, half of v1, tapering to ~0.08 m at the edge), gently CURVED — convex across its
 width (the edges swept back ~0.45 m) and a little along its length — with no decals; thrusters facing EVERY way: four round
 nozzles flush in the back (backward), vectoring vents set into the rim on the sides (left / right), the top edge (up), the
 tip (down) and ports on the face's rim (forward).
@@ -25,6 +25,28 @@ def bend(z, y):
     """the curve: the mid-surface's x at (z, y) — convex across, a slight bow along"""
     dz = z - ZC
     return MID - 0.147 * dz * dz - 0.15 * ((y + 2.6) / 4.3) ** 2
+
+
+# THINNER TOWARD THE EDGE (2026-10-07): every offset from the mid-surface is scaled by the plate's half-thickness there —
+# ~0.17 m in the middle, falling to ~0.04 m at the outline (a knife-thin rim), smoothly over the outer ~1.3 m
+def edge_dist(z, y):
+    d = 1e9
+    for i in range(len(K)):
+        a, b = K[i], K[(i + 1) % len(K)]
+        ex, ey = b[0] - a[0], b[1] - a[1]; L = math.hypot(ex, ey); nx, ny = -ey / L, ex / L
+        if nx * (CEN[0] - a[0]) + ny * (CEN[1] - a[1]) < 0: nx, ny = -nx, -ny
+        d = min(d, (z - a[0]) * nx + (y - a[1]) * ny)
+    return d
+
+
+def half_t(z, y):
+    t = max(0.0, min(1.0, edge_dist(z, y) / 1.3)); t = t * t * (3 - 2 * t)
+    return 0.04 + 0.13 * t
+
+
+def S(z, y, off):
+    """a point's x off the curved mid-surface by `off` (in the middle's units: scaled down toward the edge)"""
+    return bend(z, y) + off * half_t(z, y) / 0.17
 
 
 def palette():
@@ -91,7 +113,7 @@ def curved_solid(mb, poly, lo, hi, mat, n=48, rings=5):
         out = []
         for (z, y) in P:
             zz, yy = C[0] + (z - C[0]) * s, C[1] + (y - C[1]) * s
-            out.append(G(bend(zz, yy) + off, yy, zz))
+            out.append(G(S(zz, yy, off), yy, zz))
         return out
     sc = [1.0 - k / rings * 0.94 for k in range(1, rings + 1)]
     mb.loft([ring(1.0, lo), ring(1.0, hi)] + [ring(s, hi) for s in sc], mat, cap0=False, cap1=True)
@@ -105,11 +127,11 @@ def rim_strip(mb, a, b, t0, t1, w, lo, hi, mat, out=0.0, segs=6):
     for k in range(segs):
         u0, u1 = t0 + (t1 - t0) * k / segs, t0 + (t1 - t0) * (k + 1) / segs
         pts = [(a[0] + ex * u + nx * o, a[1] + ey * u + ny * o) for (u, o) in ((u0, -out), (u1, -out), (u1, w - out), (u0, w - out))]
-        mb.hexa([G(bend(z, y) + lo, y, z) for (z, y) in pts] + [G(bend(z, y) + hi, y, z) for (z, y) in pts], mat)
+        mb.hexa([G(S(z, y, lo), y, z) for (z, y) in pts] + [G(S(z, y, hi), y, z) for (z, y) in pts], mat)
 
 
 def quad_on(mb, q, lo, hi, mat, bevel=0.0):
-    mb.hexa([G(bend(z, y) + lo, y, z) for (z, y) in q] + [G(bend(z, y) + hi, y, z) for (z, y) in q], mat, bevel=bevel)
+    mb.hexa([G(S(z, y, lo), y, z) for (z, y) in q] + [G(S(z, y, hi), y, z) for (z, y) in q], mat, bevel=bevel)
 
 
 def shield_drone():
@@ -144,7 +166,7 @@ def shield_drone():
     quad_on(mb, [(ZC - 0.42, -1.4), (ZC + 0.42, -1.4), (ZC + 0.42, -2.3), (ZC - 0.42, -2.3)], -0.3, -0.06, 'frame', bevel=0.03)   # the back's centre block
     # ---- four main nozzles flush in the back (backward)
     for (y, dz) in ((0.55, 0.9), (0.55, -0.9), (-3.25, 0.8), (-3.25, -0.8)):
-        z = ZC + dz; xb = bend(z, y) - 0.08
+        z = ZC + dz; xb = S(z, y, -0.08)
         mb.cyl(G(xb + 0.04, y, z), G(xb - 0.1, y, z), 0.46, 0.46, 'frame', seg=24)
         mb.nozzle(G(xb - 0.06, y, z), (-1, 0, 0), 0.36, 'nozzle', 'jet_glow', length=0.14, seg=24)
     # ---- vectoring vents set into the rim, every way: sides, top, tip, the chamfers (outward-facing, a glowing slot each)
