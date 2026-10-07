@@ -201,6 +201,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     V.norm(tmp2, tmp2);
     const vent = name === 'enemy_ms' && !pod ? 0.45 : 1;                         // the pods' upper ends: small vents
     let len = r * vent * (1.7 + throttle * 5.0) * Math.max(0.5, trail * 0.6);
+    if (opts && opts.lenK) len *= opts.lenK;                                   // (opts.lenK / gainK: a longer, hotter burn — the enemy frigates' advance)
     if (!isShip) {   // a crackling flame, not a rigid cone: its length and aim jitter frame to frame
       const fr = Math.floor((R._time || 0) * 30), h1 = hash(fr * 1.7 + i * 9.1), h2 = hash(fr * 2.3 + i * 4.7 + 11);
       len *= 0.78 + 0.44 * h1;
@@ -210,7 +211,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
     let endOn = 1;
     if (R.camPos) { const vx = R.camPos[0] - tmp[0], vy = R.camPos[1] - tmp[1], vz = R.camPos[2] - tmp[2], vl = Math.hypot(vx, vy, vz) || 1;
       endOn = 0.25 + 0.75 * Math.min(1, (1 - Math.abs((vx * tmp2[0] + vy * tmp2[1] + vz * tmp2[2]) / vl)) * 3); }
-    const k = throttle * flick * endOn;
+    const k = throttle * flick * endOn * (opts && opts.gainK || 1);
     const c = [col[0] * k, col[1] * k, col[2] * k];
     if (isShip && !(opts && opts.noHeart && opts.noHeart.includes(i))) nozzleHeart(R, tmp, r, col, Math.max(0.7, throttle) * flick, tmp2);   // every ship nozzle: white-hot heart + bloom (not faded end-on; opts.noHeart: not these)
     const bk2 = entry.burnK || 0;
@@ -267,7 +268,15 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       }
       continue;
     }
-    if (isShip) { crossPlume(R, tmp, tmp2, r, len, c); continue; }   // (glow: the bloom pass)   // one smooth cone + a glow AT the nozzle only (no bead mid-plume)
+    if (isShip) {
+      crossPlume(R, tmp, tmp2, r, len, c);
+      if (opts && opts.core) {   // a hard, hot inner jet down the plume's axis (renderer jetFlame) — reads as thrust, not a haze
+        V.madd(tmp3, tmp, tmp2, len * 0.62);
+        const ck = opts.core * k;
+        R.jetFlame(tmp, tmp3, r * 0.75, [(col[0] * 0.5 + 0.35) * ck, (col[1] * 0.5 + 0.3) * ck, (col[2] * 0.5 + 0.25) * ck], 1.0, i * 3.7 + (entry.seed || 0), 2.6);
+      }
+      continue;
+    }   // (glow: the bloom pass)   // one smooth cone + a glow AT the nozzle only (no bead mid-plume)
     V.scale(tmp3, tmp2, len);
     const rw = Math.max(ep.r, 0.18);                                   // mechs: the flame never wider than its nozzle (only longer)
     R.flame(tmp, tmp3, rw, c, 1.4, i * 3.1, 1);

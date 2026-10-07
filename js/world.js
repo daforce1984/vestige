@@ -564,6 +564,7 @@ export function assaultFrigate(t, i) {
 // (2026-10-07) every enemy frigate is ADVANCING on us from the moment it arrives — engines burning, ~2.8 m/s down the +z
 // line toward our fleet (was 1.5 m/s and only from 105: they sat with idle nozzles)
 export const E_ADVANCE = 2.8;
+const E_BURN = { lenK: 2.3, gainK: 1.5, core: 0.9 };   // (2026-10-08) the enemy frigates driving at us: long, hard drive flames
 const advance = (t, arrive) => (t > arrive ? (t - arrive) * E_ADVANCE : 0);
 export function enemyFrigate(t, i) {
   const f = EF[i];
@@ -832,7 +833,7 @@ export function drawWorld(R, t, opts = {}) {
       const e = R.add('enemy_frigate', mat(tmpM, ho.pos, fwd2));
       e.revealZ = ho.revealZ; e.revealDir = ho.dir; e.revealWidth = 1.5; e.tint = [2, 0.3, 0.2]; e.stretch = stretchOut(ho.u); e.stretchOut = true;
       hyperWindow(R, ho.W, fwd2, szE[0] * 0.8 + 6, szE[1] * 0.9 + 6, HYPER_RED, ho.alpha);
-      engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 1);
+      engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 1, 1, E_BURN);
       return;
     }
     const e = R.add('enemy_frigate', mat(tmpM, pos, st.fwd));
@@ -840,7 +841,7 @@ export function drawWorld(R, t, opts = {}) {
     // (2026-10-08) no scorch or melt before it blows: intact until the explosion
     if (win) hyperWindow(R, win.c, st.fwd, szE[0] * 0.8 + 6, szE[1] * 0.9 + 6, HYPER_RED, win.a);
     e.forceThrottle = hin.u >= 1;   // (advancing: the drives burn, plumes and all)
-    engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 0.85);
+    engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 1, 1, E_BURN);
     GUN.efAlive.push({ i, pos: st.pos, e });
   });
 
@@ -1055,7 +1056,7 @@ function drawDreadnought(R, t, tmpM) {
       explosion(R, t, tk, M.transformPoint([0, 0, 0], e.m, lp), 40 + k * 5, 60 + k, 'ship');
     }
   }
-  engineGlows(R, 'enemy_dreadnought', e, DREAD_ENGINE, 1.2, 0.8);
+  engineGlows(R, 'enemy_dreadnought', e, DREAD_ENGINE, 1, 0.8);   // (scale 1: each nozzle's fire as wide as that nozzle — main.js DREAD_NOZZLES)
   GUN.dread = e; GUN.dreadT = t;
   // gravity lance charge & fire
   if (t > 200 && t < LANCE_FIRE + 6) {
@@ -1567,7 +1568,7 @@ export function drawExtras(R, t) {
     // (2026-10-08) intact until it blows
     if (hin.alpha > 0) hyperWindow(R, hin.W, st.fwd, szE[0] * 0.8 + 6, szE[1] * 0.9 + 6, HYPER_RED, hin.alpha);
     e.forceThrottle = hin.u >= 1;   // (advancing: the drives burn)
-    engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 0.85);
+    engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 1, 1, E_BURN);
   });
   drawTracerWalls(R, t);
 }

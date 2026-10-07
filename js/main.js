@@ -8,6 +8,9 @@ import { prepWreck, prepWrecks } from './world.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
   'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
+// the enemy dreadnought's eight nozzles, measured from its 'engine' discs (centre, radius; × its 1.65 load scale): the
+// clustering merged them into four, two aimed sideways — its fire now sits in every nozzle at that nozzle's size
+const DREAD_NOZZLES = [[-44.25, -7.10, -310.41, 12.10], [44.25, -7.10, -310.41, 12.10], [-66.79, -7.10, -310.41, 10.02], [66.79, -7.10, -310.41, 10.02], [-83.90, -7.10, -310.41, 7.52], [83.90, -7.10, -310.41, 7.52], [-98.52, -7.10, -310.41, 5.84], [98.52, -7.10, -310.41, 5.84]];
 const MODELS = [
   { name: 'mothership', detail: 4.5, prepass: true, hullDetail: true, cold: { mat: 'engine', absX: 70 } },   // (the two small side boosters: no glowing disc — 2026-10-07)   // layered greebles: depth prepass keeps close-ups at 24 fps
   { name: 'ion_frigate', detail: 0.9 },
@@ -19,9 +22,9 @@ const MODELS = [
   { name: 'assault_frigate', detail: 0.8 },
   ...['interceptor', 'interceptor_b', 'interceptor_c'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })),   // our fighters: assets/light_fighter.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_frigate', detail: 0 },   // every enemy frigate: blender/ships_enemy_frigate_v16.py (our own, after the shape of 'Cargo Spaceship' by blaice)
-  { name: 'enemy_dreadnought', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game.glb', texSet: 7, texBit: 4096 },
+  { name: 'enemy_dreadnought', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game.glb', texSet: 7, texBit: 4096, engines: DREAD_NOZZLES },
   { name: 'enemy_dreadnought_chunks', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_chunks.glb', texSet: 7, texBit: 4096, keep: DREAD_CHUNKS.map((c) => c.name) },   // its wreck, pre-broken (tools/make_dread_chunks.py; flown by js/wreck.js)
-  { name: 'enemy_dreadnought_lod', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game_lod.glb', texSet: 7, texBit: 4096 },   // far away (5.7k triangles)   // a little bigger than our flagship: 'Space Battleship Aquamarine' (Kai Xiang, CC BY 4.0) via tools/build_rifles.py
+  { name: 'enemy_dreadnought_lod', detail: 0.6, scale: 1.65, url: 'assets/dreadnought_game_lod.glb', texSet: 7, texBit: 4096, engines: DREAD_NOZZLES },   // far away (5.7k triangles)   // a little bigger than our flagship: 'Space Battleship Aquamarine' (Kai Xiang, CC BY 4.0) via tools/build_rifles.py
   ...['enemy_fighter', 'enemy_fighter_b', 'enemy_fighter_c'].map((name) => ({ name, detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256, engines: [[0, 0.74, -4.89, 0.33]] })),   // every enemy fighter: assets/spaceship.glb (user-supplied) via tools/build_rifles.py
   { name: 'gundam', detail: 0, keep: MS_KEEP },
   { name: 'enemy_ms', detail: 0, keep: MS_KEEP, keepGeo: true },
