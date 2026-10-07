@@ -23,7 +23,8 @@ export const CUT_RANGES = [   // (2026-10-07: scene B1 'berserk wakes', 262–26
   [77.8, 81.2], [87.2, 91.8],   // (2026-10-07: scene 10 holds until the dreadnought is out — it emerges 85–86; was cut at 85.8)
   [99.0, 101.8], [108.2, 110.0], [131.2, 135.2],
   [151.6, 153.0], [154.6, 156.0], [158.5, 161.0],
-  [195.8, 198.8], [200.0, 201.9], [212.0, 214.6], [218.0, 221.7], [249.0, 255.0], [262.0, 265.1], [269.4, 275.0],   // (2026-10-07: scene 88 'B4 the rush' cut)
+  [195.8, 198.8], [200.0, 201.9], [212.0, 214.6], [218.0, 221.7], [243.0, 247.0], [249.0, 255.0], [262.0, 265.1],   // (2026-10-07: scene 81 'S16a dive start' cut to its first 3 s)
+  [269.4, 275.0],   // (2026-10-07: scene 88 'B4 the rush' cut)
   [307.4, 308.4], [314.5, 320.0]];   // (the radio lines at 73, 102, 136.4, 224.6 and 292.1 play whole; the main cannon charges uncut through to its shot, 292–300)
 const cutBefore = (s) => CUT_RANGES.reduce((a, [x, e]) => a + Math.max(0, Math.min(s, e) - x), 0);
 export const inSkip = (s) => SKIP_RANGES.some(([a, e]) => s > a && s < e) || CUT_RANGES.some(([a, e]) => s > a && s < e);

@@ -1516,8 +1516,17 @@ export function drawExtras(R, t) {
     e.revealZ = rz; e.revealDir = dir; e.revealWidth = 1.5; e.seed = f.seed; e.stretch = str;
     // (2026-10-07) scorched only once it has really been hit — from the first bolt that lands on it (f.hits), burning up to
     // its death; never before (it used to start 6 s ahead of the death, and every survivor got random scorch after 218)
-    const h0 = f.hits && f.hits.length ? f.hits[0] : null;
-    if (h0 !== null && t > h0) e.damage = f.die ? 0.2 + 0.35 * sat((t - h0) / Math.max(0.5, f.die - h0)) : 0.2;
+    // (b) and only WHERE it was hit: a scorch round the struck side of its bow, growing with every bolt that lands; the whole
+    // hull only in its last second (the hull-wide scorch from its first bolt on read as a ship burning before any damage)
+    if (f.hits && f.hits.length) {
+      let n = 0, last = -1e9; for (const h of f.hits) if (h <= t) { n++; last = h; }
+      if (n > 0) {
+        const L = modelLen(R, f.type), dying = f.die ? sat((t - (f.die - 1)) / 1) : 0;
+        e.dmgC = [(hash(i * 3.3) - 0.5) * L * 0.35, (hash(i * 5.1) - 0.5) * L * 0.08, L * 0.28];   // (the bow faces them)
+        e.dmgR = dying > 0 ? L * (0.25 + 2 * dying) : Math.min(L * 0.45, 7 + 6 * n + 4 * sat((t - last) / 2));
+        e.damage = Math.min(0.6, 0.22 + 0.1 * n) * (0.4 + 0.6 * sat((t - last) / 0.4));
+      }
+    }
     if (win) hyperWindow(R, win.c, st.fwd, sz[0] * 0.8 + 6, sz[1] * 0.9 + 6, HYPER_BLUE, win.a);
     engineGlows(R, f.type, e, HIIG_ENGINE, 1, 0.6);
   });
