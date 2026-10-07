@@ -1037,6 +1037,11 @@ function drawBigShield(R, e, s, t) {
   const Ms = R.partWorld('enemy_ms', e, 'shield');
   e.hidden = { ...(e.hidden || {}), shield: 1 };
   droneJets(R, s.shieldW, droneThrust(t), t);
+  if (s.droneFx && s.droneFx.rcs) for (const q of s.droneFx.rcs) {   // attitude-thruster puffs (scene 35's trim): a white jet of gas off the edge
+    const c = M.transformPoint([0, 0, 0], s.shieldW, SHIELD_FACE), p = V.madd([0, 0, 0], c, q.dir, 2.0), k = q.k;
+    R.jetFlame(p, V.madd([0, 0, 0], p, q.dir, 1.2 + 2.6 * k), 0.22 + 0.25 * k, [1.6 * k, 1.7 * k, 1.9 * k], 1.0, 7, 3.5);
+    R.glow(p, 0.5 + 0.6 * k, [1.5 * k, 1.6 * k, 1.9 * k], 0.3);
+  }
   M.fromTRS(_bsA, SHIELD_FACE, [0, 0, 0, 1], 1);
   M.identity ? M.identity(_bsS) : _bsS.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   _bsS[0] = 1 + 0.3 * (sy - 1); _bsS[5] = 1 + (sy - 1); _bsS[10] = 1 + (sz - 1);   // (thickness a little, long axis and width ×2)

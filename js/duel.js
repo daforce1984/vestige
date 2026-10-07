@@ -1441,6 +1441,8 @@ function enemyState_(t) {
   { const held = smooth(ENEMY_GRAB + 0.1, ENEMY_GRAB + 0.4, tw) * (1 - smooth(189.3, 189.7, tw));
     if (held > 0 && !(tw > CUT_T)) foreGrip(s, held * (1 - COCKY(tw))); }
   if (COCKY(tw) > 0 && !(tw > CUT_T)) cockyAim(s, tw, enemyAim(tw), COCKY(tw), recoilKick(tw));
+  { const sp = smooth(172.9, 173.25, tw) * (1 - smooth(174.0, 174.5, tw));   // (scene 35, 2026-10-07) its arms held a little wider
+    if (sp > 0) { s.pose = { ...s.pose }; for (const [p, sg] of [['arm_L_upper', 1], ['arm_R_upper', -1]]) { const a = (s.pose[p] || [0, 0, 0]).slice(); a[2] += sg * 14 * DEG * sp; s.pose[p] = a; } } }
   if (tw < ENEMY_GRAB + 0.4) holsterDraw(s, tw);
   if (tw > CUT_T) {   // cut: the machine keeps the pose it was cut in (both halves), sagging only slowly toward limp — the aim
     const P0 = cutPose(), k = 0.6 * smooth(0, 2.2, tw - CUT_T);                    // IK switching off made the arms jump
@@ -1455,37 +1457,71 @@ function enemyState_(t) {
 // (face out, riding high as it crosses in front so it never fouls its own line of fire); when he lines up a shot it
 // BOOSTS across onto the line between them and takes it (178.7: the burn — its own cut, D08c; 183.25: it is shot away —
 // shots.js drawLostShield). Its world matrix is in s.shieldW (= fk.shield).
-export const DRONE_L0 = 171.9, DRONE_L1 = 172.55;   // undocks / in orbit (2026-10-07: early — it is circling it on guard from scene 35)
+// (2026-10-07, scene 35) it comes INTO its orbit from above: undocked off screen it climbs over its head and holds there;
+// in scene 35 it spins down on a hard burn, overshoots a little, and trims itself into place with short attitude-thruster
+// puffs (left/right, up/down, fore/aft) before it starts circling. s.droneFx: what its thrusters do (shots.js draws it)
+export const DRONE_L0 = 171.9, DRONE_UP = 172.7, DRONE_DESC = [173.22, 173.56], DRONE_L1 = 173.95;   // undock / over its head / the spin down / circling
+const DRONE_OVER = [0.9, -0.7, 0.6];                                    // the overshoot left after the dive (its left, up, fore — m)
+const DRONE_PUFFS = [[173.6, 0, 0.6], [173.67, 1, 1.0], [173.75, 0, 0.4], [173.84, 2, 1.0]];   // [t, axis, share of that axis removed]
+export const DRONE_PUFF_T = DRONE_PUFFS.map((p) => p[0]);
 export const DRONE_DASH = [178.38, 182.95];          // its boosts onto the line (each ~0.18 s)
 const DOCK_FACE = [3.52, -2.5, -2.3], BACKPACK_T = [0, 3.495, -1.071];   // backpack frame: the face centre (its inner face against the backpack's flank, x 2.4); the backpack node's offset on the torso (assets/enemy_ms.glb)
 const ORBIT_R = 13, ORBIT_W = 1.9;   // m, rad/s (a lap every ~3.3 s)
 const shieldMat = (R, face) => m4(R, sub(face, r3v(R, SHIELD_C)));
 const droneBlock = (tw) => smooth(DRONE_DASH[0], DRONE_DASH[0] + 0.18, tw) * (1 - smooth(179.3, 179.75, tw)) + smooth(DRONE_DASH[1], DRONE_DASH[1] + 0.15, tw);   // on the line for his shots
-/** how hard its thrusters burn (shots.js draws them): the launch, the dashes onto the line (full), a steady cruise otherwise */
+const descK = (tw) => sat((tw - DRONE_DESC[0]) / (DRONE_DESC[1] - DRONE_DESC[0]));
+/** how hard its main thrusters burn (shots.js draws them): the launch, the climb, the dive (hardest at its start, braking at
+ *  its end), the dashes onto the line, a steady cruise otherwise */
 export const droneThrust = (tw) => tw < DRONE_L0 || tw > SHIELD_HIT_T + 0.03 ? 0
-  : Math.min(1.6, 0.35 + 0.9 * Math.exp(-Math.abs(tw - DRONE_L0 - 0.12) * 5) + 1.3 * Math.exp(-Math.abs(tw - DRONE_DASH[0] - 0.07) * 9) + 0.6 * Math.exp(-Math.abs(tw - 179.5) * 7) + 1.3 * Math.exp(-Math.abs(tw - DRONE_DASH[1] - 0.06) * 9));
+  : Math.min(1.8, 0.35 + 0.9 * Math.exp(-Math.abs(tw - DRONE_L0 - 0.12) * 5) + (tw >= DRONE_DESC[0] && tw <= DRONE_DESC[1] + 0.1 ? 1.4 * (1 - 0.5 * descK(tw)) + 0.6 * Math.exp(-Math.abs(tw - DRONE_DESC[1]) * 12) : 0)
+    + 1.3 * Math.exp(-Math.abs(tw - DRONE_DASH[0] - 0.07) * 9) + 0.6 * Math.exp(-Math.abs(tw - 179.5) * 7) + 1.3 * Math.exp(-Math.abs(tw - DRONE_DASH[1] - 0.06) * 9));
 const frameFrom = (n, U0) => { const Y = nrm(sub(U0, scl(n, V.dot(U0, n)))); return [...n, ...Y, ...V.cross([0, 0, 0], n, Y)]; };   // face (+X) along n, long axis up
+const rotAx = (a, ang) => { const s2 = Math.sin(ang / 2); return colsFromQ([a[0] * s2, a[1] * s2, a[2] * s2, Math.cos(ang / 2)]); };
+const slerpR = (A, B, k) => colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(A), qFromCols(B), k));
 function shieldDrone(tw, s) {
+  s.droneFx = null;
   const fk = duelFK({ ...s, shieldW: null }, 'enemy_ms');
   const Rd = r3(fk.torso), Fd = M.transformPoint([0, 0, 0], fk.torso, add(BACKPACK_T, DOCK_FACE));   // (the backpack is fixed on the torso)
-  const u = smooth(DRONE_L0, DRONE_L1, tw); if (u <= 0 || tw < 170) return shieldMat(Rd, Fd);
+  if (tw < DRONE_L0 || tw < 170) return shieldMat(Rd, Fd);
   const tq = Math.min(tw, SHIELD_HIT_T + 0.03);   // (frozen at the hit: shots.js flies the wreck from there)
   const E = partPoint(fk, 'torso', [0, 3, 0]), H = add(heroRawPos(tq), [0, 3, 0]), d = nrm(sub(H, E));
   const W0 = fk.root, U0 = nrm([W0[4], W0[5], W0[6]]), Lf = nrm([W0[0], W0[1], W0[2]]), Fw = nrm([W0[8], W0[9], W0[10]]);
-  // the orbit (in its body's frame, starting on its left where it undocked)
-  const ph = ORBIT_W * (tq - DRONE_L1), rad = add(scl(Lf, Math.cos(ph)), scl(Fw, Math.sin(ph)));
-  const front = Math.max(0, V.dot(rad, d)), bob = 0.4;
+  // the orbit (in its body's frame, starting on its left); before DRONE_L1 the orbit's start point
+  const ph = ORBIT_W * Math.max(0, tq - DRONE_L1), rad = add(scl(Lf, Math.cos(ph)), scl(Fw, Math.sin(ph)));
+  const front = Math.max(0, V.dot(rad, d)), bob = 0.4 * smooth(DRONE_L1, DRONE_L1 + 0.6, tq);
   const Fo = add(add(E, scl(rad, ORBIT_R)), add(scl(U0, 1 + 7 * front * front), [bob * Math.sin(tw * 2.3), bob * Math.sin(tw * 3.1 + 1), bob * Math.cos(tw * 2.7)]));
   const Ro = frameFrom(rad, U0);
+  if (tw < DRONE_L1) {
+    const Ph = add(add(E, scl(U0, 21)), scl(Lf, 2)), Rh = frameFrom(Fw, U0);   // held over its head, face forward
+    if (tw < DRONE_UP) {                                                     // undock and climb (off screen)
+      const u = smooth(DRONE_L0, DRONE_UP, tw), e = easeInOut(u), arc = Math.sin(Math.PI * u);
+      return shieldMat(slerpR(Rd, Rh, e), add(lrp(Fd, Ph, e), add(scl(Lf, 4 * arc), scl(Fw, -3 * arc))));
+    }
+    if (tw < DRONE_DESC[0]) return shieldMat(Rh, add(Ph, [0.25 * Math.sin(tw * 2.1), 0.3 * Math.sin(tw * 2.9), 0.25 * Math.cos(tw * 2.4)]));   // hovering up there
+    const O = [...DRONE_OVER];
+    if (tw < DRONE_DESC[1]) {                                                // the dive: a hard burn, spinning down, braking at the end
+      const k = descK(tw), e = 1 - Math.pow(1 - k, 2.4);
+      const P1 = add(Fo, add(add(scl(Lf, O[0]), scl(U0, O[1])), scl(Fw, O[2])));
+      const R = r3mul(rotAx(U0, 2.6 * Math.PI * (1 - e)), slerpR(Rh, Ro, e));   // spinning about the vertical as it comes
+      s.droneFx = { main: 1, dir: nrm(sub(Ph, P1)) };
+      return shieldMat(R, lrp(Ph, P1, e));
+    }
+    // the trim: each attitude thruster puff takes out part of the overshoot on one axis (the gas thrown the other way)
+    const ax = [Lf, U0, Fw], rcs = [];
+    for (const [tp, a, sh] of DRONE_PUFFS) {
+      const k = smooth(tp, tp + 0.07, tw), base = DRONE_OVER[a];
+      O[a] -= base * sh * k;
+      const lt = tw - tp; if (lt > -0.01 && lt < 0.12) rcs.push({ dir: scl(ax[a], Math.sign(base)), k: Math.exp(-Math.max(0, lt) * 24) });
+    }
+    const wob = 0.04 * Math.sin(tw * 31);
+    s.droneFx = { main: 0, rcs };
+    return shieldMat(r3mul(rotAx(Fw, wob), Ro), add(Fo, add(add(scl(Lf, O[0]), scl(U0, O[1])), scl(Fw, O[2]))));
+  }
   // on the line: ~10 m out in front of it, face to him
   const Fl = add(E, scl(d, 10)), Rl = frameFrom(nrm(sub(H, Fl)), U0);
   const bw = droneBlock(tq), bE = easeInOut(bw);
   const Fs = add(lrp(Fo, Fl, bE), scl(U0, 2.5 * Math.sin(Math.PI * bw)));   // (the dash arcs a little over)
-  const Rs = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(Ro), qFromCols(Rl), bE));
-  const e = easeInOut(u), arc = Math.sin(Math.PI * u);
-  const F = add(lrp(Fd, Fs, e), add(scl(Lf, 4 * arc), scl(Fw, -3 * arc * (1 - u))));   // kicked out to its left and back first, then round
-  const R = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(Rd), qFromCols(Rs), e));
-  return shieldMat(R, F);
+  return shieldMat(slerpR(Ro, Rl, bE), Fs);
 }
 // ITS RIFLE ON ITS RIGHT THIGH (2026-10-05): holstered along the outside of the thigh, the grip just under the hip (as
 // high as the hanging hand reaches), the barrel down toward the knee, the long stock raked back; the hand goes down

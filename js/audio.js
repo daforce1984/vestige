@@ -16,7 +16,7 @@ import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, H_FEATURED, LOSS_SWAP_DT, swap2224, wreckPopTimes } from './world.js';
-import { SHIELD_CLUNKS, DRONE_L0, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
+import { SHIELD_CLUNKS, DRONE_L0, DRONE_DESC, DRONE_PUFF_T, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, STRIKE_FLIGHT, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
 import { filmT, inSkip, insertFilm, TEAR_S0, TEAR_S1, TEAR_F0, TEAR_F1, FILM_DURATION, STORY_DURATION, SLOW_WIN } from './timemap.js';
@@ -732,6 +732,11 @@ function duelCues() {
   out.push([DRONE_L0, 'reload_slam', { rate: 0.6, gain: G * 0.9, pan: 0.4, prio: 9, norand: true }]);
   out.push([DRONE_L0 + 0.04, 'hl_thruster', { dur: 0.7, rate: 1.5, gain: G * 0.7, fadeIn: 0.03, fadeOut: 0.35, pan: 0.4, prio: 8, norand: true }]);
   out.push([DRONE_L0 + 0.06, '@msBoost', { vel: G * 0.4, dur: 0.6, pan: 0.45 }]);
+  // (scene 35) it dives out of the sky over its head on a hard burn, brakes, and trims itself into place: attitude-thruster puffs
+  out.push([DRONE_DESC[0], 'hl_thruster', { dur: DRONE_DESC[1] - DRONE_DESC[0] + 0.15, rate: 1.35, gain: G * 1.0, fadeIn: 0.03, fadeOut: 0.12, pan: 0.2, prio: 9, norand: true }]);
+  out.push([DRONE_DESC[0], '@msBoost', { vel: G * 0.7, dur: 0.7, pan: 0.2 }]);
+  out.push([DRONE_DESC[1] - 0.05, '@msBoost', { vel: G * 0.5, dur: 0.3, pan: 0.3 }]);   // the brake
+  DRONE_PUFF_T.forEach((t, i) => out.push([t, 'reload_hiss', { rate: 1.7 + 0.15 * i, gain: G * 0.55, dur: 0.18, fadeOut: 0.1, pan: 0.15 + 0.1 * ((i % 2) * 2 - 1), prio: 8, norand: true }]));
   // his 178.7 splashes off its shield: the plate rings, the face burns (the hole stays)
   out.push([BLOCK_T + 0.03, 'magic_impact', { at: 'hit', gain: G * 1.1, pan: 0.3, prio: 10, norand: true }]);
   // THE SHIELD TAKES IT (2026-10-06 — the block had no sound you could hear: its cues were prio 9 under the prio-10 beam):
