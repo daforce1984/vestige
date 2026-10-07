@@ -1023,12 +1023,18 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let sa = inst.p1.w * 1.7; let ca = cos(sa); let sn = sin(sa);
     let qs = normalize(vec3f(qs0.x * ca - qs0.z * sn, qs0.y * cos(sa * 0.6) + (qs0.x * sn + qs0.z * ca) * sin(sa * 0.6), (qs0.x * sn + qs0.z * ca) * cos(sa * 0.6) - qs0.y * sin(sa * 0.6)));
     let mu = vec2f(atan2(qs.z, qs.x) / 6.2831853 + 0.5, acos(clamp(qs.y, -1.0, 1.0)) / 3.14159265);
-    let mt = textureSampleLevel(texMoon, texSmp, mu, 0.0);
+    // (2026-10-07: it shimmered) the baked moon has no mipmaps: four taps spread over the pixel's footprint, and the finest
+    // detail (crater slopes, grit, mineral grains) fading out as the rock gets small on screen
+    let fo = clamp(pwLP / 6.2831853, 0.0, 0.02);
+    let mt = (textureSampleLevel(texMoon, texSmp, mu + vec2f(fo, fo * 0.5), 0.0) + textureSampleLevel(texMoon, texSmp, mu + vec2f(-fo, -fo * 0.5), 0.0)
+      + textureSampleLevel(texMoon, texSmp, mu + vec2f(fo * 0.5, -fo), 0.0) + textureSampleLevel(texMoon, texSmp, mu + vec2f(-fo * 0.5, fo), 0.0)) * 0.25;
+    let fineK = 1.0 - smoothstep(0.004, 0.02, pwLP);
+    let slopeK = 1.0 - 0.75 * smoothstep(0.008, 0.04, pwLP);
     let big = fbm(q * 2.2 + inst.p1.w, 4);
     let mid = fbm(q * 7.0 + 3.1 + inst.p1.w, 3);
     base = vec3f(mt.b) * mix(0.82, 1.05, mid) * vec3f(1.0, 0.985, 0.965);                                // the moon's grey regolith
     base = mix(base, base * vec3f(1.08, 0.97, 0.88), smoothstep(0.6, 0.85, big) * 0.35);                  // (a faint warmth here and there: not the moon's twin)
-    base += vec3f(0.02) * smoothstep(0.85, 0.92, vnoise(q * 70.0 + inst.p1.w));                         // mineral grains
+    base += vec3f(0.02) * smoothstep(0.85, 0.92, vnoise(q * 70.0 + inst.p1.w)) * fineK;                 // mineral grains
     rough = 0.93; metal = 0.0;
     // bump: height field gradient by central differences (fine pits and grit that the mesh cannot hold)
     let e = 0.004;
@@ -1045,7 +1051,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
     let ci = cos(sa * 0.6); let si = sin(sa * 0.6);
     let y1 = sl.y * ci - sl.z * si; let z1 = sl.y * si + sl.z * ci;          // undo the tilt
     let slm = vec3f(sl.x * ca + z1 * sn, y1, -sl.x * sn + z1 * ca);           // undo the turn
-    g3 = g3 * 0.5 - slm * 55.0;
+    g3 = g3 * 0.5 * fineK - slm * 40.0 * slopeK;
     var gw = (inst.m * vec4f(g3, 0.0)).xyz;
     gw = gw / max(length(inst.m[0].xyz), 1e-3);
     gw = gw - n * dot(gw, n);

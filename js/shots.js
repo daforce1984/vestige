@@ -3306,25 +3306,54 @@ function astOnly(R, name) {
   const h = {}; for (const p of R.models.asteroids.parts) if (p.name !== name && p.name !== '__root') h[p.name] = 1;
   return (_astHidden[name] = h);
 }
+// (2026-10-07) THE ROCKS COLLIDE: their drift is baked once (280–346, 1/24 s) as spheres (mass by size, a soft bounce) —
+// first the ones that started out overlapping are pushed apart, then they drift and knock into each other, the knocks
+// setting them tumbling a little faster; the frames read from the cache
+const AST_BIG = [[-70, 25, -230, 26, 0], [110, -40, -330, 38, 3], [-170, 70, -470, 55, 1], [60, 90, -150, 12, 4], [-40, -60, -120, 9, 5]];
+let _astBake = null;
+function astBodies() {
+  const base = addv(WELL, [40, 60, -1150]), B = [];
+  for (let i = 0; i < 34; i++) {
+    const d = randDir([0, 0, 0], i * 7.7), r = 3 + 26 * Math.pow(hash(i + 4), 2.2);
+    B.push({ p: madd(base, d, 60 + r * 1.3 + hash(i * 3.3) * 200), v: [0, 0, (hash(i) - 0.5) * 2], r, k: i % 6, seed: i * 3.7,
+      rot: [0.05 * (hash(i + 1) - 0.5), 0.04 * (hash(i + 2) - 0.5)], ph: [i * 1.3, i, i * 0.7] });
+  }
+  AST_BIG.forEach(([x, y, z, r, k], j) => B.push({ p: addv(base, [x, y, z]), v: [0, 0, -0.6], r, k, seed: 50 + j, rot: [0.02 * (j % 2 ? 1 : -1), 0.015], ph: [j, j * 2.1, j * 0.9] }));
+  return B;
+}
+function astBake() {
+  if (_astBake) return _astBake;
+  const B = astBodies(), n = B.length, DT = 1 / 24, steps = Math.ceil(66 / DT) + 1, track = new Float32Array(steps * n * 3), spin = new Float32Array(steps * n * 2);
+  const rad = (b) => b.r * 1.05, mass = (b) => b.r ** 3;
+  for (let it = 0; it < 40; it++) for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {   // the overlaps they started with, pushed apart
+    const a = B[i], b = B[j], d = V.sub([0, 0, 0], b.p, a.p), l = V.len(d), pen = rad(a) + rad(b) - l;
+    if (pen > 0 && l > 1e-6) { const nrm = V.scale(d, d, 1 / l), wa = mass(b) / (mass(a) + mass(b)); a.p = madd(a.p, nrm, -pen * wa); b.p = madd(b.p, nrm, pen * (1 - wa)); }
+  }
+  const sp = B.map(() => 1), ang = B.map((b) => [280 * b.rot[0], 280 * b.rot[1]]);   // (the tumble integrated: a knock speeds it up, no jump)
+  for (let st = 0; st < steps; st++) {
+    for (let i = 0; i < n; i++) { track.set(B[i].p, (st * n + i) * 3); spin.set(ang[i], (st * n + i) * 2); }
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const a = B[i], b = B[j], d = V.sub([0, 0, 0], b.p, a.p), l = V.len(d), pen = rad(a) + rad(b) - l;
+      if (pen <= 0 || l < 1e-6) continue;
+      const nr = V.scale([0, 0, 0], d, 1 / l), vn = V.dot(V.sub([0, 0, 0], b.v, a.v), nr), ma = mass(a), mb = mass(b);
+      if (vn < 0) { const jimp = -(1 + 0.4) * vn / (1 / ma + 1 / mb); a.v = madd(a.v, nr, -jimp / ma); b.v = madd(b.v, nr, jimp / mb); sp[i] += Math.min(2, -vn * 0.5); sp[j] += Math.min(2, -vn * 0.5); }
+      a.p = madd(a.p, nr, -pen * 0.5 * mb / (ma + mb)); b.p = madd(b.p, nr, pen * 0.5 * ma / (ma + mb));
+    }
+    B.forEach((b, i) => { b.p = madd(b.p, b.v, DT); ang[i][0] += b.rot[0] * sp[i] * DT; ang[i][1] += b.rot[1] * sp[i] * DT; sp[i] = 1 + (sp[i] - 1) * Math.exp(-DT * 0.05); });
+  }
+  return (_astBake = { n, steps, DT, track, spin, B });
+}
 function drawDebrisField(R, t) {
   const base = addv(WELL, [40, 60, -1150]);
   const m = M.new();
-  // procedural asteroids (tools/make_asteroids.py; shaded with texSet -1): power-law sizes, slow tumbles
-  for (let i = 0; i < 34; i++) {
-    const d = randDir([0, 0, 0], i * 7.7);
-    const r = 3 + 26 * Math.pow(hash(i + 4), 2.2);
-    const p = madd(base, d, 60 + r * 1.3 + hash(i * 3.3) * 200);          // keep clear of Sigma and the close cameras
-    p[2] += (t - 280) * (hash(i) - 0.5) * 2;
-    const e = R.add('asteroids', matEuler(m, p, t * 0.05 * (hash(i + 1) - 0.5) + i * 1.3, t * 0.04 * (hash(i + 2) - 0.5) + i, i * 0.7, r));
-    if (!e) continue;
-    e.hidden = astOnly(R, 'ast' + (i % 6));
-    e.texSet = -1; e.seed = i * 3.7;
-  }
-  // a few large ones placed where the drift / return cameras look (behind Sigma, down his line home)
-  [[-70, 25, -230, 26, 0], [110, -40, -330, 38, 3], [-170, 70, -470, 55, 1], [60, 90, -150, 12, 4], [-40, -60, -120, 9, 5]].forEach(([x, y, z, r, k], j) => {
-    const p = addv(base, [x, y, z - (t - 280) * 0.6]);
-    const e = R.add('asteroids', matEuler(m, p, t * 0.02 * (j % 2 ? 1 : -1) + j, t * 0.015 + j * 2.1, j * 0.9, r));
-    if (e) { e.hidden = astOnly(R, 'ast' + k); e.texSet = -1; e.seed = 50 + j; }
+  // procedural asteroids (tools/make_asteroids.py; shaded with texSet -1): power-law sizes, slow tumbles — colliding (astBake)
+  const ab = astBake(), f = Math.max(0, Math.min(ab.steps - 1.001, (t - 280) / ab.DT)), s0 = Math.floor(f), a = f - s0;
+  ab.B.forEach((b, i) => {
+    const o0 = (s0 * ab.n + i) * 3, o1 = o0 + ab.n * 3, p = [0, 1, 2].map((k) => ab.track[o0 + k] + (ab.track[o1 + k] - ab.track[o0 + k]) * a);
+    const q0 = (s0 * ab.n + i) * 2, q1 = q0 + ab.n * 2, a0 = ab.spin[q0] + (ab.spin[q1] - ab.spin[q0]) * a, a1 = ab.spin[q0 + 1] + (ab.spin[q1 + 1] - ab.spin[q0 + 1]) * a;
+    const e = R.add('asteroids', matEuler(m, p, a0 + b.ph[0], a1 + b.ph[1], b.ph[2], b.r));
+    if (!e) return;
+    e.hidden = astOnly(R, 'ast' + b.k); e.texSet = -1; e.seed = b.seed;
   });
   // torn hull plates from the battle
   for (let i = 0; i < 8; i++) {
