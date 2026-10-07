@@ -936,7 +936,7 @@ function boxWreckBake(R, name, seed, o = {}) {
 }
 export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   if (t < t0) return;
-  const lt = t - t0; if (lt > (o.life ?? 10)) return;
+  const lt = t - t0; if (o.life !== undefined && lt > o.life) return;   // (2026-10-07: no time limit — the pieces drift on, on their last velocity and spin, as long as the scene lasts)
   const w = boxWreckBake(R, name, seed, o); if (!w) return;
   const key = w.cn + '#' + seed, xf = _xfs.get(key) || {}; _xfs.set(key, xf);
   const e = R.add(w.cn, base); if (!e) return;
@@ -953,7 +953,7 @@ export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   }
 }
 // an ion frigate's wreck (EXTRA_H): ~7 m pieces (ion_frigate_cells), the cut faces molten white-orange and slow to cool
-const ION_WRECK = { damage: 0.1, speed: 1.1, spin: 2.2, tint: [0.4, 0.7, 1], pops: 12, popSize: 7, life: 120, heat: 0.75, cool: 0.35, fires: 4 };
+const ION_WRECK = { damage: 0.1, speed: 1.1, spin: 2.2, tint: [0.4, 0.7, 1], pops: 12, popSize: 7, heat: 0.75, cool: 0.35, fires: 4 };
 /** every wreck's flight baked at load (they used to be baked the first time each one was drawn: a hitch mid-shot) */
 export function prepWrecks(R) {   // (one per idle slice after load: nothing blocks; a wreck not baked yet bakes when first drawn)
   const jobs = [];
