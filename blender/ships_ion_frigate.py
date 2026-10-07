@@ -49,6 +49,9 @@ def palette():
     reg('coil', (0.420, 0.200, 0.110), 1.00, 0.34)      # copper accelerator / focusing windings
     reg('coil2', (0.300, 0.130, 0.070), 1.00, 0.24)     # the windings' outer turns: polished, a shade darker
     reg('insul', (0.030, 0.028, 0.026), 0.00, 0.62)     # resin spacers / insulators between the winding packs
+    for k in range(STAGES * 3):   # each coil its own copper (coil_k packs, turn_k outer turns): the film heats them one by one
+        reg('coil_%d' % k, (0.420, 0.200, 0.110), 1.00, 0.34)          # (world.js ionCharge: blue glow behind the fill front)
+        reg('turn_%d' % k, (0.300, 0.130, 0.070), 1.00, 0.24)
     reg('accent', (0.070, 0.120, 0.215), 0.40, 0.42)    # restrained slate-blue trim stripes
     reg('exhaust', (0.300, 0.265, 0.300), 1.00, 0.36)   # heat-tinted nozzle metal
     reg('glass', (0.020, 0.032, 0.050), 0.30, 0.08)     # sensor domes / canopy
@@ -182,7 +185,7 @@ def ring_pts(c, ax, r, seg):
             for i in range(seg)]
 
 
-def coil_ring(mb, s, big=False):
+def coil_ring(mb, s, big=False, idx=0):
     ax = (0, -1, 0)
     c = (0, Y(s), BZ)
     if big:   # stage flange: armoured ring with bolt lugs
@@ -197,9 +200,9 @@ def coil_ring(mb, s, big=False):
         # eight clamp bars with bolt heads, a terminal block with its lead
         annulus(mb, c, ax, 0.76, 1.3, 0.62, 'greeble', seg=40)                  # former
         for ds in (-0.2, 0.0, 0.2):
-            annulus(mb, (0, Y(s + ds), BZ), ax, 1.28, 1.52, 0.17, 'coil', seg=40)   # the pack's inner layers
+            annulus(mb, (0, Y(s + ds), BZ), ax, 1.28, 1.52, 0.17, 'coil_%d' % idx, seg=40)   # the pack's inner layers
             for t in (-0.054, 0.0, 0.054):                                       # its outer layer: three round turns
-                turn(mb, s + ds + t, 1.545, 0.029)
+                turn(mb, s + ds + t, 1.545, 0.029, 'turn_%d' % idx)
         for ds in (-0.1, 0.1):                                                   # resin spacers between the packs
             for k in range(12):
                 a = (k + 0.25) / 12 * 2 * math.pi
@@ -228,7 +231,7 @@ def coil_ring(mb, s, big=False):
                 mb.cyl(q, q + n * 0.08, 0.04, 0.03, 'coil', seg=8)
 
 
-def turn(mb, s, R, a, seg=44, cs=6):
+def turn(mb, s, R, a, mat, seg=44, cs=6):
     """One round turn of conductor around the barrel axis: a torus (centre radius R, wire radius a) at station s."""
     rings = []
     for j in range(cs):
@@ -236,7 +239,7 @@ def turn(mb, s, R, a, seg=44, cs=6):
         r, dy = R + a * math.cos(th), a * math.sin(th)
         rings.append([Vector((math.cos(i / seg * 2 * math.pi) * r, Y(s) + dy, BZ + math.sin(i / seg * 2 * math.pi) * r))
                       for i in range(seg)])
-    mb.loft(rings, 'coil2', wrap=True)
+    mb.loft(rings, mat, wrap=True)
 
 
 def cap_module(mb, s0, s1, sg, SB):
@@ -275,7 +278,7 @@ def ion_cannon(mb, SB):
         s0 = ST0 + k * STL
         coil_ring(mb, s0, big=True)
         for j in range(3):
-            coil_ring(mb, s0 + 1.0 + j * 1.0)
+            coil_ring(mb, s0 + 1.0 + j * 1.0, idx=k * 3 + j)
         for sg in (1, -1):
             cap_module(mb, s0 + 0.45, s0 + STL - 0.25, sg, SB)
         # saddle blocks under the flange and the coils
@@ -866,16 +869,15 @@ def ion_frigate():
 def smooth_turns(obj):
     """The coils' round turns shade smooth (their 60-degree facets would read as hexagonal wire at the 26-degree cut)."""
     me = obj.data
-    names = [m.name for m in me.materials]
-    if 'coil2' not in names:
+    mis = {i for i, m in enumerate(me.materials) if m.name.startswith('turn_')}
+    if not mis:
         return
-    mi = names.index('coil2')
     sharp = me.attributes.get('sharp_edge')
     if sharp is None:
         return
     cnt = {}
     for p in me.polygons:
-        if p.material_index == mi:
+        if p.material_index in mis:
             for ek in p.edge_keys:
                 cnt[ek] = cnt.get(ek, 0) + 1
     n = 0

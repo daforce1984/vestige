@@ -159,13 +159,14 @@ function copyText(txt) {
 function fallbackCopy(txt) { const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) { /* ok */ } ta.remove(); }
 // ←/→: one scene (camera cut) at a time
 function stepScene(dir) {
-  const st = storyT(now());
-  const starts = [...new Set(SCENE_ORDER.map((x) => x.t0))].sort((a, b) => a - b);
-  const cur = [...starts].reverse().find((x) => x <= st + 0.001) ?? starts[0];
-  const to = dir > 0 ? starts.find((x) => x > st + 0.001)
-    : st - cur > 0.3 ? cur : [...starts].reverse().find((x) => x < cur - 0.0005);   // ←: back to this cut's start, again → previous cut
+  // (2026-10-08) in FILM time: a cut whose story start lies in a cut-out range starts later in the film than its t0, and
+  // ← compared in story time kept landing back on the same cut; ← now always goes to the previous scene
+  const ft = now();
+  const starts = [...new Set(SCENE_ORDER.map((x) => Math.round(filmT(x.t0) * 1000) / 1000))].sort((a, b) => a - b);
+  const cur = starts.reduce((k, x, i) => (x <= ft + 0.01 ? i : k), 0);
+  const to = dir > 0 ? starts[cur + 1] : starts[Math.max(0, cur - 1)];
   if (to === undefined) return;
-  seek(filmT(to) + 0.002);
+  seek(to + 0.002);
   if (!playing) showSceneTag();   // (2026-10-07: while it plays, no info window — it stayed up)
 }
 function hideSceneTag() { sceneTag.classList.remove('on'); }

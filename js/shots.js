@@ -11,7 +11,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  STRIKE_FLIGHT, S10_SWAP_DT, EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drawBoxWreck, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
+  STRIKE_FLIGHT, S10_SWAP_DT, EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drawBoxWreck, drainOutflow, fighterModel, ionCharge, queueIonCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -2368,7 +2368,7 @@ shot(110, 120, 'B5 ion muzzle charge', (c) => {
   const R = c.R;
   // the charge climbs... stalls... and the gravity well pulls it back out of the coils (nothing will fire at 120)
   const k = sat((t - 110) / 6) * 0.85 * (1 - 0.8 * smooth(116.2, 119.5, t));
-  ionCharge(R, GUN.ionEntries && GUN.ionEntries[0], t, k, t > 115.6, 11);                   // the gun wakes stage by stage…
+  queueIonCharge(0, t, k, t > 115.6, 11);                   // the gun wakes stage by stage…
   drainOutflow(R, t, 115.8, m, smooth(115.8, 116.8, t), 11);                                  // …and the well drinks it
 });
 shot(120, 123.6, 'S9a nothing fires', (c) => {

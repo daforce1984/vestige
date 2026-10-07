@@ -804,6 +804,10 @@ export function drawWorld(R, t, opts = {}) {
   };
   GUN.ionEntries = []; GUN.ionT = t;
   IONF.forEach((f, i) => { GUN.ionEntries[i] = place('ion_frigate', ionFrigate(t, i), f.arrive, Li, szI, f.seed, null); });
+  if (GUN.chargeQ && GUN.chargeQ.length) {   // charges asked for by a shot (it runs before the world: its entries were last frame's)
+    for (const q of GUN.chargeQ) ionCharge(R, GUN.ionEntries[q[0]], q[1], q[2], q[3], q[4]);
+    GUN.chargeQ.length = 0;
+  }
   ASF.forEach((f, i) => place('assault_frigate', assaultFrigate(t, i), f.arrive, La, szA, f.seed, null));
 
   // ---------------- enemy frigates
@@ -1259,6 +1263,22 @@ export function drainOutflow(R, t, t0, from, k, seed) {
 // up the barrel, and the charge gathers into a plasma core INSIDE the muzzle bore (z ≈ 30.6). c: 0..1 charge,
 // fail: the stages die back from the muzzle and the core bleeds away (the well drains it)
 const ION_BORE = [0, 0.9, 30.6], ION_BORE_MOUTH = 31.2;   // (bore r 0.93 from s 28.6, its glowing exit disc at 31.25, lip 31.5)
+const _ionCoilMats = [];
+function ionCoilMats() {   // per-entry material overrides for the 12 coils (reused: a small pool per frame's entries)
+  const k = (ionCoilMats.n = (ionCoilMats.n || 0) + 1) % 8;
+  if (!_ionCoilMats[k]) {
+    const o = {};
+    for (let j = 0; j < 12; j++) {
+      o['coil_' + j] = { base: [0.42, 0.2, 0.11], metal: 1, rough: 0.34, emissive: [0, 0, 0] };
+      o['turn_' + j] = { base: [0.3, 0.13, 0.07], metal: 1, rough: 0.24, emissive: [0, 0, 0] };
+    }
+    _ionCoilMats[k] = o;
+  }
+  return _ionCoilMats[k];
+}
+/** a shot's charge on ion frigate i: drawn by the world right after it places the frigates (so the coil glow lands on this
+ *  frame's entry) */
+export function queueIonCharge(i, t, c, fail, seed) { (GUN.chargeQ || (GUN.chargeQ = [])).push([i, t, c, fail, seed]); }
 export function ionCharge(R, e, t, c, fail, seed) {
   if (!e || c <= 0.005) return;
   const P = (x, y, z) => M.transformPoint([0, 0, 0], e.m, [x, y, z]);
@@ -1267,15 +1287,20 @@ export function ionCharge(R, e, t, c, fail, seed) {
   // muzzle at an even pace — a plasma column climbing behind a crackling front, the coil windings blazing in spinning
   // rings behind it, the barrel dark ahead; failing, it stutters
   const fill = sat((c - 0.1) / 0.7), zF = 6.8 + (ION_BORE_MOUTH - 6.8) * fill;
-  const k = 0.68 * Math.min(1.2, 0.4 + c);   // (brighter, 2026-10-07)
-  R.ionCoil(P(0, 0.9, 6.0), P(0, 0.9, ION_BORE_MOUTH), 3.2, fill, [CC[0] * k, CC[1] * k, CC[2] * k], 1.0, seed, fail ? 1 : 0, 1.9);   // (a wider quad: room for its soft round falloff)
-  for (let s = 0; s < 4; s++) {                                              // capacitor modules flashing over onto the filled stages
-    const zc = 6.8 + 4.1 * (s + 0.5), on = sat((zF - zc) / 2.5); if (on <= 0.3) continue;
-    for (const sx of [1, -1]) {
-      const a = P(sx * 2.6, -0.2, zc + (hash(s + sx + Math.floor(t * 5)) - 0.5) * 2.4), b2 = P(sx * 1.4, 0.9, zc + (hash(s * 3 + sx + Math.floor(t * 5)) - 0.5) * 2);
-      R.arc(a, b2, 0.8, [0.5, 0.9, 2.2], 0.6 * on, seed + s * 3 + (sx > 0 ? 1 : 2), 10 + 8 * c);
-    }
+  // (2026-10-08) no shader sheet over the barrel any more (it spilled out past the coils): the COILS THEMSELVES glow — each
+  // coil's copper (blender/ships_ion_frigate.py coil_k / turn_k) heats blue as the fill front reaches it, the outer turns
+  // hottest, a slow seethe and a crackle flicker through them; failing, they stutter; they cool as the charge drains
+  const mo = e.matOverride = ionCoilMats();
+  for (let j = 0; j < 12; j++) {
+    const zc = 6.8 + 4.1 * Math.floor(j / 3) + 1 + (j % 3);
+    const on = sat((zF - zc + 0.6) / 1.2);
+    const fl = (0.82 + 0.18 * Math.sin(t * 9 + j * 1.7)) * (0.9 + 0.1 * Math.sin(t * 47 + j * 5.3)) * (fail ? 0.7 + 0.3 * Math.sin(t * 23 + j) : 1);
+    const g = on * Math.min(1, c * 1.4) * fl;
+    const ec = mo['coil_' + j].emissive, et = mo['turn_' + j].emissive;
+    ec[0] = CC[0] * 0.25 * g; ec[1] = CC[1] * 0.3 * g; ec[2] = CC[2] * 0.4 * g;
+    et[0] = CC[0] * 0.6 * g; et[1] = CC[1] * 0.75 * g; et[2] = CC[2] * 1.0 * g;
   }
+  // (2026-10-08: the capacitor flash-over arcs are gone too — they jutted out past the coils)
   // the charge gathering in the muzzle bore once the front arrives (never wider than the bore, r 0.93 m)
   const core = P(ION_BORE[0], ION_BORE[1], ION_BORE_MOUTH);
   const ck = sat((fill - 0.85) / 0.15);
@@ -1520,11 +1545,12 @@ export function drawExtras(R, t) {
     // hull only in its last second (the hull-wide scorch from its first bolt on read as a ship burning before any damage)
     if (f.hits && f.hits.length) {
       let n = 0, last = -1e9; for (const h of f.hits) if (h <= t) { n++; last = h; }
-      if (n > 0) {
+      // (c) one bolt is not enough: a single hit leaves no scorch and no heat at all — only from the second bolt on
+      if (n >= 2) {
         const L = modelLen(R, f.type), dying = f.die ? sat((t - (f.die - 1)) / 1) : 0;
         e.dmgC = [(hash(i * 3.3) - 0.5) * L * 0.35, (hash(i * 5.1) - 0.5) * L * 0.08, L * 0.28];   // (the bow faces them)
-        e.dmgR = dying > 0 ? L * (0.25 + 2 * dying) : Math.min(L * 0.45, 7 + 6 * n + 4 * sat((t - last) / 2));
-        e.damage = Math.min(0.6, 0.22 + 0.1 * n) * (0.4 + 0.6 * sat((t - last) / 0.4));
+        e.dmgR = dying > 0 ? L * (0.25 + 2 * dying) : Math.min(L * 0.45, 6 * (n - 1) + 4 * sat((t - last) / 2));
+        e.damage = Math.min(0.6, 0.12 + 0.1 * n) * (0.4 + 0.6 * sat((t - last) / 0.4));
       }
     }
     if (win) hyperWindow(R, win.c, st.fwd, sz[0] * 0.8 + 6, sz[1] * 0.9 + 6, HYPER_BLUE, win.a);
