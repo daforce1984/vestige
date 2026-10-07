@@ -2,7 +2,8 @@
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { fxOpts, explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, breakOff, chargeInflow, spark } from './fx.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
-import { bakeWreck, wreckPose } from './wreck.js';
+import { bakeWreck, wreckPose, boxChunks } from './wreck.js';
+import { ION_FRIGATE_CHUNKS } from './ion_frigate_chunks.js';
 export { explosion };
 
 export const HIIG_ENGINE = [0.55, 0.8, 1.6];
@@ -877,11 +878,57 @@ export function dreadEmitter(R, t, entry) {
   return R.emptyWorld([0, 0, 0], 'enemy_dreadnought', entry, 'lance_emitter');
 }
 
+// BAKED WRECKS (2026-10-06): any pre-broken ship (chunks: tools/make_chunks.py) or any model cut into box cells at draw
+// time (the third-party fighters), flying apart on a baked, colliding, tumbling flight (js/wreck.js, baked once per wreck,
+// a few ms), with small explosions popping where the pieces tore off (pops) and the torn faces hot for a while
+const _bakes = new Map(), _xfs = new Map();
+function wreckFor(key, chunks, dur, seed, speed, spin) {
+  let b = _bakes.get(key); if (!b) { b = bakeWreck(1, dur, seed, speed, chunks, spin); _bakes.set(key, b); } return b;
+}
+function wreckPops(R, t, t0, base, bake, xf, seed, n, size) {   // small blasts at the broken spots, one after another
+  for (let j = 0; j < n; j++) {
+    const ci = Math.floor(hash(seed * 3.7 + j * 1.3) * bake.n), tp = t0 + 0.08 + 1.4 * Math.pow(hash(seed + j * 2.9), 1.5);
+    if (t < tp || t > tp + 1.6) continue;
+    const ch = bake.chunks[ci], x = xf[ch.name]; if (!x) continue;
+    const off = [(hash(seed + j) - 0.5) * (ch.hi[0] - ch.lo[0]), (hash(seed + j + 5) - 0.5) * (ch.hi[1] - ch.lo[1]), (hash(seed + j + 9) - 0.5) * (ch.hi[2] - ch.lo[2])];
+    const lp = M.transformPoint([0, 0, 0], x, off), wp = M.transformPoint([0, 0, 0], base, lp);
+    explosion(R, t, tp, wp, size * (0.6 + 0.8 * hash(seed + j * 7)), seed * 11 + j, 'small');
+  }
+}
+export function drawChunkWreck(R, model, chunks, base, t, t0, seed, o = {}) {
+  const lt = t - t0, bake = wreckFor(model + seed, chunks, 12, seed, o.speed ?? 1, o.spin ?? 1);
+  const xf = _xfs.get(model + seed) || {}; _xfs.set(model + seed, xf);
+  const e = R.add(model, base); if (!e) return;
+  e.partXf = wreckPose(bake, lt, xf); e.damage = 0.45; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
+  wreckPops(R, t, t0, base, bake, xf, seed, o.pops ?? 6, (o.popSize ?? 7));
+  if (lt < 4) for (let i = 0; i < bake.n; i += 3) {   // the torn faces still burning
+    const x = xf[chunks[i].name]; const wp = M.transformPoint([0, 0, 0], base, [x[12], x[13], x[14]]);
+    R.fire(wp, (o.popSize ?? 7) * 0.5 * (1 - lt / 4), 0.3 + lt / 8, seed + i, [1, 1, 1], 0.5);
+  }
+}
+const _bw = new Float32Array(16), _bc = new Float32Array(16);
+/** a model (fighter) broken into box cells on a baked flight: each cell drawn clipped, tumbling fast */
+export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
+  const model = R.models[name]; if (!model || t < t0) return;
+  const lt = t - t0; if (lt > (o.life ?? 10)) return;
+  const key = name + '#' + seed;
+  let chunks = _bakes.get(key + 'c'); if (!chunks) { chunks = boxChunks(model.bounds, o.grid || [3, 2, 3], seed); _bakes.set(key + 'c', chunks); }
+  const bake = wreckFor(key, chunks, 6, seed, o.speed ?? 1.4, o.spin ?? 4);
+  const xf = _xfs.get(key) || {}; _xfs.set(key, xf);
+  wreckPose(bake, lt, xf);
+  for (const ch of chunks) {
+    M.fromTRS(_bc, [-ch.c[0], -ch.c[1], -ch.c[2]], [0, 0, 0, 1], 1); M.mul(_bw, xf[ch.name], _bc); M.mul(_bw, base, _bw);
+    const e = R.add(name, _bw); if (!e) continue;
+    e.clip = ch.box; e.clipHeat = Math.max(0.1, 1 - lt / 1.2) * 1.1;   // (the torn edges cool in about a second) e.damage = 0.35; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
+    if (o.texSet) e.texSet = o.texSet;
+  }
+  wreckPops(R, t, t0, base, bake, xf, seed, o.pops ?? 3, o.popSize ?? 2.2);
+}
 // the wreck: the pre-broken hull on its baked, colliding flight (js/wreck.js) — one entry for all 32 chunks
 let _wreck = null; const _wreckXf = {}, _wp = [0, 0, 0];
 export function prepWreck() {
   if (_wreck) return;
-  _wreck = bakeWreck(1.65, EARTH_T - DREAD_DIE + 1, 77, 0.7);   // (1.65: its scale in main.js MODELS)
+  _wreck = bakeWreck(1.65, EARTH_T - DREAD_DIE + 1, 77, 0.7);   // (1.65: its scale in main.js MODELS; DREAD_CHUNKS by default)
 }
 function drawDreadWreck(R, t) {
   const model = R.models.enemy_dreadnought_chunks; if (!model) return;
@@ -1058,7 +1105,11 @@ function drawDogfight(R, t, tmpM) {
     if (alive) {
       const e = R.add(targetName, mat(tmpM, a, v, [0, 1, 0], Math.sin(t * 1.3 + k) * 0.6));
       engineGlows(R, targetName, e, hiChase ? ENEMY_ENGINE : HIIG_ENGINE, 0.6, 1, 2.5, { past: dogPast(k, 0, t) });
-    } else explosion(R, t, p.die, fighterPos([0, 0, 0], k, p.die), 7, 200 + k, 'small');
+    } else {
+      explosion(R, t, p.die, fighterPos([0, 0, 0], k, p.die), 7, 200 + k, 'small');
+      const pd = fighterPos([0, 0, 0], k, p.die), vd = V.sub([0, 0, 0], fighterPos([0, 0, 0], k, p.die + 0.05), pd);
+      drawBoxWreck(R, targetName, mat(M.new(), pd, vd, [0, 1, 0], Math.sin(p.die * 1.3 + k) * 0.6), t, p.die, 200 + k);   // (2026-10-06) and it comes apart, the pieces tumbling away
+    }
     fighterPos(v, k, t - 0.85); V.sub(v, v, b);
     const ce = R.add(chaserName, mat(tmpM, b, v, [0, 1, 0], Math.sin(t * 1.1 + k + 1) * 0.5));
     engineGlows(R, chaserName, ce, hiChase ? HIIG_ENGINE : ENEMY_ENGINE, 0.6, 1, 2.5, { past: dogPast(k, 0.9, t) });
@@ -1393,7 +1444,14 @@ export function drawExtras(R, t) {
     if (f.die && t > f.die - 0.1) {                          // killed: breaks apart in a fireball, burning pieces drift
       explosion(R, t, f.die, st.pos, 48, 950 + i, 'ship');
       explosion(R, t, f.die + 0.5, V.add([0, 0, 0], st.pos, [12, 8, -20]), 20, 970 + i, 'small');
-      if (t > f.die + 0.2) { if (t < EARTH_T) shatter(R, f.type, mat(M.new(), extraHPos(f.die, i).pos, extraHPos(f.die, i).fwd), t, f.die, 60 + i, [2, 2, 3], 1.1, { tint: [0.4, 0.7, 1] }); return; }
+      if (t > f.die + 0.2) {
+        if (t < EARTH_T) {
+          const base = mat(M.new(), extraHPos(f.die, i).pos, extraHPos(f.die, i).fwd);
+          if (f.type === 'ion_frigate' && R.models.ion_frigate_chunks) drawChunkWreck(R, 'ion_frigate_chunks', ION_FRIGATE_CHUNKS, base, t, f.die, 60 + i, { speed: 1.1, spin: 2.2, tint: [0.4, 0.7, 1], pops: 9 });
+          else shatter(R, f.type, base, t, f.die, 60 + i, [2, 2, 3], 1.1, { tint: [0.4, 0.7, 1] });
+        }
+        return;
+      }
     }
     const js = jumpState(t, f.seed, st.pos, st.fwd, L);
     if (js) {

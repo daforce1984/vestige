@@ -3,6 +3,7 @@ import { frame, findShot, DURATION, SHOTS } from './shots.js';
 import { storyT, filmT, insertFilm, inSkip, TEAR_F0, TEAR_F1 } from './timemap.js';
 import { DUEL_CAMS } from './duel.js';
 import { DREAD_CHUNKS } from './dread_chunks.js';
+import { ION_FRIGATE_CHUNKS } from './ion_frigate_chunks.js';
 import { prepWreck } from './world.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
@@ -10,6 +11,7 @@ const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper'
 const MODELS = [
   { name: 'mothership', detail: 4.5, prepass: true, hullDetail: true },   // layered greebles: depth prepass keeps close-ups at 24 fps
   { name: 'ion_frigate', detail: 0.9 },
+  { name: 'ion_frigate_chunks', detail: 0.9, url: 'assets/ion_frigate_chunks.glb', keep: ION_FRIGATE_CHUNKS.map((c) => c.name) },   // its wreck, pre-broken (tools/make_chunks.py, from the LOD copy; flown by js/wreck.js)
   { name: 'assault_frigate', detail: 0.8 },
   ...['interceptor', 'interceptor_b', 'interceptor_c'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })),   // our fighters: assets/light_fighter.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_frigate', detail: 0, url: 'assets/cargo_game.glb', texSet: 8, texBit: 16384 },   // every enemy frigate: 'Cargo Spaceship' (blaice, CC BY 4.0) via tools/build_rifles.py

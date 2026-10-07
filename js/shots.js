@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
+  EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drawBoxWreck, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -1922,7 +1922,12 @@ function drawColdOpenAction(R, t, cam, tgt) {
     if (t < t0 || t > t0 + 4.5) continue;
     const die = CO_BOOM.find((b) => b[1] === k);
     const p = coFighter(t, k, cam, fwd, side);
-    if (die && t > die[0]) { explosion(R, t, die[0], coFighter(die[0], k, cam, fwd, side), 9, 900 + k, 'small'); continue; }
+    if (die && t > die[0]) {
+      const pd = coFighter(die[0], k, cam, fwd, side), vd = V.sub([0, 0, 0], coFighter(die[0] + 0.05, k, cam, fwd, side), pd);
+      explosion(R, t, die[0], pd, 9, 900 + k, 'small');
+      drawBoxWreck(R, fighterModel(enemy, k), mat(M.new(), pd, vd, [0, 1, 0], 0), t, die[0], 900 + k);   // (2026-10-06: it comes apart, the pieces tumbling away)
+      continue;
+    }
     const q = coFighter(t + 0.05, k, cam, fwd, side);
     const name = fighterModel(enemy, k);
     const e = R.add(name, mat(tmpM, p, V.sub([0, 0, 0], q, p), [0, 1, 0], Math.sin((t - t0) * 2 + k) * 0.7));
@@ -2249,7 +2254,7 @@ shot(134, 141, 'S10a dogfight chase', (c) => {
     if (die && t > die) {                                                       // killed: fireball, the craft breaks up
       const st = strikePos(die, [x, y, z]);
       explosion(R, t, die, st.p, 14, 610 + k, 'small');
-      shatter(R, fighterModel(false, k), mat(M.new(), st.p, st.v, [0, 1, 0], roll), t, die, 620 + k, [2, 1, 3], 1.4, { tint: [0.4, 0.7, 1] });
+      drawBoxWreck(R, fighterModel(false, k), mat(M.new(), st.p, st.v, [0, 1, 0], roll), t, die, 620 + k);   // (2026-10-06: baked, tumbling pieces)
       return;
     }
     const st = strikePos(t, [x, y, z]);
