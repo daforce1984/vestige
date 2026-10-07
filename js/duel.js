@@ -1427,7 +1427,7 @@ function enemyState_(t) {
   const ak = ENEMY_AIM(tw);
   if (ak > 0 && !(tw > CUT_T)) {   // the rifle levelled on where he is going, in both hands — the muzzle kicks up with the body on each shot
     const tg = enemyAim(tw), kick = recoilKick(tw);
-    const wHip = styleW(tw, SERAPH_SHOTS, ENEMY_STYLE, 'hip'), wSnap = styleW(tw, SERAPH_SHOTS, ENEMY_STYLE, 'snap'), kL = 1;   // (both hands on it: the shield flies on its own)
+    const wHip = styleW(tw, SERAPH_SHOTS, ENEMY_STYLE, 'hip'), wSnap = styleW(tw, SERAPH_SHOTS, ENEMY_STYLE, 'snap'), kL = 1 - COCKY(tw);   // (both hands on it: the shield flies on its own — except the cocky one-handed pose, untouched by the two-handed twist)
     aim2H(s, tg, ak, kL, lrp([-0.35, 3.9, 2.3], [-1.6, 1.2, 2.2], wHip));
     if (wSnap > 0) aimEnemy(s, tg, wSnap * ak);                          // the snap shot: its arm thrown out
     holdWrist(s, tw, [TRANS0], _wristT, (x) => enemyRaw_(x), TRANS_SHOT - TRANS0);   // the transformation: arm + rifle held as one
@@ -1439,7 +1439,7 @@ function enemyState_(t) {
   // the left fist on the foregrip the whole time the rifle is in hand (aiming or not), after whatever moved the rifle last
   // (the snap, the held wrist, the kick); cockyAim lets it hang again
   { const held = smooth(ENEMY_GRAB + 0.1, ENEMY_GRAB + 0.4, tw) * (1 - smooth(189.3, 189.7, tw));
-    if (held > 0 && !(tw > CUT_T)) foreGrip(s, held); }
+    if (held > 0 && !(tw > CUT_T)) foreGrip(s, held * (1 - COCKY(tw))); }
   if (COCKY(tw) > 0 && !(tw > CUT_T)) cockyAim(s, tw, enemyAim(tw), COCKY(tw), recoilKick(tw));
   if (tw < ENEMY_GRAB + 0.4) holsterDraw(s, tw);
   if (tw > CUT_T) {   // cut: the machine keeps the pose it was cut in (both halves), sagging only slowly toward limp — the aim
@@ -1455,7 +1455,7 @@ function enemyState_(t) {
 // (face out, riding high as it crosses in front so it never fouls its own line of fire); when he lines up a shot it
 // BOOSTS across onto the line between them and takes it (178.7: the burn — its own cut, D08c; 183.25: it is shot away —
 // shots.js drawLostShield). Its world matrix is in s.shieldW (= fk.shield).
-export const DRONE_L0 = 177.45, DRONE_L1 = 178.1;   // undocks / in orbit
+export const DRONE_L0 = 171.9, DRONE_L1 = 172.55;   // undocks / in orbit (2026-10-07: early — it is circling it on guard from scene 35)
 export const DRONE_DASH = [178.38, 182.95];          // its boosts onto the line (each ~0.18 s)
 const DOCK_FACE = [3.52, -2.5, -2.3], BACKPACK_T = [0, 3.495, -1.071];   // backpack frame: the face centre (its inner face against the backpack's flank, x 2.4); the backpack node's offset on the torso (assets/enemy_ms.glb)
 const ORBIT_R = 13, ORBIT_W = 1.9;   // m, rad/s (a lap every ~3.3 s)
@@ -2485,8 +2485,10 @@ export const DUEL_CAMS = [
     return { pos: add(add(add(H, scl(sd, -(46 - 4 * u))), scl(f, 4)), [0, 8, 0]), target: add(add(H, scl(f, 4)), [0, 4, 0]), fov: 38, handheld: 0.03 }; } },   // side-on (his right), ~45 m off: the rifle's whole length across frame
   { t0: 172.4, t1: 173.2, name: 'D01d his face — the eye flares, dead still', fn: (t, u) => { const h = duelHero(t), fk = duelFK(h, 'gundam'), E = partPoint(fk, 'head', [0, 1.2, 0.8]), f = nrm(sub(ep(t), hp(t)));
     return { pos: add(add(E, scl(f, 13 - 1.2 * u)), [0, 0.5, 0]), target: E, fov: 34, handheld: 0.02 }; } },
-  { t0: 173.2, t1: 173.95, name: 'D02a low behind it — it rips its rifle off its hip', fn: (t, u) => { const E = ep(t), f = nrm(sub(ep(t + 0.1), E)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0]));
-    return { pos: add(add(add(E, scl(f, -12)), scl(sd, 11)), [0, -6, 0]), target: add(add(E, scl(f, 4)), [0, 7, 0]), fov: 46, handheld: 0.06 }; } },
+  // (2026-10-07: square on to it from in front, pulled back — the shield drone circling it on guard, round and round it)
+  { t0: 173.2, t1: 173.95, name: 'D02a front on, pulled back — it rips its rifle off its hip, the shield drone circling it on guard', fn: (t, u) => { const e = enemyRaw_(t), fk = duelFK(e, 'enemy_ms'), E = partPoint(fk, 'torso', [0, 2, 0]);
+    const W0 = fk.root, F = nrm(flat([W0[8], W0[9], W0[10]], 0)), sd = [F[2], 0, -F[0]];
+    return { pos: add(add(add(E, scl(F, 52 - 4 * u)), scl(sd, 3)), [0, 4, 0]), target: add(E, [0, -1, 0]), fov: 40, handheld: 0.05 }; } },
   { t0: 173.95, t1: 174.15, snap: 1.6, name: 'D02b CU its eye — a glint', fn: (t, u) => { const e = enemyRaw_(t), fk = duelFK(e, 'enemy_ms'), E = partPoint(fk, 'head', [0, 0.6, 1.2]), f = nrm(M.transformDir([0, 0, 0], fk.head, [0, 0, 1]));
     return { pos: add(add(E, scl(f, 9)), [0, 0.8, 0]), target: E, fov: 36, handheld: 0.02 }; } },
   { t0: 174.15, t1: 176.4, snap: 1.6, name: 'D02c on its muzzle — the charge runs down the barrel', fn: (t, u) => { const F = enemyRifleFrame(t), c = add(F.muzzle, scl(F.dir, -3));
