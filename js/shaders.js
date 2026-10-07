@@ -861,7 +861,7 @@ fn cutAway(i: VO, inst: Inst) -> vec2f {
       if (inside < 0.0) { discard; }
       g_edge = select(exp(-inside / (sc * 3.0)), 0.0, inst.clipMax.w < 0.0);   // (how near the torn edge: soot, slag)
       tornEdge = select(abs(inst.clipMax.w) * exp(-inside / sc),
-        abs(inst.clipMax.w) * (exp(-inside / 0.2) + 0.3 * exp(-inside / 0.55)), inst.clipMax.w < 0.0);   // a beam cut: a thick molten seam + a soft glow
+        abs(inst.clipMax.w) * (exp(-inside / (sc * 0.7)) + 0.15 * exp(-inside / (sc * 2.0))), inst.clipMax.w < 0.0);   // a clean cut: a molten seam right at the cut + a little soft glow (2026-10-07: a fixed 0.2 / 0.55 m falloff lit small pieces — a fighter's — all over; now it scales with the piece, ~0.1–0.4 m)
     } else {
       if (inside > 0.0) { discard; }                  // hole punched out of the hull
       tornEdge = inst.clipMax.w * exp(inside / (sc * 1.5));

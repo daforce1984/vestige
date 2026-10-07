@@ -1212,7 +1212,7 @@ function halfBake(R, half) {
     const c = M.transformPoint([0, 0, 0], P0[name], PIECE_C[name]), h = PIECE_E[name].map((v) => v / 2);
     chunks.push({ name, c, lo: h.map((v) => -v), hi: h });
   }
-  const bake = bakeWreck(1, 4, half > 0 ? 91 : 57, half > 0 ? 2.2 : 2.6, chunks, 2.6, 2);
+  const bake = bakeWreck(1, 4, half > 0 ? 91 : 57, half > 0 ? 3.6 : 4.2, chunks, 3.2, 2);   // (2026-10-07: faster, farther)
   return (_hb[half] = { tb, sb, P0, chunks, bake, xf: {}, D: {}, px: {} });
 }
 export function prepHalfBlasts(R) { halfBake(R, -1); setTimeout(() => halfBake(R, 1), 0); }

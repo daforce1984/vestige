@@ -932,7 +932,7 @@ export function drawChunkWreck(R, model, chunks, base, t, t0, seed, o = {}) {
 const cellsOf = (name) => (name.startsWith('enemy_fighter') ? 'enemy_fighter_cells' : name.startsWith('interceptor') ? 'interceptor_cells' : name + '_cells');
 function boxWreckBake(R, name, seed, o = {}) {
   const cn = cellsOf(name), model = R.models[cn]; if (!model || !model.cells) return null;
-  return { cn, model, bake: wreckFor(cn + '#' + seed, model.cells, o.bakeDur ?? 3, seed, o.speed ?? 1.4, o.spin ?? 4) };   // (3 s baked: they scatter fast; then carried on)
+  return { cn, model, bake: wreckFor(cn + '#' + seed, model.cells, o.bakeDur ?? 3, seed, o.speed ?? 3.2, o.spin ?? 5) };   // (3 s baked: they scatter fast; then carried on — 2026-10-07: faster and farther, was 1.4 / 4)
 }
 export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   if (t < t0) return;
@@ -953,7 +953,7 @@ export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   }
 }
 // an ion frigate's wreck (EXTRA_H): ~7 m pieces (ion_frigate_cells), the cut faces molten white-orange and slow to cool
-const ION_WRECK = { damage: 0.1, speed: 1.1, spin: 2.2, tint: [0.4, 0.7, 1], pops: 12, popSize: 7, heat: 0.22, cool: 0.45, fires: 4 };   // (heat: with the cells really clipped every cut face glows — kept to a rim of heat)
+const ION_WRECK = { damage: 0.1, speed: 2.6, spin: 3.0, tint: [0.4, 0.7, 1], pops: 12, popSize: 7, heat: 0.22, cool: 0.45, fires: 4 };   // (heat: with the cells really clipped every cut face glows — kept to a rim of heat)
 /** every wreck's flight baked at load (they used to be baked the first time each one was drawn: a hitch mid-shot) */
 export function prepWrecks(R) {   // (one per idle slice after load: nothing blocks; a wreck not baked yet bakes when first drawn)
   const jobs = [];
@@ -969,7 +969,7 @@ export function prepWrecks(R) {   // (one per idle slice after load: nothing blo
 let _wreck = null; const _wreckXf = {}, _wp = [0, 0, 0];
 export function prepWreck() {
   if (_wreck) return;
-  _wreck = bakeWreck(1.65, EARTH_T - DREAD_DIE + 1, 77, 0.7);   // (1.65: its scale in main.js MODELS; DREAD_CHUNKS by default)
+  _wreck = bakeWreck(1.65, EARTH_T - DREAD_DIE + 1, 77, 1.1);   // (2026-10-07: 0.7 → 1.1, flung farther)   // (1.65: its scale in main.js MODELS; DREAD_CHUNKS by default)
 }
 function drawDreadWreck(R, t) {
   const model = R.models.enemy_dreadnought_chunks; if (!model) return;

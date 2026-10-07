@@ -166,7 +166,7 @@ function stepScene(dir) {
     : st - cur > 0.3 ? cur : [...starts].reverse().find((x) => x < cur - 0.0005);   // ←: back to this cut's start, again → previous cut
   if (to === undefined) return;
   seek(filmT(to) + 0.002);
-  showSceneTag();
+  if (!playing) showSceneTag();   // (2026-10-07: while it plays, no info window — it stayed up)
 }
 function hideSceneTag() { sceneTag.classList.remove('on'); }
 function seek(t) {
