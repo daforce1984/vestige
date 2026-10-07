@@ -2505,7 +2505,13 @@ export const DUEL_CAMS = [
   { t0: 178.2, t1: 178.36, roll: -0.04, name: 'D08b side-on — he lays the rifle on it', fn: (t) => d08b(t) },
   // THE SHIELD CUTS IN (2026-10-07): beside the line in front of it — the drone, circling it, fires up its thrusters and
   // boosts across into the frame, slamming to a stop on the line between them, face to him; it aims on behind it
-  { t0: 178.36, t1: 178.64, roll: 0.05, name: 'D08c beside the line — the shield drone boosts across in front of it to block', slowmo: true, fn: (t, u) => { const T = 178.36, E = ep(T), f = nrm(flat(sub(hp(T), E), 0)), sd = [f[2], 0, -f[0]];
+  // …first CLOSE on the drone as it comes (2026-10-07): the lens riding along beside it, just off its back — the plate
+  // at three-quarters ('07' on its face) filling half the frame, its four thrusters blazing out behind it
+  { t0: 178.36, t1: 178.47, roll: -0.08, name: 'D08c0 CU riding with the shield drone — its thrusters blazing as it boosts in', slowmo: true, fn: (t) => {
+      const S = enemyRaw_(t).shieldW, C = M.transformPoint([0, 0, 0], S, SHIELD_C);
+      const X = nrm(M.transformDir([0, 0, 0], S, [1, 0, 0])), Y = nrm(M.transformDir([0, 0, 0], S, [0, 1, 0])), Z = nrm(M.transformDir([0, 0, 0], S, [0, 0, 1]));
+      return { pos: add(add(add(C, scl(X, 8.5)), scl(Z, 6.5)), scl(Y, -2)), target: add(add(C, scl(X, -1.5)), scl(Y, 0.5)), fov: 48, handheld: 0.05, baseShake: 0.04 }; } },
+  { t0: 178.47, t1: 178.64, roll: 0.05, name: 'D08c beside the line — the shield drone slams to a stop in front of it to block', slowmo: true, fn: (t, u) => { const T = 178.36, E = ep(T), f = nrm(flat(sub(hp(T), E), 0)), sd = [f[2], 0, -f[0]];
       const L = add(up(ep(t), 6), scl(f, 10));   // (where it stops: 10 m out on the line, as shieldDrone)
       return { pos: add(add(add(E, scl(f, 26)), scl(sd, -16)), [0, 3, 0]), target: lrp(add(up(E, 6), scl(f, 4)), L, 0.6), fov: 40, handheld: 0.04, baseShake: 0.01 }; } },
   { t0: 178.64, t1: 178.895, roll: -0.04, name: 'D08d side-on — he fires', fn: (t) => d08b(t) },
