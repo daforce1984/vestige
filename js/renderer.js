@@ -658,6 +658,10 @@ export class Renderer {
   /** a real-looking jet flame (shape 18) from the nozzle p0 to the tip p1, `radius` its widest half-width, `flow` how many
    *  of its lengths the gas travels a second */
   jetFlame(p0, p1, radius, col, intensity = 1, seed = 0, flow = 3) { this.sprite(18, p0, [p1[0], p1[1], p1[2], 0], [radius, seed, flow, 0], col, intensity); }
+  /** the ion gun's coil charge (shape 19): p0 breech → p1 muzzle, radius, front 0..1, fail stutter, push toward the lens */
+  ionCoil(p0, p1, radius, front, col, intensity = 1, seed = 0, fail = 0, push = 0) { this.sprite(19, p0, [p1[0], p1[1], p1[2], push], [radius, seed, front, fail], col, intensity); }
+  /** one segment of a drained-energy ribbon (shape 20): a → b, max radius, its span s0..s1 of the whole ribbon */
+  drainRibbon(a, b, radius, s0, s1, col, intensity = 1, seed = 0) { this.sprite(20, a, [b[0], b[1], b[2], 0], [radius, seed, s0, s1], col, intensity); }
   surge(p0, p1, radius, col, intensity = 1, seed = 0) { this.sprite(17, p0, [p1[0], p1[1], p1[2], 0], [radius, seed, 0, 0], col, intensity); }
   ring(center, axU, axV, col, phase) { this.sprite(4, center, axU, axV, col, phase); }
   bayField(center, axU, axV, age, col, intensity) { this.sprite(11, center, [axU[0], axU[1], axU[2], age], axV, col, intensity); }

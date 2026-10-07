@@ -2346,10 +2346,17 @@ shot(110, 120, 'B5 ion muzzle charge', (c) => {
   // when the charge starts bleeding away the camera swings round to follow it: past the muzzle, down the line into
   // the distance where the gravity well waits
   const wellDir = V.norm([0, 0, 0], V.sub([0, 0, 0], WELL, m)), kc = easeInOut(sat((t - 116.4) / 2.4));
-  const p0 = madd(madd(m, st.fwd, -L * 0.45 + u * 10), side, 30 + u * 4).map((v, i) => v + (i === 1 ? 12 : 0));
   const perp = V.norm([0, 0, 0], V.cross([0, 0, 0], wellDir, [0, 1, 0]));
-  const p1 = addv(madd(madd(m, wellDir, 60), perp, 230), [0, 45, 0]);            // side-on to the drain line: the streams race across frame
-  camLook(c, V.lerp([0, 0, 0], p0, p1, kc), V.lerp([0, 0, 0], madd(m, st.fwd, 12), madd(m, wellDir, 330), kc), lerp(44, 58, kc), 0.06);
+  const p1 = addv(madd(madd(m, wellDir, 60), perp, 230), [0, 45, 0]);            // side-on to the drain line: the ribbons stream across frame
+  // (2026-10-07, cinematic) 1. low beside the barrel, keeping pace with the fill front as it climbs the coils; 2. round in
+  // front of the muzzle as the charge gathers in the bore; 3. out side-on to the drain as the well pulls it away
+  const G = (z, sd, h) => addv(madd(madd(st.pos, st.fwd, z), side, sd), [0, h, 0]);
+  const cc = sat((t - 110) / 6) * 0.85, fill = sat((cc - 0.1) / 0.7), zF = 6.8 + (31.2 - 6.8) * fill;
+  const kb = easeInOut(sat((t - 115.2) / 1.2));
+  const camA = G(zF - 7, 6.5, 2.2), tgtA = G(zF + 5, 0, 0.9);
+  const camB = G(31.2 + 13, 9, 3.2), tgtB = G(31.2, 0, 0.9);
+  const cam = V.lerp([0, 0, 0], V.lerp([0, 0, 0], camA, camB, kb), p1, kc), tgt = V.lerp([0, 0, 0], V.lerp([0, 0, 0], tgtA, tgtB, kb), madd(m, wellDir, 330), kc);
+  camLook(c, cam, tgt, lerp(lerp(40, 46, kb), 58, kc), 0.06);
   handheld(c, 0.3);
   c.env.shadowCenter = st.pos; c.env.shadowRadius = 70;
   const R = c.R;

@@ -1316,7 +1316,7 @@ struct VO {
   var wp: vec3f;
   var uv = corner;
   var ext = vec2f(0.0);
-  if (shape == 3 || shape == 12 || shape == 17 || shape == 18) {
+  if (shape == 3 || shape == 12 || shape == 17 || shape == 18 || shape == 19 || shape == 20) {
     // streak / beam capsule from a.xyz to b.xyz, radius c.x (12: arc discharge channel, same camera-facing ribbon)
     let p0 = s.a.xyz; let p1 = s.b.xyz; let r = s.c.x;
     let ax = p1 - p0;
@@ -1330,6 +1330,7 @@ struct VO {
     wp = mix(p0 - dir * r, p1 + dir * r, t) + side * corner.y * r;
     uv = vec2f(mix(-r, L + r, t), corner.y);
     ext = vec2f(L, r);
+    if (shape == 19) { let tc = F.camPos.xyz - mid; wp += tc / max(length(tc), 1e-4) * s.b.w; }   // (the coil charge: brought out to the coils' outer face, b.w — on the axis the gun hid it)
   } else if (shape == 7) {
     // homeland-style exhaust flame: camera-facing trapezoid from the nozzle (wide) to the tail (0.34 wide)
     let L = max(length(s.b.xyz), 1e-4);
@@ -1743,6 +1744,56 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     let flick = 0.85 + 0.15 * sin(t * 61.0 + sd * 3.0) * sin(t * 37.0 + sd);
     col = (tint * heat * (1.0 + 0.6 * n3) + vec3f(1.0, 0.97, 0.95) * core * 1.6 * length(tint) * 0.6) * s.d.a * flick;
     dist = tanS * (n2 - 0.5) * body * 0.004 * s.d.a;
+  } else if (shape == 19) {
+    // ION COIL CHARGE (2026-10-07, scene 13): the gun's accelerator filling with energy, breech → muzzle — a plasma column
+    // climbs the bore behind a crackling white front; behind it the coil windings blaze in rings that spin and race
+    // forward, turbulence seething through; ahead of it the barrel waits dark with a faint pre-glow. failing (c.w): it
+    // stutters and drops out. uv: along (world units, p0 = the breech), across −1..1; c.z = the front (0..1 of the length)
+    let L = i.ext.x; let r = i.ext.y; let u = i.uv.x / L; let v = i.uv.y;
+    if (u < -0.03 || u > 1.03) { discard; }
+    let sd = s.c.y; let f = s.c.z; let fail = s.c.w;
+    let x = i.uv.x;                                              // metres from the breech
+    let df = (f - u) * L / r;                                     // how far behind the front (in radii; < 0: ahead of it)
+    let filled = smoothstep(-0.6, 0.9, df);
+    let n1 = vnoise(vec3f(x * 0.35 - t * 4.0, v * 1.8, sd + t * 0.7));
+    let n2 = vnoise(vec3f(x * 0.9 - t * 9.0, v * 3.5 + n1 * 1.4, sd * 1.7 + t * 2.3));
+    let rings = pow(0.5 + 0.5 * sin(x * 6.2832 / 1.05 - t * (8.0 + 14.0 * f) + v * 0.9), 7.0);   // the windings, one a metre, spinning forward
+    let across = sqrt(max(0.0, 1.0 - v * v));
+    let column = exp(-v * v * 7.0) * (0.55 + 0.45 * n1);
+    let pulse = pow(0.5 + 0.5 * sin(x * 0.7 - t * 14.0), 6.0);   // energy packets racing up behind the front
+    var heat = filled * (column * (0.5 + 0.5 * pulse) + rings * across * (0.45 + 0.55 * n2) * 0.85);
+    let frontK = exp(-df * df * 1.6) * step(0.01, f) * (1.0 - smoothstep(0.97, 1.0, f));
+    let crackle = pow(1.0 - abs(vnoise(vec3f(x * 2.2 - t * 30.0, v * 5.0, sd + t * 8.0)) * 2.0 - 1.0), 10.0);
+    heat += frontK * (0.8 * across + 1.0 * crackle);
+    heat += exp(-max(0.0, -df) * 0.7) * (1.0 - filled) * 0.12 * across;   // the pre-glow ahead
+    let stut = mix(1.0, 0.25 + 0.75 * step(0.35, vnoise(vec3f(t * 9.0, sd, 3.0))), fail);
+    let flick = 0.85 + 0.15 * sin(t * 47.0 + x * 0.3);
+    col = (tint * heat + vec3f(0.9, 0.95, 1.0) * pow(clamp(heat * 0.35, 0.0, 1.2), 2.2) * 0.3) * s.d.a * flick * stut * smoothstep(1.0, 0.7, abs(v));
+    dist = tanS * (n2 - 0.5) * heat * 0.003 * s.d.a;
+  } else if (shape == 20) {
+    // THE DRAIN (2026-10-07, scene 13): the charge pulled out of the muzzle as ONE continuous ribbon of plasma, segment by
+    // segment along a path (c.z..c.w = this segment's span of the whole ribbon, 0 at the muzzle, 1 at its end) — it flows
+    // away down the path, swelling, its threads loosening and tearing into tendrils, thinning and fading out
+    let L = i.ext.x; let r = i.ext.y; let uu = clamp(i.uv.x / L, 0.0, 1.0); let v = i.uv.y;
+    if (i.uv.x < 0.0 || i.uv.x > L) { discard; }
+    let sd = s.c.y; let sg = mix(s.c.z, s.c.w, uu);             // where on the whole ribbon
+    let X = sg * 26.0;                                            // (its own coordinate along, seamless across segments)
+    let flow = t * 2.6;
+    let n1 = vnoise(vec3f(X * 0.9 - flow * 3.0, v * 1.5, sd));
+    let n2 = vnoise(vec3f(X * 2.1 - flow * 6.0, v * 3.8 + n1 * 2.0, sd + 4.0));
+    let n3 = vnoise(vec3f(X * 5.0 - flow * 11.0, v * 8.0 + n2 * 2.5, sd + 9.0));
+    let w = 0.18 + 0.82 * sqrt(sg);                               // swelling as it goes
+    let bend = (n1 - 0.5) * 0.6 * sg;
+    let d = abs(v - bend) / w;
+    let tb = n1 * 0.5 + n2 * 0.33 + n3 * 0.17;
+    let body = smoothstep(1.0, 0.2, d + (tb - 0.5) * (0.4 + 1.2 * sg));
+    let tear = smoothstep(0.1 + 0.62 * sg, 0.25 + 0.62 * sg, tb);   // tendrils: more and more of it torn away downstream
+    let threads = pow(1.0 - abs(n2 * 2.0 - 1.0), 6.0 + 10.0 * (1.0 - sg)) * smoothstep(1.0, 0.3, d);
+    let fade = pow(1.0 - sg, 1.4) * smoothstep(0.0, 0.05, sg);
+    let heat = (body * tear * (0.5 + 0.5 * n3) + threads * 0.9 * (1.0 - sg)) * fade;
+    let core = exp(-pow((v - bend) / 0.12, 2.0)) * pow(1.0 - sg, 4.0);
+    col = (tint * heat + vec3f(0.85, 0.92, 1.0) * core * 0.8) * s.d.a;
+    dist = tanS * (n2 - 0.5) * body * fade * 0.004 * s.d.a;
   } else if (shape == 17) {
     // ENERGY RUNAWAY on an overdriven blade (2026-10-06): the power it can't hold — irregular surges race up it (hilt →
     // tip), each one swelling the blade's envelope into ragged tongues of plasma that lick off its sides and stream
