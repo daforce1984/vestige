@@ -2,7 +2,7 @@
 (revision 1: shield_drone_concept_v1.png): a THIN plate (~0.34 m in the middle, half of v1, tapering to ~0.08 m at the edge), gently CURVED — convex across its
 width (the edges swept back ~0.45 m) and a little along its length — with no decals; thrusters facing EVERY way: four round
 nozzles flush in the back (backward), vectoring vents set into the rim on the sides (left / right), the top edge (up), the
-tip (down) and ports on the face's rim (forward).
+tip (down) — none forward: it has no reverse thrust.
 
 Built in the frame of enemy_ms.glb's 'shield' part (the film places it with the same matrix — duel.js shieldDrone /
 fk.shield): glTF +X = the face's normal, +Y = the long axis (top 1.65, tip -6.9), +Z = across (centre 0.17). One node,
@@ -192,9 +192,7 @@ def shield_drone():
     vent(0, 0.25, 0.75)                                # the top edge (up)
     vent(4, 0.1, 0.9); vent(5, 0.1, 0.9)               # the tip (down)
     vent(1, 0.3, 0.7); vent(8, 0.3, 0.7)               # the chamfers (up-and-out)
-    for (z, y) in ((ZC + 1.2, 1.3), (ZC - 1.2, 1.3), (ZC + 1.25, -2.9), (ZC - 1.25, -2.9)):   # forward ports on the face's rim
-        q = [(z - 0.18, y + 0.09), (z + 0.18, y + 0.09), (z + 0.18, y - 0.09), (z - 0.18, y - 0.09)]
-        quad_on(mb, q, 0.14, 0.22, 'nozzle'); groove_light(mb, (z - 0.13, y), (z + 0.13, y), 0.22, w=0.018, lip=0.014, lift=0.01)
+    # (no forward ports: it has no reverse thrust — nothing fires out of its face)
     for (i, t) in ((2, 0.08), (2, 0.95), (7, 0.05), (7, 0.92), (3, 0.62), (6, 0.38), (0, 0.12), (0, 0.88)):   # amber edge lights
         a, b = K[i], K[(i + 1) % nK]
         ex, ey = b[0] - a[0], b[1] - a[1]; L = math.hypot(ex, ey); nx, ny = -ey / L, ex / L

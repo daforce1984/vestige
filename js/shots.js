@@ -931,11 +931,20 @@ function drawDroppedRifle(R, t) {
 }
 // the block (his 178.7 shot on the shield): no hole — the face is scorched black round the splash (renderer damage
 // sphere on the shield part only), with glowing cracks cooling in it
+// the burn was laid on the plate while it was racked out big (bigShieldScale); as it folds back, the marks go with it:
+// a plate-local point from then (shield frame, scale at tThen) → where that spot of the plate is at t
+const SHIELD_FACE_C = [1.351, -2.337, 0.17];
+function plateNow(l, tThen, t) {
+  const st = bigShieldScale(tThen), sn = bigShieldScale(t), C = SHIELD_FACE_C;
+  return [C[0] + (l[0] - C[0]) * (1 + 0.3 * (sn.sy - 1)) / (1 + 0.3 * (st.sy - 1)), C[1] + (l[1] - C[1]) * sn.sy / st.sy, C[2] + (l[2] - C[2]) * sn.sz / st.sz];
+}
+const toModel = (l, tThen) => plateNow(l, tThen, -1e9);   // (the plate at rest: the entry's own coordinates)
 function shieldScorch(e, t) {
   const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0) return;   // (the line reaches it ~8 ms after the event)
   const g = easeOut(sat(lt / 0.15));
   const P = blockPath(), a0 = P.length ? P[0].local : blockLocalAt(t), a1 = blockLocalAt(t), mid = [0, 1, 2].map((i) => (a0[i] + a1[i]) / 2);
-  e.dmgC = mid; e.dmgR = 1.5 * (0.3 + 0.7 * g) + 0.5 * Math.hypot(a1[1] - a0[1], a1[2] - a0[2]);   // the soot over the whole swept track (it stays) e.dmgPart = 'shield'; e.damage = Math.max(e.damage || 0, 0.55 * g);   // patchy soot, cracks glowing
+  const tb = Math.min(t, B.t + 0.26), sb = bigShieldScale(tb);   // (in the entry's own, unscaled coordinates)
+  e.dmgC = toModel(mid, tb); e.dmgR = (1.5 * (0.3 + 0.7 * g) + 0.5 * Math.hypot(a1[1] - a0[1], a1[2] - a0[2])) / Math.max(1, sb.sy);   // the soot over the whole swept track (it stays) e.dmgPart = 'shield'; e.damage = Math.max(e.damage || 0, 0.55 * g);   // patchy soot, cracks glowing
 }
 // …and the shot's energy spreads out over its face from the hit in every direction and dies away: a ragged ring
 // racing out across the plate, radial pixel streaks skating flat along it, motes shed from the front fading behind
@@ -944,21 +953,22 @@ function shieldScorch(e, t) {
 const driveK = (s) => (s.accel === undefined ? 1 : Math.max(smooth(45, 130, s.accel), smooth(130, 240, s.speed || 0)));
 const _sparkPts = new Map();   // the contact point at each spark burst's birth (block shot)
 function drawBlockSplash(R, t) {
-  const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0 || lt > 1.8) return;
+  const B = BLOCK_SPOT(), lt = t - B.t - 0.01; if (lt < 0 || lt > 5) return;   // (2026-10-07: the heat stays for seconds — it read gone at once)
   const F = blockFrame(t); if (!F) return;
   const sh = DUEL_SHOTS.find((x) => x.block), sdir = sh ? V.norm([0, 0, 0], V.sub([0, 0, 0], sh.to, sh.from)) : F.up;
   const nF = V.dot(F.n, sdir) > 0 ? V.scale([0, 0, 0], F.n, -1) : F.n;   // the struck face's normal, toward the shooter (not into the plate)
   const sd = V.norm([0, 0, 0], V.cross([0, 0, 0], nF, F.up));
-  const onFace = (a, r, lift = 0.1) => madd(madd(madd(F.p, F.up, r * Math.cos(a)), sd, r * Math.sin(a)), nF, lift + 0.55);   // (+0.55: clear of the enlarged plate's face)
+  const Fp = M.transformPoint([0, 0, 0], F.S, plateNow(blockLocalAt(t), Math.min(t, B.t + 0.26), t));   // (the struck spot where the plate is now)
+  const onFace = (a, r, lift = 0.1) => madd(madd(madd(Fp, F.up, r * Math.cos(a)), sd, r * Math.sin(a)), nF, lift + 0.12);   // (+0.12: just clear of the shield drone's face)
   // the shot's line skimmed onto the plate: the energy it carries goes skating off along the face that way
   let sk = V.sub([0, 0, 0], sdir, V.scale([0, 0, 0], nF, V.dot(sdir, nF))); sk = V.len(sk) > 1e-3 ? V.norm([0, 0, 0], sk) : F.up;
   const ska = Math.atan2(V.dot(sk, sd), V.dot(sk, F.up));
   // 1. the struck spot glowing: white-hot, cooling through yellow and orange to a dull red
-  const heat = sat(lt / 0.03) * Math.exp(-lt * 1.6), hw = sat(heat * 1.6);
+  const heat = sat(lt / 0.03) * Math.exp(-lt * 0.55) * (1 - smooth(3.6, 5, lt)), hw = sat(heat * 1.6);   // (slow to cool: white → orange → dull red over seconds)
   if (heat > 0.01) {
     R.glow(onFace(0, 0, 0.15), 1.6 + 1.2 * heat, [6 * heat, (0.9 + 1.6 * hw) * heat, (0.05 + 0.5 * hw * hw) * heat], 0.2);   // the glowing patch (red-orange so it reads on the white plate)
     R.glow(onFace(0, 0, 0.15), 0.8 + 0.8 * heat, [6 * heat * hw, 4.5 * heat * hw, 2.5 * heat * hw], 0.15);
-    if (lt < 0.4) R.light(F.p, 24, [1, 0.55, 0.25], 3 * heat);
+    if (lt < 0.4) R.light(Fp, 24, [1, 0.55, 0.25], 3 * heat);
   }
   // 2. the energy skating off across the plate along the shot's line: crackling arcs racing out to the edge
   const on = sat(lt / 0.02) * (1 - sat((lt - 0.12) / 0.35));
@@ -1005,8 +1015,8 @@ function drawBlockSplash(R, t) {
     let pa = null, ta = 0;
     for (const x of P) {
       if (x.t > t) break;
-      const q = madd(M.transformPoint([0, 0, 0], F.S, x.local), nF, 0.6);
-      if (pa) { const age = t - x.t, hh = Math.exp(-age / 0.03) * (1 - smooth(0.05, 0.1, age)), w2 = sat(hh * 1.6);   // each bit cools from when it was hit, FAST (2026-10-06: ~0.2 s on screen in the bullet time, was ~3 s): the glow sweeps along behind the beam, the first-struck end out first
+      const q = madd(M.transformPoint([0, 0, 0], F.S, plateNow(x.local, x.t, t)), nF, 0.18);   // (just off the plate's face, where that spot of the plate is now)
+      if (pa) { const age = t - x.t, hh = Math.exp(-age / 0.45) * (1 - smooth(3, 4.5, age)), w2 = sat(hh * 1.6);   // (2026-10-07: the burnt track holds its heat for seconds, cooling to dull red — it was gone in ~0.1 s)   // each bit cools from when it was hit, FAST (2026-10-06: ~0.2 s on screen in the bullet time, was ~3 s): the glow sweeps along behind the beam, the first-struck end out first
         if (hh > 0.02) R.beam(pa, q, (0.08 + 0.55 * hh) * (0.6 + 0.4 * w2), [4 * hh, (0.6 + 2.2 * w2) * hh, (0.1 + 1.2 * w2 * w2) * hh], 0.35, 5, 0, 0.3); }   // (and thins as it fades)
       pa = q; ta = x.t;
     } }
@@ -1065,9 +1075,8 @@ function drawBigShield(R, e, s, t) {
 // its thrusters: four nozzles on the back of the plate (shield frame −X), flames out behind it
 const DRONE_JETS = [[0.77, 0.55, 1.07], [0.77, 0.55, -0.73], [0.87, -3.25, 0.97], [0.87, -3.25, -0.63]];   // (the four flush nozzles of blender/shield_drone.py v2: their exits)
 // VECTORED THRUST (2026-10-07): it flies on its jets — the thrust goes where its own flight needs it (duel.js droneAccel,
-// m/s²): the four back nozzles gimbal their flames up to 55° off straight back to push along it; when it must push back
-// against its face the forward ports fire; sideways / up / down the rim vents do (the gas always thrown the other way)
-const DRONE_FWD = [[1.3, 1.3, 1.37], [1.3, 1.3, -1.03], [1.3, -2.9, 1.42], [1.3, -2.9, -1.08]];   // forward ports (shield frame)
+// m/s²): the four back nozzles gimbal their flames up to 55° off straight back to push along it; sideways / up / down the
+// rim vents help (the gas always thrown the other way). It has NO reverse: nothing fires out of its face (it turns instead)
 const DRONE_SIDE = { zp: [0.8, -0.55, 1.97], zn: [0.8, -0.55, -1.63], yp: [1.1, 1.7, 0.17], yn: [0.95, -6.95, 0.17] };   // rim vents: +Z / -Z side, top, tip
 const A_FULL = 60;   // m/s² that reads as full burn (its orbit asks ~47)
 function droneJets(R, W, kScript, t, A) {
@@ -1087,8 +1096,6 @@ function droneJets(R, W, kScript, t, A) {
   });
   const small = (pl, dir, kk, i) => { if (kk < 0.05) return; const p = M.transformPoint([0, 0, 0], W, pl), fl = kk * flick(i + 7);
     R.jetFlame(p, V.madd([0, 0, 0], p, dir, 0.8 + 2.4 * fl), 0.16 + 0.18 * fl, [1.5 * fl, 0.8 * fl, 0.35 * fl], 1.0, i * 2.9 + 11, 3.2); R.glow(p, 0.25 + 0.3 * fl, [1.8 * fl, 1.0 * fl, 0.45 * fl], 0.3); };
-  const kf = k * Math.max(0, -tx - 0.15) / 0.85;                  // pushing back: the forward ports (flame out of the face)
-  DRONE_FWD.forEach((q, i) => small(q, X, kf, i));
   const ty = V.dot(T, Y), tz = V.dot(T, Z);                     // sideways / up / down: the rim vents (flame the other way)
   small(DRONE_SIDE.zn, V.scale([0, 0, 0], Z, -1), k * Math.max(0, tz - 0.2), 20); small(DRONE_SIDE.zp, Z, k * Math.max(0, -tz - 0.2), 21);
   small(DRONE_SIDE.yn, V.scale([0, 0, 0], Y, -1), k * Math.max(0, ty - 0.2), 22); small(DRONE_SIDE.yp, Y, k * Math.max(0, -ty - 0.2), 23);
