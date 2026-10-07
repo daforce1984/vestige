@@ -2,12 +2,13 @@
 reached back (scene 35, the draw from its thigh holster) and left open sky between them — the shoulder seemed to come
 off. A dark ball (the 'inner' material: the renderer draws it untextured, gunmetal) is added to the PARENT part at each
 joint pivot, a little inboard, so the socket stays filled however the limb turns. Idempotent (replaces its own balls).
-usage: uv run --with pygltflib --with numpy tools/add_joint_balls.py enemy_ms"""
+usage: uv run --with pygltflib --with numpy tools/add_joint_balls.py enemy_ms|gundam"""
 import os, sys, numpy as np
 from pygltflib import GLTF2, BufferView, Accessor, Material, PbrMetallicRoughness, Primitive, Attributes
 sys.path.insert(0, os.path.dirname(__file__))
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BALLS = {'enemy_ms': {'torso': [((-3.1, 5.15, 0.0), 1.05), ((3.1, 5.15, 0.0), 1.05)]}}   # parent part: [(centre in its frame, radius)]
+BALLS = {'enemy_ms': {'torso': [((-3.1, 5.15, 0.0), 1.05), ((3.1, 5.15, 0.0), 1.05)]},
+         'gundam': {'torso': [((-4.15, 3.85, 0.0), 1.5), ((4.15, 3.85, 0.0), 1.5)]}}   # (Sigma, scene 34: his left pauldron pulled forward under the rifle stood off the torso)   # parent part: [(centre in its frame, radius)]
 
 def sphere(c, r, nu=16, nv=10):
     V, N, F = [], [], []
