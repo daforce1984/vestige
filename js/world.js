@@ -686,6 +686,8 @@ const _moonM = M.new();
 // its orientation: Euler (0.4, 1.1, 0.2), then turned so the giant basin sits a little lower-left as scene 30 sees it
 // (2026-10-06: −0.17 rad about the up of scene 30's line of sight to the moon, +0.15 about its right)
 const MOON_Q = [0.271926, 0.402748, -0.052150, 0.872428];
+// the flagship's engines: no round glow on the two small side boosters (x ±100, its emitters 0 and 1 — 2026-10-07)
+const MOTHER_JETS = { noHeart: [0, 1] };
 export function drawWorld(R, t, opts = {}) {
   R._time = t; _R = R;
   const tmpM = M.new();
@@ -755,7 +757,7 @@ export function drawWorld(R, t, opts = {}) {
       if (winA > 0 && winC) hyperWindow(R, winC, fwd, sz[0] * 0.62 + 30, sz[1] * 0.75 + 30, HYPER_BLUE, winA);
     }
     // the wound: the hangar bay behind the melted wall, molten drips, and the bay's contents sucked out into space
-    engineGlows(R, 'mothership', me, [0.3, 1.1, 0.85], 0.6, t > 232 && t < 292 ? 1 : 0.7, 1.6);   // (after the jump code: it hides/reveals the hull)
+    engineGlows(R, 'mothership', me, [0.3, 1.1, 0.85], 0.6, t > 232 && t < 292 ? 1 : 0.7, 1.6, MOTHER_JETS);   // (after the jump code: it hides/reveals the hull)
     if (t > LANCE_FIRE && (me._woundVis ?? 1) > 0.02) { fxOpts.noRipple = true; drawWound(R, t, me); fxOpts.noRipple = false; }   // (2026-10-03: no space distortion round the torn flank)
     drawDock(R, t, me);                                          // bay doors + mouth frame always; the rig and fields inside
     // hull fires after lance

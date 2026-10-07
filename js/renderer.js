@@ -92,6 +92,32 @@ function cellSplit(g, opts, gi) {
   }
   return { parts, materials, empties: {}, verts: new Float32Array(vs), indices: new Uint32Array(is), bounds: g.bounds, cells };
 }
+// a material switched OFF on part of a model (spec.cold { mat, absX }): its triangles whose centre lies beyond |x| > absX
+// (model space) move to a copy of the material that does not glow — e.g. the flagship's two small side boosters keep
+// their dark nozzles while the big ones burn (2026-10-07)
+function coldSplit(g, o) {
+  const mi = g.materials.findIndex((m) => m.name === o.mat); if (mi < 0) return;
+  const src = g.materials[mi], ci = g.materials.length;
+  g.materials.push({ ...src, name: o.mat + '_cold', emissive: [0, 0, 0], base: src.base.map((v) => v * 0.25), metal: 0.85, rough: 0.45 });
+  const V = g.verts, I = g.indices;
+  for (const p of g.parts) {
+    const W = p.worldRest, add = [];
+    for (const gr of p.groups) {
+      if (gr.mat !== mi) continue;
+      const keep = [], cold = [];
+      for (let k = gr.first; k < gr.first + gr.count; k += 3) {
+        let x = 0;
+        for (let j = 0; j < 3; j++) { const v = I[k + j] * 8; x += W[0] * V[v] + W[4] * V[v + 1] + W[8] * V[v + 2] + W[12]; }
+        (Math.abs(x / 3) > o.absX ? cold : keep).push(I[k], I[k + 1], I[k + 2]);
+      }
+      if (!cold.length) continue;
+      I.set(keep, gr.first); I.set(cold, gr.first + keep.length);
+      add.push({ mat: ci, first: gr.first + keep.length, count: cold.length });
+      gr.count = keep.length;
+    }
+    p.groups = p.groups.filter((gr) => gr.count > 0).concat(add);
+  }
+}
 // front-to-back triangle order inside every draw group (by centroid along `axis`, e.g. [1,0,0] = +X first) so early-Z
 // rejects hidden layers — used for the interior bay, which is always seen from outside the starboard hull
 function sortTriangles(g, axis) {
@@ -422,6 +448,7 @@ export class Renderer {
           if (s.cells.interior) { try { const ri = await fetch(s.cells.interior); if (ri.ok) gi = parseGLB(await ri.arrayBuffer()); } catch (e) { /* no interior */ } }
           g = cellSplit(g, s.cells, gi);
         }
+        if (s.cold) coldSplit(g, s.cold);
         if (s.sortAxis) sortTriangles(g, s.sortAxis);
         if (s.resphere) for (const pn of s.resphere) resphere(g, pn, 192, 96);
         return { s, g };

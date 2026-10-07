@@ -8,7 +8,7 @@ import { prepWreck, prepWrecks } from './world.js';
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
   'leg_L_upper', 'leg_L_lower', 'foot_L', 'leg_R_upper', 'leg_R_lower', 'foot_R'];
 const MODELS = [
-  { name: 'mothership', detail: 4.5, prepass: true, hullDetail: true },   // layered greebles: depth prepass keeps close-ups at 24 fps
+  { name: 'mothership', detail: 4.5, prepass: true, hullDetail: true, cold: { mat: 'engine', absX: 70 } },   // (the two small side boosters: no glowing disc — 2026-10-07)   // layered greebles: depth prepass keeps close-ups at 24 fps
   { name: 'ion_frigate', detail: 0.9 },
   { name: 'wreck_interior', detail: 0, url: 'assets/wreck_interior.glb' },
   // the fighters' wrecks: each craft cut into its pieces at load, in memory (renderer cellSplit), with our own interior inside

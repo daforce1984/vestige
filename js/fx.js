@@ -181,7 +181,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
         const r = Math.max(ep.r, 0.3) * scale;
         const pk = 0.8 + 0.12 * Math.sin(time * 1.6 + i * 0.9 + (entry.seed || 0));    // idle but still burning bright, slow breathing
         M.transformDir(tmp2, pm, [0, 0, -1]); V.norm(tmp2, tmp2);
-        nozzleHeart(R, tmp, r, col, pk, tmp2);
+        if (!(opts && opts.noHeart && opts.noHeart.includes(i))) nozzleHeart(R, tmp, r, col, pk, tmp2);
       }
       return;
     }
@@ -212,7 +212,7 @@ export function engineGlows(R, name, entry, col, scale = 1, throttle = 1, trail 
       endOn = 0.25 + 0.75 * Math.min(1, (1 - Math.abs((vx * tmp2[0] + vy * tmp2[1] + vz * tmp2[2]) / vl)) * 3); }
     const k = throttle * flick * endOn;
     const c = [col[0] * k, col[1] * k, col[2] * k];
-    if (isShip) nozzleHeart(R, tmp, r, col, Math.max(0.7, throttle) * flick, tmp2);   // every ship nozzle: white-hot heart + bloom (not faded end-on)
+    if (isShip && !(opts && opts.noHeart && opts.noHeart.includes(i))) nozzleHeart(R, tmp, r, col, Math.max(0.7, throttle) * flick, tmp2);   // every ship nozzle: white-hot heart + bloom (not faded end-on; opts.noHeart: not these)
     const bk2 = entry.burnK || 0;
     if (bk2 > 0.01) {   // (2026-10-06) AFTERBURNER (Sigma fleeing through the Itano circus): a long white-hot core jet, a wide outer jet, a hard bloom at the nozzle and its light
       const jl = len * (1.0 + 0.25 * hash(Math.floor(time * 24) * 1.3 + i)) * bk2, ck2 = k * bk2;
