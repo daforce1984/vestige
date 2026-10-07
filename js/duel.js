@@ -1741,6 +1741,11 @@ function heroDraw(s, tw) {
 function poseSlerp(s, keep, k) {
   if (k >= 1) return;
   for (const p in keep) {
+    // (2026-10-07) the hinges (elbows, knees) blend their bend angle straight: through a rotation and back to Euler angles a
+    // bend past 90° came out as (x, ±180°, ±180°) — e.g. VANGUARD's elbow at (−70, −173, 173) for −110 — and the arm was
+    // thrown off its socket (scene 35, reaching for its holster)
+    const a0 = keep[p], b0 = s.pose[p];
+    if (/_lower$/.test(p) && a0 && b0 && Math.abs(a0[1]) + Math.abs(a0[2]) < 1e-4 && Math.abs(b0[1]) + Math.abs(b0[2]) < 1e-4) { s.pose[p] = [lerp(a0[0], b0[0], k), 0, 0]; continue; }
     const a = Q.fromEuler([0, 0, 0, 1], ...keep[p]), b = Q.fromEuler([0, 0, 0, 1], ...s.pose[p]);
     s.pose[p] = euler3(colsFromQ(Q.slerp([0, 0, 0, 1], a, b, k)));
   }
