@@ -29,6 +29,7 @@ BUILDERS = {
     'gravity_well': ('environment', 'gravity_well'),
     'hangar': ('hangar_v2', 'hangar'),   # v2 (2026-10-07) after the Codex concept assets/tex/src/hangar_concept_v1.png; v1 kept in environment.py
     'debris': ('environment', 'debris'),
+    'shield_drone': ('shield_drone', 'shield_drone'),   # VANGUARD's shield drone (2026-10-07, after the Codex sheet assets/tex/src/shield_drone_concept_v1.png)
 }
 
 

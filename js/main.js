@@ -28,6 +28,7 @@ const MODELS = [
   { name: 'enemy_rifle', detail: 0, url: 'assets/rifle1_game.glb' },  // VANGUARD's rifle: assets/rifle1.glb (user-supplied), drawn on its rifle part
   { name: 'gravity_well', detail: 2.5, keep: ['ring', 'core', 'pylons'], resphere: ['core'] },   // (its core rebuilt as a smooth sphere)
   { name: 'hangar', detail: 0, metalize: true },
+  { name: 'shield_drone', detail: 0.4 },   // VANGUARD's shield drone (blender/shield_drone.py, 2026-10-07), in the shield part's frame
   { name: 'mace', detail: 0 },
   { name: 'dock_rig', detail: 0.5, keep: ['frame', 'clampL', 'clampR', 'door', 'mouth'], hullDetail: true },
   { name: 'mech_hand', detail: 0, keep: ['palm', 'f0_1', 'f0_2', 'f0_3', 'f1_1', 'f1_2', 'f1_3', 'f2_1', 'f2_2', 'f2_3', 'f3_1', 'f3_2', 'f3_3', 'thumbR_1', 'thumbR_2', 'thumbL_1', 'thumbL_2'] },

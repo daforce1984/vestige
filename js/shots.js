@@ -1047,6 +1047,12 @@ function drawBigShield(R, e, s, t) {
   _bsS[0] = 1 + 0.3 * (sy - 1); _bsS[5] = 1 + (sy - 1); _bsS[10] = 1 + (sz - 1);   // (thickness a little, long axis and width ×2)
   M.fromTRS(_bsB, [-SHIELD_FACE[0], -SHIELD_FACE[1], -SHIELD_FACE[2]], [0, 0, 0, 1], 1);
   M.mul(_bsM, s.shieldW, M.mul(new Float32Array(16), _bsA, M.mul(new Float32Array(16), _bsS, _bsB)));   // the shield's scaled world matrix
+  if (R.models.shield_drone) {   // (2026-10-07) its own detailed model (blender/shield_drone.py, after the Codex sheet), built in the shield part's frame
+    const c = R.add('shield_drone', new Float32Array(_bsM)); if (!c) return;
+    c.seed = e.seed; c.wear = 0.6;
+    shieldScorch(c, t);
+    return;
+  }
   M.invert(_bsI, Ms);
   const Mc = M.mul(new Float32Array(16), _bsM, M.mul(new Float32Array(16), _bsI, e.m));           // the copy's model matrix
   const c = R.add('enemy_ms', Mc); if (!c) return;
@@ -1054,7 +1060,7 @@ function drawBigShield(R, e, s, t) {
   shieldScorch(c, t);
 }
 // its thrusters: four nozzles on the back of the plate (shield frame −X), flames out behind it
-const DRONE_JETS = [[0.25, 0.6, 1.3], [0.25, 0.6, -1.0], [0.25, -5.6, 1.3], [0.25, -5.6, -1.0]];
+const DRONE_JETS = [[0.26, 0.55, 1.07], [0.26, 0.55, -0.73], [0.26, -3.25, 0.97], [0.26, -3.25, -0.63]];   // (the four nozzles of blender/shield_drone.py)
 function droneJets(R, W, k, t) {
   if (k <= 0.01) return;
   const back = V.norm([0, 0, 0], M.transformDir([0, 0, 0], W, [-1, 0, 0]));
@@ -1083,9 +1089,12 @@ function drawLostShield(R, t) {
   M.mul(_wA, _wT, _wing.m);
   Q.fromEuler(_wQ, lt * 2.6, lt * 1.1, lt * 3.4);
   M.fromTRS(_wB, d, _wQ, 1);
-  const w = R.add('enemy_ms', M.mul(new Float32Array(16), _wB, _wA));
+  const own = !!R.models.shield_drone;   // (its own model: placed by the drone's frame where it was hit)
+  if (own && !_wing.sm) { M.fromTRS(_wT, [-P[0], -P[1], -P[2]], [0, 0, 0, 1], 1); _wing.sm = M.mul(new Float32Array(16), _wT, enemyMS2(t0).shieldW); }
+  const w = own ? R.add('shield_drone', M.mul(new Float32Array(16), _wB, _wing.sm)) : R.add('enemy_ms', M.mul(new Float32Array(16), _wB, _wA));
   if (!w) return;
-  w.pose = _wing.pose; w.hidden = _wing.hide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0;
+  if (own) { w.seed = 10; w.wear = 1; }
+  else { w.pose = _wing.pose; w.hidden = _wing.hide; w.seed = 10; w.wear = 1; w.texSet = R.texLoaded & 4 ? 2 : 0; }
   w.damage = 0.6; meltHole(w, 'enemy', t, 'shield'); shieldScorch(w, t);
   if (lt < 3) R.light(V.madd([0, 0, 0], P, _wing.v, lt), 30, [1, 0.5, 0.2], 4 * Math.exp(-lt * 2));   // the burnt mount glowing hot for a moment
 }
