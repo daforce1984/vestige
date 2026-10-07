@@ -1877,8 +1877,25 @@ function gundamHangarState(t, phase) {
     blendPose('crouch', 'flight', sat(lt / 1.2), s.pose);
     s.thr = 1;
   } else s.pos[1] -= 2.5 * smooth(154.5, 156.8, t);
+  // (2026-10-07) the feet ON the deck: the crouch lowered the body a fixed 2.5 m that the legs' bend didn't match — the
+  // feet sank into the floor. Now the body is set so the lowest corner of either foot rests where it does standing,
+  // through the crouch and the first moments of the catapult run (then he lifts off)
+  const gk = 1 - smooth(158.15, 158.45, t);
+  if (gk > 0) s.pos[1] += (footRest() - footMin(s)) * gk;
   s.thr = t > 157.6 ? 1 : 0.15 * smooth(155, 156, t);
   return s;
+}
+// the lowest point of Sigma's feet (world y): the corners of each foot's box (part-local, assets/gundam.glb)
+const FOOT_BOX = { foot_L: [[-1.48, -1.7, -2.52], [2.07, 0.69, 3.12]], foot_R: [[-2.07, -1.7, -2.52], [1.48, 0.69, 3.12]] };
+function footMin(s) {
+  const fk = duelFK(s, 'gundam'); let m = 1e9;
+  for (const f in FOOT_BOX) { const [a, b] = FOOT_BOX[f]; for (let i = 0; i < 8; i++) m = Math.min(m, M.transformPoint([0, 0, 0], fk[f], [i & 1 ? b[0] : a[0], i & 2 ? b[1] : a[1], i & 4 ? b[2] : a[2]])[1]); }
+  return m;
+}
+let _footRest = null;
+function footRest() {   // standing (the standby pose, on the deck)
+  if (_footRest === null) { const s0 = { vis: true, pos: addv(HANGAR, [0, 9, 0]), fwd: [0, 0, 1], pose: {}, roll: 0, pitch: 0 }; blendPose('stand', 'stand', 0, s0.pose); _footRest = footMin(s0); }
+  return _footRest;
 }
 
 export const SHOTS = [];
