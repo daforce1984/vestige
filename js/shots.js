@@ -2558,6 +2558,7 @@ shot(226, 233, 'S15a the wound', (c) => {
   const w = motherPoint([0, 0, 0], t, LANCE_HIT);
   camLook(c, motherPoint([0, 0, 0], t, [LANCE_HIT[0] + 170 - u * 35, LANCE_HIT[1] + 18 - u * 6, LANCE_HIT[2] + 60 - u * 20]), w, 44 - u * 4, 0.05);
   handheld(c, 0.35);
+  c.clearLens = { r: 160, t0: 226, t1: 233 };   // (no fighter sweeping across the lens: those pairs sit this shot out)
   c.env.shadowCenter = w; c.env.shadowRadius = 160;
   c.env.shadows = false;                 // perf: the huge interior would double in the shadow pass
 });
@@ -3034,7 +3035,7 @@ function moonFor(R, s, film) {
   if (_moon.has(s)) return _moon.get(s);
   const save = { t: ctx.t, lt: ctx.lt, u: ctx.u, env: ctx.env, post: ctx.post };
   ctx.R = R; ctx.t = tm; ctx.lt = tm - s.t0; ctx.u = 0.5; ctx.env = spaceEnv(tm); ctx.post = basePost();
-  ctx.world = true; ctx.hangar = null; ctx.worldT = undefined; ctx.fpv = false;
+  ctx.world = true; ctx.hangar = null; ctx.worldT = undefined; ctx.fpv = false; ctx.clearLens = null;
   R.begin();
   s.fn(ctx);
   const cam = ctx.cam, f = V.norm([0, 0, 0], V.sub([0, 0, 0], cam.target, cam.pos));
@@ -3060,7 +3061,7 @@ export function frame(R, film) {
   const s = findShot(t);
   ctx.R = R; ctx.t = t; ctx.lt = t - s.t0; ctx.u = sat((t - s.t0) / (s.t1 - s.t0));
   ctx.env = spaceEnv(t); ctx.post = basePost();
-  ctx.world = true; ctx.hangar = null; ctx.debris = false; ctx.worldT = undefined; ctx.fpv = false; ctx.filmT = film; ctx.closeCore = false;
+  ctx.world = true; ctx.hangar = null; ctx.debris = false; ctx.worldT = undefined; ctx.fpv = false; ctx.filmT = film; ctx.closeCore = false; ctx.clearLens = null;
   ctx.cam.near = 0.3; ctx.cam.far = 400000;
   const moonDir = null;                                   // (background moon removed)
   R.begin();
@@ -3090,7 +3091,7 @@ export function frame(R, film) {
   ctx.cam.near = Math.max(0.2, Math.min(4, V.dist(ctx.cam.pos, ctx.cam.target) * 0.01));
   if (ctx.world) {
     const wt = ctx.worldT ?? t;          // cold open shows the battle while the film clock is at 0–14
-    drawWorld(R, wt, {});
+    drawWorld(R, wt, { clearLens: ctx.clearLens });
     FPV_NOW = !!ctx.fpv;
     drawMSBattle(R, wt);
     drawLanceAndCannon(R, wt, ctx);

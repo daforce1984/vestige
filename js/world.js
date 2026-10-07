@@ -831,7 +831,7 @@ export function drawWorld(R, t, opts = {}) {
   if (!opts.noWell && t < IMPLODE + 0.2) drawWell(R, t, tmpM);
 
   // ---------------- dogfight
-  if (t > 116 && t < 250) drawDogfight(R, t, tmpM);
+  if (t > 116 && t < 250) drawDogfight(R, t, tmpM, opts.clearLens);
 
   // ---------------- combat effects
   drawIonVolleys(R, t);
@@ -1103,12 +1103,23 @@ function dogPast(k, lag, t) {
     return { m: mat(new Float32Array(16), p, V.sub([0, 0, 0], q, p), [0, 1, 0], Math.sin(tt * 1.3 + k + (lag ? 1 : 0)) * (lag ? 0.5 : 0.6)) };
   };
 }
-function drawDogfight(R, t, tmpM) {
+// clearLens { r, t0, t1 } (a shot asks for it, 2026-10-07 scene 78): every pair whose fighters come within r of the lens
+// at any moment of the shot is left out of the whole shot — nothing sweeps across the lens, and nothing pops in or out
+function lensClearPairs(cam, cl) {
+  const out = new Set(), q = [0, 0, 0];
+  for (let k = 0; k < PAIRS.length; k++)
+    for (let tt = cl.t0; tt <= cl.t1 && !out.has(k); tt += 0.1)
+      for (const lag of [0, 0.9]) { fighterPos(q, k, tt - lag); if (V.dist(q, cam) < cl.r) { out.add(k); break; } }
+  return out;
+}
+function drawDogfight(R, t, tmpM, clearLens) {
   const fade = smooth(116, 120, t) * (1 - smooth(236, 248, t));
   const a = [0, 0, 0], b = [0, 0, 0], v = [0, 0, 0];
+  const skip = clearLens && R.camPos ? lensClearPairs(R.camPos, clearLens) : null;
   GUN.pairs = [];
   for (let k = 0; k < PAIRS.length; k++) {
     const p = PAIRS[k];
+    if (skip && skip.has(k)) continue;
     const launch = 116 + k * 0.35;
     if (t < launch) continue;
     fighterPos(a, k, t);           // target
@@ -1135,6 +1146,7 @@ function drawDogfight(R, t, tmpM) {
   // laser shots: a HIT strikes the target's hull (flash + sparks + a scorch glow riding on it); a MISS keeps going
   for (const sh of DOG_SHOTS) {
     if (sh.tf > t || sh.tf < t - 12) continue;
+    if (skip && skip.has(sh.k)) continue;
     const k = sh.k, p = PAIRS[k], lt = t - sh.tf;
     const col = p.hiigChases ? [0.5, 1.1, 3.0] : [3.0, 0.55, 0.35], c = [col[0] * fade, col[1] * fade, col[2] * fade];
     const from = fighterPos([0, 0, 0], k, sh.tf - 0.9);
