@@ -303,7 +303,7 @@ const BAY_CRAFT = [
 ];
 const _cq = [0, 0, 0, 1], _cm1 = M.new(), _cm2 = M.new();
 function drawBayCraft(R, t, mm) {
-  if (!R.models.interceptor) return;
+  if (!R.models.interceptor || t >= 343.8) return;   // (2026-10-08: not from scene 100 'F1 the jump' on — they rode the flagship's jump out of the open bay)
   const b = R.models.interceptor.bounds, sc = 16 / Math.max(1, b.max[2] - b.min[2]);
   const k = easeOut(sat((t - LANCE_FIRE - 0.15) / 0.6));           // decompression shove
   const la = Math.max(0, t - LANCE_FIRE - 0.75);                    // then a slow zero-g drift
