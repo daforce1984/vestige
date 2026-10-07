@@ -1267,8 +1267,8 @@ export function ionCharge(R, e, t, c, fail, seed) {
   // muzzle at an even pace — a plasma column climbing behind a crackling front, the coil windings blazing in spinning
   // rings behind it, the barrel dark ahead; failing, it stutters
   const fill = sat((c - 0.1) / 0.7), zF = 6.8 + (ION_BORE_MOUTH - 6.8) * fill;
-  const k = 0.45 * Math.min(1.2, 0.4 + c);
-  R.ionCoil(P(0, 0.9, 6.0), P(0, 0.9, ION_BORE_MOUTH), 2.3, fill, [CC[0] * k, CC[1] * k, CC[2] * k], 1.0, seed, fail ? 1 : 0, 1.9);
+  const k = 0.68 * Math.min(1.2, 0.4 + c);   // (brighter, 2026-10-07)
+  R.ionCoil(P(0, 0.9, 6.0), P(0, 0.9, ION_BORE_MOUTH), 3.2, fill, [CC[0] * k, CC[1] * k, CC[2] * k], 1.0, seed, fail ? 1 : 0, 1.9);   // (a wider quad: room for its soft round falloff)
   for (let s = 0; s < 4; s++) {                                              // capacitor modules flashing over onto the filled stages
     const zc = 6.8 + 4.1 * (s + 0.5), on = sat((zF - zc) / 2.5); if (on <= 0.3) continue;
     for (const sx of [1, -1]) {

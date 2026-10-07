@@ -1746,29 +1746,33 @@ fn softFade(p: vec4f, vz: f32, k: f32) -> f32 {
     dist = tanS * (n2 - 0.5) * body * 0.004 * s.d.a;
   } else if (shape == 19) {
     // ION COIL CHARGE (2026-10-07, scene 13): the gun's accelerator filling with energy, breech → muzzle — a plasma column
-    // climbs the bore behind a crackling white front; behind it the coil windings blaze in rings that spin and race
-    // forward, turbulence seething through; ahead of it the barrel waits dark with a faint pre-glow. failing (c.w): it
-    // stutters and drops out. uv: along (world units, p0 = the breech), across −1..1; c.z = the front (0..1 of the length)
+    // climbs the bore behind a crackling white front; behind it the windings blaze in rings that spin and race forward,
+    // turbulence seething through; ahead of it the barrel waits dark with a faint pre-glow. failing (c.w): it stutters.
+    // (2026-10-07 b: no flat sheet — a soft round falloff across, soft ends, the rings warped and broken by the plasma)
+    // uv: along (world units, p0 = the breech), across −1..1; c.z = the front (0..1 of the length)
     let L = i.ext.x; let r = i.ext.y; let u = i.uv.x / L; let v = i.uv.y;
-    if (u < -0.03 || u > 1.03) { discard; }
+    if (u < -0.06 || u > 1.06) { discard; }
     let sd = s.c.y; let f = s.c.z; let fail = s.c.w;
     let x = i.uv.x;                                              // metres from the breech
-    let df = (f - u) * L / r;                                     // how far behind the front (in radii; < 0: ahead of it)
-    let filled = smoothstep(-0.6, 0.9, df);
+    let df = (f - u) * L / (r * 0.6);                             // how far behind the front (in core radii; < 0: ahead)
+    let filled = smoothstep(-0.8, 1.2, df);
     let n1 = vnoise(vec3f(x * 0.35 - t * 4.0, v * 1.8, sd + t * 0.7));
     let n2 = vnoise(vec3f(x * 0.9 - t * 9.0, v * 3.5 + n1 * 1.4, sd * 1.7 + t * 2.3));
-    let rings = pow(0.5 + 0.5 * sin(x * 6.2832 / 1.05 - t * (8.0 + 14.0 * f) + v * 0.9), 7.0);   // the windings, one a metre, spinning forward
-    let across = sqrt(max(0.0, 1.0 - v * v));
-    let column = exp(-v * v * 7.0) * (0.55 + 0.45 * n1);
-    let pulse = pow(0.5 + 0.5 * sin(x * 0.7 - t * 14.0), 6.0);   // energy packets racing up behind the front
-    var heat = filled * (column * (0.5 + 0.5 * pulse) + rings * across * (0.45 + 0.55 * n2) * 0.85);
-    let frontK = exp(-df * df * 1.6) * step(0.01, f) * (1.0 - smoothstep(0.97, 1.0, f));
-    let crackle = pow(1.0 - abs(vnoise(vec3f(x * 2.2 - t * 30.0, v * 5.0, sd + t * 8.0)) * 2.0 - 1.0), 10.0);
-    heat += frontK * (0.8 * across + 1.0 * crackle);
-    heat += exp(-max(0.0, -df) * 0.7) * (1.0 - filled) * 0.12 * across;   // the pre-glow ahead
+    let n3 = vnoise(vec3f(x * 2.4 - t * 15.0, v * 6.0 + n2 * 2.0, sd * 2.9 + t * 4.1));
+    let env = exp(-v * v * 4.5) * (1.0 - smoothstep(0.7, 1.0, abs(v))) * smoothstep(-0.05, 0.04, u) * (1.0 - smoothstep(0.96, 1.05, u));   // round, soft all round, nothing at the quad's edge
+    let core = exp(-v * v * 14.0);                                // the bright heart of the column
+    let ph = x * 6.2832 / 1.05 - t * (8.0 + 14.0 * f) + (n1 - 0.5) * 3.0 + v * 0.8;
+    let rings = pow(0.5 + 0.5 * sin(ph), 5.0) * (0.35 + 0.65 * n2);   // the windings — warped and broken by the plasma
+    let pulse = pow(0.5 + 0.5 * sin(x * 0.7 - t * 14.0 + n1 * 2.0), 5.0);
+    var heat = filled * env * (0.55 + 0.45 * n1) * (0.7 + 0.5 * pulse) + filled * core * (0.9 + 0.6 * pulse) + filled * env * rings * 0.9;
+    let frontK = exp(-df * df * 0.9) * step(0.01, f) * (1.0 - smoothstep(0.97, 1.0, f));
+    let crackle = pow(1.0 - abs(n3 * 2.0 - 1.0), 8.0);
+    heat += frontK * env * (1.1 + 1.4 * crackle * exp(-v * v * 6.0));   // (the crackle held in near the core)
+    heat += exp(-max(0.0, -df) * 0.5) * (1.0 - filled) * 0.15 * env;   // the pre-glow ahead
+    heat *= 0.85 + 0.3 * n3;                                       // the seethe all through
     let stut = mix(1.0, 0.25 + 0.75 * step(0.35, vnoise(vec3f(t * 9.0, sd, 3.0))), fail);
-    let flick = 0.85 + 0.15 * sin(t * 47.0 + x * 0.3);
-    col = (tint * heat + vec3f(0.9, 0.95, 1.0) * pow(clamp(heat * 0.35, 0.0, 1.2), 2.2) * 0.3) * s.d.a * flick * stut * smoothstep(1.0, 0.7, abs(v));
+    let flick = 0.88 + 0.12 * sin(t * 47.0 + x * 0.3);
+    col = (tint * heat + vec3f(0.92, 0.96, 1.0) * pow(clamp(heat * 0.5, 0.0, 1.6), 2.0) * 0.45) * s.d.a * flick * stut;
     dist = tanS * (n2 - 0.5) * heat * 0.003 * s.d.a;
   } else if (shape == 20) {
     // THE DRAIN (2026-10-07, scene 13): the charge pulled out of the muzzle as ONE continuous ribbon of plasma, segment by
