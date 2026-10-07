@@ -3198,16 +3198,29 @@ function drawLanceAndCannon(R, t, c) {
       R.glow(mc, 50 * k, [1.5 * k, 2 * k, 4 * k], 0.6);
       R.light(mc, 1500, ION_COL, 40 * k);
       if (reach >= 1) { R.glow(d, 220 * k, [4 * k, 4.5 * k, 7 * k], 1); R.light(d, 2000, [0.7, 0.8, 1.2], 50 * k); }
-      // shock rings travelling down the beam
+      // (2026-10-06: no rings) a raging mass of energy, not a tidy beam: the runaway shader along it (surges racing out,
+      // plasma tearing off its sides), knots of energy of uneven size racing down it, lightning twisting round it
       const dir = V.norm([0, 0, 0], V.sub([0, 0, 0], d, mc));
       const side = V.norm([0, 0, 0], V.cross([0, 0, 0], dir, [0, 1, 0]));
       const upv = V.cross([0, 0, 0], side, dir);
-      const L = V.dist(mc, d);
-      for (let i = 0; i < 6; i++) {
-        const ph = ((lt * 1.4 + i / 6) % 1);
-        const pos = madd(mc, dir, ph * L * reach);
-        const rr = w * (2.5 + ph * 2);
-        R.ring(pos, [side[0] * rr, side[1] * rr, side[2] * rr, 0], [upv[0] * rr, upv[1] * rr, upv[2] * rr, 0], [0.8 * k, 1.2 * k, 2.4 * k], 0.55);
+      const L = V.dist(mc, d) * reach;
+      R.surge(mc, end, w * 2.6, [ION_COL[0] * 1.1 * k, ION_COL[1] * 1.1 * k, ION_COL[2] * 1.1 * k], 1.5 * k, 9.1);
+      for (let i = 0; i < 14; i++) {
+        const sp = 0.9 + 0.7 * hash(i * 1.7), ph = ((lt * sp * 0.9 + hash(i * 3.3)) % 1);
+        if (ph > reach) continue;
+        const r0 = w * (0.7 + 1.1 * hash(i * 5.1)) * (0.8 + 0.2 * Math.sin(t * 23 + i)), ang = i * 2.4 + t * 3;
+        const pos = madd(madd(madd(mc, dir, ph * L / reach * reach), side, Math.cos(ang) * w * 0.25), upv, Math.sin(ang) * w * 0.25);
+        R.orb(pos, r0, [ION_COL[0] * 1.4 * k, ION_COL[1] * 1.4 * k, ION_COL[2] * 1.4 * k], 1.4 * k, 300 + i, 0.9);
+      }
+      for (let a = 0; a < 4; a++) {   // lightning coiling round the beam, re-struck a few times a second
+        const seg = 10, f0 = Math.floor(t * 9 + a * 0.37);
+        let prev = mc;
+        for (let j = 1; j <= seg; j++) {
+          const u = j / seg, ang = a * 1.57 + u * 9 + (hash(f0 + a * 7) - 0.5) * 2, rr = w * (1.2 + 0.6 * hash(f0 * 3 + j + a));
+          const q = madd(madd(madd(mc, dir, u * L), side, Math.cos(ang) * rr), upv, Math.sin(ang) * rr);
+          R.beam(prev, q, w * 0.06, [1.2 * k, 1.8 * k, 3.4 * k], 1, 14);
+          prev = q;
+        }
       }
     }
   }
