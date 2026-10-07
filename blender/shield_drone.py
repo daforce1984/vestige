@@ -134,6 +134,18 @@ def quad_on(mb, q, lo, hi, mat, bevel=0.0):
     mb.hexa([G(S(z, y, lo), y, z) for (z, y) in q] + [G(S(z, y, hi), y, z) for (z, y) in q], mat, bevel=bevel)
 
 
+def groove_light(mb, p0, p1, lvl, w=0.022, lip=0.018, lift=0.012):
+    """a hair-thin light set into a groove (2026-10-07): the light line flush with the surface at `lvl`, a thin dark lip
+    standing just proud all round it, so it reads recessed"""
+    ez, ey = p1[0] - p0[0], p1[1] - p0[1]; L = math.hypot(ez, ey); nz, ny = -ey / L * 1.0, ez / L
+    P = lambda u, o: (p0[0] + ez * u + nz * o, p0[1] + ey * u + ny * o)
+    quad_on(mb, [P(0, -w / 2), P(1, -w / 2), P(1, w / 2), P(0, w / 2)], lvl, lvl + 0.002, 'glow_y')
+    for o0, o1 in ((-w / 2 - lip, -w / 2), (w / 2, w / 2 + lip)):
+        quad_on(mb, [P(0, o0), P(1, o0), P(1, o1), P(0, o1)], lvl - 0.01, lvl + lift, 'nozzle')
+    for u0, u1 in ((-lip / L, 0), (1, 1 + lip / L)):
+        quad_on(mb, [P(u0, -w / 2 - lip), P(u1, -w / 2 - lip), P(u1, w / 2 + lip), P(u0, w / 2 + lip)], lvl - 0.01, lvl + lift, 'nozzle')
+
+
 def shield_drone():
     palette()
     mb = MB()
@@ -158,7 +170,7 @@ def shield_drone():
         q = [(ZC - 0.22, y0), (ZC + 0.22, y0), (ZC + 0.22, y1), (ZC - 0.22, y1)]
         quad_on(mb, q, 0.05, 0.2, 'frame'); quad_on(mb, q, -0.2, -0.06, 'frame')
     for y in (1.0, -0.6, -3.0, -5.2):
-        quad_on(mb, [(ZC - 0.05, y + 0.2), (ZC + 0.05, y + 0.2), (ZC + 0.05, y - 0.2), (ZC - 0.05, y - 0.2)], 0.2, 0.215, 'glow_y')
+        groove_light(mb, (ZC, y + 0.22), (ZC, y - 0.22), 0.2)   # (hair-thin, in a groove)
     for (yc, h) in ((0.2, 0.9), (-3.9, 0.9), (-5.6, 0.6)):                  # back vents (louvred)
         for j in range(5):
             yy = yc + h / 2 - (j + 0.5) * h / 5
@@ -173,7 +185,7 @@ def shield_drone():
     def vent(i, t0, t1):
         a, b = K[i], K[(i + 1) % nK]
         rim_strip(mb, a, b, t0, t1, 0.24, -0.13, 0.13, 'nozzle', out=0.04, segs=2)
-        rim_strip(mb, a, b, t0 + 0.02, t1 - 0.02, 0.03, -0.09, 0.09, 'glow_y', out=0.06, segs=2)
+        rim_strip(mb, a, b, t0 + 0.03, t1 - 0.03, 0.004, -0.018, 0.018, 'glow_y', out=0.042, segs=2)   # (a hair-thin slit on the vent's face)
     vent(2, 0.25, 0.5); vent(2, 0.62, 0.86)            # one side, upper (out to the side)
     vent(7, 0.14, 0.38); vent(7, 0.5, 0.74)            # the other side
     vent(3, 0.2, 0.36); vent(6, 0.64, 0.8)             # the taper (down-and-out)
@@ -182,8 +194,11 @@ def shield_drone():
     vent(1, 0.3, 0.7); vent(8, 0.3, 0.7)               # the chamfers (up-and-out)
     for (z, y) in ((ZC + 1.2, 1.3), (ZC - 1.2, 1.3), (ZC + 1.25, -2.9), (ZC - 1.25, -2.9)):   # forward ports on the face's rim
         q = [(z - 0.18, y + 0.09), (z + 0.18, y + 0.09), (z + 0.18, y - 0.09), (z - 0.18, y - 0.09)]
-        quad_on(mb, q, 0.14, 0.22, 'nozzle'); quad_on(mb, q, 0.22, 0.23, 'glow_y')
+        quad_on(mb, q, 0.14, 0.22, 'nozzle'); groove_light(mb, (z - 0.13, y), (z + 0.13, y), 0.22, w=0.018, lip=0.014, lift=0.01)
     for (i, t) in ((2, 0.08), (2, 0.95), (7, 0.05), (7, 0.92), (3, 0.62), (6, 0.38), (0, 0.12), (0, 0.88)):   # amber edge lights
         a, b = K[i], K[(i + 1) % nK]
-        rim_strip(mb, a, b, t - 0.025, t + 0.025, 0.06, 0.2, 0.215, 'glow_y', out=-0.12, segs=1)
+        ex, ey = b[0] - a[0], b[1] - a[1]; L = math.hypot(ex, ey); nx, ny = -ey / L, ex / L
+        if nx * (CEN[0] - a[0]) + ny * (CEN[1] - a[1]) < 0: nx, ny = -nx, -ny
+        c0 = (a[0] + ex * (t - 0.03) + nx * 0.15, a[1] + ey * (t - 0.03) + ny * 0.15); c1 = (a[0] + ex * (t + 0.03) + nx * 0.15, a[1] + ey * (t + 0.03) + ny * 0.15)
+        groove_light(mb, c0, c1, 0.2)   # (along the rim, in a groove)
     return [mb.to_object('shield', smooth_angle=35)]
