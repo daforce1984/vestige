@@ -37,9 +37,9 @@ export const EF = [
   { p: [300, -40, -1000], arrive: 81.4, die: 293.9, seed: 12 },      //  until then our ion guns cannot hold a charge)
   { p: [-120, -120, -1150], arrive: 81.8, die: 298.4, seed: 13 },
   { p: [150, 130, -1120], arrive: 82.3, die: 304.9, seed: 14 },
-  { p: [-430, -60, -1300], arrive: 82.7, flee: 312, seed: 15 },
-  { p: [430, 40, -1320], arrive: 83.1, flee: 314, seed: 16 },
-  { p: [20, 210, -1420], arrive: 83.5, flee: 316, seed: 17 },
+  { p: [-430, -60, -1300], arrive: 82.7, flee: 311, seed: 15 },
+  { p: [430, 40, -1320], arrive: 83.1, flee: 312.2, seed: 16 },
+  { p: [20, 210, -1420], arrive: 83.5, flee: 313.2, seed: 17 },   // (2026-10-08: every jump done before scene 96 is cut at 314.5 — one at 316 sat there, never leaving)
 ];
 export const DREAD_ARRIVE = 85;      // emerges slowly 85–99 (window opens at 84)
 export const DREAD_EMERGE = 1;       // every hyperspace exit takes 1 s (user request)
@@ -1440,7 +1440,7 @@ for (let i = 0; i < 22; i++) {
   const row = i % 4, col = Math.floor(i / 4);
   EXTRA_E.push({
     p: [(col - 2.5) * 190 + (hash(i * 2.3) - 0.5) * 80, (row - 1.5) * 120 + (hash(i * 4.9) - 0.5) * 50, -1080 - row * 110 - hash(i * 6.1) * 260],
-    arrive: 81.2 + i * 0.13, die: E_DIE[i] ?? null, flee: E_DIE[i] ? null : 311.5 + (i % 5) * 1.1, seed: 60 + i,
+    arrive: 81.2 + i * 0.13, die: E_DIE[i] ?? null, flee: E_DIE[i] ? null : 310.8 + (i % 5) * 0.6, seed: 60 + i,
   });
 }
 // keep the extra line ships clear of the named frigates (avoid "twin" ships reading as duplicates)
