@@ -772,13 +772,25 @@ export class Renderer {
    *  own submit, so no single one holds the GPU long); the mesh shader then just reads it */
   /** the real moon's surface for the bake (assets/tex/moon_lroc.png, NASA CGI Moon Kit — tools/make_moon_lroc.py) */
   async loadMoonData(url) {
+    // (2026-10-08) decoded HERE, byte for byte: its R,G are a 16-bit elevation (hi/lo bytes) — any colour management on the
+    // way in (the browser's image decode / copyExternalImageToTexture may convert an untagged PNG) scrambles the low byte and
+    // the bake grew terraced plateaus along the maria (it looked like the Earth's continents). Plain 8-bit RGBA PNGs only;
+    // anything else falls back to the browser's decoder
     try {
       const r = await fetch(url); if (!r.ok) return;
-      const bmp = await createImageBitmap(await r.blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
-      const tex = this.device.createTexture({ size: [bmp.width, bmp.height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
-      this.device.queue.copyExternalImageToTexture({ source: bmp }, { texture: tex }, [bmp.width, bmp.height]); bmp.close();
+      const buf = new Uint8Array(await r.arrayBuffer());
+      const px = await decodePNG(buf);
+      let tex;
+      if (px) {
+        tex = this.device.createTexture({ size: [px.w, px.h], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+        this.device.queue.writeTexture({ texture: tex }, px.data, { bytesPerRow: px.w * 4 }, [px.w, px.h]);
+      } else {
+        const bmp = await createImageBitmap(new Blob([buf]), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+        tex = this.device.createTexture({ size: [bmp.width, bmp.height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+        this.device.queue.copyExternalImageToTexture({ source: bmp }, { texture: tex }, [bmp.width, bmp.height]); bmp.close();
+      }
       this.moonLroc = tex;
-    } catch (e) { /* the moon stays unbaked: no texMoon */ }
+    } catch (e) { console.warn('moon data:', e); /* the moon stays unbaked: no texMoon */ }
   }
   _bakeMoon() {
     const m = this.models.moon, e = m && m.entries[0]; if (!e || this._moonBaked || !this.moonLroc) return;   // (waits for the real moon's data)
@@ -1136,6 +1148,33 @@ export class Renderer {
 
 const Z4 = [0, 0, 0, 0];
 const ONE = [1, 1, 1];
+/** minimal PNG decoder (8-bit RGBA, non-interlaced): the bytes exactly as stored — no colour management (loadMoonData) */
+async function decodePNG(b) {
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  if (dv.getUint32(0) !== 0x89504e47) return null;
+  let i = 8, w = 0, h = 0; const idat = [];
+  while (i < b.length) {
+    const len = dv.getUint32(i), type = String.fromCharCode(b[i + 4], b[i + 5], b[i + 6], b[i + 7]);
+    if (type === 'IHDR') { w = dv.getUint32(i + 8); h = dv.getUint32(i + 12); if (b[i + 16] !== 8 || b[i + 17] !== 6 || b[i + 20] !== 0) return null; }
+    else if (type === 'IDAT') idat.push(b.subarray(i + 8, i + 8 + len));
+    else if (type === 'IEND') break;
+    i += 12 + len;
+  }
+  if (!w || !idat.length) return null;
+  const raw = new Uint8Array(await new Response(new Blob(idat).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer());
+  const stride = w * 4, out = new Uint8Array(stride * h);
+  for (let y = 0, p = 0; y < h; y++) {
+    const ft = raw[p++], o = y * stride, u = o - stride;
+    for (let x = 0; x < stride; x++, p++) {
+      const a = x >= 4 ? out[o + x - 4] : 0, up = y ? out[u + x] : 0, c = x >= 4 && y ? out[u + x - 4] : 0;
+      let v = raw[p];
+      if (ft === 1) v += a; else if (ft === 2) v += up; else if (ft === 3) v += (a + up) >> 1;
+      else if (ft === 4) { const pp = a + up - c, pa = Math.abs(pp - a), pb = Math.abs(pp - up), pc = Math.abs(pp - c); v += pa <= pb && pa <= pc ? a : pb <= pc ? up : c; }
+      out[o + x] = v;   // (Uint8Array: wraps mod 256)
+    }
+  }
+  return { w, h, data: out };
+}
 function newEntry() {
   return { m: new Float32Array(16), flash: 0, damage: 0, revealDir: 0, revealZ: 0, revealWidth: 1, emissive: 1, seed: 0, tint: [0.4, 0.7, 1], pose: null, partXf: null, hidden: null, matOverride: null, partM: null, dmgC: [0, 0, 0], dmgR: 0, clip: null, clipHeat: 1 };
 }
