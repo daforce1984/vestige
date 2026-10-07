@@ -1188,28 +1188,36 @@ export function ionMuzzle(R, t, i) {
   }
   return V.madd([0, 0, 0], st.pos, st.fwd, modelLen(R, 'ion_frigate') * 0.5);
 }
-// the gravity well steals the charge: energy streams OUT of the muzzle and bends away toward the well
+// the gravity well steals the charge (2026-10-07, like the cut compressed shot's energy, duel): the charge comes out
+// of the muzzle in torn plasma lumps — writhing heads with smaller ragged pieces strung out behind — dragged off toward
+// the well, faster and faster, spreading apart as they go, shrinking, cooling and fading until nothing is left
 export function drainOutflow(R, t, t0, from, k, seed) {
-  // the charge is SUCKED OUT toward the gravity well: filaments peel off the coils, swing out, then bend onto the well
-  // line and accelerate away down it, stretching as they go (quadratic Bézier: muzzle → swing-out → 1.1 km down the line)
   if (k <= 0.01) return;
   const toWell = V.norm([0, 0, 0], V.sub([0, 0, 0], WELL, from));
   const P = (a, b, c, u) => { const w = 1 - u; return [w * w * a[0] + 2 * w * u * b[0] + u * u * c[0], w * w * a[1] + 2 * w * u * b[1] + u * u * c[1], w * w * a[2] + 2 * w * u * b[2] + u * u * c[2]]; };
-  const end = V.madd([0, 0, 0], from, toWell, 1100);
-  for (let s = 0; s < 30; s++) {
-    const hs = hash(s * 1.7 + seed), hs2 = hash(s * 3.1 + seed + 5);
-    const ph = ((t - t0) * (0.55 + hs * 0.5) + hs2) % 1;
-    const d0 = randDir([0, 0, 0], s * 5.1 + seed * 3.3);
-    const a = V.madd([0, 0, 0], from, d0, 4 + 5 * hs);
-    const b = V.madd([0, 0, 0], V.madd([0, 0, 0], from, d0, 30 + 40 * hs2), toWell, 90);
-    const u = Math.pow(ph, 1.8), du = 0.015 + 0.09 * u;                 // accelerating, stretching
-    const head = P(a, b, end, u), tail = P(a, b, end, Math.max(0, u - du)), mid = P(a, b, end, Math.max(0, u - du * 0.5));
-    const fade = Math.min(1, ph * 8) * (1 - Math.pow(ph, 3));
-    const br = 2.6 * k * fade;
-    R.beam(tail, mid, 0.6 + 1.2 * u, [0.4 * br, 0.8 * br, 2.0 * br], 1, 10);
-    R.beam(mid, head, 0.9 + 1.8 * u, [0.6 * br, 1.0 * br, 2.4 * br], 1, 10);
+  const end = V.madd([0, 0, 0], from, toWell, 420);
+  const HOT = [0.7, 1.3, 3.2], COOL = [0.25, 0.45, 1.7];
+  for (let s = 0; s < 34; s++) {
+    const hs = hash(s * 1.7 + seed), hs2 = hash(s * 3.1 + seed + 5), big = s < 12;
+    const ph = ((t - t0) * (0.4 + hs * 0.3) + hs2) % 1;
+    const d0 = randDir([0, 0, 0], s * 5.1 + seed * 3.3), dr = randDir([0, 0, 0], s * 7.9 + seed * 1.3 + 2);
+    const a = V.madd([0, 0, 0], from, d0, 2 + 4 * hs);
+    const b = V.madd([0, 0, 0], V.madd([0, 0, 0], from, d0, 14 + 22 * hs2), toWell, 50);
+    const u = Math.pow(ph, 1.7);                                           // dragged off, accelerating
+    const at = (uu) => V.madd([0, 0, 0], P(a, b, end, uu), dr, (8 + 50 * hs) * uu);   // (spreading apart as they go)
+    const p = at(u), pb = at(Math.max(0, u - 0.012)), vd = V.norm([0, 0, 0], V.sub([0, 0, 0], p, pb));
+    const fade = Math.min(1, ph * 7) * Math.pow(1 - ph, 1.5) * k; if (fade < 0.02) continue;
+    const r = (big ? 1.1 + 1.2 * hs : 0.5 + 0.6 * hs) * (1 - 0.55 * ph);
+    const col = [0, 1, 2].map((c) => lerp(HOT[c], COOL[c], ph)), fl = 0.8 + 0.2 * Math.sin(t * 30 + s);
+    R.orb(p, r * 1.3, col, 1.5 * fade * fl, 400 + s + seed * 7, 0.9);    // a torn, writhing head
+    const tl = Math.max(4, 22 * u + 3) * (big ? 1 : 0.6);
+    if (big) for (let q = 1; q <= 3; q++) {                                // a few smaller ragged pieces strung out behind
+      const qp = V.madd([0, 0, 0], V.madd([0, 0, 0], p, vd, -tl * 0.28 * q), randDir([0, 0, 0], s * 13 + q + seed), r * 0.6);
+      R.orb(qp, r * (1 - 0.22 * q), col, 1.1 * fade * fl * (1 - 0.2 * q), 430 + s * 3 + q + seed, 1.0);
+    }
+    R.beam(V.madd([0, 0, 0], p, vd, -tl), p, r * 0.35, [col[0] * fade * 0.35, col[1] * fade * 0.35, col[2] * fade * 0.35], 0.5, 2);   // a faint streak
   }
-  R.glow(V.madd([0, 0, 0], from, toWell, 25), 14 * k, [0.3 * k, 0.6 * k, 1.4 * k], 0.6);   // the leak at the mouth
+  R.glow(V.madd([0, 0, 0], from, toWell, 12), 8 * k, [0.3 * k, 0.6 * k, 1.4 * k], 0.6);   // the leak at the mouth
 }
 // ION CANNON CHARGE, following the frigate's real gun (blender/ION_FRIGATE_DESIGN.md, model space, nose +z):
 // the four accelerator stages (z 6.8…23.2, three copper coils each, r 1.65, barrel axis y 0.9) wake one after
@@ -1223,16 +1231,24 @@ export function ionCharge(R, e, t, c, fail, seed) {
   const ax = V.norm([0, 0, 0], M.transformDir([0, 0, 0], e.m, [0, 0, 1])), up = V.norm([0, 0, 0], M.transformDir([0, 0, 0], e.m, [0, 1, 0]));
   const sd = V.cross([0, 0, 0], ax, up);
   const CC = [0.45, 0.85, 2.2];
+  // THE FILL (2026-10-07): the charge visibly rises up the gun — a front climbing from the breech to the front of the
+  // coils and on to the muzzle; behind it everything is lit, at it a bright band, ahead of it dark
+  const fill = sat((c - 0.1) / 0.7),   // (steady: it climbs at an even pace)
+    zF = 6.8 + (ION_BORE_MOUTH - 6.8) * fill;
+  // (glows sit on the coils' camera-side surface, out past the trim cage — on the axis the gun itself hides them)
+  const outC = (z, r) => { const q = P(0, 0.9, z); if (!R.camPos) return q; const v = V.sub([0, 0, 0], R.camPos, q), al = V.dot(v, ax), w = V.norm([0, 0, 0], V.madd([0, 0, 0], v, ax, -al)); return V.madd([0, 0, 0], q, w, r); };
   for (let k = 0; k < 4; k++) {
-    const on = sat((c - k * 0.16) / 0.2);                                   // breech first, then forward
-    if (on <= 0) continue;
     const zc = 6.8 + 4.1 * (k + 0.5);
+    const on = sat((zF - (zc - 1.5)) / 2.5);                                // this stage reached by the front
+    if (on <= 0) continue;
     for (let j = -1; j <= 1; j++) {                                          // the stage's three coils
       const z = zc + j;
       const wave = 0.55 + 0.45 * Math.sin(t * (9 + 10 * c) - k * 1.3 - j * 0.6);
-      const b = on * wave * (fail ? 0.7 + 0.3 * Math.sin(t * 31 + k + j) : 1) * 1.6;
-      const r = 1.85;
-      R.ring(P(0, 0.9, z), V.scale([0, 0, 0], sd, r), V.scale([0, 0, 0], up, r), [CC[0] * b, CC[1] * b, CC[2] * b], 0.6);
+      const lit = sat((zF - z) / 1.2 + 0.5), front = Math.exp(-(((z - zF) / 1.3) ** 2)) * sat(1 - fill * 0.9 + 0.1);
+      const b = (lit * wave * 1.6 + 3 * front) * (fail ? 0.7 + 0.3 * Math.sin(t * 31 + k + j) : 1) * 1.6;
+      const r = 1.85 + 0.35 * front;
+      if (b > 0.01) R.ring(P(0, 0.9, z), V.scale([0, 0, 0], sd, r), V.scale([0, 0, 0], up, r), [CC[0] * b, CC[1] * b, CC[2] * b], 0.6);
+      if (lit > 0.05) R.glow(outC(z, 2.2), 1.6, [CC[0] * 0.35 * b, CC[1] * 0.35 * b, CC[2] * 0.35 * b], 0.5);   // (the lit coils bloom: the filled part of the gun reads at a distance)
     }
     if (on > 0.4) for (const sx of [1, -1]) {                               // capacitor module → coil flash-over
       const a = P(sx * 2.6, -0.2, zc + (hash(k + sx + Math.floor(t * 5)) - 0.5) * 2.4), b2 = P(sx * 1.4, 0.9, zc + (hash(k * 3 + sx + Math.floor(t * 5)) - 0.5) * 2);
@@ -1240,18 +1256,25 @@ export function ionCharge(R, e, t, c, fail, seed) {
     }
   }
   // energy pulses racing up the barrel into the focusing section and the bore
+  if (c > 0.02 && fill < 0.985) {                                          // the front itself: a bright band climbing the barrel
+    const fz = P(0, 0.9, zF), fo = outC(zF, 2.6), fb = (0.5 + c) * (1.6 + 0.5 * Math.sin(t * 37));
+    R.ring(fz, V.scale([0, 0, 0], sd, 2.4), V.scale([0, 0, 0], up, 2.4), [CC[0] * fb * 3, CC[1] * fb * 3, CC[2] * fb * 3], 0.6);
+    R.glow(fo, 3 + 1.5 * c, [CC[0] * fb * 1.4, CC[1] * fb * 1.4, CC[2] * fb * 1.6], 0.5);
+    if (zF > 9) R.arc(outC(Math.max(6.8, zF - 4), 2.3), fo, 0.7, [0.5, 0.9, 2.2], 0.6 * c, seed + 17 + Math.floor(t * 6), 14);   // crackling up behind it
+  }
   for (let q = 0; q < 6; q++) {
     const ph = ((t * (0.9 + 1.6 * c) + q / 6) % 1);
-    const z = 7 + ph * 23.5, len = 1.2 + 3 * c;
+    const z = 7 + ph * (zF - 7), len = 1.2 + 3 * c;                            // (only up to the front)
     const bb = c * (1 - ph * 0.3) * 1.6;
     R.beam(P(0, 0.9, z - len), P(0, 0.9, z), 0.55 + 0.4 * c, [CC[0] * bb, CC[1] * bb, CC[2] * bb], 1, 20, 0.3, 1);
   }
   // the charge: an energy sphere in the muzzle bore, brightening and swelling with the charge — never wider than the
   // bore (r 0.93 m) and nothing drawn in from around the gun
   const core = P(ION_BORE[0], ION_BORE[1], ION_BORE_MOUTH);
-  const pk = c * (0.85 + 0.15 * Math.sin(t * (14 + 30 * c))) * (fail ? 0.75 + 0.25 * Math.sin(t * 23 + seed) : 1);
-  R.orb(core, 0.12 + 0.76 * Math.pow(c, 0.8), [0.45, 0.85, 2.2], 0.25 + 2.6 * pk, seed);
-  R.light(core, 60, ION_COL, 5 * c);
+  const ck = sat((fill - 0.85) / 0.15);                                     // (only once the front reaches the muzzle)
+  const pk = c * ck * (0.85 + 0.15 * Math.sin(t * (14 + 30 * c))) * (fail ? 0.75 + 0.25 * Math.sin(t * 23 + seed) : 1);
+  if (ck > 0) R.orb(core, (0.12 + 0.76 * Math.pow(c, 0.8)) * (0.4 + 0.6 * ck), [0.45, 0.85, 2.2], 0.25 + 2.6 * pk, seed);
+  R.light(P(0, 0.9, zF), 60, ION_COL, 5 * c);
 }
 function drawIonVolleys(R, t) {
   for (const [t0, t1, fi, ti] of VOLLEYS) {
