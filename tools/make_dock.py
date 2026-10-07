@@ -9,7 +9,8 @@ import json, math, struct, pathlib
 MATS = [('dock_metal', [0.16, 0.17, 0.19], 0.8, 0.4, None), ('dock_trim', [0.5, 0.5, 0.52], 0.9, 0.3, None),
         ('hazard', [0.75, 0.55, 0.05], 0.2, 0.5, None), ('dock_light', [0.3, 0.7, 1.0], 0.0, 0.3, [0.35, 0.85, 1.4]),
         ('amber', [1.0, 0.5, 0.1], 0.0, 0.4, [1.4, 0.6, 0.12]),
-        ('hull', [0.092, 0.098, 0.114], 0.75, 0.46, None), ('trim', [0.12, 0.125, 0.14], 0.8, 0.42, None)]   # = hull gunmetal
+        ('hull', [0.092, 0.098, 0.114], 0.75, 0.46, None), ('trim', [0.12, 0.125, 0.14], 0.8, 0.42, None),   # = hull gunmetal
+        ('lip', [0.01, 0.01, 0.012], 0.3, 0.6, None)]   # (2026-10-08) the black surround of every recessed light
 nodes, meshes = [], []
 
 
@@ -27,6 +28,34 @@ class Mesh:
         if sum(n[k]*(mid[k]-ref[k]) for k in range(3)) < 0: b, c = c, b; n = [-x for x in n]
         base = len(v); v += [p + n for p in (a, b, c)]; ix += [base, base+1, base+2]
     def box(self, m, x0, x1, y0, y1, z0, z1):
+        # (2026-10-08) every lamp box becomes a RECESSED LIGHT, as on the flagship (ships_mothership_v9 slit / the shield
+        # drone's groove lights): thinned to a hair-line across its shorter face side, a black lip standing proud all round
+        if m in ('dock_light', 'amber'):
+            lo, hi = [x0, y0, z0], [x1, y1, z1]
+            d = [hi[k] - lo[k] for k in range(3)]
+            nax = min(range(3), key=lambda k: d[k])
+            a, b = [k for k in range(3) if k != nax]
+            sh, lg = (a, b) if d[a] <= d[b] else (b, a)
+            c = (lo[sh] + hi[sh]) / 2; w = max(0.06, min(0.2, d[sh] * 0.3)); lo[sh], hi[sh] = c - w / 2, c + w / 2
+            lip = 0.08
+            def bx(mm, L, H):
+                self._box(mm, L[0], H[0], L[1], H[1], L[2], H[2])
+            for side in (-1, 1):
+                L, H = lo[:], hi[:]
+                L[nax] -= 0.06; H[nax] += 0.06
+                if side < 0: H[sh] = lo[sh]; L[sh] = lo[sh] - lip
+                else: L[sh] = hi[sh]; H[sh] = hi[sh] + lip
+                L[lg] -= lip; H[lg] += lip
+                bx('lip', L, H)
+                L, H = lo[:], hi[:]
+                L[nax] -= 0.06; H[nax] += 0.06
+                if side < 0: H[lg] = lo[lg]; L[lg] = lo[lg] - lip
+                else: L[lg] = hi[lg]; H[lg] = hi[lg] + lip
+                bx('lip', L, H)
+            x0, x1, y0, y1, z0, z1 = lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]
+        self._box(m, x0, x1, y0, y1, z0, z1)
+
+    def _box(self, m, x0, x1, y0, y1, z0, z1):
         P = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]]
         c = [(x0+x1)/2, (y0+y1)/2, (z0+z1)/2]
         for f in [(0,1,2,3),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)]:

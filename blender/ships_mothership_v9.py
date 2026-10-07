@@ -61,6 +61,7 @@ def palette():
     reg('blue_light', (0.05, 0.10, 0.20), 0.0, 0.4, (0.3, 0.6, 1.0), 5.0)
     reg('engine', (0.40, 0.50, 0.60), 0.0, 0.3, (0.72, 0.86, 1.0), 10.0)
     reg('muzzle', (0.10, 0.18, 0.28), 0.0, 0.3, (0.35, 0.65, 1.0), 1.3)
+    reg('lip', (0.010, 0.010, 0.012), 0.30, 0.60)        # the black surround of every recessed light (2026-10-08)
 
 
 # normalized hull profile (u = x, v = z); edges: 0 stbd wall, 1 stbd top chamfer, 2 deck, 3 port chamfer,
@@ -90,6 +91,88 @@ def blk(mb, s0, s1, x0, x1, z0, z1, mat, ins=0.0, ins_s=None, bevel=0.0):
 
 
 LAMP_BODY, WIN_FRAME = 'hull2', 'greeble'       # non-emissive fixture bodies (housings / window bezels)
+
+
+# ------------------------------------------------------------------------------------------ RECESSED LIGHTS (2026-10-08)
+# Every light on the ship set INTO the hull, thin, in a black surround — after the shield drone's groove lights (no more
+# housed lamps, bars, bezels or beacons standing proud): a hair-thin emissive line a little below the surface, a black lip
+# standing just proud all round it. The shipkit fixture functions are replaced here, so every call site follows.
+from shipkit import frame as _frame
+
+
+def slit(mb, pos, n, size, mat, fwd=Vector((0, -1, 0)), across=None):
+    """one recessed light line on the surface point pos (normal n): along its longer footprint side, thin across"""
+    b, t, nn = _frame(n, Vector(fwd))
+    su, sv = size[0], size[1]
+    if su > sv:
+        su, sv, fwd = sv, su, b
+    w = across if across is not None else max(0.07, min(0.3, su * 0.22))
+    L = max(0.35, sv * 0.9)
+    lip = max(0.05, min(0.14, w * 0.6))
+    pos = Vector(pos)
+    obox(mb, pos - nn * 0.08, nn, (w + 2 * lip, L + 2 * lip, 0.1), 'lip', lift=0.0, fwd=Vector(fwd))        # the black well (top -0.03)
+    obox(mb, pos - nn * 0.01, nn, (w, L, 0.04), mat, lift=0.0, fwd=Vector(fwd))                           # the light: top +0.01, under the lip's +0.07
+    for k in (-1, 1):                                                                                   # the lip, proud
+        bb, tt, _ = _frame(nn, Vector(fwd))
+        obox(mb, pos + bb * (k * (w / 2 + lip / 2)), nn, (lip, L + 2 * lip, 0.14), 'lip', lift=0.0, fwd=Vector(fwd))
+        obox(mb, pos + tt * (k * (L / 2 + lip / 2)), nn, (w, lip, 0.14), 'lip', lift=0.0, fwd=Vector(fwd))
+
+
+def lamp_fixture(mb, pos, n, size, mat, body=None, fwd=Vector((0, -1, 0)), lift=None, lens='pill', spin=0.0):
+    slit(mb, pos, n, size, mat, fwd)
+
+
+def light_bar(mb, pos, n, size, mat, body=None, fwd=Vector((0, -1, 0)), lift=None, segs=None, spin=0.0):
+    slit(mb, pos, n, size, mat, fwd)
+
+
+def chevron_light(mb, pos, n, size, mat, body=None, fwd=Vector((0, -1, 0)), lift=None, spin=0.0):
+    slit(mb, pos, n, size, mat, fwd)
+
+
+def window_bay(mb, pos, n, size, mat='window', frame_mat=None, fwd=Vector((0, -1, 0)), lift=None, lit=True, **kw):
+    slit(mb, pos, n, size, mat if lit else 'lip', fwd)
+
+
+def beacon(mb, pos, n, r, mat, body=None, trim=None, cage=True, fwd=Vector((0, -1, 0))):
+    slit(mb, pos, n, (r * 0.9, r * 2.4, 0.2), mat, fwd)
+
+
+def light_panel(mb, pos, n, size, mat, frame_mat=None, fwd=Vector((0, -1, 0)), lift=None, grid=(1, 3), depth=0.5):
+    """a big lit panel: parallel recessed lines across it"""
+    b, t, nn = _frame(n, Vector(fwd))
+    k = max(1, int(size[0] / 2.4))
+    for i in range(k):
+        slit(mb, Vector(pos) + b * ((i - (k - 1) / 2) * size[0] / k), n, (0.3, size[1], 0.2), mat, fwd)
+
+
+# ------------------------------------------------------------------------------------------ TURRETS (2026-10-08)
+# after the enemy dreadnought's batteries: a low pedestal with a horseshoe armour collar open to the front, a long low
+# wedge housing, two long slender barrels side by side under armoured shrouds with a recessed light line along each
+def dread_turret(mb, pos, n, d, size, barrels=2):
+    pos, nn = Vector(pos), Vector(n).normalized()
+    d = (Vector(d) - nn * Vector(d).dot(nn)).normalized()
+    sd = nn.cross(d)
+    mb.cyl(pos - nn * 0.2 * size, pos + nn * 0.18 * size, 0.62 * size, 0.58 * size, 'hull2', seg=12)       # pedestal
+    for k in range(7):                                                                                    # horseshoe collar
+        a = math.radians(-135 + k * 45) if k < 7 else 0
+        if abs(math.degrees(a)) < 40:
+            continue
+        c = pos + nn * 0.2 * size + (d * math.cos(a) + sd * math.sin(a)) * 0.72 * size
+        obox(mb, c, nn, (0.2 * size, 0.42 * size, 0.22 * size), 'trim', lift=0.0, fwd=sd * math.cos(a) - d * math.sin(a), bevel=0.02 * size)
+    h0 = pos + nn * 0.32 * size                                                                           # the wedge housing
+    hw, hl, hh = 0.42 * size, 0.95 * size, 0.26 * size
+    bot = [h0 - sd * hw - d * hl * 0.55, h0 + sd * hw - d * hl * 0.55, h0 + sd * hw * 0.8 + d * hl * 0.6, h0 - sd * hw * 0.8 + d * hl * 0.6]
+    top = [h0 + nn * hh - sd * hw * 0.75 - d * hl * 0.45, h0 + nn * hh + sd * hw * 0.75 - d * hl * 0.45,
+           h0 + nn * hh * 0.7 + sd * hw * 0.45 + d * hl * 0.55, h0 + nn * hh * 0.7 - sd * hw * 0.45 + d * hl * 0.55]
+    mb.hexa(bot + top, 'hull2', bevel=0.02 * size)
+    for k in range(barrels):                                                                              # barrels + shrouds
+        off = (k - (barrels - 1) / 2) * 0.32 * size
+        a = h0 + nn * hh * 0.45 + sd * off + d * hl * 0.3
+        obox(mb, a + d * 0.55 * size, nn, (0.16 * size, 1.1 * size, 0.14 * size), 'trim', lift=0.0, fwd=d, bevel=0.01 * size)
+        slit(mb, a + d * 0.55 * size + nn * 0.07 * size, nn, (0.05 * size, 0.9 * size, 0.1), 'blue_light', d, across=0.03 * size)
+        mb.cyl(a, a + d * 2.6 * size, 0.055 * size, 0.045 * size, 'greeble', seg=8)
+        mb.cyl(a + d * 2.45 * size, a + d * 2.65 * size, 0.075 * size, 0.075 * size, 'trim', seg=8)   # muzzle collar
 
 
 def fixture(mb, pos, n, size, mat, fwd=Vector((0, -1, 0)), lift=None):
@@ -589,6 +672,7 @@ def accumulator(mb, sg, zc, Rb):
     # front cap: recessed capacitor-head face with blue charge slots
     cprism(mb, 322.4, 323.4, xs(13.8, 20.4) + (-7.8, 6.9), xs(14.2, 20.0) + (-7.4, 6.5), 1.0, 'plate', bevel=0.12)
     for z in (-4.2, -0.4, 3.4):
+        slit(mb, P(sg * 17.1, 323.4, z), Vector((0, -1, 0)), (0.7, 4.6, 0.35), 'blue_light'); continue   # (recessed)
         obox(mb, P(sg * 17.1, 323.4, z), Vector((0, -1, 0)), (0.7, 4.6, 0.35), 'blue_light', lift=0.1,
              fwd=Vector((1, 0, 0)))
     # outer face (x ~ +-23.4 .. 21.2 over s 309..322): radiator fin banks between trim header pipes
@@ -605,7 +689,7 @@ def accumulator(mb, sg, zc, Rb):
     # inner face toward the barrel: coil-glow slots
     for s0, s1, xin, zs in ((309.6, 314.0, 11.9, (6.2, -8.5)), (316.0, 322.0, 12.6, (5.6, -7.6))):
         for z in zs:
-            mb.box((sg * (xin - 0.15), Y((s0 + s1) / 2), z), (0.35, s1 - s0, 1.1), 'blue_light')
+            slit(mb, Vector((sg * xin, Y((s0 + s1) / 2), z)), Vector((sg, 0, 0)), (1.1, s1 - s0, 0.35), 'blue_light')   # (recessed)
     # top of the housings: capacitor cans laid along the axis with collars + charge band, bus bar, markers
     for s0, s1, z0, z1 in ((309.8, 314.0, 9.17, 9.02), (316.2, 321.6, 8.46, 7.55)):
         zt = lambda s: lerp(z0, z1, (s - s0) / (s1 - s0)) + 1.0
@@ -691,7 +775,7 @@ def bow_cannon(mb, H, R):
         b = [vp(8.7, 327.8, -0.8), vp(14.0, 327.8, -0.8), vp(14.0, 327.8, 0.8), vp(8.7, 327.8, 0.8)]
         f = [vp(8.9, BOW_TIP, -0.45), vp(10.6, BOW_TIP, -0.45), vp(10.6, BOW_TIP, 0.45), vp(8.9, BOW_TIP, 0.45)]
         mb.hexa(b + f, 'hull2', bevel=0.12)
-        obox(mb, vp(8.75, 330.6, 0.0), -rad, (0.5, 2.2, 0.2), 'blue_light', lift=0.05, fwd=ax)
+        slit(mb, vp(8.75, 330.6, 0.0), -rad, (0.5, 2.2, 0.2), 'blue_light', ax)   # (recessed)
         if q % 2 == 0:
             lamp_fixture(mb, vp(13.2, 328.9, 0.0) + rad * 0.0, rad, (0.6, 0.6, 0.3), 'amber', LAMP_BODY,
                          fwd=ax, lift=0.1)
@@ -718,7 +802,7 @@ def bow_cannon(mb, H, R):
             sb = 313.6 + k * 2.0
             xh = lerp(11.2, 10.2, (sb - 312.2) / 9.6)
             obox(mb, P(sg * xh, sb, zc + 18.4), Vector((sg, 0, 0)), (2.6, 1.0, 0.3), 'greeble', lift=0.0)
-        mb.box((sg * 10.7, Y(317.0), zc + 13.25), (0.6, 8.6, 0.3), 'blue_light')
+        slit(mb, Vector((sg * 10.7, Y(317.0), zc + 13.4)), Vector((0, 0, 1)), (0.6, 8.6, 0.3), 'blue_light')   # (recessed)
     for x in (-7.5, -2.5, 2.5, 7.5):               # under-lamps washing the coil stack blue
         lamp_fixture(mb, P(x, 318.0, zc + 12.95), Vector((0, 0, -1)), (1.4, 0.7, 0.3), 'blue_light', LAMP_BODY,
                      lift=0.05)
@@ -995,7 +1079,7 @@ class LF:
 
     def lamp(self, mb, u, v, w, su, sv, sw, mat):
         """Housed lamp fixture in place of an emissive box (same footprint, bottom at height w)."""
-        lamp_fixture(mb, self.p(u, v, w + sw / 2), self.n, (su, sv, sw), mat, LAMP_BODY, fwd=self.t, lift=0.0)
+        slit(mb, self.p(u, v, w), self.n, (su, sv, sw), mat, self.t)   # (2026-10-08: recessed, on the surface)
 
     def cyl(self, mb, a, b, r0, r1=None, mat='trim', seg=8, caps=True):
         mb.cyl(self.p(*a), self.p(*b), r0, r0 if r1 is None else r1, mat, seg=seg, caps=caps)
@@ -1006,15 +1090,9 @@ class LF:
 
 # ---------------------------------------------------------------------------------------------- components
 def pd_turret(mb, F, u, v, w, sz=2.6, yaw=0.0):
-    """Point-defence mount: low drum, boxy twin-gun housing, two barrels (yaw 0 = toward the bow)."""
-    F.cyl(mb, (u, v, w), (u, v, w + 0.4 * sz), 0.62 * sz, 0.55 * sz, 'trim', seg=8)
+    """Point-defence mount — a small dreadnought-style battery (2026-10-08) (yaw 0 = toward the bow)."""
     d = F.t * math.cos(yaw) + F.b * math.sin(yaw)
-    sd = F.n.cross(d)
-    c = F.p(u, v, w + 0.4 * sz + 0.25 * sz)
-    obox(mb, c, F.n, (0.8 * sz, 0.95 * sz, 0.5 * sz), 'hull2', lift=0.0, fwd=d)
-    for k in (-1, 1):
-        a = c + sd * (k * 0.2 * sz) + d * (0.35 * sz)
-        mb.cyl(a, a + d * (1.2 * sz), 0.085 * sz, 0.07 * sz, 'greeble', seg=6)
+    dread_turret(mb, F.p(u, v, w), F.n, d, sz * 0.75, barrels=2)
 
 
 def pd_battery(mb, F, n=3, pitch=5.0, sz=2.4, yaw=0.0):
@@ -1136,7 +1214,7 @@ def shield_emitter(mb, F, r=2.0):
     F.cyl(mb, (0, 0, -F.sink), (0, 0, 0.9), r * 1.35, r * 1.15, 'hull2', seg=8)
     F.cyl(mb, (0, 0, 0.9), (0, 0, 1.3), r * 1.15, r * 1.1, 'trim', seg=10)
     F.cyl(mb, (0, 0, 1.3), (0, 0, 1.3 + r * 0.7), r, r * 0.45, 'plate', seg=10)
-    mb.sphere(F.p(0, 0, 1.3 + r * 0.75), r * 0.3, 'blue_light', seg=6, rings=3)
+    slit(mb, F.p(0, 0, 1.3 + r * 0.7), F.n, (r * 0.18, r * 0.75, 0.1), 'blue_light', F.t)   # (2026-10-08: a recessed line in its cap, no glowing ball)
 
 
 def vent_louvre(mb, F, W, L, pitch=1.0):
@@ -1312,7 +1390,8 @@ def pair(fn):
 def heavy_turret(mb, S, x, s, size=6.5, yaw=0.0):
     for sg, F in pair(lambda sg: S.site_top(sg * x, s, size * 1.4, size * 1.4, 'heavy_turret')):
         F.cyl(mb, (0, 0, -F.sink), (0, 0, 0.3), size * 0.9, size * 0.85, 'hull2', seg=12)
-        turret(mb, F.p(0, 0, size * 0.25), F.n, size, 'trim', 'hull2', 'greeble', barrels=3, blen=2.4, yaw=sg * yaw)
+        dd = F.t * math.cos(sg * yaw) + F.b * math.sin(sg * yaw)
+        dread_turret(mb, F.p(0, 0, size * 0.1), F.n, dd, size, barrels=2)
 
 
 # ------------------------------------------------------------------------------------------ zone A: main gun
