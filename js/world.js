@@ -3,7 +3,6 @@ import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, l
 import { fxOpts, explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, breakOff, chargeInflow, spark } from './fx.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
 import { bakeWreck, wreckPose, boxChunks } from './wreck.js';
-import { ION_FRIGATE_CHUNKS } from './ion_frigate_chunks.js';
 export { explosion };
 
 export const HIIG_ENGINE = [0.55, 0.8, 1.6];
@@ -537,11 +536,24 @@ function propOnly(R, name) {
 }
 const _m2 = M.new();
 
+// (2026-10-07) the ion gun is fixed along the hull: for each volley the frigate TURNS onto its target (from ~3.4 s before,
+// settled 2 s before the shot) so the beam leaves straight down the barrel, and swings back to the line after
+function ionAim(t, i, pos) {
+  let w = 0, d = null;
+  for (const [t0, t1, fi, ti] of VOLLEYS) {
+    if (fi !== i || t < t0 - 3.4 || t > t1 + 2.6) continue;
+    const k = smooth(t0 - 3.4, t0 - 2.0, t) * (1 - smooth(t1 + 0.6, t1 + 2.6, t));
+    if (k > w) { w = k; d = V.norm([0, 0, 0], V.sub([0, 0, 0], enemyFrigate(t0, ti).pos, pos)); }
+  }
+  return { w, d };
+}
 export function ionFrigate(t, i) {
   const f = IONF[i];
   const yaw = frigateYaw(t);
   const drift = V.add([0, 0, 0], [Math.sin(t * 0.2 + i) * 2, Math.sin(t * 0.17 + i * 2) * 1.5, 0], homeOffset([0, 0, 0], t));
-  return { pos: V.add([0, 0, 0], f.p, drift), fwd: yawDir(yaw), yaw };
+  const pos = V.add([0, 0, 0], f.p, drift), base = yawDir(yaw), a = ionAim(t, i, pos);
+  const fwd = a.w > 0 ? V.norm([0, 0, 0], V.lerp([0, 0, 0], base, a.d, easeInOut(a.w))) : base;
+  return { pos, fwd, yaw };
 }
 export function assaultFrigate(t, i) {
   const f = ASF[i];
@@ -886,6 +898,8 @@ const _bakes = new Map(), _xfs = new Map(), _cells = new Map();
 function wreckFor(key, chunks, dur, seed, speed, spin) {
   let b = _bakes.get(key); if (!b) { b = bakeWreck(1, dur, seed, speed, chunks, spin, 2); _bakes.set(key, b); } return b;   // (2 substeps: plenty for pieces flying apart)
 }
+/** when a wreck's small blasts go off (wreckPops), for the sound */
+export const wreckPopTimes = (t0, seed, n) => Array.from({ length: n }, (_, j) => t0 + 0.08 + 1.4 * Math.pow(hash(seed + j * 2.9), 1.5));
 function wreckPops(R, t, t0, base, bake, xf, seed, n, size) {   // small blasts at the broken spots, one after another
   for (let j = 0; j < n; j++) {
     const ci = Math.floor(hash(seed * 3.7 + j * 1.3) * bake.n), tp = t0 + 0.08 + 1.4 * Math.pow(hash(seed + j * 2.9), 1.5);
@@ -916,7 +930,7 @@ export function drawChunkWreck(R, model, chunks, base, t, t0, seed, o = {}) {
 const cellsOf = (name) => (name.startsWith('enemy_fighter') ? 'enemy_fighter_cells' : name.startsWith('interceptor') ? 'interceptor_cells' : name + '_cells');
 function boxWreckBake(R, name, seed, o = {}) {
   const cn = cellsOf(name), model = R.models[cn]; if (!model || !model.cells) return null;
-  return { cn, model, bake: wreckFor(cn + '#' + seed, model.cells, 3, seed, o.speed ?? 1.4, o.spin ?? 4) };   // (3 s baked: they scatter fast; then carried on)
+  return { cn, model, bake: wreckFor(cn + '#' + seed, model.cells, o.bakeDur ?? 3, seed, o.speed ?? 1.4, o.spin ?? 4) };   // (3 s baked: they scatter fast; then carried on)
 }
 export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   if (t < t0) return;
@@ -926,16 +940,24 @@ export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   const e = R.add(w.cn, base); if (!e) return;
   e.partXf = wreckPose(w.bake, lt, xf);
   let cp = _cells.get(w.cn); if (!cp) { cp = {}; for (const c of w.model.cells) cp[c.name] = [...c.lo.map((v) => v - 0.02), ...c.hi.map((v) => v + 0.02)]; _cells.set(w.cn, cp); }
-  e.clipParts = cp; e.clipHeat = -(0.4 + 0.25 * Math.exp(-lt * 0.8));   // (clean flat cuts, staying hot)
+  const hk = o.heat ?? 0.4;
+  e.clipParts = cp; e.clipHeat = -(hk + 0.6 * hk * Math.exp(-lt * (o.cool ?? 0.8)));   // (clean flat cuts, staying hot)
   e.damage = 0.35; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
   wreckPops(R, t, t0, base, w.bake, xf, seed, o.pops ?? 3, o.popSize ?? 2.2);
+  if (o.fires && lt < o.fires) for (let i = 0; i < w.bake.n; i += 4) {   // the torn pieces still burning for a while
+    const x = xf[w.bake.chunks[i].name]; if (!x) continue;
+    const wp = M.transformPoint([0, 0, 0], base, [x[12], x[13], x[14]]), k = 1 - lt / o.fires;
+    R.fire(wp, (o.popSize ?? 2.2) * 0.45 * k, 0.3 + 0.5 * (1 - k), seed + i, [1, 1, 1], 0.5);
+  }
 }
+// an ion frigate's wreck (EXTRA_H): ~7 m pieces (ion_frigate_cells), the cut faces molten white-orange and slow to cool
+const ION_WRECK = { speed: 1.1, spin: 2.2, tint: [0.4, 0.7, 1], pops: 12, popSize: 7, life: 120, heat: 0.75, cool: 0.35, fires: 4 };
 /** every wreck's flight baked at load (they used to be baked the first time each one was drawn: a hitch mid-shot) */
 export function prepWrecks(R) {   // (one per idle slice after load: nothing blocks; a wreck not baked yet bakes when first drawn)
   const jobs = [];
   for (const [, k] of CO_BOOM) jobs.push(() => boxWreckBake(R, fighterModel(CO_FLY[k][4], k), 900 + k));   // (the cold open's kills first: they come first)
   PAIRS.forEach((p, k) => { if (p.die) jobs.push(() => boxWreckBake(R, fighterModel(p.hiigChases, k), 200 + k)); });
-  EXTRA_H.forEach((f, i) => { if (f.die && f.type === 'ion_frigate') jobs.push(() => wreckFor('ion_frigate_chunks' + (60 + i), ION_FRIGATE_CHUNKS, 8, 60 + i, 1.1, 2.2)); });
+  EXTRA_H.forEach((f, i) => { if (f.die && f.type === 'ion_frigate') jobs.push(() => boxWreckBake(R, 'ion_frigate', 60 + i, ION_WRECK)); });
   for (let k = 1; k < 4; k++) jobs.push(() => boxWreckBake(R, fighterModel(false, k), 620 + k));   // (the strike wingmen)
   const t0 = performance.now();
   const next = () => { const j = jobs.shift(); if (!j) { console.log('[wrecks] all baked in the background,', (performance.now() - t0).toFixed(0), 'ms'); return; } j(); setTimeout(next, 0); };
@@ -1473,6 +1495,7 @@ export const swap2224 = (t) => (t >= 145.4 && t < 148.2 ? t - S10_SWAP_DT : t >=
     EXTRA_H[best].die = bt; H_FEATURED.push({ t: bt, i: best });
   }
   EXTRA_H.forEach((f, i) => { if (!f.die && hash(i * 4.7 + 2) < 0.9 && hits[i].length >= 2) f.die = hits[i][1]; });
+  EXTRA_H.forEach((f, i) => { f.hits = hits[i].filter((x) => !f.die || x <= f.die + 1e-6); });   // (the bolts it takes, for the sound)
 }
 export function extraHAlive(t, i) { const f = EXTRA_H[i]; return t >= f.arrive + 2 && !(f.die && t > f.die); }
 export function extraHPos(t, i) {
@@ -1504,7 +1527,7 @@ export function drawExtras(R, t) {
       if (t > f.die + 0.2) {
         if (t < EARTH_T) {
           const base = mat(M.new(), extraHPos(f.die, i).pos, extraHPos(f.die, i).fwd);
-          if (f.type === 'ion_frigate' && R.models.ion_frigate_chunks) drawChunkWreck(R, 'ion_frigate_chunks', ION_FRIGATE_CHUNKS, base, t, f.die, 60 + i, { speed: 1.1, spin: 2.2, tint: [0.4, 0.7, 1], pops: 9 });
+          if (f.type === 'ion_frigate' && R.models.ion_frigate_cells) drawBoxWreck(R, 'ion_frigate', base, t, f.die, 60 + i, ION_WRECK);   // (2026-10-07: cut fine, baked with the others, the cut faces molten)
           else shatter(R, f.type, base, t, f.die, 60 + i, [2, 2, 3], 1.1, { tint: [0.4, 0.7, 1] });
         }
         return;

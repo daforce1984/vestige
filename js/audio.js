@@ -15,7 +15,7 @@
 import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
-import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, H_FEATURED, LOSS_SWAP_DT, swap2224 } from './world.js';
+import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, H_FEATURED, LOSS_SWAP_DT, swap2224, wreckPopTimes } from './world.js';
 import { SHIELD_CLUNKS, DRONE_L0, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, STRIKE_FLIGHT, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
@@ -821,8 +821,26 @@ function lossCues() {
     const far = 0.15 + 0.3 * ((i * 7) % 5) / 5, pan = Math.sin(i * 2.3) * 0.6;
     // (scenes 23 / 25 swapped: those two deaths are heard where they are now seen)
     const die = f.die + (H_FEATURED[3] && i === H_FEATURED[3].i ? -LOSS_SWAP_DT : H_FEATURED[2] && i === H_FEATURED[2].i ? LOSS_SWAP_DT : 0);
-    out.push([die, 'hl_big_explosion', { rate: 0.9, gain: 1.0, far, pan, prio: 8, duck: far < 0.25 ? 1.2 : 0 }]);
-    out.push([die + 0.4, 'metal_groan', { at: 2.8, dur: 2.2, fadeOut: 0.8, rate: 0.75, gain: 0.7, far: far + 0.1, pan, prio: 6 }]);
+    const sh = die - f.die;   // (the swapped scenes move the whole death)
+    // (2026-10-07: the losses sounded thin) every bolt it takes lands HARD: a metal impact, a crack, a low thump
+    for (const h of (f.hits || [])) {
+      const th = h + sh, kill = Math.abs(h - f.die) < 1e-6;
+      out.push([th, 'hit_heavy', { rate: 0.7, gain: kill ? 1.1 : 0.8, far, pan, prio: 8, norand: true }]);
+      out.push([th, 'expl_metal', { rate: 0.8, gain: 0.7, far: far + 0.05, pan, prio: 7, norand: true }]);
+      out.push([th, '@boom', { bus: 'sfx', f: 46, vel: 0.35 * (1 - far * 0.6), dur: 0.8, verb: 0.3 }]);
+    }
+    // the blast: the big explosion over a deep boom and a tearing metal burst, then the wreck's own small blasts
+    // going off one after another (world.js wreckPopTimes — the same ones on screen), debris, the hull groaning apart
+    out.push([die, 'hl_big_explosion', { rate: 0.85, gain: 1.25, far, pan, prio: 9, duck: far < 0.25 ? 1.4 : 0.6 }]);
+    out.push([die, '@boom', { bus: 'sfx', f: 34, vel: 0.75 * (1 - far * 0.5), dur: 2.6, verb: 0.45 }]);
+    out.push([die + 0.03, 'expl_metal', { rate: 0.65, gain: 1.0, far, pan, prio: 8, norand: true }]);
+    out.push([die + 0.5, 'hl_big_explosion', { rate: 1.15, gain: 0.6, far: far + 0.1, pan: pan * 0.7, prio: 6 }]);
+    if (f.type === 'ion_frigate') wreckPopTimes(die, 60 + i, 12).forEach((tp, j) => {
+      if (j % 2) return;   // (half of them: a crackle, not a wall)
+      out.push([tp, 'hl_explosion', { rate: 1.1 + 0.2 * ((j * 0.37) % 1), gain: 0.45, far: far + 0.12, pan: pan + ((j % 3) - 1) * 0.15, prio: 5 }]);
+    });
+    out.push([die + 0.25, 'expl_debris', { rate: 0.9, gain: 0.6, far: far + 0.05, pan, prio: 5 }]);
+    out.push([die + 0.4, 'metal_groan', { at: 2.8, dur: 2.6, fadeOut: 0.9, rate: 0.7, gain: 0.85, far: far + 0.1, pan, prio: 6 }]);
   });
   return out;
 }

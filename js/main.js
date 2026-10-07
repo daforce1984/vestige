@@ -3,7 +3,6 @@ import { frame, findShot, DURATION, SHOTS } from './shots.js';
 import { storyT, filmT, insertFilm, inSkip, TEAR_F0, TEAR_F1 } from './timemap.js';
 import { DUEL_CAMS, enemyGripCheck } from './duel.js';
 import { DREAD_CHUNKS } from './dread_chunks.js';
-import { ION_FRIGATE_CHUNKS } from './ion_frigate_chunks.js';
 import { prepWreck, prepWrecks } from './world.js';
 
 const MS_KEEP = ['ms_root', 'pelvis', 'torso', 'head', 'backpack', 'arm_L_upper', 'arm_L_lower', 'hand_L', 'saber_hilt', 'arm_R_upper', 'arm_R_lower', 'hand_R', 'rifle', 'shield',
@@ -15,7 +14,7 @@ const MODELS = [
   // the fighters' wrecks: each craft cut into its pieces at load, in memory (renderer cellSplit), with our own interior inside
   { name: 'interceptor_cells', detail: 0, url: 'assets/light_fighter_game_lod.glb', texSet: 6, texBit: 1024, cells: { grid: [3, 2, 3], seed: 11, interior: 'assets/wreck_interior.glb' } },
   { name: 'enemy_fighter_cells', detail: 0, url: 'assets/spaceship_game.glb', texSet: 5, texBit: 256, cells: { grid: [3, 2, 3], seed: 13, interior: 'assets/wreck_interior.glb' } },   // a generic craft interior inside broken fighters (tools/make_wreck_interior.py)
-  { name: 'ion_frigate_chunks', detail: 0.9, url: 'assets/ion_frigate_chunks.glb', keep: ION_FRIGATE_CHUNKS.map((c) => c.name) },   // its wreck, pre-broken (tools/make_chunks.py, from the LOD copy; flown by js/wreck.js)
+  { name: 'ion_frigate_cells', detail: 0, url: 'assets/ion_frigate_lod.glb', cells: { grid: [4, 3, 10], seed: 17, interior: 'assets/wreck_interior.glb' } },   // (2026-10-07) its wreck: cut fine at load like the fighters (renderer cellSplit), flown by js/wreck.js
   { name: 'assault_frigate', detail: 0.8 },
   ...['interceptor', 'interceptor_b', 'interceptor_c'].map((name) => ({ name, detail: 0, url: 'assets/light_fighter_game.glb', texSet: 6, texBit: 1024 })),   // our fighters: assets/light_fighter.glb (user-supplied) via tools/build_rifles.py
   { name: 'enemy_frigate', detail: 0, url: 'assets/cargo_game.glb', texSet: 8, texBit: 16384 },   // every enemy frigate: 'Cargo Spaceship' (blaice, CC BY 4.0) via tools/build_rifles.py
