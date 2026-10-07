@@ -13,7 +13,7 @@ export const SLOW_HITS = [178.73, 183.28, 190.95, 192.05];   // the gunfight: th
 // sustained bullet time: the SANDEVISTAN dash (duel.js SANDE0–SANDE1) — the world all but stops while he crosses it
 // [from, to, picture speed]: the Sandevistan dash (he still has to read FAST), and inside it the blade going through its
 // waist in extreme bullet time (0.1 s of story → ~4 s on screen: the parts being cut and thrown off)
-export const SLOW_RANGES = [[178.7, 178.96, 0.13], [183.95, 184.5, 0.45], [184.43, 184.57, 0.04], [184.57, 184.82, 0.12], [184.8, 185.02, 0.1], [190.9, 191.1, 0.0298], [191.28, 192.2, 0.4], [192.015, 192.1, 0.025]];   // (+ its rifle transforming, + the Itano circus; the rifle caught back runs at full speed — 2026-10-03)
+export const SLOW_RANGES = [[178.4, 178.6, 0.35], [178.7, 178.96, 0.13], [183.95, 184.5, 0.45], [184.43, 184.57, 0.04], [184.57, 184.82, 0.12], [184.8, 185.02, 0.1], [190.9, 191.1, 0.0298], [191.28, 192.2, 0.4], [192.015, 192.1, 0.025]];   // (+ its rifle transforming, + the Itano circus; the rifle caught back runs at full speed — 2026-10-03)   // (178.4–178.6: the shield drone boosting onto the line — 2026-10-07)
 // story spans CUT OUT of the film (a hard cut straight across them: no film time at all) — scene 43 (its boost-jump and
 // inverted shot) removed 2026-09-30
 export const SKIP_RANGES = [[165.3, 167.4], [168.3, 169.0], [171.45, 172.4], [174.4, 176.4], [179.25, 180.45], [184.522, 184.57]];   // (+ 2026-09-30: scenes 30-37 tightened — the chase, the carnage, the aim hold, its charge (cut as soon as the muzzle comes up))

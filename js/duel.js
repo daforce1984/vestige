@@ -1451,28 +1451,39 @@ function enemyState_(t) {
   return r;
 }
 // THE SHIELD DRONE (2026-10-07): the shield is not on its arm — it rides docked on the left flank of its backpack, and
-// before his shots come it lets go, its own thrusters kick it out and round, and it flies itself: holding station off
-// its left front, face to him; when he lines up a shot it slides onto the line between them and takes it (178.7: the
-// burn; 183.25: it is shot away — shots.js drawLostShield). Its world matrix is in s.shieldW (= fk.shield).
-export const DRONE_L0 = 177.45, DRONE_L1 = 178.1;   // undocks / on station
-const DOCK_FACE = [3.52, -2.5, -2.3], BACKPACK_T = [0, 3.495, -1.071];   // (backpack node offset on the torso: assets/enemy_ms.glb)   // backpack frame: the face centre (its inner face against the backpack's flank, x 2.4)
+// before his shots come it lets go, its own thrusters kick it out and round, and it flies itself: CIRCLING the machine
+// (face out, riding high as it crosses in front so it never fouls its own line of fire); when he lines up a shot it
+// BOOSTS across onto the line between them and takes it (178.7: the burn — its own cut, D08c; 183.25: it is shot away —
+// shots.js drawLostShield). Its world matrix is in s.shieldW (= fk.shield).
+export const DRONE_L0 = 177.45, DRONE_L1 = 178.1;   // undocks / in orbit
+export const DRONE_DASH = [178.38, 182.95];          // its boosts onto the line (each ~0.18 s)
+const DOCK_FACE = [3.52, -2.5, -2.3], BACKPACK_T = [0, 3.495, -1.071];   // backpack frame: the face centre (its inner face against the backpack's flank, x 2.4); the backpack node's offset on the torso (assets/enemy_ms.glb)
+const ORBIT_R = 13, ORBIT_W = 1.9;   // m, rad/s (a lap every ~3.3 s)
 const shieldMat = (R, face) => m4(R, sub(face, r3v(R, SHIELD_C)));
-const droneBlock = (tw) => smooth(178.2, 178.5, tw) * (1 - smooth(179.3, 179.65, tw)) + smooth(182.8, 183.1, tw);   // on the line for his shots
-/** how hard its thrusters burn (shots.js draws them): the launch, the moves onto the line, a steady hover otherwise */
+const droneBlock = (tw) => smooth(DRONE_DASH[0], DRONE_DASH[0] + 0.18, tw) * (1 - smooth(179.3, 179.75, tw)) + smooth(DRONE_DASH[1], DRONE_DASH[1] + 0.15, tw);   // on the line for his shots
+/** how hard its thrusters burn (shots.js draws them): the launch, the dashes onto the line (full), a steady cruise otherwise */
 export const droneThrust = (tw) => tw < DRONE_L0 || tw > SHIELD_HIT_T + 0.03 ? 0
-  : Math.min(1, 0.3 + 0.9 * Math.exp(-Math.abs(tw - DRONE_L0 - 0.12) * 5) + 0.6 * Math.exp(-Math.abs(tw - 178.35) * 7) + 0.6 * Math.exp(-Math.abs(tw - 179.45) * 7) + 0.6 * Math.exp(-Math.abs(tw - 182.95) * 7));
+  : Math.min(1.6, 0.35 + 0.9 * Math.exp(-Math.abs(tw - DRONE_L0 - 0.12) * 5) + 1.3 * Math.exp(-Math.abs(tw - DRONE_DASH[0] - 0.07) * 9) + 0.6 * Math.exp(-Math.abs(tw - 179.5) * 7) + 1.3 * Math.exp(-Math.abs(tw - DRONE_DASH[1] - 0.06) * 9));
+const frameFrom = (n, U0) => { const Y = nrm(sub(U0, scl(n, V.dot(U0, n)))); return [...n, ...Y, ...V.cross([0, 0, 0], n, Y)]; };   // face (+X) along n, long axis up
 function shieldDrone(tw, s) {
   const fk = duelFK({ ...s, shieldW: null }, 'enemy_ms');
   const Rd = r3(fk.torso), Fd = M.transformPoint([0, 0, 0], fk.torso, add(BACKPACK_T, DOCK_FACE));   // (the backpack is fixed on the torso)
   const u = smooth(DRONE_L0, DRONE_L1, tw); if (u <= 0 || tw < 170) return shieldMat(Rd, Fd);
   const tq = Math.min(tw, SHIELD_HIT_T + 0.03);   // (frozen at the hit: shots.js flies the wreck from there)
   const E = partPoint(fk, 'torso', [0, 3, 0]), H = add(heroRawPos(tq), [0, 3, 0]), d = nrm(sub(H, E));
-  const U0 = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 1, 0])), Lf = nrm(M.transformDir([0, 0, 0], fk.torso, [1, 0, 0])), Bk = nrm(M.transformDir([0, 0, 0], fk.torso, [0, 0, -1]));
-  const bw = droneBlock(tq), bob = (1 - bw) * 0.35;
-  const Fs = add(add(add(E, scl(d, lerp(9, 11, bw))), scl(Lf, 6.5 * (1 - bw))), add(scl(U0, 2.5 * (1 - bw)), [bob * Math.sin(tw * 2.3), bob * Math.sin(tw * 3.1 + 1), bob * Math.cos(tw * 2.7)]));
-  const n = nrm(sub(H, Fs)), Y = nrm(sub(U0, scl(n, V.dot(U0, n)))), Rs = [...n, ...Y, ...V.cross([0, 0, 0], n, Y)];   // face (+X) to him, long axis up
+  const W0 = fk.root, U0 = nrm([W0[4], W0[5], W0[6]]), Lf = nrm([W0[0], W0[1], W0[2]]), Fw = nrm([W0[8], W0[9], W0[10]]);
+  // the orbit (in its body's frame, starting on its left where it undocked)
+  const ph = ORBIT_W * (tq - DRONE_L1), rad = add(scl(Lf, Math.cos(ph)), scl(Fw, Math.sin(ph)));
+  const front = Math.max(0, V.dot(rad, d)), bob = 0.4;
+  const Fo = add(add(E, scl(rad, ORBIT_R)), add(scl(U0, 1 + 7 * front * front), [bob * Math.sin(tw * 2.3), bob * Math.sin(tw * 3.1 + 1), bob * Math.cos(tw * 2.7)]));
+  const Ro = frameFrom(rad, U0);
+  // on the line: ~10 m out in front of it, face to him
+  const Fl = add(E, scl(d, 10)), Rl = frameFrom(nrm(sub(H, Fl)), U0);
+  const bw = droneBlock(tq), bE = easeInOut(bw);
+  const Fs = add(lrp(Fo, Fl, bE), scl(U0, 2.5 * Math.sin(Math.PI * bw)));   // (the dash arcs a little over)
+  const Rs = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(Ro), qFromCols(Rl), bE));
   const e = easeInOut(u), arc = Math.sin(Math.PI * u);
-  const F = add(lrp(Fd, Fs, e), add(scl(Lf, 4 * arc), scl(Bk, 3 * arc * (1 - u))));   // kicked out to its left and back first, then round
+  const F = add(lrp(Fd, Fs, e), add(scl(Lf, 4 * arc), scl(Fw, -3 * arc * (1 - u))));   // kicked out to its left and back first, then round
   const R = colsFromQ(Q.slerp([0, 0, 0, 1], qFromCols(Rd), qFromCols(Rs), e));
   return shieldMat(R, F);
 }
@@ -2459,6 +2470,12 @@ function ots(from, to, { right = 1, back = 16, lift = 6, fov = 42, side = 7 } = 
   const d = nrm(sub(to, from)), sd = [d[2], 0, -d[0]];
   return { pos: add(add(from, scl(d, -back)), add(scl(sd, -right * side), [0, lift, 0])), target: up(lrp(from, to, 0.75), 3), fov };
 }
+// D08b / D08d: side-on to the line of fire, his rifle-arm side to the lens — he levels it, the muzzle steadies, a slow
+// push in toward the barrel over both (the shield's cut-in between them), and the shot (178.7) leaves it across the frame
+function d08b(t) { const T = 178.2, H = hp(T), E = ep(T), u = sat((t - 178.2) / 0.695);
+  const f = nrm(flat(sub(E, H), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0])), m = duelMuzzle(t), M = m ? m.pos : add(up(hp(t), 6), scl(f, 8));
+  const k = easeInOut(u), C = lrp(up(hp(t), 5), M, 0.45);
+  return { pos: add(add(add(C, scl(sd, -lerp(46, 34, k))), scl(f, lerp(4, 9, k))), [0, -4, 0]), target: add(C, scl(f, 3)), fov: 30, handheld: 0.02, baseShake: 0 }; }
 export const DUEL_CAMS = [
   // ---- THE CHARGE (no standoff): out of the launch they drive straight at each other from ~700 m, jinking, firing
   // ---- THE DRAW + LOAD (Unicorn-style: short cuts, a close-up on each thing that matters)
@@ -2485,10 +2502,13 @@ export const DUEL_CAMS = [
     return { pos: at(E, -150, -40, 6, T), target: pan(up(E, 2), up(ep(t), 2), 0.9), fov: 12, handheld: 0.06 }; } },
   // HE AIMS, THEN FIRES (2026-10-03; 2026-10-04: and holds it — a 1.5 s burn dragged down across the shield, in bullet time): side-on to the line of fire, his rifle-arm side to the lens — he levels it, the
   // muzzle steadies, a slow push in toward the barrel, and the shot (178.7) leaves it across the frame; cut on the flash
-  { t0: 178.2, t1: 178.895, roll: -0.04, name: 'D08b side-on — he lays the rifle on it and fires', fn: (t, u) => { const T = 178.2, H = hp(T), E = ep(T);
-      const f = nrm(flat(sub(E, H), 0)), sd = nrm(V.cross([0, 0, 0], f, [0, 1, 0])), m = duelMuzzle(t), M = m ? m.pos : add(up(hp(t), 6), scl(f, 8));
-      const k = easeInOut(u), C = lrp(up(hp(t), 5), M, 0.45);
-      return { pos: add(add(add(C, scl(sd, -lerp(46, 34, k))), scl(f, lerp(4, 9, k))), [0, -4, 0]), target: add(C, scl(f, 3)), fov: 30, handheld: 0.02, baseShake: 0 }; } },
+  { t0: 178.2, t1: 178.36, roll: -0.04, name: 'D08b side-on — he lays the rifle on it', fn: (t) => d08b(t) },
+  // THE SHIELD CUTS IN (2026-10-07): beside the line in front of it — the drone, circling it, fires up its thrusters and
+  // boosts across into the frame, slamming to a stop on the line between them, face to him; it aims on behind it
+  { t0: 178.36, t1: 178.64, roll: 0.05, name: 'D08c beside the line — the shield drone boosts across in front of it to block', slowmo: true, fn: (t, u) => { const T = 178.36, E = ep(T), f = nrm(flat(sub(hp(T), E), 0)), sd = [f[2], 0, -f[0]];
+      const L = add(up(ep(t), 6), scl(f, 10));   // (where it stops: 10 m out on the line, as shieldDrone)
+      return { pos: add(add(add(E, scl(f, 26)), scl(sd, -16)), [0, 3, 0]), target: lrp(add(up(E, 6), scl(f, 4)), L, 0.6), fov: 40, handheld: 0.04, baseShake: 0.01 }; } },
+  { t0: 178.64, t1: 178.895, roll: -0.04, name: 'D08d side-on — he fires', fn: (t) => d08b(t) },
   { t0: 178.895, t1: 179.25, snap: 1.8, name: 'D09 front on — the shield drone, on the line in front of it, takes his shot, the energy splashing off', slowmo: true, fn: (t, u) => { const T = 178.6, E = ep(T), f = nrm(flat(sub(hp(T), E), 0)), sd = [f[2], 0, -f[0]];
     return { pos: add(add(add(E, scl(f, 30)), scl(sd, 4)), [0, 8, 0]), target: pan(up(E, 8), up(ep(t), 8), 0.8), fov: 38, handheld: 0.03, baseShake: 0.02 }; } },
   { t0: 180.45, t1: 181.4, roll: -0.1, name: 'D11 profile — he rolls out and answers', fn: (t, u) => { const T = 180.45, H = hp(T);
