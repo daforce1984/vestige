@@ -202,7 +202,6 @@ export const CUES = [
   [240,   'warp',       { dur: 22, vel: 0.6 }],
   // ---------------- ACT V
   [262,   'wellHum',    { dur: 16, vel: 0.5 }],
-  [262,   'growl',      { dur: 1.9, vel: 0.9 }],
   [266.0, 'beamSaberIgnite', { vel: 1 }],            // the blade at ten times its output
   [266.05, 'beamSaberHum', { dur: 4.2, vel: 0.9, fadeIn: 0.1, fadeOut: 0.3 }],
   [267.1, 'beamSaberSwing', { vel: 1, dur: 0.45 }],   // the lunge
@@ -414,7 +413,6 @@ export const SAMPLE_CUES = [
   [240,   'black_hole', { loop: true, dur: 38, gain: 1.1, fadeIn: 3, rate: 0.7, rateTo: 1.45, prio: 9, norand: true }],
   ...HB.map((t, i) => [t - 0.1, 'heartbeat:s' + (i % 3), { gain: 0.6 + 0.4 * i / HB.length, prio: 8, norand: true }]),
   // ---- WELL ASSAULT 262–273: berserk mech tears through the core's energy shield (no dialogue)
-  [262,   'mech_powerup', { rate: 0.5, gain: 1.1, prio: 9, norand: true }],          // feral roar
   [262.05,'metal_groan', { at: 2.8, dur: 1.4, fadeOut: 0.4, rate: 0.6, gain: 0.9, prio: 8, norand: true }],   // (2026-10-06: the servo whirr out) the frame straining
   // THE ROAR (shots.js ROAR_T 265.3): head thrown back — a feral, tearing cry and the red shockwave bursting off him
   [265.28, '@growl', { dur: 1.3, vel: 1.15 }],
