@@ -20,9 +20,10 @@ export const SKIP_RANGES = [[165.3, 167.4], [168.3, 169.0], [171.45, 172.4], [17
 // story spans cut out of the rest of the film (outside the duel table and the tear window): the battle scenes tightened,
 // the wide shots of the whole battlefield kept short (2026-09-30)
 export const CUT_RANGES = [   // (2026-10-07: scene B1 'berserk wakes', 262–263.3, cut — the film goes from the event horizon straight to his roar) (2026-10-01: every cut lands on a camera change — no jump inside a shot; spans moved to a shot's head or tail)
-  [77.8, 81.2], [85.8, 91.8], [99.0, 101.8], [108.2, 110.0], [131.2, 135.2],
+  [77.8, 81.2], [87.2, 91.8],   // (2026-10-07: scene 10 holds until the dreadnought is out — it emerges 85–86; was cut at 85.8)
+  [99.0, 101.8], [108.2, 110.0], [131.2, 135.2],
   [151.6, 153.0], [154.6, 156.0], [158.5, 161.0],
-  [195.8, 198.8], [200.0, 201.9], [212.0, 214.6], [218.0, 221.7], [249.0, 255.0], [262.0, 265.1],
+  [195.8, 198.8], [200.0, 201.9], [212.0, 214.6], [218.0, 221.7], [249.0, 255.0], [262.0, 265.1], [269.4, 275.0],   // (2026-10-07: scene 88 'B4 the rush' cut)
   [307.4, 308.4], [314.5, 320.0]];   // (the radio lines at 73, 102, 136.4, 224.6 and 292.1 play whole; the main cannon charges uncut through to its shot, 292–300)
 const cutBefore = (s) => CUT_RANGES.reduce((a, [x, e]) => a + Math.max(0, Math.min(s, e) - x), 0);
 export const inSkip = (s) => SKIP_RANGES.some(([a, e]) => s > a && s < e) || CUT_RANGES.some(([a, e]) => s > a && s < e);
