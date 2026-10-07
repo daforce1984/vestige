@@ -126,6 +126,12 @@ function showSceneTag() {
   const ft = now(), sc = sceneAt(storyT(ft)), i = SCENE_ORDER.indexOf(sc);
   const mm = Math.floor(ft / 60), ss = (ft % 60).toFixed(1).padStart(4, '0');
   sceneTag.innerHTML = `<b>SCENE ${i + 1}</b> / ${SCENE_ORDER.length}<span>${sc.name}</span><em>${mm}:${ss}  (story ${storyT(ft).toFixed(2)} s)</em>`;
+  // GO TO SCENE (2026-10-07): while paused, pick any scene and jump straight to its first frame (still paused)
+  const pick = document.createElement('select'); pick.className = 'goto'; pick.title = 'go to scene';
+  SCENE_ORDER.forEach((x, k) => { const o = document.createElement('option'); o.value = k; o.textContent = `${k + 1}. ${x.name.replace(/^.*DUEL[^·]*· /, '')}`; if (k === i) o.selected = true; pick.appendChild(o); });
+  pick.onchange = () => { const x = SCENE_ORDER[+pick.value]; if (x) { seek(filmT(x.t0) + 0.002); pick.blur(); } };
+  pick.onkeydown = (ev) => ev.stopPropagation();   // (its own arrow keys / typing; not the film's)
+  sceneTag.appendChild(pick);
   // the sounds used in this scene: ▶ auditions it, clicking the name copies it
   const f0 = filmT(sc.t0), f1 = filmT(sc.t1), list = score && score.soundsIn ? score.soundsIn(f0, f1) : [];
   if (list.length) {
@@ -325,7 +331,8 @@ $('#start .go').addEventListener('click', () => startFilm(clockOffset >= DURATIO
 const DUEL_FROM = 165.9, DUEL_UNTIL = 195.2;   // story   // from the bolt Sigma swats away on the way in
 $('#duelBtn').addEventListener('click', () => startFilm(filmT(DUEL_FROM), filmT(DUEL_UNTIL)));
 document.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') { e.preventDefault(); if (playing) pause(); else play(now()); }
+  if (e.target && e.target.tagName === 'SELECT') return;   // (the scene picker has the keyboard)
+  if (e.code === 'Space') { e.preventDefault(); if (!$('#start').classList.contains('hidden')) return; if (playing) pause(); else play(now()); }   // (not from the main menu: the film starts from its buttons)
   else if (e.code === 'Escape') { if (playing) pause(); }
   else if (e.code === 'ArrowRight') { if (e.shiftKey) seek(now() + 5); else stepScene(1); }
   else if (e.code === 'ArrowLeft') { if (e.shiftKey) seek(now() - 5); else stepScene(-1); }
