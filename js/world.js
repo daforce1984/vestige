@@ -830,14 +830,14 @@ export function drawWorld(R, t, opts = {}) {
       const ho = hyperOut(t, f.flee, st.pos, fwd2, Le, 1);
       if (ho.gone) { if (ho.alpha > 0) hyperWindow(R, ho.W, fwd2, szE[0] * 0.8, szE[1] * 0.9, HYPER_RED, ho.alpha); return; }
       const e = R.add('enemy_frigate', mat(tmpM, ho.pos, fwd2));
-      e.revealZ = ho.revealZ; e.revealDir = ho.dir; e.revealWidth = 1.5; e.tint = [2, 0.3, 0.2]; e.damage = 0.2; e.stretch = stretchOut(ho.u); e.stretchOut = true;
+      e.revealZ = ho.revealZ; e.revealDir = ho.dir; e.revealWidth = 1.5; e.tint = [2, 0.3, 0.2]; e.stretch = stretchOut(ho.u); e.stretchOut = true;
       hyperWindow(R, ho.W, fwd2, szE[0] * 0.8 + 6, szE[1] * 0.9 + 6, HYPER_RED, ho.alpha);
       engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 1);
       return;
     }
     const e = R.add('enemy_frigate', mat(tmpM, pos, st.fwd));
     e.revealZ = rz; e.revealDir = dir; e.revealWidth = 1.5; e.tint = [2, 0.3, 0.2]; e.seed = f.seed; e.stretch = hin.u < 1 ? stretchIn(hin.u) : 0;
-    if (f.die) e.damage = sat((t - (f.die - 4)) / 4) * 0.5;
+    // (2026-10-08) no scorch or melt before it blows: intact until the explosion
     if (win) hyperWindow(R, win.c, st.fwd, szE[0] * 0.8 + 6, szE[1] * 0.9 + 6, HYPER_RED, win.a);
     e.forceThrottle = hin.u >= 1;   // (advancing: the drives burn, plumes and all)
     engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 0.85);
@@ -1539,20 +1539,7 @@ export function drawExtras(R, t) {
     const e = R.add(f.type, mat(tmpM, pos, st.fwd));
     if (!e) return;
     e.revealZ = rz; e.revealDir = dir; e.revealWidth = 1.5; e.seed = f.seed; e.stretch = str;
-    // (2026-10-07) scorched only once it has really been hit — from the first bolt that lands on it (f.hits), burning up to
-    // its death; never before (it used to start 6 s ahead of the death, and every survivor got random scorch after 218)
-    // (b) and only WHERE it was hit: a scorch round the struck side of its bow, growing with every bolt that lands; the whole
-    // hull only in its last second (the hull-wide scorch from its first bolt on read as a ship burning before any damage)
-    if (f.hits && f.hits.length) {
-      let n = 0, last = -1e9; for (const h of f.hits) if (h <= t) { n++; last = h; }
-      // (c) one bolt is not enough: a single hit leaves no scorch and no heat at all — only from the second bolt on
-      if (n >= 2) {
-        const L = modelLen(R, f.type), dying = f.die ? sat((t - (f.die - 1)) / 1) : 0;
-        e.dmgC = [(hash(i * 3.3) - 0.5) * L * 0.35, (hash(i * 5.1) - 0.5) * L * 0.08, L * 0.28];   // (the bow faces them)
-        e.dmgR = dying > 0 ? L * (0.25 + 2 * dying) : Math.min(L * 0.45, 6 * (n - 1) + 4 * sat((t - last) / 2));
-        e.damage = Math.min(0.6, 0.12 + 0.1 * n) * (0.4 + 0.6 * sat((t - last) / 0.4));
-      }
-    }
+    // (2026-10-08) no scorch, heat or melt at all before it blows — however many bolts it takes; the wreck carries the damage
     if (win) hyperWindow(R, win.c, st.fwd, sz[0] * 0.8 + 6, sz[1] * 0.9 + 6, HYPER_BLUE, win.a);
     engineGlows(R, f.type, e, HIIG_ENGINE, 1, 0.6);
   });
@@ -1577,7 +1564,7 @@ export function drawExtras(R, t) {
     const e = R.add('enemy_frigate', mat(tmpM, hin.u < 1 ? hin.pos : st.pos, st.fwd));
     if (!e) return;
     e.revealZ = hin.revealZ; e.revealDir = hin.dir; e.revealWidth = 1.5; e.tint = [2, 0.3, 0.2]; e.seed = f.seed; e.stretch = hin.u < 1 ? stretchIn(hin.u) : 0;
-    if (f.die) e.damage = sat((t - (f.die - 5)) / 5) * 0.5;
+    // (2026-10-08) intact until it blows
     if (hin.alpha > 0) hyperWindow(R, hin.W, st.fwd, szE[0] * 0.8 + 6, szE[1] * 0.9 + 6, HYPER_RED, hin.alpha);
     e.forceThrottle = hin.u >= 1;   // (advancing: the drives burn)
     engineGlows(R, 'enemy_frigate', e, ENEMY_ENGINE, 1, 0.85);
