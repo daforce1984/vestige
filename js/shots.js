@@ -514,7 +514,7 @@ function gundamStateRaw(t, s) {
       if (land > 0) { const cur = s.pose, st = {}; blendPose('flight', 'stand', land, st); for (const k in st) cur[k] = st[k]; }   // keep the waking blend until landing
       s.boostK = smooth(336.2, 339.2, t) * (1 - smooth(339.8, 340.2, t));   // the burn builds slowly with the speed
       s.thr = t < 340.2 ? 1 : t < 342.6 ? 0.6 + 0.4 * Math.sin(t * 20) * 0.2 : 0.6 * (1 - smooth(342.6, 342.95, t));   // braking flare, the turn on the thrusters, then cut
-      if (t > 343.7) s.vis = false;                            // behind the closed doors
+      if (t > 344.85) s.vis = false;                           // behind the closed doors (they shut 342.8–344.9)
     }
   }
   return s;
@@ -3026,7 +3026,7 @@ shot(330, 340, 'S21b return', (c) => {
   c.env.shadowCenter = g.pos; c.env.shadowRadius = 50;
   c.debris = true;
 });
-shot(340, 343.8, 'F0 recovered', (c) => {
+shot(340, 345.0, 'F0 recovered', (c) => {   // (2026-10-08: held until the bay doors have shut on him, 344.9)
   const { t, u, R } = c;
   // off the flagship's port flank: the bay mouth lit, beacons pulsing, the battered machine drifting home
   const bay = recoveryBay(t);
@@ -3041,7 +3041,7 @@ shot(340, 343.8, 'F0 recovered', (c) => {
   R.light(addv(mouth, [0, 0, 0]), 60, [1, 0.8, 0.55], 6);
   c.env.shadowCenter = mouth; c.env.shadowRadius = 90;
 });
-shot(343.8, 347.3, 'F1 the jump', (c) => {
+shot(345.0, 347.3, 'F1 the jump', (c) => {
   const { t, u } = c;
   // wide on the battered fleet; ships slip into blue rifts one after another
   camLook(c, [-520 + u * 40, 120, 700 - u * 60], [0, 0, 120], 42, 0.03);

@@ -80,7 +80,8 @@ export const HOME_YAW = Math.atan2(PLANET[0], PLANET[2]);
 export function homeOffset(out, t) { out[0] = out[1] = out[2] = 0; return out; }
 export const EARTH_T = 347.3;
 // per-ship jump-out / Earth-arrival times (seeded), shared by all Hiigaran ships
-export function jumpTimes(seed) { return { d: 344.3 + hash(seed * 1.7) * 1.6, a: EARTH_T + 0.5 + hash(seed * 2.3) * 2.4 }; }
+export function jumpTimes(seed) { return { d: 345.0 + hash(seed * 1.7) * 1.0,   // (2026-10-08: 345–346, all inside scene 100 — scene 99 holds until the bay doors have shut)
+   a: EARTH_T + 0.5 + hash(seed * 2.3) * 2.4 }; }
 function jumpState(t, seed, pos, fwd, L, dur = 1) {
   const { d, a } = jumpTimes(seed);
   if (t >= a) { const h = hyperIn(t, a, pos, fwd, L, dur); return { pos: h.pos, rz: h.revealZ, dir: h.dir, st: stretchIn(h.u), win: h.alpha > 0 ? { c: h.W, a: h.alpha } : null }; }
@@ -360,12 +361,28 @@ function interiorPos(o, t) {
 // Sigma's docking rig in the port launch bay: clamps swing down over the shoulders (342.3–342.9), the two door leaves
 // slide shut along the hull (342.8–343.6) and stay shut — through the jump and the arrival at Earth
 const _dm = M.new(), _dt = M.new();
+const _hb1 = M.new(), _hb2 = M.new();
 function drawDock(R, t, me) {
   if (!R.models.dock_rig || (me.hidden && me.hidden.__all)) return;
   const mm = me.m;
+  // (2026-10-08) THE RECOVERY BAY is the launch bay of scene 6 (the 'hangar' model): it sits behind the port mouth,
+  // its open end at the mouth, its cradle facing out — he backs into it and the doors close on him; while it is there
+  // the shallow stand-in box (the rig's 'frame') is hidden
+  const bayIn = R.models.hangar && t > 335 && t < 345.6;
+  if (bayIn) {
+    M.fromTRS(_hb1, [-47.2, -11.5, 57], [0, -Math.SQRT1_2, 0, Math.SQRT1_2], 1);   // its +Z (the exit) to the flagship's -X (out of the port mouth)
+    _hb2.set([1.45, 0, 0, 0, 0, 1.45, 0, 0, 0, 0, 0.9, 0, 0, 0, 0, 1]);                // as tall as the mouth, a little shorter in depth
+    M.mul(_hb1, _hb1, _hb2); M.mul(_hb1, mm, _hb1);
+    const hb = R.add('hangar', _hb1);
+    if (hb) {
+      hb.seed = 2; hb.emissive = 1; hb.tint = [0.95, 0.95, 1.0]; hb.stretch = me.stretch || 0;
+      hb.matOverride = { lamp: { base: [0.9, 0.9, 0.9], metal: 0, rough: 0.4, emissive: [0.95, 0.9, 0.8] }, guide: { base: [0.2, 0.4, 0.6], metal: 0, rough: 0.4, emissive: [0.5, 2.2, 3.4] } };
+      for (let i = 0; i < 3; i++) R.light(M.transformPoint([0, 0, 0], mm, [-60 + i * 16, 18, 57]), 34, [1, 0.93, 0.82], 2.4);   // its ceiling pools
+    }
+  }
   const rig = R.add('dock_rig', mm);
   if (rig) {
-    rig.hidden = { door: 1, mouth: 1 }; rig.stretch = me.stretch || 0; rig.stretchAnchor = motherAnchor(R, me); rig.seed = 7.7;
+    rig.hidden = bayIn ? { door: 1, mouth: 1, frame: 1 } : { door: 1, mouth: 1 }; rig.stretch = me.stretch || 0; rig.stretchAnchor = motherAnchor(R, me); rig.seed = 7.7;
     const open = 1 - easeInOut(sat((t - 342.55) / 0.5));
     rig.pose = { clampL: [0, 0, -1.5 * open], clampR: [0, 0, -1.5 * open] };
     const blink = 0.6 + 0.4 * Math.sin(t * 9);
@@ -406,10 +423,13 @@ function drawDock(R, t, me) {
     mf.matOverride = { dock_light: { base: [0.3, 0.7, 1], metal: 0, rough: 0.3, emissive: [0.45 * lamp * 2, 0.85 * lamp * 2, 1.4 * lamp * 2] }, amber: ov.amber }; }
 }
 
-// bay door opening 0 (shut) … 1 (fully parted)
+// bay door opening 0 (shut) … 1 (fully parted); (2026-10-08) after the recovery they close slowly, heavily — 2.1 s, done
+// before the jump at 345.6 (they used to snap shut in 0.75 s)
+export const DOOR_C0 = 342.8, DOOR_C1 = 344.9;
 function doorOpen(t) {
-  const seg = (a0, a1, c0, c1) => (t < a0 || t > c1 ? 0 : t < a1 ? easeInOut((t - a0) / (a1 - a0)) : t < c0 ? 1 : 1 - easeInOut((t - c0) / (c1 - c0)));
-  return Math.max(seg(149.6, 151.0, 160.6, 161.8), seg(335.4, 336.9, 343.0, 343.75));
+  const heavy = (x) => x * x * x * (x * (6 * x - 15) + 10);   // (smootherstep: a slow, massive start and a soft seat — no snap)
+  const seg = (a0, a1, c0, c1) => (t < a0 || t > c1 ? 0 : t < a1 ? easeInOut((t - a0) / (a1 - a0)) : t < c0 ? 1 : 1 - heavy((t - c0) / (c1 - c0)));
+  return Math.max(seg(149.6, 151.0, 160.6, 161.8), seg(335.4, 336.9, DOOR_C0, DOOR_C1));
 }
 function motherAnchor(R, me) { const b = R.models.mothership.bounds; return me.stretchOut ? b.min[2] : b.max[2]; }
 const _rimT = M.new(), _rimM = M.new();

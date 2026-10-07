@@ -15,7 +15,7 @@
 import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
-import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, THRUST_T, LAUNCH_T, H_FEATURED, LOSS_SWAP_DT, swap2224, wreckPopTimes } from './world.js';
+import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, THRUST_T, LAUNCH_T, DOOR_C0, DOOR_C1, H_FEATURED, LOSS_SWAP_DT, swap2224, wreckPopTimes } from './world.js';
 import { SHIELD_CLUNKS, DRONE_L0, DRONE_DESC, DRONE_PUFF_T, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT, EYE_POPS, EYE_DEAD } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, STRIKE_FLIGHT, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
@@ -476,7 +476,16 @@ export const SAMPLE_CUES = [
   // Sigma comes to: thrusters cough (334.2–335.6), catch, and the burn builds to full by ~338
   ...[334.3, 334.75, 335.2].map((t, i) => [t, 'hl_thruster', { loop: true, dur: 0.3, rate: 0.6, gain: 0.35 + 0.1 * i, fadeIn: 0.03, fadeOut: 0.15, prio: 7, norand: true }]),
   [335.6, 'hl_thruster', { loop: true, dur: 5.0, rate: 0.62, rateTo: 1.1, gain: 1.0, fadeIn: 1.8, fadeOut: 1.0, prio: 8, norand: true }],   // builds to a hard burn home
-  [344.0, 'whoosh:c',  { rate: 0.9, gain: 0.8, prio: 8, norand: true }],
+  // (2026-10-08) the bay doors close on him, slowly and heavily: a hydraulic release, the motors and the leaves grinding
+  // along their rails, then the seal — a deep clunk and the pressure hiss
+  [DOOR_C0 - 0.05, 'reload_hiss', { rate: 0.6, gain: 0.7, prio: 7, norand: true }],
+  [DOOR_C0, 'servo', { loop: true, dur: DOOR_C1 - DOOR_C0, rate: 0.5, rateTo: 0.42, gain: 0.85, fadeIn: 0.35, fadeOut: 0.25, prio: 8, norand: true }],
+  [DOOR_C0 + 0.05, 'rumble', { dur: DOOR_C1 - DOOR_C0 + 0.3, rate: 0.7, gain: 0.8, fadeIn: 0.4, fadeOut: 0.4, prio: 7, norand: true }],
+  [DOOR_C0 + 0.3, 'metal_groan', { at: 2.8, dur: 1.6, rate: 0.55, gain: 0.55, fadeOut: 0.5, prio: 6, norand: true }],
+  [DOOR_C1, 'metal_door', { at: 'hit', rate: 0.6, gain: 1.1, prio: 9, norand: true }],
+  [DOOR_C1 + 0.04, 'metal_knock', { rate: 0.5, gain: 0.8, prio: 8, norand: true }],
+  [DOOR_C1 + 0.12, 'reload_hiss', { rate: 0.75, gain: 0.6, prio: 6, norand: true }],
+  [344.9, 'whoosh:c',  { rate: 0.9, gain: 0.8, prio: 8, norand: true }],
   [348,   'braam',     { rate: 0.8, gain: 0.6, fadeOut: 1.5, prio: 8, norand: true }],
   [348.2, 'flyby_large', { rate: 0.45, gain: 0.6, fadeIn: 2, pan0: -0.3, pan1: 0.3, prio: 7, norand: true }],   // mothership emerging, slow
 ];
