@@ -1631,6 +1631,81 @@ def systems(mb, H, R, S):
     zone_edges(mb, H, R, S)
 
 
+# ------------------------------------------------------------------------------------------ FLANK DETAIL (2026-10-08)
+# after the Codex production-design frame assets/tex/src/mothership_side_concept_v1.png: the flat side walls broken up —
+# a second layer of armour belts with offset seams, two long trenches between them (pipes, clamps and recessed lights
+# down in them), heavy vertical ribs on every bulkhead line, louvre vents and hatches on the belts, and the same belts
+# and trenches running on over the launch-bay blister. Its own random stream (the systems placed after keep theirs);
+# the sites cast onto these new surfaces.
+FLANK_BELTS = [(0.03, 0.27), (0.31, 0.70), (0.755, 0.855), (0.905, 0.985)]   # wall height fractions (0 keel side .. 1 deck)
+FLANK_TRENCH = [(0.70, 0.755), (0.855, 0.905)]
+BELT_T = 0.6
+
+
+def flank_detail(mb, H):
+    Rf = rng(4242)
+    mats = lambda i, j, R: ('plate', 'hull2', 'hull', 'plate')[R.randrange(4)]
+
+    def pc(e, f0, f1):            # wall fractions -> the edge's p range (edge 4 runs top -> bottom)
+        return (e + f0, e + f1) if e == 0 else (e + 1 - f1, e + 1 - f0)
+    walls = ((0, ((124.5, 293.0),)), (4, ((-45.0, 5.5), (104.5, 293.0))), (4, ((5.5, 104.5),)))
+    for wi, (e, spans) in enumerate(walls):
+        over_bay = wi == 2                                    # over the launch-bay blister: only the upper belts
+        for a, b in spans:
+            for k, (f0, f1) in enumerate(FLANK_BELTS):
+                if over_bay and f0 < 0.7:
+                    continue
+                p0, p1 = pc(e, f0, f1)
+                armor(mb, H, cuts(a + 0.6, b - 0.6, Rf, 9, 17), [p0, (p0 + p1) / 2, p1] if f1 - f0 > 0.3 else [p0, p1], mats, Rf,
+                      off=WALL_T, thick=BELT_T, gap_s=0.35, gap_p=0.004, sub_prob=0.28, sub_mat='hull2', rnd=0.06)
+            # the trenches: two pipes on clamps down the length, a recessed light every ~12 m
+            for f0, f1 in FLANK_TRENCH:
+                fm = (f0 + f1) / 2
+                pm = pc(e, fm, fm)[0]
+                t0, t1 = pc(e, f0 - 0.004, f1 + 0.004)
+                plate(mb, H, a + 0.3, b - 0.3, t0, t1, 'greeble', off=WALL_T - 0.02, thick=0.12, rnd=0)   # the trench floor, dark
+                for dz, r in ((-0.22, 0.32), (0.22, 0.24)):
+                    q = pc(e, fm + dz * (f1 - f0), 0)[0]
+                    A, _ = H.pt(a + 0.5, q, WALL_T + 0.35); B, _ = H.pt(b - 0.5, q, WALL_T + 0.35)
+                    mb.cyl(A, B, r, r, 'trim' if dz < 0 else 'greeble', seg=8)
+                s_ = a + 3.0
+                while s_ < b - 2.0:
+                    pos, n = H.pt(s_, pm, WALL_T)
+                    obox(mb, pos, n, (1.6, 0.5, 0.75), 'hull2', lift=0.0, fwd=Vector((0, -1, 0)))   # pipe clamp
+                    if int((s_ - a) / 6.0) % 2 == 0:
+                        lp, ln = H.pt(s_ + 3.0, pc(e, fm - 0.35 * (f1 - f0), 0)[0], WALL_T + 0.02)
+                        slit(mb, lp, ln, (0.4, 2.2, 0.2), 'amber', Vector((0, -1, 0)))
+                    s_ += 6.0
+            # heavy ribs on the bulkhead lines, proud of the belts, a bolt row down each
+            f_lo = 0.7 if over_bay else 0.02
+            for sr in grid(a, b)[1:-1]:
+                p0, p1 = pc(e, f_lo, 0.99)
+                plate(mb, H, sr - 0.75, sr + 0.75, p0, p1, 'hull2', off=WALL_T, thick=BELT_T + 0.45, rnd=0.08)
+                for k in range(10):
+                    f = f_lo + (0.99 - f_lo) * (k + 0.5) / 10
+                    bp, bn = H.pt(sr, pc(e, f, f)[0], WALL_T + BELT_T + 0.45)
+                    mb.cyl(bp - bn * 0.05, bp + bn * 0.12, 0.13, 0.13, 'trim', seg=6)
+            # louvre vents and hatches on the belts
+            nb = int((b - a) / 16)
+            for _ in range(nb):
+                s_ = Rf.uniform(a + 4, b - 4)
+                if any(abs(s_ - g) < 3.5 for g in grid(a, b)):
+                    continue
+                f0, f1 = Rf.choice(FLANK_BELTS[1:] if over_bay is False else FLANK_BELTS[2:])
+                f = Rf.uniform(f0 + 0.02, f1 - 0.02)
+                pos, n = H.pt(s_, pc(e, f, f)[0], WALL_T + BELT_T)
+                if Rf.random() < 0.6:                                          # louvre: a dark frame, slats across
+                    W, L = Rf.uniform(2.0, 3.5), Rf.uniform(3.0, 6.0)
+                    obox(mb, pos, n, (W, L, 0.12), 'greeble', lift=0.0, fwd=Vector((0, -1, 0)))
+                    for j in range(int(L / 0.5)):
+                        obox(mb, pos + Vector((0, -L / 2 + 0.25 + j * 0.5, 0)), n, (W * 0.9, 0.12, 0.3), 'trim', lift=0.0, fwd=Vector((0, -1, 0)))
+                else:                                                          # hatch: a framed plate, a recessed light
+                    W, L = Rf.uniform(2.5, 4.0), Rf.uniform(2.5, 4.0)
+                    obox(mb, pos, n, (W + 0.4, L + 0.4, 0.14), 'greeble', lift=0.0, fwd=Vector((0, -1, 0)))
+                    obox(mb, pos, n, (W, L, 0.26), 'hull2', lift=0.0, fwd=Vector((0, -1, 0)), bevel=0.05)
+                    slit(mb, pos + n * 0.26 + Vector((0, 0, W * 0.3)), n, (0.3, L * 0.6, 0.1), 'blue_light', Vector((0, -1, 0)))
+
+
 # ------------------------------------------------------------------------------------------ build
 def mothership(probe=False):
     palette()
@@ -1649,6 +1724,7 @@ def mothership(probe=False):
     bow_cannon(mb, H, R)
     starboard_bay_wall(mb, R)
     port_launch_bay(mb, R)
+    flank_detail(mb, H)
     empty('wound', (WALL_X, Y(40.0), 10.0), size=6)
     # functional systems, placed on the finished armour by ray casting (zoning plan: MOTHERSHIP_SYSTEMS.md)
     mouth0 = mouth_faces(mb)
