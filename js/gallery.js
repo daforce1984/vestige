@@ -2,7 +2,8 @@
 // tool), browsable from the main menu — a thumbnail grid, click for the full image, ←/→ to step, Esc to close.
 const REFS = [
   { src: 'assets/tex/src/hangar_concept_v1.png', title: '격납고 콘셉트', note: '6번씬 구도, 빈 격납고 — blender/hangar_v2.py로 재구성' },
-  { src: 'assets/tex/src/shield_drone_concept_v1.png', title: '방패 드론 디자인 시트', note: '정면 · 후면 · 측면 · 3/4 — blender/shield_drone.py' },
+  { src: 'assets/tex/src/shield_drone_concept_v2.png', title: '방패 드론 디자인 시트 v2 (채택)', note: '곡면 · 절반 두께 · 전방향 추진기 · 데칼 없음 — blender/shield_drone.py' },
+  { src: 'assets/tex/src/shield_drone_concept_v1.png', title: '방패 드론 디자인 시트 v1', note: '정면 · 후면 · 측면 · 3/4' },
   { src: 'assets/ref/vanguard_scheme_a.png', title: 'VANGUARD 도장 A안 (채택)', note: "'ace custom' — 옥스블러드 · 차콜 · 건메탈" },
   { src: 'assets/ref/vanguard_scheme_b.png', title: 'VANGUARD 도장 B안', note: '네이비 지휘관기' },
   { src: 'assets/tex/src/sigma_suncult_emblem.png', title: '시그마 엠블럼 (원본)', note: '태양 숭배 교단 — 가슴 · 백팩 데칼' },

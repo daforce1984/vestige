@@ -1475,7 +1475,7 @@ const DRONE_OVER = [0.9, -0.7, 0.6];                                    // the o
 const DRONE_PUFFS = [[173.6, 0, 0.6], [173.67, 1, 1.0], [173.75, 0, 0.4], [173.84, 2, 1.0]];   // [t, axis, share of that axis removed]
 export const DRONE_PUFF_T = DRONE_PUFFS.map((p) => p[0]);
 export const DRONE_DASH = [178.38, 182.95];          // its boosts onto the line (each ~0.18 s)
-const DOCK_FACE = [3.52, -2.5, -2.3], BACKPACK_T = [0, 3.495, -1.071];   // backpack frame: the face centre (its inner face against the backpack's flank, x 2.4); the backpack node's offset on the torso (assets/enemy_ms.glb)
+const DOCK_FACE = [3.24, -2.5, -2.3], BACKPACK_T = [0, 3.495, -1.071];   // backpack frame: the face centre (its inner face against the backpack's flank, x 2.4); the backpack node's offset on the torso (assets/enemy_ms.glb)
 const ORBIT_R = 13, ORBIT_W = 1.9;   // m, rad/s (a lap every ~3.3 s)
 const shieldMat = (R, face) => m4(R, sub(face, r3v(R, SHIELD_C)));
 const droneBlock = (tw) => smooth(DRONE_DASH[0], DRONE_DASH[0] + 0.18, tw) * (1 - smooth(179.3, 179.75, tw)) + smooth(DRONE_DASH[1], DRONE_DASH[1] + 0.15, tw);   // on the line for his shots

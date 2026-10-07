@@ -1063,7 +1063,7 @@ function drawBigShield(R, e, s, t) {
   shieldScorch(c, t);
 }
 // its thrusters: four nozzles on the back of the plate (shield frame −X), flames out behind it
-const DRONE_JETS = [[0.26, 0.55, 1.07], [0.26, 0.55, -0.73], [0.26, -3.25, 0.97], [0.26, -3.25, -0.63]];   // (the four nozzles of blender/shield_drone.py)
+const DRONE_JETS = [[0.77, 0.55, 1.07], [0.77, 0.55, -0.73], [0.87, -3.25, 0.97], [0.87, -3.25, -0.63]];   // (the four flush nozzles of blender/shield_drone.py v2: their exits)
 function droneJets(R, W, k, t) {
   if (k <= 0.01) return;
   const back = V.norm([0, 0, 0], M.transformDir([0, 0, 0], W, [-1, 0, 0]));
