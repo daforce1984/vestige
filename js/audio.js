@@ -15,7 +15,7 @@
 import { INSTR, VOICE_PRE, buildShared } from './audio-synth.js';
 import { buildMusic, heartbeatTimes } from './audio-music.js';
 import { ION_SHOTS, ION_BOLT_SPEED } from './ionfire.js';
-import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, H_FEATURED, LOSS_SWAP_DT } from './world.js';
+import { warpSchedule, EXTRA_H, EXTRA_E, EF, MISSILES, CORE_HIT_T, H_FEATURED, LOSS_SWAP_DT, swap2224 } from './world.js';
 import { SHIELD_CLUNKS, DRONE_L0, THROW0, CATCH_T, SD_GRAB, SD_OUT, SD_HOLSTER, ultSwarm, DUEL_EVENTS, AUTO_FX, duelHero, duelEnemy1, duelEnemy2, SERAPH_SHOTS, HERO_SHOTS, SHIELD_HIT_T, BLOCK_T, THIGH_T, HERO_HIT_T, ultBeams, ULT_HIT, HERO_BURST, ENEMY_BURST, HERO_GRAB, HERO_EJECT, HERO_LOAD, HERO_LOCK, HERO_SNAP0, HERO_SNAP1, ENEMY_GRAB, ENEMY_EYE, ENEMY_CHARGE0, ENEMY_CHARGE1, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, energyShards, KILL_SHOT_T, FINALE_T, FINALE_END, SANDE0, CUT_T, CUT_SPLIT } from './duel.js';
 import { DOG_SHOTS, STRIKE_SHOTS, STRIKE_FLIGHT, CO_KILLS, CO_HULL_HITS, CO_TURRET } from './world.js';   // pure data/functions (no DOM/GPU)
 
@@ -322,7 +322,8 @@ export const SAMPLE_CUES = [
   [116.8, 'charge_up', { rate: 0.8, rateTo: 0.25, gain: 0.5, dur: 3, fadeOut: 1.2, pan: -0.5, far: 0.3, prio: 6 }],
   [120.05, 'metal_knock', { rate: 0.5, gain: 0.5, prio: 7, norand: true }],
   // point defence swats down every missile of the salvo (world.js MISSILES / missileEnd)
-  ...MISSILES.map((m, i) => [m.t0 + m.dur * (0.45 + hash01(m.seed * 3.9 + 1) * 0.3), 'hl_explosion', { rate: 1.35, gain: 0.45, far: 0.35 + 0.1 * (i % 3), pan: i % 2 ? 0.4 : -0.4, prio: 4 }]),
+  ...MISSILES.map((m, i) => [swap2224(m.t0 + m.dur * (0.45 + hash01(m.seed * 3.9 + 1) * 0.3)), 'hl_explosion',   // (heard where S10b now shows them)
+    { rate: 1.35, gain: 0.45, far: 0.35 + 0.1 * (i % 3), pan: i % 2 ? 0.4 : -0.4, prio: 4 }]),
   // ---------------- volleys
   ...VOLLEYS.flatMap(([t, main, body, fail], i) => volley(t, main, body, i, fail)),
   // ---------------- missiles
@@ -365,8 +366,9 @@ export const SAMPLE_CUES = [
   ...DOG_SHOTS.filter((d) => d.tf > 141 && d.tf < 150 && d.k < 6).flatMap((d) => {
     const h = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
     const pan = (h(d.k * 3.7) - 0.5) * 1.2, near = d.k < 3 ? 1 : 0.55;
-    const out = [[d.tf, '@blaster', { vel: 0.5 * near, f0: 1400 + 700 * h(d.seed), pan }]];
-    if (d.hit) out.push([d.tf + 0.22, '@sparkBurst', { vel: 0.35 * near, pan }]);
+    const tf = swap2224(d.tf);   // (scenes 22 / 24 swapped: heard where they are seen)
+    const out = [[tf, '@blaster', { vel: 0.5 * near, f0: 1400 + 700 * h(d.seed), pan }]];
+    if (d.hit) out.push([tf + 0.22, '@sparkBurst', { vel: 0.35 * near, pan }]);
     return out;
   }),
   // fighter kills (small)

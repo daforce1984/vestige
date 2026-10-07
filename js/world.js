@@ -1438,6 +1438,11 @@ export const H_FEATURED = [];
 // trade places in the film — each shows the world LOSS_SWAP_DT later / earlier than its slot (shots.js, ctx.worldT), and
 // those two ships' death sounds move with them (audio.js lossCues)
 export const LOSS_SWAP_DT = 4.8;
+// scenes 22 / 24 (S10b missiles swatted down / S10c fighter cockpit-ish) trade places too (2026-10-07): S10c shows the
+// world 4.4 s later than its new slot, S10b 4.4 s earlier. swap2224: a world time → the film (story) time it is SEEN at
+// (for the sounds of what is on screen there)
+export const S10_SWAP_DT = 4.4;
+export const swap2224 = (t) => (t >= 145.4 && t < 148.2 ? t - S10_SWAP_DT : t >= 141 && t < 144.2 ? t + S10_SWAP_DT : t);
 // our losses: most line ships die when the SECOND enemy ion bolt lands on them (so every kill is a visible hit)
 {
   const hits = EXTRA_H.map(() => []);

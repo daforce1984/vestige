@@ -10,7 +10,7 @@ import {
   WELL, DREAD, HANGAR, BC, GC, IONF, ASF, EF, GUN, POSES, blendPose, breathe, gundamLaunchPath, fighterPos, PAIRS,
   HIIG_ENGINE, ENEMY_ENGINE, HYPER_BLUE, HYPER_RED, ION_COL, LANCE_COL, BEAM_PINK, LANCE_FIRE, MAIN_FIRE, IMPLODE, LANCE_HIT, DREAD_DIE,
   modelLen, modelSize, ionMuzzle, missilePos, MISSILES, debrisOnly, allParts, rotY,
-  STRIKE_FLIGHT, EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drawBoxWreck, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
+  STRIKE_FLIGHT, S10_SWAP_DT, EXTRA_H, EXTRA_E, extraHPos, extraEPos, H_FEATURED, LOSS_SWAP_DT, drawBoxWreck, drainOutflow, fighterModel, ionCharge, EARTH_T, CORE_HIT_T, STRIKE_SHOTS, CO_FLY, CO_BOOM, CO_KILLS, CO_HULL_HITS, CO_TURRET,
 } from './world.js';
 
 export const DURATION = FILM_DURATION;   // film (player) duration; choreography below is in story time
@@ -2368,17 +2368,18 @@ shot(134, 141, 'S10a dogfight chase', (c) => {
   c.env.shadowCenter = lead.p; c.env.shadowRadius = 90;
   c.post.shakeBlur = 0.0006;
 });
-shot(141, 145, 'S10b missiles swatted down', (c) => {
+// scenes 22 / 24 swapped (2026-10-07): the fighter's ride first, shown S10_SWAP_DT later than its slot; the missiles
+// swatted down second, earlier (world.js swap2224 moves their sounds with them)
+function s10b(c, t) {
   // our last weapon that does not need a charge: the salvo streaks out and the enemy point defence swats it down
-  const { t, u } = c;
+  const u = sat((t - 141) / 4);
   const a = assaultFrigate(141.8, 3).pos, b = EF[3].p;
   const mid = V.lerp([0, 0, 0], a, b, 0.28);
   camLook(c, addv(mid, [150 - u * 20, 70, 40]), V.lerp([0, 0, 0], a, b, 0.6), 46, -0.05);
   shake(c, 0.15, 8);
   c.env.shadowCenter = mid; c.env.shadowRadius = 300;
-});
-shot(145, 150, 'S10c fighter cockpit-ish', (c) => {
-  const { t, u } = c;
+}
+function s10c(c, t) {
   const k = 4;
   const a = fighterPos([0, 0, 0], k, t), b = fighterPos([0, 0, 0], k, t - 0.1);
   const v = V.norm([0, 0, 0], V.sub([0, 0, 0], a, b));
@@ -2386,7 +2387,9 @@ shot(145, 150, 'S10c fighter cockpit-ish', (c) => {
   shake(c, t > 148.4 && t < 149.6 ? 1 : 0.35, 12);
   c.post.shakeBlur = 0.001;
   c.env.shadowCenter = a; c.env.shadowRadius = 60;
-});
+}
+shot(141, 145, 'S10c fighter cockpit-ish', (c) => { c.worldT = c.t + S10_SWAP_DT; s10c(c, c.worldT); });
+shot(145, 150, 'S10b missiles swatted down', (c) => { c.worldT = c.t - S10_SWAP_DT; s10b(c, c.worldT); });
 shot(150, 153, 'S11a hangar lights', (c) => {
   const { t, u } = c;
   c.world = false; c.hangar = 'launch';
