@@ -1,7 +1,7 @@
 // Shot list: camera + shot-specific content for every second of the film.
 import { M, V, Q, hash, noise1, sat, smooth, ease, easeOut, easeIn, easeInOut, lerp, spline, DEG, clamp } from './math.js';
 import { fxOpts, explosion, hyperWindow, engineGlows, emitWorld, bolt, hitFlash, trail, randDir, shatter, chargeInflow, spark } from './fx.js';
-import { RIFLE_T, RIFLE_Q, enemyRifleMat, enemyHolsterLocal, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX, energyShards, SHARD_LIFE } from './duel.js';
+import { RIFLE_T, RIFLE_Q, enemyRifleMat, enemyHolsterLocal, droneThrust, CATCH_T, duelMuzzle, duelHero, duelEnemy1, duelEnemy2, duelCamera, DUEL_EVENTS, DUEL_SHOTS, trailSample, maceCharge, rifleCharge, SERAPH_SHOTS, seraphMuzzle, FINALE_T, FINALE_END, SHIELD_HIT_T, HOLES, HERO_RIFLE_S, bigShieldScale, blockHitAt, blockPath, blockLocalAt, heroBackMount, heroRifleThrow, SD_GRAB, ENEMY_BURST, BLOCK_SPOT, blockFrame, HERO_LOAD, HERO_EJECT, HERO_LOCK, HERO_GRAB, heroEject, heroCap, heroRifleFrame, ENEMY_CHARGE0, ENEMY_CHARGE1, ENEMY_EYE, TRANS0, TRANS_SHOT, TRANS_PASS, TRANS_HIT, transK, enemyRifleFrame, transPath, transHead, transOrb, transCutAxis, SWING_PRE, SWING_POST, ultBeams, ultPoint, ultSwarm, missilePosC, circusClock, CIRCUS_B3, ULT_HIT, KILL_SHOT_T, CUT_T, CUT_Y, CUT_SPLIT, cutArms, SANDE0, duelFK, maceWrist, ragdoll, DODGE, dodgeRight, AUTO_FX, energyShards, SHARD_LIFE } from './duel.js';
 import { storyT, filmT, tearU, slowHit, FILM_DURATION } from './timemap.js';
 import { heartbeatTimes } from './audio-music.js';
 let FILM_NOW = 0;
@@ -1027,27 +1027,45 @@ function drawBlockSplash(R, t) {
 const SHIELD_FACE = [1.351, -2.337, 0.17];
 const _bsA = new Float32Array(16), _bsB = new Float32Array(16), _bsS = new Float32Array(16), _bsI = new Float32Array(16), _bsM = new Float32Array(16);
 let _bsHide = null;
+// THE SHIELD DRONE (duel.js shieldDrone, 2026-10-07): never on the arm — drawn as a shield-only copy at its own world
+// matrix (docked on the backpack or flying), with its thrusters
 function drawBigShield(R, e, s, t) {
-  const { sy, sz } = bigShieldScale(t); if (sy < 1.002 && sz < 1.002) return;   // (duel.js: it racks out in clunky steps)
+  if (!s.shieldW) return;
+  const { sy, sz } = bigShieldScale(t);   // (duel.js: it racks out in clunky steps)
   if (!_bsHide) { _bsHide = {}; for (const p of R.models.enemy_ms.parts) if (p.name !== 'shield') _bsHide[p.name] = 1; }
-  e.hidden = { ...(e.hidden || {}), shield: 1 };
   const Ms = R.partWorld('enemy_ms', e, 'shield');
+  e.hidden = { ...(e.hidden || {}), shield: 1 };
+  droneJets(R, s.shieldW, droneThrust(t), t);
   M.fromTRS(_bsA, SHIELD_FACE, [0, 0, 0, 1], 1);
   M.identity ? M.identity(_bsS) : _bsS.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   _bsS[0] = 1 + 0.3 * (sy - 1); _bsS[5] = 1 + (sy - 1); _bsS[10] = 1 + (sz - 1);   // (thickness a little, long axis and width ×2)
   M.fromTRS(_bsB, [-SHIELD_FACE[0], -SHIELD_FACE[1], -SHIELD_FACE[2]], [0, 0, 0, 1], 1);
-  M.mul(_bsM, Ms, M.mul(new Float32Array(16), _bsA, M.mul(new Float32Array(16), _bsS, _bsB)));   // the shield's scaled world matrix
+  M.mul(_bsM, s.shieldW, M.mul(new Float32Array(16), _bsA, M.mul(new Float32Array(16), _bsS, _bsB)));   // the shield's scaled world matrix
   M.invert(_bsI, Ms);
   const Mc = M.mul(new Float32Array(16), _bsM, M.mul(new Float32Array(16), _bsI, e.m));           // the copy's model matrix
   const c = R.add('enemy_ms', Mc); if (!c) return;
   c.pose = e.pose; c.hidden = _bsHide; c.seed = e.seed; c.wear = 1; c.texSet = e.texSet; c.matOverride = e.matOverride;
   shieldScorch(c, t);
 }
+// its thrusters: four nozzles on the back of the plate (shield frame −X), flames out behind it
+const DRONE_JETS = [[0.25, 0.6, 1.3], [0.25, 0.6, -1.0], [0.25, -5.6, 1.3], [0.25, -5.6, -1.0]];
+function droneJets(R, W, k, t) {
+  if (k <= 0.01) return;
+  const back = V.norm([0, 0, 0], M.transformDir([0, 0, 0], W, [-1, 0, 0]));
+  DRONE_JETS.forEach((q, i) => {
+    const p = M.transformPoint([0, 0, 0], W, q), fl = k * (0.85 + 0.15 * Math.sin(t * 61 + i * 2.1)), L = 1.2 + 3.4 * fl;
+    R.jetFlame(p, V.madd([0, 0, 0], p, back, L), 0.28 + 0.3 * fl, [1.6 * fl, 0.75 * fl, 0.3 * fl], 1.0, i * 4.3 + 2, 3);
+    R.glow(p, 0.35 + 0.5 * fl, [2.2 * fl, 1.2 * fl, 0.5 * fl], 0.4);
+  });
+  R.light(M.transformPoint([0, 0, 0], W, [-1.5, -2.3, 0.2]), 14, [1, 0.6, 0.3], 1.5 * k);
+}
 function drawLostShield(R, t) {
   const t0 = SHIELD_HIT_T + 0.03;
   if (!_wing.m) {
     const s0 = enemyMS2(t0), s1 = enemyMS2(t0 + 0.05), ev = DUEL_EVENTS.find((e) => Math.abs(e.t - t0) < 1e-6);
-    _wing.m = msMatrix(new Float32Array(16), s0); _wing.pose = JSON.parse(JSON.stringify(s0.pose));
+    { const m0 = msMatrix(new Float32Array(16), s0), Ms = R.partWorld('enemy_ms', { m: m0, pose: s0.pose }, 'shield');   // (the drone where it was hit: a copy whose shield sits at s0.shieldW)
+      _wing.m = M.mul(new Float32Array(16), s0.shieldW, M.mul(new Float32Array(16), M.invert(new Float32Array(16), Ms), m0)); }
+    _wing.pose = JSON.parse(JSON.stringify(s0.pose));
     _wing.pivot = ev ? ev.pos : s0.pos;
     const vs = V.scale([0, 0, 0], V.sub([0, 0, 0], s1.pos, s0.pos), 1 / 0.05), sd = ev && ev.shotDir ? ev.shotDir : [0, 0, 1];
     _wing.v = V.madd([0, 0, 0], V.madd([0, 0, 0], vs, sd, 22), [0, 1, 0], 4);
@@ -1322,9 +1340,10 @@ function drawEnemyMS(R, t, s, idx) {
     e.hidden = { ...(e.hidden || {}), rifle: 1 };
     const lw = R.partWorld('enemy_ms', e, 'leg_R_upper'); if (lw) { const g = R.add('enemy_rifle', M.mul(new Float32Array(16), lw, enemyHolsterLocal())); if (g) { g.seed = 10; g.wear = 0.4; g.texSet = R.texLoaded & 64 ? 4 : 0; } }
   }
-  if (!s.shieldLost) { shieldScorch(e, t); drawBlockSplash(R, t); drawBigShield(R, e, s, t); }
+  if (!s.shieldLost) { drawBlockSplash(R, t); drawBigShield(R, e, s, t); }   // (the scorch is on the drone copy)
   // (its rifle charge no longer shown: the shot cuts away as the muzzle comes up)
-  if (idx === 2 && s.shieldLost) { e.hidden = { ...(e.hidden || {}), shield: 1 }; drawLostShield(R, t); }
+  if (s.shieldLost) e.hidden = { ...(e.hidden || {}), shield: 1 };
+  if (idx === 2 && s.shieldLost) drawLostShield(R, t);
   if (idx === 2 && transK(t) > 0.001) drawRails(R, t, s);
   if (idx === 2 && t >= RIFLE_DROP_T) { e.hidden = { ...(e.hidden || {}), rifle: 1 }; drawDroppedRifle(R, t); }
   if (!(e.hidden && e.hidden.rifle)) enemyRifleAt(R, e.m, s.pose);   // its own rifle model in place of the built-in one
