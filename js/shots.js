@@ -348,9 +348,10 @@ function gundamStateRaw(t, s) {
     s.fwd = V.sub([0, 0, 0], p2, s.pos);
     if (V.len(s.fwd) < 1e-3) s.fwd = [1, 0, 0];
     blendPose('flight', 'flight', 0, s.pose);
-    s.pitch = 0.5; s.thr = 1;
+    s.pitch = 0.5;
+    s.thr = 1 - 0.55 * smooth(160.0, 162.9, t) * (1 - smooth(163.2, 164.4, t));   // (scene 29: the burn dies down to a cruise; back up on the run to the battle)
     s.roll = Math.sin(t * 0.8) * 0.3;
-    s.launchBurn = 1 - smooth(160.6, 162.2, t);   // (2026-10-07) out of the bay on full afterburner, easing off as he climbs away
+    s.launchBurn = 1 - smooth(159.6, 162.9, t);   // (2026-10-07) out of the bay on full afterburner, easing off steadily all through the fly-by (scene 29)
   } else if (t < 180) {
     s.pos = strafePos(t);
     const e1 = enemyMS1(t).pos;
