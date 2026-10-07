@@ -944,7 +944,7 @@ export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   let cp = _cells.get(w.cn); if (!cp) { cp = {}; for (const c of w.model.cells) cp[c.name] = [...c.lo.map((v) => v - 0.02), ...c.hi.map((v) => v + 0.02)]; _cells.set(w.cn, cp); }
   const hk = o.heat ?? 0.4;
   e.clipParts = cp; e.clipHeat = -(hk + 0.6 * hk * Math.exp(-lt * (o.cool ?? 0.8)));   // (clean flat cuts, staying hot)
-  e.damage = 0.35; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
+  e.damage = o.damage ?? 0.35; e.seed = seed; e.emissive = 0; e.tint = o.tint || [0.4, 0.7, 1];
   wreckPops(R, t, t0, base, w.bake, xf, seed, o.pops ?? 3, o.popSize ?? 2.2);
   if (o.fires && lt < o.fires) for (let i = 0; i < w.bake.n; i += 4) {   // the torn pieces still burning for a while
     const x = xf[w.bake.chunks[i].name]; if (!x) continue;
@@ -953,7 +953,7 @@ export function drawBoxWreck(R, name, base, t, t0, seed, o = {}) {
   }
 }
 // an ion frigate's wreck (EXTRA_H): ~7 m pieces (ion_frigate_cells), the cut faces molten white-orange and slow to cool
-const ION_WRECK = { speed: 1.1, spin: 2.2, tint: [0.4, 0.7, 1], pops: 12, popSize: 7, life: 120, heat: 0.75, cool: 0.35, fires: 4 };
+const ION_WRECK = { damage: 0.1, speed: 1.1, spin: 2.2, tint: [0.4, 0.7, 1], pops: 12, popSize: 7, life: 120, heat: 0.75, cool: 0.35, fires: 4 };
 /** every wreck's flight baked at load (they used to be baked the first time each one was drawn: a hitch mid-shot) */
 export function prepWrecks(R) {   // (one per idle slice after load: nothing blocks; a wreck not baked yet bakes when first drawn)
   const jobs = [];

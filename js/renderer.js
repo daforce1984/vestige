@@ -69,7 +69,7 @@ function cellSplit(g, opts, gi) {
     const b = g.bounds, fu = opts.fuse || [0.3, 0.5, 0.75], S = M.new();
     S[0] = (b.max[0] - b.min[0]) / 2 * fu[0]; S[5] = (b.max[1] - b.min[1]) / 2 * fu[1]; S[10] = (b.max[2] - b.min[2]) / 2 * fu[2];
     S[12] = (b.min[0] + b.max[0]) / 2; S[13] = (b.min[1] + b.max[1]) / 2; S[14] = (b.min[2] + b.max[2]) / 2;
-    take(gi, null, materials.length, (w) => M.mul(M.new(), S, w));
+    take(gi, null, materials.length, opts.interiorAbs ? (w) => w : (w) => M.mul(M.new(), S, w));   // (interiorAbs: built in the model's own space — placed as is)
     materials.push(...gi.materials);
   }
   const parts = [{ name: '__root', parent: -1, rest: M.new(), worldRest: M.new(), groups: [] }];
